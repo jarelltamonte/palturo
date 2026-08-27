@@ -35,9 +35,7 @@ class _IntroScreenState extends State<IntroScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => const LoginPage(),
-          ),
+          MaterialPageRoute(builder: (context) => const LoginPage()),
         );
       }
     });
@@ -51,14 +49,13 @@ class _IntroScreenState extends State<IntroScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'assets/images/logo.png',
-              width: 180,
-            ),
+            Image.asset('assets/images/logo.png', width: 180),
             const SizedBox(height: 20),
-            const Text(
-              'PalTuro',
-              style: AppTextStyles.title,
+            Stack(
+              children: [
+                Text('PalTuro', style: AppTextStyles.titleStroke),
+                Text('PalTuro', style: AppTextStyles.title),
+              ],
             ),
           ],
         ),

@@ -25,4 +25,24 @@ class AppTextStyles {
     fontSize: 16,
     color: AppColors.textSecondary,
   );
+
+  static const TextStyle regularText = TextStyle(
+    fontFamily: 'Inter',
+    fontWeight: FontWeight.w400,
+    fontSize: 16,
+  );
+
+  static const TextStyle boldText = TextStyle(
+    fontFamily: 'Inter',
+    fontWeight: FontWeight.w700,
+    fontSize: 16,
+  );
+
+  static const TextStyle italicText = TextStyle(
+    fontFamily: 'Inter',
+    fontWeight: FontWeight.w400,
+    fontSize: 16,
+    color: AppColors.textPrimary,
+    fontStyle: FontStyle.italic,
+  );
 }

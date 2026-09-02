@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'authentication/login.dart';
 import 'theme/app_colors.dart';
-import 'theme/app_text_styles.dart';
 
 void main() {
   runApp(const MainApp());
@@ -49,19 +48,9 @@ class _IntroScreenState extends State<IntroScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Hero(
-              tag: 'logo',
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 180,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Stack(
-              children: [
-                Text('PalTuro', style: AppTextStyles.titleStroke),
-                Text('PalTuro', style: AppTextStyles.title),
-              ],
+            Image.asset(
+              'assets/images/vlogo.png',
+              width: 320,
             ),
           ],
         ),

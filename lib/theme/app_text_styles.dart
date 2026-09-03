@@ -38,6 +38,12 @@ class AppTextStyles {
     fontSize: 16,
   );
 
+  static const TextStyle headingText = TextStyle(
+    fontFamily: 'Inter',
+    fontWeight: FontWeight.w600,
+    fontSize: 24,
+  );
+
   static const TextStyle italicText = TextStyle(
     fontFamily: 'Inter',
     fontWeight: FontWeight.w400,

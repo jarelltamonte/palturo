@@ -68,14 +68,12 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
           color: AppColors.inputBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.white,
+            color: _focusNode.hasFocus ? AppColors.primary : AppColors.white,
             width: _focusNode.hasFocus ? 1.5 : 1,
           ),
         ),
         child: Stack(
           children: [
-            // Label: centered + large when empty/unfocused,
-            // top + small once focused or filled.
             AnimatedPositioned(
               duration: _duration,
               curve: _curve,
@@ -98,7 +96,6 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
               ),
             ),
 
-            // The actual input, only shown/enabled once floating.
             Positioned(
               left: 16,
               right: suffixWidth,
@@ -128,7 +125,6 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
               ),
             ),
 
-            // Suffix icon (e.g. show/hide password), always visible.
             if (widget.suffixIcon != null)
               Positioned(
                 right: 4,

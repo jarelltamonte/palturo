@@ -3,6 +3,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
+import 'package:palturo/authentication/forgot_password_1.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -23,9 +24,7 @@ class _LoginPageState extends State<LoginPage> {
           builder: (context, constraints) {
             return SingleChildScrollView(
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                ),
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -35,18 +34,17 @@ class _LoginPageState extends State<LoginPage> {
                       Center(
                         child: Hero(
                           tag: 'logo',
-                          child: Image.asset('assets/images/logo.png', width: 285),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            width: 285,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 56),
 
-                      // Email / phone field
-                      const TopLabeledField(
-                        label: 'Email or phone number',
-                      ),
+                      const TopLabeledField(label: 'Email'),
                       const SizedBox(height: 16),
 
-                      // Password field
                       TopLabeledField(
                         label: 'Password',
                         obscureText: _isObscured,
@@ -86,11 +84,21 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 16),
                       Center(
-                        child: Text(
-                          'Forgot Password?',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.boldText.copyWith(
-                            color: AppColors.primary,
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ForgotPassword(),
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'Forgot Password?',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.boldText.copyWith(
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
                       ),
@@ -125,10 +133,7 @@ class _LoginPageState extends State<LoginPage> {
                     foregroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     textStyle: AppTextStyles.boldText,
-                    side: const BorderSide(
-                      color: AppColors.primary,
-                      width: 1,
-                    ),
+                    side: const BorderSide(color: AppColors.primary, width: 1),
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.all(Radius.circular(24)),
                     ),
@@ -138,9 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              Center(
-                child: Image.asset('assets/images/brand.png', width: 145),
-              ),
+              Center(child: Image.asset('assets/images/brand.png', width: 145)),
             ],
           ),
         ),

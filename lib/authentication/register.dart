@@ -74,23 +74,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
-                          Expanded(
-                            child: TopLabeledField(
-                              label: 'First name',
-                            ),
-                          ),
+                          Expanded(child: TopLabeledField(label: 'First name')),
                           SizedBox(width: 16),
-                          Expanded(
-                            child: TopLabeledField(
-                              label: 'Last name',
-                            ),
-                          ),
+                          Expanded(child: TopLabeledField(label: 'Last name')),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const TopLabeledField(
-                        label: 'Email or phone number',
-                      ),
+                      const TopLabeledField(label: 'Email'),
                       const SizedBox(height: 16),
                       TopLabeledField(
                         label: 'Password',
@@ -132,21 +122,44 @@ class _RegisterPageState extends State<RegisterPage> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 24),
-                            textStyle: AppTextStyles.boldText,
-                            foregroundColor: AppColors.textSecondary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
+                      const SizedBox(height: 16),
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: TextStyle(
+                            color: AppColors.white.withAlpha(
+                              (0.7 * 255).round(),
                             ),
+                            fontSize: 12,
+                            height: 1.4,
                           ),
-                          child: const Text('Sign Up'),
+                          children: [
+                            const TextSpan(
+                              text: 'By signing up, you agree to our\n',
+                            ),
+                            TextSpan(
+                              text: 'Terms of Service, ',
+                              style: AppTextStyles.boldText.copyWith(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'Data Policy, ',
+                              style: AppTextStyles.boldText.copyWith(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const TextSpan(text: 'and '),
+                            TextSpan(
+                              text: '\nCookies Policy.',
+                              style: AppTextStyles.boldText.copyWith(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -159,43 +172,24 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(32.0, 0.0, 32.0, 32.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  style: TextStyle(
-                    color: AppColors.white.withAlpha((0.7 * 255).round()),
-                    fontSize: 12,
-                    height: 1.4,
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    textStyle: AppTextStyles.boldText,
+                    foregroundColor: AppColors.textSecondary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                   ),
-                  children: [
-                    const TextSpan(text: 'By signing up, you agree to our\n'),
-                    TextSpan(
-                      text: 'Terms of Service, ',
-                      style: AppTextStyles.boldText.copyWith(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Data Policy, ',
-                      style: AppTextStyles.boldText.copyWith(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const TextSpan(text: 'and '),
-                    TextSpan(
-                      text: '\nCookies Policy.',
-                      style: AppTextStyles.boldText.copyWith(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+                  child: const Text('Sign Up'),
                 ),
               ),
             ],

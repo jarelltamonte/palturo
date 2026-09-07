@@ -4,6 +4,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
+import 'package:palturo/onboarding/onboarding_1.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -69,7 +70,14 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const OnboardingIntro(),
+                              ),
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             padding: const EdgeInsets.symmetric(vertical: 24),

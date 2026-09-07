@@ -28,14 +28,18 @@ class _OnboardingIntroState extends State<OnboardingIntro>
 
     _glowAnimation = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0.0, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 30,
       ),
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 20),
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
+        tween: Tween(
+          begin: 1.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.easeInOut)),
         weight: 30,
       ),
       TweenSequenceItem(tween: ConstantTween(0.0), weight: 20),
@@ -50,6 +54,8 @@ class _OnboardingIntroState extends State<OnboardingIntro>
 
   @override
   Widget build(BuildContext context) {
+    final visualCorrection = _triangleVisualCorrection(300, -15);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Padding(
@@ -74,81 +80,84 @@ class _OnboardingIntroState extends State<OnboardingIntro>
             ),
             Expanded(
               child: Center(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ClipPath(
-                      clipper: const _RoundedTriangleClipper(
-                        cornerRadius: 16,
-                        rotationDeg: -15,
-                      ),
-                      child: SizedBox(
-                        width: 300,
-                        height: 300,
-                        child: Stack(
-                          children: [
-                            const SizedBox.expand(
-                              child: CustomPaint(
-                                painter: _RoundedTrianglePainter(
-                                  color: Color(0x40D6FF00),
-                                  cornerRadius: 16,
-                                  rotationDeg: -15,
+                child: Transform.translate(
+                  offset: visualCorrection,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ClipPath(
+                        clipper: const _RoundedTriangleClipper(
+                          cornerRadius: 16,
+                          rotationDeg: -15,
+                        ),
+                        child: SizedBox(
+                          width: 300,
+                          height: 300,
+                          child: Stack(
+                            children: [
+                              const SizedBox.expand(
+                                child: CustomPaint(
+                                  painter: _RoundedTrianglePainter(
+                                    color: Color(0x40D6FF00),
+                                    cornerRadius: 16,
+                                    rotationDeg: -15,
+                                  ),
                                 ),
                               ),
-                            ),
-                            AnimatedBuilder(
-                              animation: _glowAnimation,
-                              builder: (context, child) {
-                                final t = _glowAnimation.value;
-
-                                return Opacity(
-                                  opacity: t,
-                                  child: Transform.scale(
-                                    scale: 0.98 + (t * 0.04),
-                                    child: child,
+                              AnimatedBuilder(
+                                animation: _glowAnimation,
+                                builder: (context, child) {
+                                  final t = _glowAnimation.value;
+                                  return Opacity(
+                                    opacity: t,
+                                    child: Transform.scale(
+                                      scale: 0.98 + (t * 0.04),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: ImageFiltered(
+                                  imageFilter: ImageFilter.blur(
+                                    sigmaX: 20,
+                                    sigmaY: 20,
                                   ),
-                                );
-                              },
-                              child: ImageFiltered(
-                                imageFilter:
-                                    ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                                child: const SizedBox.expand(
-                                  child: CustomPaint(
-                                    painter: _RoundedTrianglePainter(
-                                      color: _glowColor,
-                                      cornerRadius: 16,
-                                      rotationDeg: -15,
+                                  child: const SizedBox.expand(
+                                    child: CustomPaint(
+                                      painter: _RoundedTrianglePainter(
+                                        color: _glowColor,
+                                        cornerRadius: 16,
+                                        rotationDeg: -15,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-
-                    ClipPath(
-                      clipper: const _RoundedTriangleClipper(
-                        cornerRadius: 16,
-                        rotationDeg: -15,
-                      ),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                        child: Container(
-                          width: 305,
-                          height: 305,
-                          decoration: BoxDecoration(
-                            color: _glowColor.withValues(alpha: 0.2),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.25),
-                              width: 1,
+                      ClipPath(
+                        clipper: const _RoundedTriangleClipper(
+                          cornerRadius: 16,
+                          rotationDeg: -15,
+                        ),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                          child: Container(
+                            width: 350,
+                            height: 350,
+                            decoration: BoxDecoration(
+                              color: _glowColor.withValues(alpha: 0.2),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                width: 1,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -178,13 +187,31 @@ class _OnboardingIntroState extends State<OnboardingIntro>
                   child: const Text('Continue'),
                 ),
               ),
-              
             ],
           ),
         ),
       ),
     );
   }
+}
+
+Offset _triangleVisualCorrection(double referenceSize, double rotationDeg) {
+  final radius = referenceSize / 2;
+  final rotationRad = rotationDeg * math.pi / 180;
+
+  final vertices = List.generate(3, (i) {
+    final angle = -math.pi / 2 + i * (2 * math.pi / 3) + rotationRad;
+    return Offset(math.cos(angle), math.sin(angle)) * radius;
+  });
+
+  final path =
+      Path()
+        ..moveTo(vertices[0].dx, vertices[0].dy)
+        ..lineTo(vertices[1].dx, vertices[1].dy)
+        ..lineTo(vertices[2].dx, vertices[2].dy)
+        ..close();
+
+  return -path.getBounds().center;
 }
 
 Path _roundedTrianglePath(Size size, double cornerRadius, double rotationDeg) {

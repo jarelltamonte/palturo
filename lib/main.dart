@@ -1,60 +1,35 @@
 import 'package:flutter/material.dart';
-import 'authentication/login.dart';
-import 'theme/app_colors.dart';
+import 'package:palturo/landing_page.dart';
+import 'package:palturo/onboarding_intro.dart';
+import 'package:palturo/services/preferences_service.dart';
 
-void main() {
-  runApp(const MainApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  PreferencesService.instance.init();
+  bool? isOnboardingDone = await PreferencesService.instance.getBool(
+    'onboarding_done',
+  );
+  runApp(MyApp(isOnboardingDone: isOnboardingDone ?? false));
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key, required this.isOnboardingDone});
+
+  final bool isOnboardingDone;
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
-      home: IntroScreen(),
-    );
-  }
-}
-
-class IntroScreen extends StatefulWidget {
-  const IntroScreen({super.key});
-
-  @override
-  State<IntroScreen> createState() => _IntroScreenState();
-}
-
-class _IntroScreenState extends State<IntroScreen> {
-  @override
-  void initState() {
-    super.initState();
-
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/images/vlogo.png',
-              width: 320,
-            ),
-          ],
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.brown,
+          foregroundColor: Colors.white,
         ),
       ),
+      home: isOnboardingDone ? const LandingPage() : const OnboardingIntro(),
     );
   }
 }

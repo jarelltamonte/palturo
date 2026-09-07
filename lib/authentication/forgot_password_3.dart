@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
+import 'package:palturo/authentication/scratch.dart';
 
 class ForgotPasswordType extends StatefulWidget {
   const ForgotPasswordType({super.key});
@@ -81,9 +82,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       _isPasswordObscured
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.white.withAlpha(
-                        (0.8 * 255).round(),
-                      ),
+                      color: AppColors.white.withAlpha((0.8 * 255).round()),
                     ),
                     onPressed: () {
                       setState(() {
@@ -101,9 +100,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       _isConfirmPasswordObscured
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.white.withAlpha(
-                        (0.8 * 255).round(),
-                      ),
+                      color: AppColors.white.withAlpha((0.8 * 255).round()),
                     ),
                     onPressed: () {
                       setState(() {
@@ -117,7 +114,14 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ScratchWidget(),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 24),

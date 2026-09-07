@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:palturo/models/onboarding_item.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/landing_page.dart';
 
 
 class OnboardingIntro extends StatefulWidget {
@@ -58,6 +59,10 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_done', true);
       if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LandingPage()),
+        );
       }
     }
   }

@@ -24,7 +24,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
       svg: 'assets/icons/icon_o1.svg',
       title: 'AI-Powered\nReciprocal Matching',
       description:
-          'Get matched with learners and mentors\nwho are actually a fit for you, not just the\nclosest available.',
+          'Get matched with learners and mentors\nwho are actually a fit for you, not the\nclosest available.',
       lottieUrl: 'assets/lottie/lottie_1.json',
     ),
     const OnboardItem(

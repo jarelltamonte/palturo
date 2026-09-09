@@ -20,12 +20,13 @@ class OnboardItemWidget extends StatelessWidget {
         Lottie.asset(item.lottieUrl),
         Text(
           item.title,
-          style: AppTextStyles.headingText.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.headingText.copyWith(color: Theme.of(context).colorScheme.secondary),
         ),
+        const SizedBox(height: 16),
 
         Text(
           item.description,
-          style: AppTextStyles.regularText.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.regularText.copyWith(color: Theme.of(context).colorScheme.secondary),
           textAlign: TextAlign.center,
         ),
       ],

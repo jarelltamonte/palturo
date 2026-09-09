@@ -149,7 +149,7 @@ class _OnboardItemView extends StatelessWidget {
           item.title,
           textAlign: TextAlign.center,
           style: AppTextStyles.headingText.copyWith(
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.secondary,
           ),
         ),
         const SizedBox(height: 12),
@@ -157,7 +157,7 @@ class _OnboardItemView extends StatelessWidget {
           item.description,
           textAlign: TextAlign.center,
           style: AppTextStyles.regularText.copyWith(
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.secondary,
           ),
         ),
       ],

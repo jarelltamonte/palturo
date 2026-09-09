@@ -34,11 +34,15 @@ class _IntroScreenState extends State<IntroScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: Image.asset(
-          'assets/images/vlogo.png',
+          isDarkMode 
+                ? 'assets/images/vlogo_white.png'   
+                : 'assets/images/vlogo_black.png',
           width: 320,
         ),
       ),

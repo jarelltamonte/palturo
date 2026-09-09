@@ -18,6 +18,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
@@ -36,7 +38,9 @@ class _LoginPageState extends State<LoginPage> {
                         child: Hero(
                           tag: 'logo',
                           child: Image.asset(
-                            'assets/images/logo.png',
+                            isDarkMode
+                                ? 'assets/images/logo_white.png'
+                                : 'assets/images/logo_black.png',
                             width: 285,
                           ),
                         ),
@@ -54,9 +58,8 @@ class _LoginPageState extends State<LoginPage> {
                             _isObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: Theme.of(context).colorScheme.secondary.withAlpha(
-                              (0.8 * 255).round(),
-                            ),
+                            color: Theme.of(context).colorScheme.secondary
+                                .withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
                             setState(() {
@@ -141,7 +144,10 @@ class _LoginPageState extends State<LoginPage> {
                     foregroundColor: Theme.of(context).colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     textStyle: AppTextStyles.boldText,
-                    side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 1,
+                    ),
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.all(Radius.circular(24)),
                     ),

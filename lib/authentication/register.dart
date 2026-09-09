@@ -16,6 +16,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -65,7 +67,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         child: Hero(
                           tag: 'logo',
                           child: Image.asset(
-                            'assets/images/logo.png',
+                            isDarkMode
+                                ? 'assets/images/logo_white.png'
+                                : 'assets/images/logo_black.png',
                             width: 285,
                           ),
                         ),

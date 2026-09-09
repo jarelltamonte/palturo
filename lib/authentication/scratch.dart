@@ -11,8 +11,7 @@ class ScratchWidget extends StatefulWidget {
 class _ScratchWidgetState extends State<ScratchWidget> {
 	@override
 	Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
+    return Scaffold(
         body: Center(
           child: Lottie.asset(
             'assets/images/lottie_1.json',
@@ -20,7 +19,6 @@ class _ScratchWidgetState extends State<ScratchWidget> {
             fit: BoxFit.fill,
           ),
         ),
-      ),
-    );
+      );
   }
 }

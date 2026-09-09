@@ -19,7 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -54,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
                             _isObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: AppColors.white.withAlpha(
+                            color: Theme.of(context).colorScheme.secondary.withAlpha(
                               (0.8 * 255).round(),
                             ),
                           ),
@@ -105,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
                             'Forgot Password?',
                             textAlign: TextAlign.center,
                             style: AppTextStyles.boldText.copyWith(
-                              color: AppColors.primary,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                         ),
@@ -138,10 +138,10 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: AppColors.primary,
+                    foregroundColor: Theme.of(context).colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     textStyle: AppTextStyles.boldText,
-                    side: const BorderSide(color: AppColors.primary, width: 1),
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1),
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.all(Radius.circular(24)),
                     ),

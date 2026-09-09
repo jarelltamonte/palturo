@@ -70,7 +70,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
         child: Column(

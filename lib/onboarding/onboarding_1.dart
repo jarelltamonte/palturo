@@ -57,7 +57,7 @@ class _OnboardingIntroState extends State<OnboardingIntro>
     final visualCorrection = _triangleVisualCorrection(300, -15);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -68,14 +68,14 @@ class _OnboardingIntroState extends State<OnboardingIntro>
             Text(
               'Let’s personalize\nyour experience',
               style: AppTextStyles.headingText.copyWith(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.secondary,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'You can choose one role or both.',
               style: AppTextStyles.regularText.copyWith(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.secondary,
               ),
             ),
             Expanded(

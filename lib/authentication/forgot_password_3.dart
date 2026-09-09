@@ -18,7 +18,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -36,14 +36,17 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 alignment: Alignment.centerLeft,
               ),
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.secondary,
                 size: 16,
               ),
-              label: const Text(
+              label: Text(
                 '',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
@@ -62,7 +65,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                   'Reset your password',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.headingText.copyWith(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).colorScheme.secondary,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -70,7 +73,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                   'Enter your new password below.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.textPrimary.withValues(alpha: 0.8),
+                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -82,7 +85,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       _isPasswordObscured
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.white.withAlpha((0.8 * 255).round()),
+                      color: Theme.of(context).colorScheme.secondary.withAlpha((0.8 * 255).round()),
                     ),
                     onPressed: () {
                       setState(() {
@@ -100,7 +103,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       _isConfirmPasswordObscured
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.white.withAlpha((0.8 * 255).round()),
+                      color: Theme.of(context).colorScheme.secondary.withAlpha((0.8 * 255).round()),
                     ),
                     onPressed: () {
                       setState(() {

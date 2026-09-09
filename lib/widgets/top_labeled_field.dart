@@ -65,10 +65,10 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
       child: Container(
         height: _height,
         decoration: BoxDecoration(
-          color: AppColors.inputBackground,
+          color: Theme.of(context).colorScheme.onPrimary,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _focusNode.hasFocus ? AppColors.primary : AppColors.white,
+            color: _focusNode.hasFocus ? AppColors.primary : Theme.of(context).colorScheme.secondary,
             width: _focusNode.hasFocus ? 1.5 : 1,
           ),
         ),
@@ -87,7 +87,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                   duration: _duration,
                   curve: _curve,
                   style: TextStyle(
-                    color: AppColors.white.withAlpha((0.6 * 255).round()),
+                    color: Theme.of(context).colorScheme.secondary.withAlpha((0.6 * 255).round()),
                     fontSize: floating ? 12 : 16,
                     fontWeight: floating ? FontWeight.w500 : FontWeight.normal,
                   ),
@@ -112,7 +112,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     focusNode: _focusNode,
                     obscureText: widget.obscureText,
                     keyboardType: widget.keyboardType,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 16),
                     decoration: const InputDecoration(
                       isDense: true,
                       contentPadding: EdgeInsets.zero,

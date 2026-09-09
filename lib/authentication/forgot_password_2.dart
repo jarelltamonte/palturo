@@ -10,7 +10,7 @@ class ForgotPasswordCode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -28,14 +28,17 @@ class ForgotPasswordCode extends StatelessWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 alignment: Alignment.centerLeft,
               ),
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.secondary,
                 size: 16,
               ),
-              label: const Text(
+              label: Text(
                 '',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
@@ -50,31 +53,31 @@ class ForgotPasswordCode extends StatelessWidget {
               Text(
                 'Verify your identity',
                 style: AppTextStyles.headingText.copyWith(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.secondary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter the 4-digit code sent to your email.',
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.textPrimary.withValues(alpha: 0.8),
+                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 32),
 
               OtpTextField(
                 numberOfFields: 4,
-                borderColor: AppColors.textPrimary.withValues(alpha: 0.3),
+                borderColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                 focusedBorderColor: AppColors.primary,
                 showFieldAsBox: true,
                 fieldWidth: 55.0,
                 borderRadius: BorderRadius.circular(12.0),
                 textStyle: AppTextStyles.boldText.copyWith(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.secondary,
                   fontSize: 20,
                 ),
                 filled: true,
-                fillColor: AppColors.inputBackground,
+                fillColor: Theme.of(context).colorScheme.onPrimary,
                 onCodeChanged: (String code) {
                 },
                 onSubmit: (String verificationCode) {
@@ -114,7 +117,7 @@ class ForgotPasswordCode extends StatelessWidget {
                     'Resend Code',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.boldText.copyWith(
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:palturo/landing_page.dart';
 import 'package:palturo/onboarding_intro.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/theme/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,13 +23,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.brown,
-          foregroundColor: Colors.white,
-        ),
-      ),
+      theme: lightMode,
+      darkTheme: darkMode,
       home: isOnboardingDone ? const LandingPage() : const OnboardingIntro(),
     );
   }

@@ -17,7 +17,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -35,14 +35,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 alignment: Alignment.centerLeft,
               ),
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_back_ios,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.secondary,
                 size: 16,
               ),
-              label: const Text(
+              label: Text(
                 'Back to Log In',
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 16),
               ),
             ),
           ),
@@ -90,7 +90,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             _isPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: AppColors.white.withAlpha(
+                            color: Theme.of(context).colorScheme.secondary.withAlpha(
                               (0.8 * 255).round(),
                             ),
                           ),
@@ -110,7 +110,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             _isConfirmPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: AppColors.white.withAlpha(
+                            color: Theme.of(context).colorScheme.secondary.withAlpha(
                               (0.8 * 255).round(),
                             ),
                           ),

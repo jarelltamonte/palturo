@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 
 class TopLabeledField extends StatefulWidget {
   final String label;
@@ -86,7 +87,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                 child: AnimatedDefaultTextStyle(
                   duration: _duration,
                   curve: _curve,
-                  style: TextStyle(
+                  style: AppTextStyles.regularText.copyWith(
                     color: Theme.of(context).colorScheme.secondary.withAlpha((0.6 * 255).round()),
                     fontSize: floating ? 12 : 16,
                     fontWeight: floating ? FontWeight.w500 : FontWeight.normal,
@@ -112,7 +113,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     focusNode: _focusNode,
                     obscureText: widget.obscureText,
                     keyboardType: widget.keyboardType,
-                    style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 16),
+                    style: AppTextStyles.regularText.copyWith(color: Theme.of(context).colorScheme.secondary, fontSize: 16),
                     decoration: const InputDecoration(
                       isDense: true,
                       contentPadding: EdgeInsets.zero,

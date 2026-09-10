@@ -17,7 +17,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -44,7 +44,10 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               label: Text(
                 'Back to Log In',
-                style: TextStyle(color: Theme.of(context).colorScheme.secondary, fontSize: 16),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
@@ -94,9 +97,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             _isPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: Theme.of(context).colorScheme.secondary.withAlpha(
-                              (0.8 * 255).round(),
-                            ),
+                            color: Theme.of(context).colorScheme.secondary
+                                .withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
                             setState(() {
@@ -114,9 +116,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             _isConfirmPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: Theme.of(context).colorScheme.secondary.withAlpha(
-                              (0.8 * 255).round(),
-                            ),
+                            color: Theme.of(context).colorScheme.secondary
+                                .withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
                             setState(() {
@@ -127,43 +128,64 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: TextStyle(
-                            color: AppColors.white.withAlpha(
-                              (0.7 * 255).round(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 64),
+                        child: RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.secondary.withAlpha(
+                                (0.7 * 255).round(),
+                              ),
+                              fontSize: 12,
+                              height: 1.4,
                             ),
-                            fontSize: 12,
-                            height: 1.4,
+                            children: [
+                              const TextSpan(
+                                text: 'By signing up, you agree to our ',
+                              ),
+                              TextSpan(
+                                text: 'Terms of Service',
+                                style: AppTextStyles.boldText.copyWith(
+                                  color: Theme.of(context).colorScheme.secondary,
+                                  fontSize: 12,
+                                ),
+
+                                // recognizer:
+                                //     TapGestureRecognizer()
+                                //       ..onTap = () {
+                                //         // Terms of Service
+                                //       },
+                              ),
+                              const TextSpan(text: ', '),
+                              TextSpan(
+                                text: 'Data Policy',
+                                style: AppTextStyles.boldText.copyWith(
+                                  color: Theme.of(context).colorScheme.secondary,
+                                  fontSize: 12,
+                                ),
+                                // recognizer:
+                                //     TapGestureRecognizer()
+                                //       ..onTap = () {
+                                //         // Data Policy
+                                //       },
+                              ),
+                              const TextSpan(text: ', and '),
+                              TextSpan(
+                                text: 'Cookies Policy',
+                                style: AppTextStyles.boldText.copyWith(
+                                  color: Theme.of(context).colorScheme.secondary,
+                                  fontSize: 12,
+                                ),
+                                // recognizer:
+                                //     TapGestureRecognizer()
+                                //       ..onTap = () {
+                                //         // Cookies Policy
+                                //       },
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
                           ),
-                          children: [
-                            const TextSpan(
-                              text: 'By signing up, you agree to our\n',
-                            ),
-                            TextSpan(
-                              text: 'Terms of Service, ',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'Data Policy, ',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const TextSpan(text: 'and '),
-                            TextSpan(
-                              text: '\nCookies Policy.',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ],

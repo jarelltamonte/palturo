@@ -70,7 +70,7 @@ class ForgotPasswordCode extends StatelessWidget {
                 borderColor: Theme.of(context).colorScheme.secondary,
                 enabledBorderColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5),
                 focusedBorderColor: AppColors.primary,
-                borderWidth: 1.0,
+                borderWidth: 1.5,
                 showFieldAsBox: true,
                 fieldWidth: 55.0,
                 borderRadius: BorderRadius.circular(12.0),

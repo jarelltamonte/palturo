@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
+import 'package:palturo/authentication/legal_dialogs.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -151,11 +153,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                   fontSize: 12,
                                 ),
 
-                                // recognizer:
-                                //     TapGestureRecognizer()
-                                //       ..onTap = () {
-                                //         // Terms of Service
-                                //       },
+                                recognizer:
+                                    TapGestureRecognizer()
+                                      ..onTap = () {
+                                        LegalDialogs.showTermsOfService(context);
+                                      },
                               ),
                               const TextSpan(text: ', '),
                               TextSpan(
@@ -164,11 +166,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                   color: Theme.of(context).colorScheme.secondary,
                                   fontSize: 12,
                                 ),
-                                // recognizer:
-                                //     TapGestureRecognizer()
-                                //       ..onTap = () {
-                                //         // Data Policy
-                                //       },
+                                recognizer:
+                                    TapGestureRecognizer()
+                                      ..onTap = () {
+                                        LegalDialogs.showDataPolicy(context);
+                                      },
                               ),
                               const TextSpan(text: ', and '),
                               TextSpan(
@@ -177,11 +179,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                   color: Theme.of(context).colorScheme.secondary,
                                   fontSize: 12,
                                 ),
-                                // recognizer:
-                                //     TapGestureRecognizer()
-                                //       ..onTap = () {
-                                //         // Cookies Policy
-                                //       },
+                                recognizer:
+                                    TapGestureRecognizer()
+                                      ..onTap = () {
+                                        LegalDialogs.showCookiesPolicy(context);
+                                      },
                               ),
                               const TextSpan(text: '.'),
                             ],

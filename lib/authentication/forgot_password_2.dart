@@ -67,8 +67,10 @@ class ForgotPasswordCode extends StatelessWidget {
 
               OtpTextField(
                 numberOfFields: 4,
-                borderColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                borderColor: Theme.of(context).colorScheme.secondary,
+                enabledBorderColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5),
                 focusedBorderColor: AppColors.primary,
+                borderWidth: 1.0,
                 showFieldAsBox: true,
                 fieldWidth: 55.0,
                 borderRadius: BorderRadius.circular(12.0),

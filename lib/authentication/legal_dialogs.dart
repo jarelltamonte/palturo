@@ -7,7 +7,7 @@ class LegalDialogs {
     _showLegalDialog(
       context,
       title: 'Terms of Service',
-      content: 'Your Terms of Service text goes here...',
+      content: 'Terms of Service text goes here...',
     );
   }
 
@@ -15,7 +15,7 @@ class LegalDialogs {
     _showLegalDialog(
       context,
       title: 'Data Policy',
-      content: 'Your Data Policy text goes here...',
+      content: 'Data Policy text goes here...',
     );
   }
 
@@ -23,7 +23,7 @@ class LegalDialogs {
     _showLegalDialog(
       context,
       title: 'Cookies Policy',
-      content: 'Your Cookies Policy text goes here...',
+      content: 'Cookies Policy text goes here...',
     );
   }
 

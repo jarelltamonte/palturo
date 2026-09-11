@@ -4,14 +4,15 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
-class OnboardingIntro extends StatefulWidget {
-  const OnboardingIntro({super.key});
+class OnboardingEntry extends StatefulWidget {
+  final VoidCallback onContinue;
+  const OnboardingEntry({super.key, required this.onContinue});
 
   @override
-  State<OnboardingIntro> createState() => _OnboardingIntroState();
+  State<OnboardingEntry> createState() => _OnboardingEntryState();
 }
 
-class _OnboardingIntroState extends State<OnboardingIntro>
+class _OnboardingEntryState extends State<OnboardingEntry>
     with SingleTickerProviderStateMixin {
   late final AnimationController _glowController;
   late final Animation<double> _glowAnimation;
@@ -69,6 +70,7 @@ class _OnboardingIntroState extends State<OnboardingIntro>
               'Let’s personalize\nyour experience',
               style: AppTextStyles.headingText.copyWith(
                 color: Theme.of(context).colorScheme.secondary,
+                height: 1.3,
               ),
             ),
             const SizedBox(height: 16),
@@ -174,7 +176,7 @@ class _OnboardingIntroState extends State<OnboardingIntro>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: widget.onContinue,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 24),

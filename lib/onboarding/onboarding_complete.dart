@@ -3,14 +3,15 @@ import 'package:lottie/lottie.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_colors.dart';
 
-class ScratchWidget extends StatefulWidget {
-  const ScratchWidget({super.key});
+class OnboardingComplete extends StatefulWidget {
+  final VoidCallback onDone;
+  const OnboardingComplete({super.key, required this.onDone});
 
   @override
-  State<ScratchWidget> createState() => _ScratchWidgetState();
+  State<OnboardingComplete> createState() => _OnboardingCompleteState();
 }
 
-class _ScratchWidgetState extends State<ScratchWidget> {
+class _OnboardingCompleteState extends State<OnboardingComplete> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,7 +57,7 @@ class _ScratchWidgetState extends State<ScratchWidget> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: widget.onDone,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 24),
@@ -66,7 +67,7 @@ class _ScratchWidgetState extends State<ScratchWidget> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: const Text('Continue'),
+                  child: const Text('Done'),
                 ),
               ),
             ],

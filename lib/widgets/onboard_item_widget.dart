@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/models/onboarding_item.dart';
 import 'package:lottie/lottie.dart';
-import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 

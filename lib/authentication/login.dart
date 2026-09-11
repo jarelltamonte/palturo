@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/onboarding/onboarding_flow.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
-import 'package:palturo/onboarding/onboarding_1.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -77,7 +77,14 @@ class _LoginPageState extends State<LoginPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const OnboardingIntro(),
+                                builder:
+                                    (context) => OnboardingFlow(
+                                      onFinished: () {
+                                        Navigator.pop(
+                                          context,
+                                        );
+                                      },
+                                    ),
                               ),
                             );
                           },

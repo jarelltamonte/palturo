@@ -152,7 +152,7 @@ class _OnboardItemView extends StatelessWidget {
             color: Theme.of(context).colorScheme.secondary,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Text(
           item.description,
           textAlign: TextAlign.center,

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/onboarding/onboarding_complete.dart';
+import 'package:palturo/onboarding/onboarding_entry.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_models.dart';
+import 'screens/onboarding_final_screen.dart';
 import 'screens/onboarding_interests_screen.dart';
 import 'screens/onboarding_role_screen.dart';
-
-import 'onboarding_entry.dart';
-import 'onboarding_complete.dart';
 
 enum OnboardingStep {
   intro,
@@ -80,11 +80,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: KeyedSubtree(
-        key: ValueKey(_current),
-        child: _buildStep(_current),
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: KeyedSubtree(
+          key: ValueKey(_current),
+          child: _buildStep(_current),
+        ),
       ),
     );
   }
@@ -134,7 +137,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         );
 
       case OnboardingStep.finalDetails:
-        return const SizedBox.shrink();
+        return AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => OnboardingFinalScreen(
+            controller: _controller,
+            onDone: () => _goTo(_next(step)),
+            onBack: _back,
+            onSkip: widget.onFinished,
+          ),
+        );
 
       case OnboardingStep.complete:
         return OnboardingComplete(onDone: widget.onFinished);

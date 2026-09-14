@@ -5,6 +5,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
+import 'package:palturo/screen/home.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -80,8 +81,12 @@ class _LoginPageState extends State<LoginPage> {
                                 builder:
                                     (context) => OnboardingFlow(
                                       onFinished: () {
-                                        Navigator.pop(
+                                        Navigator.pushAndRemoveUntil(
                                           context,
+                                          MaterialPageRoute(
+                                            builder: (context) => const Home(),
+                                          ),
+                                          (route) => false,
                                         );
                                       },
                                     ),

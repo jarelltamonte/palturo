@@ -7,9 +7,11 @@ class OnboardingController extends ChangeNotifier {
   final Set<String> learningInterests = {};
   final Set<String> teachingInterests = {};
 
-  String? learningStyle;
+  final Set<String> learningStyles = {};
+
   final Map<String, String> availability = {};
-  String language = 'English';
+
+  final Set<String> languages = {};
 
   bool get wantsLearning =>
       role == OnboardingRole.learn || role == OnboardingRole.both;
@@ -30,13 +32,26 @@ class OnboardingController extends ChangeNotifier {
     _toggle(teachingInterests, id, max);
   }
 
-  void setLearningStyle(String value) {
-    learningStyle = value;
+  void toggleLearningStyle(String style) {
+    if (learningStyles.contains(style)) {
+      learningStyles.remove(style);
+    } else {
+      learningStyles.add(style);
+    }
     notifyListeners();
   }
 
-  void setLanguage(String value) {
-    language = value;
+  void setLearningStyles(Iterable<String> values) {
+    learningStyles
+      ..clear()
+      ..addAll(values);
+    notifyListeners();
+  }
+
+  void setLanguages(Iterable<String> values) {
+    languages
+      ..clear()
+      ..addAll(values);
     notifyListeners();
   }
 

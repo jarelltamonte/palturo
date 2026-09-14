@@ -37,7 +37,7 @@ class OnboardingInterestsScreen extends StatelessWidget {
       showBackButton: true,
       onBack: onBack,
       onSkip: onSkip,
-      onPrimaryPressed: onContinue,
+      onPrimaryPressed: selected.isEmpty ? null : onContinue,
       child: SingleChildScrollView(
         child: ChipSelector(
           options: options,

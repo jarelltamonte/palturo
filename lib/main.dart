@@ -4,6 +4,7 @@ import 'package:palturo/onboarding_intro.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
 
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   PreferencesService.instance.init();

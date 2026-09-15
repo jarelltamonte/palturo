@@ -17,9 +17,9 @@ class OnboardingRoleScreen extends StatelessWidget {
   });
 
   static const _options = [
-    RoleOption(OnboardingRole.learn, Icons.menu_book_rounded, 'I want to\nlearn'),
-    RoleOption(OnboardingRole.teach, Icons.school_rounded, 'I want to\nteach'),
-    RoleOption(OnboardingRole.both, Icons.diversity_3_rounded, 'I can do\nboth'),
+    RoleOption(OnboardingRole.learn, 'assets/icons/rlearner.svg', 'I want to\nlearn'),
+    RoleOption(OnboardingRole.teach, 'assets/icons/rmentor.svg', 'I want to\nteach'),
+    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
   ];
 
   @override

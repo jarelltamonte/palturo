@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 enum OnboardingRole { learn, teach, both }
 
 class OnboardingOption {
@@ -7,10 +5,9 @@ class OnboardingOption {
   final String label;
   const OnboardingOption(this.id, this.label);
 }
-
 class RoleOption {
   final OnboardingRole role;
-  final IconData icon;
+  final String iconAsset;
   final String label;
-  const RoleOption(this.role, this.icon, this.label);
+  const RoleOption(this.role, this.iconAsset, this.label);
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding_models.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class RoleCardGroup extends StatelessWidget {
   final List<RoleOption> options;
@@ -65,7 +66,12 @@ class _RoleCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(option.icon, color: fg),
+            SvgPicture.asset(
+              option.iconAsset,
+              width: 24,
+              height: 24,
+              colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+            ),
             const SizedBox(height: 8),
             Text(
               option.label,

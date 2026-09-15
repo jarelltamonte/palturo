@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:palturo/theme/app_colors.dart';
 
 import 'home_page.dart';
 import 'explore_page.dart';
 import 'chats_page.dart';
 import 'profile_page.dart';
+import 'request_page.dart';
 
 class NavigationBarWidget extends StatefulWidget {
   const NavigationBarWidget({super.key});
@@ -16,17 +18,18 @@ class NavigationBarWidget extends StatefulWidget {
 class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   int _selectedIndex = 0;
 
-  // 1. Keep this list as your outlined/unselected icons
   final List<IconData> _navigationIcons = [
     CupertinoIcons.home,
     CupertinoIcons.compass,
+    CupertinoIcons.heart,
     CupertinoIcons.chat_bubble,
     CupertinoIcons.person,
   ];
 
   final List<IconData> _selectedIcons = [
     CupertinoIcons.house_fill,   
-    CupertinoIcons.compass_fill,     
+    CupertinoIcons.compass_fill,  
+    CupertinoIcons.heart_fill,   
     CupertinoIcons.chat_bubble_fill, 
     CupertinoIcons.person_fill,     
   ];
@@ -34,6 +37,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   final List<String> _navigationLabels = [
     'Home',
     'Explore',
+    'Requests',
     'Chats',
     'Profile',
   ];
@@ -41,6 +45,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   final List<Widget> _pages = [
     const HomePage(),
     const ExplorePage(),
+    const RequestPage(),
     const ChatsPage(),
     const ProfilePage(),
   ];
@@ -60,10 +65,10 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   Widget _buildNavBar() {
     return Container(
       height: 60,
-      margin: const EdgeInsets.only(right: 16, left: 16, bottom: 24),
+      margin: const EdgeInsets.only(right: 16, left: 16, bottom: 32),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: AppColors.background,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(20),
@@ -76,7 +81,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(_navigationIcons.length, (index) {
           final isSelected = _selectedIndex == index;
-          final activeColor = Theme.of(context).primaryColor;
+          final activeColor = AppColors.primary;
           final inactiveColor = Colors.grey;
 
           return GestureDetector(
@@ -89,7 +94,6 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 3. Conditionally swap out the IconData depending on selection state
                 Icon(
                   isSelected ? _selectedIcons[index] : _navigationIcons[index],
                   color: isSelected ? activeColor : inactiveColor,

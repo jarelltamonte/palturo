@@ -68,7 +68,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       margin: const EdgeInsets.only(right: 16, left: 16, bottom: 32),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        color: AppColors.background,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(20),

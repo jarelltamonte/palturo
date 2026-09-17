@@ -9,6 +9,8 @@ class ForgotPasswordCode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -30,13 +32,13 @@ class ForgotPasswordCode extends StatelessWidget {
               ),
               icon: Icon(
                 Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.secondary,
+                color: textTheme,
                 size: 16,
               ),
               label: Text(
                 '',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: textTheme,
                   fontSize: 16,
                 ),
               ),
@@ -53,29 +55,29 @@ class ForgotPasswordCode extends StatelessWidget {
               Text(
                 'Verify your identity',
                 style: AppTextStyles.headingText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: textTheme,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter the 4-digit code sent to your email.',
                 style: AppTextStyles.regularText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+                  color: textTheme.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 32),
 
               OtpTextField(
                 numberOfFields: 4,
-                borderColor: Theme.of(context).colorScheme.secondary,
-                enabledBorderColor: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5),
+                borderColor: textTheme,
+                enabledBorderColor: textTheme.withValues(alpha: 0.5),
                 focusedBorderColor: AppColors.primary,
                 borderWidth: 1.5,
                 showFieldAsBox: true,
                 fieldWidth: 55.0,
                 borderRadius: BorderRadius.circular(12.0),
                 textStyle: AppTextStyles.boldText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: textTheme,
                   fontSize: 20,
                 ),
                 filled: true,

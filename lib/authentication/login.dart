@@ -20,6 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textTheme = Theme.of(context).colorScheme.secondary;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -59,8 +60,7 @@ class _LoginPageState extends State<LoginPage> {
                             _isObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: Theme.of(context).colorScheme.secondary
-                                .withAlpha((0.8 * 255).round()),
+                            color: textTheme.withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
                             setState(() {

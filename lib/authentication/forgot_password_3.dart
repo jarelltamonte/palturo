@@ -17,6 +17,8 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -38,13 +40,13 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
               ),
               icon: Icon(
                 Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.secondary,
+                color: textTheme,
                 size: 16,
               ),
               label: Text(
                 '',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: textTheme,
                   fontSize: 16,
                 ),
               ),
@@ -65,7 +67,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                   'Reset your password',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.headingText.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
+                    color: textTheme,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -73,7 +75,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                   'Enter your new password below.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.regularText.copyWith(
-                    color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+                    color: textTheme.withValues(alpha: 0.8),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -85,7 +87,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       _isPasswordObscured
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: Theme.of(context).colorScheme.secondary.withAlpha((0.8 * 255).round()),
+                      color: textTheme.withAlpha((0.8 * 255).round()),
                     ),
                     onPressed: () {
                       setState(() {
@@ -103,7 +105,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       _isConfirmPasswordObscured
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: Theme.of(context).colorScheme.secondary.withAlpha((0.8 * 255).round()),
+                      color: textTheme.withAlpha((0.8 * 255).round()),
                     ),
                     onPressed: () {
                       setState(() {

@@ -19,6 +19,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textTheme = Theme.of(context).colorScheme.secondary;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -41,13 +42,13 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               icon: Icon(
                 Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.secondary,
+                color: textTheme,
                 size: 16,
               ),
               label: Text(
                 'Back to Log In',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: textTheme,
                   fontSize: 16,
                 ),
               ),
@@ -99,7 +100,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             _isPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: Theme.of(context).colorScheme.secondary
+                            color: textTheme
                                 .withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
@@ -118,7 +119,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             _isConfirmPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: Theme.of(context).colorScheme.secondary
+                            color: textTheme
                                 .withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
@@ -136,7 +137,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           textAlign: TextAlign.center,
                           text: TextSpan(
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.secondary.withAlpha(
+                              color: textTheme.withAlpha(
                                 (0.7 * 255).round(),
                               ),
                               fontSize: 12,
@@ -149,7 +150,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               TextSpan(
                                 text: 'Terms of Service',
                                 style: AppTextStyles.boldText.copyWith(
-                                  color: Theme.of(context).colorScheme.secondary,
+                                  color: textTheme,
                                   fontSize: 12,
                                 ),
 
@@ -163,7 +164,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               TextSpan(
                                 text: 'Data Policy',
                                 style: AppTextStyles.boldText.copyWith(
-                                  color: Theme.of(context).colorScheme.secondary,
+                                  color: textTheme,
                                   fontSize: 12,
                                 ),
                                 recognizer:
@@ -176,7 +177,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               TextSpan(
                                 text: 'Cookies Policy',
                                 style: AppTextStyles.boldText.copyWith(
-                                  color: Theme.of(context).colorScheme.secondary,
+                                  color: textTheme,
                                   fontSize: 12,
                                 ),
                                 recognizer:

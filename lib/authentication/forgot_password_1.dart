@@ -14,6 +14,8 @@ class ForgotPassword extends StatefulWidget {
 class _ForgotPasswordState extends State<ForgotPassword> {
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -35,13 +37,13 @@ class _ForgotPasswordState extends State<ForgotPassword> {
               ),
               icon: Icon(
                 Icons.arrow_back_ios,
-                color: Theme.of(context).colorScheme.secondary,
+                color: textTheme,
                 size: 16,
               ),
               label: Text(
                 'Back to Log In',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: textTheme,
                   fontSize: 16,
                 ),
               ),
@@ -63,7 +65,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                     Text(
                       'Find your account',
                       style: AppTextStyles.headingText.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
+                        color: textTheme,
                       ),
                     ),
 
@@ -72,7 +74,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                     Text(
                       'Enter your email address.',
                       style: AppTextStyles.regularText.copyWith(
-                        color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.8),
+                        color: textTheme.withValues(alpha: 0.8),
                       ),
                     ),
 

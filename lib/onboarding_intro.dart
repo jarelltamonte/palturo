@@ -139,6 +139,7 @@ class _OnboardItemView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -149,7 +150,7 @@ class _OnboardItemView extends StatelessWidget {
           item.title,
           textAlign: TextAlign.center,
           style: AppTextStyles.headingText.copyWith(
-            color: Theme.of(context).colorScheme.secondary,
+            color: textTheme,
           ),
         ),
         const SizedBox(height: 16),
@@ -157,7 +158,7 @@ class _OnboardItemView extends StatelessWidget {
           item.description,
           textAlign: TextAlign.center,
           style: AppTextStyles.regularText.copyWith(
-            color: Theme.of(context).colorScheme.secondary,
+            color: textTheme,
           ),
         ),
       ],

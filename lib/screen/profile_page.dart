@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -39,27 +40,27 @@ class _ProfilePageState extends State<ProfilePage> {
     final textTheme2 = Theme.of(context).colorScheme.surface;
     final darkColor = Theme.of(context).colorScheme.primary;
     final lightColor = Theme.of(context).colorScheme.surface;
+    final adaptiveHeight =
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: lightColor,
       appBar: AppBar(
+        toolbarHeight: adaptiveHeight,
         backgroundColor: darkColor,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: Padding(
-          padding: const EdgeInsets.only(top: 32.0),
-          child: Align(
+        title: Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Profile',
               style: AppTextStyles.headingText.copyWith(color: textTheme2),
             ),
-          ),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(top: 32.0, right: 16.0),
+            padding: const EdgeInsets.only(right: 16.0),
             child: TextButton(
               style: TextButton.styleFrom(
                 backgroundColor: textTheme2,

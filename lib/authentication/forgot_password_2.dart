@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
 import '../theme/app_colors.dart';
@@ -10,17 +11,18 @@ class ForgotPasswordCode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final adaptiveHeight =
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
+        toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: Padding(
-          padding: const EdgeInsets.only(top: 32.0),
-          child: Align(
+        title: Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => Navigator.pop(context),
@@ -43,7 +45,6 @@ class ForgotPasswordCode extends StatelessWidget {
                 ),
               ),
             ),
-          ),
         ),
       ),
       body: SafeArea(

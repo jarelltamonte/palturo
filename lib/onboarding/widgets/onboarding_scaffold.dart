@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -37,50 +38,50 @@ class OnboardingScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final secondary = Theme.of(context).colorScheme.secondary;
     final surface = Theme.of(context).colorScheme.surface;
+    final adaptiveHeight =
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: surface,
       appBar: (showBackButton || progress > 0)
           ? PreferredSize(
-              preferredSize: const Size.fromHeight(32.0 + kToolbarHeight),
-              child: Padding(
-                padding: const EdgeInsets.only(top: 32.0),
-                child: AppBar(
-                  backgroundColor: surface,
-                  elevation: 0,
-                  scrolledUnderElevation: 0,
-                  automaticallyImplyLeading: false,
-                  titleSpacing: 24,
-                  title: Row(
-                    children: [
-                      if (showBackButton)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: GestureDetector(
-                            onTap: onBack ?? () => Navigator.maybePop(context),
-                            child: Icon(Icons.arrow_back_ios_new,
-                                size: 18, color: secondary),
-                          ),
+              preferredSize: Size.fromHeight(adaptiveHeight),
+              child: AppBar(
+                toolbarHeight: adaptiveHeight,
+                backgroundColor: surface,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                automaticallyImplyLeading: false,
+                titleSpacing: 24,
+                title: Row(
+                  children: [
+                    if (showBackButton)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: GestureDetector(
+                          onTap: onBack ?? () => Navigator.maybePop(context),
+                          child: Icon(Icons.arrow_back_ios_new,
+                              size: 18, color: secondary),
                         ),
-                      if (progress > 0)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 24),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: progress,
-                                minHeight: 4,
-                                backgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.15),
-                                valueColor: const AlwaysStoppedAnimation(
-                                    AppColors.primary),
-                              ),
+                      ),
+                    if (progress > 0)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 24),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 4,
+                              backgroundColor:
+                                  AppColors.primary.withValues(alpha: 0.15),
+                              valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.primary),
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             )

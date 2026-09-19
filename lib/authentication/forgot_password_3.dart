@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -18,17 +19,18 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final adaptiveHeight =
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
+        toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: Padding(
-          padding: const EdgeInsets.only(top: 32.0),
-          child: Align(
+        title: Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => Navigator.pop(context),
@@ -51,7 +53,6 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                 ),
               ),
             ),
-          ),
         ),
       ),
       body: SafeArea(

@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:flutter/foundation.dart';
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -12,30 +14,161 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final adaptiveHeight =
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
+        toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: Padding(
-          padding: const EdgeInsets.only(top: 32.0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text (
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
               'Chats',
-              style: AppTextStyles.headingText.copyWith(
-                color: textTheme,
-              ),
-            )
-              
-          ),
+              style: AppTextStyles.headingText.copyWith(color: textTheme),
+            ),
+            Icon(
+              CupertinoIcons.search,
+              color: textTheme,
+              size: 24,
+            ),
+          ],
         ),
       ),
-      body: Center(
-        child: Text('Chats'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16.0),
+                  child: Text(
+                    'Messages',
+                    style: AppTextStyles.boldText.copyWith(color: textTheme),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: Text(
+                    'Requests',
+                    style: AppTextStyles.regularText.copyWith(color: textTheme),
+                  ),
+                ),
+              ],
+            ),
+
+          const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: 8, // placeholder count until wired to DB
+                itemBuilder: (context, index) {
+                  return const ChatListItem(
+                    name: 'Random Name',
+                    message: 'Random chat message goes here',
+                    time: 'Just now',
+                    hasUnread: true,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ChatListItem extends StatelessWidget {
+  final String name;
+  final String message;
+  final String time;
+  final bool hasUnread;
+  final ImageProvider? avatarImage;
+
+  const ChatListItem({
+    super.key,
+    this.name = 'Random Name',
+    this.message = 'Random chat message goes here',
+    this.time = 'Just now',
+    this.hasUnread = true,
+    this.avatarImage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Avatar
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.grey[300],
+            backgroundImage: avatarImage,
+            child: avatarImage == null
+                ? Icon(Icons.person, color: Colors.grey[600], size: 28)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Row 1: Name + unread dot
+                Row(
+                  children: [
+                    Text(
+                      name,
+                      style: AppTextStyles.boldText.copyWith(color: textTheme),
+                    ),
+                    if (hasUnread) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        message,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme.withAlpha(90),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      ' · $time',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withAlpha(70),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

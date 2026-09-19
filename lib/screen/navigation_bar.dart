@@ -103,6 +103,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
                 Text(
                   _navigationLabels[index],
                   style: TextStyle(
+                    fontFamily: 'Inter',
                     color: isSelected ? activeColor : inactiveColor,
                     fontSize: 11,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

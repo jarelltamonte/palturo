@@ -43,6 +43,21 @@ class _ChatsPageState extends State<ChatsPage> {
       body: SafeArea(
         child: Column(
           children: [
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 130,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                itemCount: 8, // placeholder count until wired to DB
+                itemBuilder: (context, index) {
+                  return const ChatProfileItem(
+                    name: 'Random Name',
+                  );
+                },
+              ),
+            ),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -63,7 +78,8 @@ class _ChatsPageState extends State<ChatsPage> {
               ],
             ),
 
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
+
             Expanded(
               child: ListView.builder(
                 itemCount: 8, // placeholder count until wired to DB
@@ -79,6 +95,62 @@ class _ChatsPageState extends State<ChatsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class ChatProfileItem extends StatelessWidget {
+  final String name;
+  final ImageProvider? avatarImage;
+
+  const ChatProfileItem({
+    super.key,
+    this.name = 'Random Name',
+    this.avatarImage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 80,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(12), // adjust or remove for sharp corners
+              image: avatarImage != null
+                  ? DecorationImage(
+                      image: avatarImage!,
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: avatarImage == null
+                ? Icon(Icons.person, color: Colors.grey[600], size: 28)
+                : null,
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 64,
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -109,7 +181,6 @@ class ChatListItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar
           CircleAvatar(
             radius: 28,
             backgroundColor: Colors.grey[300],
@@ -123,7 +194,6 @@ class ChatListItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Row 1: Name + unread dot
                 Row(
                   children: [
                     Text(

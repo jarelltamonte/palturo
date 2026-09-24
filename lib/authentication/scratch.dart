@@ -1,73 +1,158 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-import '../theme/app_text_styles.dart';
-import '../theme/app_colors.dart';
+import 'package:flutter/foundation.dart';
+import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/theme/app_colors.dart';
 
-class ScratchWidget extends StatefulWidget {
-  const ScratchWidget({super.key});
+class Scratch extends StatefulWidget {
+  const Scratch({super.key});
 
   @override
-  State<ScratchWidget> createState() => _ScratchWidgetState();
+  State<Scratch> createState() => _ChatRoomState();
 }
 
-class _ScratchWidgetState extends State<ScratchWidget> {
+class _ChatRoomState extends State<Scratch> {
+  final TextEditingController _messageController = TextEditingController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  void _sendMessage() {
+    final message = _messageController.text.trim();
+
+    if (message.isEmpty) return;
+
+    // Send message here
+
+    _messageController.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    final adaptiveHeight =
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+
+      appBar: AppBar(
+        toolbarHeight: adaptiveHeight,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Center(
+          child: Row(
             children: [
-              Lottie.asset(
-                'assets/lottie/lottie_finished.json',
-                width: 350,
-                repeat: false,
-                animate: true,
+              IconButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
               ),
-              Text(
-                'You\'re all set!',
-                style: AppTextStyles.headingText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+
+              const SizedBox(width: 4),
+
+              const CircleAvatar(radius: 20, backgroundColor: Colors.grey),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Text(
+                  'John Doe',
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.boldText.copyWith(color: textTheme),
                 ),
               ),
 
-              const SizedBox(height: 16),
-
-              Text(
-                'Your account setup is complete.\nLet’s get started.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.regularText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                onSelected: (value) {
+                  if (value == 'block') {
+                    // Block user
+                  } else if (value == 'report') {
+                    // Report user
+                  }
+                },
+                itemBuilder:
+                    (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'block',
+                        child: Text('Block'),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'report',
+                        child: Text('Report'),
+                      ),
+                    ],
               ),
             ],
           ),
         ),
       ),
+
+      body: const Center(child: Text('Start messaging')),
+
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    textStyle: AppTextStyles.boldText,
-                    foregroundColor: AppColors.textSecondary,
-                    shape: RoundedRectangleBorder(
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  minLines: 1,
+                  maxLines: 3,
+                  textInputAction: TextInputAction.newline,
+                  style:  AppTextStyles.regularText.copyWith(
+                    fontSize: 16, 
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    filled: true,
+                    fillColor: AppColors.secondary,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide(color: primaryColor, width: 1.5),
                     ),
                   ),
-                  child: const Text('Continue'),
                 ),
+              ),
+
+              const SizedBox(width: 8),
+
+              IconButton(
+                onPressed: _sendMessage,
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.background,
+                  minimumSize: const Size(48, 48),
+                  maximumSize: const Size(48, 48),
+                ),
+                icon: const Icon(Icons.send_rounded, size: 21),
               ),
             ],
           ),

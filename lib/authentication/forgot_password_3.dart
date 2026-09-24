@@ -124,7 +124,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => ScratchWidget(),
+                          builder: (context) => Scratch(),
                         ),
                       );
                     },

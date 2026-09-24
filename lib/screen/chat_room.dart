@@ -1,20 +1,20 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
-class HomePage extends StatefulWidget {
-	const HomePage({super.key});
+class ChatRoom extends StatefulWidget {
+	const ChatRoom({super.key});
 
 	@override
-	State<HomePage> createState() => _HomePageState();
+	State<ChatRoom> createState() => _ChatRoomState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _ChatRoomState extends State<ChatRoom> {
 	@override
 	Widget build(BuildContext context) {
 		final textTheme = Theme.of(context).colorScheme.secondary;
     final adaptiveHeight =
-    defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -27,17 +27,17 @@ class _HomePageState extends State<HomePage> {
         title: Align(
             alignment: Alignment.centerLeft,
             child: Text (
-              'Home',
-              style: AppTextStyles.headingText.copyWith(
+              'Explore',
+              style: AppTextStyles.boldText.copyWith(
                 color: textTheme,
               ),
             )
               
         ),
       ),
-			body: Center(
-				child: Text('Home'),
-			),
-		);
-	}
+      body: const Center(
+        child: Text('Explore'),
+      ),
+    );
+  }
 }

@@ -1,0 +1,22 @@
+flutter_native_splash:
+  android: true
+  ios: true
+  web: true
+
+  color: "#FFFFFF" 
+  image: "assets/images/slogo_black.png"
+  branding: "assets/images/sbrand.png"
+
+  color_dark: "#262626"
+  image_dark: "assets/images/slogo_white.png"
+  branding_dark: "assets/images/sbrand.png"
+
+  fullscreen: false
+  branding_mode: bottom 
+
+android_12: 
+  color: "#FFFFFF"
+  color_dark: "#262626"
+  image: "assets/images/slogo_black.png"
+  image_dark: "assets/images/slogo_white.png"
+  branding: "assets/images/sbrand.png"

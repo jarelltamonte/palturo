@@ -23,6 +23,7 @@ class RoleCardGroup extends StatelessWidget {
     final visibleOptions = isEditing
         ? options
         : options.where((o) => o.role == selected).toList();
+
     final isCompact = visibleOptions.length == 1;
 
     return Row(
@@ -67,6 +68,12 @@ class _RoleCard extends StatelessWidget {
         ? AppColors.textSecondary
         : Theme.of(context).colorScheme.secondary;
 
+    final cardColor = Theme.of(context).colorScheme.surface;
+
+    final labelParts = option.label.split('\n');
+    final firstLine = labelParts.first;
+    final secondLine = labelParts.length > 1 ? labelParts[1] : '';
+
     return GestureDetector(
       onTap: isEditing ? onTap : null,
       child: AnimatedContainer(
@@ -78,11 +85,15 @@ class _RoleCard extends StatelessWidget {
           vertical: 8,
         ),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? AppColors.primary : fg.withValues(alpha: 0.5),
-          ),
+          color: selected ? AppColors.primary : cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: compact
             ? Row(
@@ -93,30 +104,52 @@ class _RoleCard extends StatelessWidget {
                     option.iconAsset,
                     width: 20,
                     height: 20,
-                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                    colorFilter: ColorFilter.mode(
+                      fg,
+                      BlendMode.srcIn,
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    option.label.replaceAll('\n', ' '),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(color: fg),
+                  RichText(
+                    text: TextSpan(
+                      style: AppTextStyles.regularText.copyWith(color: fg),
+                      children: [
+                        TextSpan(text: '$firstLine '),
+                        TextSpan(
+                          text: secondLine,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               )
             : Column(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SvgPicture.asset(
                     option.iconAsset,
                     width: 24,
                     height: 24,
-                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                    colorFilter: ColorFilter.mode(
+                      fg,
+                      BlendMode.srcIn,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    option.label,
+                    firstLine,
                     textAlign: TextAlign.center,
                     style: AppTextStyles.regularText.copyWith(color: fg),
+                  ),
+                  Text(
+                    secondLine,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),

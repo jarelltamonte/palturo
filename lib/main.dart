@@ -3,11 +3,14 @@ import 'package:palturo/landing_page.dart';
 import 'package:palturo/onboarding_intro.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   PreferencesService.instance.init();
+
   bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );
@@ -22,6 +25,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    FlutterNativeSplash.remove();
+    
     return MaterialApp(
       title: 'Palturo',
       debugShowCheckedModeBanner: false,

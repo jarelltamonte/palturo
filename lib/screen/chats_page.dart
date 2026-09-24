@@ -45,7 +45,7 @@ class _ChatsPageState extends State<ChatsPage> {
           children: [
             const SizedBox(height: 8),
             SizedBox(
-              height: 130,
+              height: 160,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -120,8 +120,8 @@ class ChatProfileItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 80,
-            height: 100,
+            width: 100,
+            height: 120,
             decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius: BorderRadius.circular(12), 

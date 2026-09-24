@@ -147,19 +147,22 @@ class _ProfilePageState extends State<ProfilePage> {
                         Positioned(
                           bottom: 4,
                           right: 4,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: _accent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              size: 16,
-                              color: Colors.black,
-                            ),
-                          ),
+                          child:
+                              _isEditing
+                                  ? Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: const BoxDecoration(
+                                      color: _accent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.edit,
+                                      size: 16,
+                                      color: Colors.black,
+                                    ),
+                                  )
+                                  : const SizedBox.shrink(), 
                         ),
                       ],
                     ),
@@ -211,8 +214,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     SkillsCard.toLearn(
                       isEditing: _isEditing,
                       initialSkillIds: _learningSkillIds,
-                      onChanged: (updatedIds) =>
-                          setState(() => _learningSkillIds = updatedIds),
+                      onChanged:
+                          (updatedIds) =>
+                              setState(() => _learningSkillIds = updatedIds),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -221,8 +225,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     SkillsCard.toTeach(
                       isEditing: _isEditing,
                       initialSkillIds: _teachingSkillIds,
-                      onChanged: (updatedIds) =>
-                          setState(() => _teachingSkillIds = updatedIds),
+                      onChanged:
+                          (updatedIds) =>
+                              setState(() => _teachingSkillIds = updatedIds),
                       onAttachFile: (skillId) {
                         debugPrint('Attach file for $skillId');
                       },

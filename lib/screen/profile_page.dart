@@ -4,6 +4,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
+import 'package:palturo/onboarding/widgets/skills_card.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -19,6 +20,14 @@ class _ProfilePageState extends State<ProfilePage> {
   static const double _avatarSize = 120;
 
   OnboardingRole? _role = OnboardingRole.both;
+
+  bool _isEditing = false;
+  List<String> _learningSkillIds = [
+    'cooking_pinakbet',
+    'weaving_inabel',
+    'parol_making',
+  ];
+  List<String> _teachingSkillIds = [];
 
   static const _roleOptions = [
     RoleOption(
@@ -52,11 +61,11 @@ class _ProfilePageState extends State<ProfilePage> {
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Profile',
-              style: AppTextStyles.headingText.copyWith(color: textTheme2),
-            ),
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Profile',
+            style: AppTextStyles.headingText.copyWith(color: textTheme2),
+          ),
         ),
         actions: [
           Padding(
@@ -74,117 +83,156 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               onPressed: () {
+                setState(() => _isEditing = !_isEditing);
               },
-              child: Text(
-                'Edit',
-                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isEditing ? Icons.save : Icons.edit,
+                    color: textTheme,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isEditing ? 'Save' : 'Edit',
+                    style: AppTextStyles.regularText.copyWith(color: textTheme),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: double.infinity,
-                height: _headerHeight,
-                decoration: BoxDecoration(
-                  color: darkColor,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: _headerHeight - (_avatarSize / 2),
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: _avatarSize,
-                        height: _avatarSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: lightColor, width: 4),
-                          image: const DecorationImage(
-                            image: NetworkImage(
-                              'https://placehold.co/240x240/png',
-                            ),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: _accent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit,
-                            size: 16,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: _avatarSize / 2 + 16),
-          Text(
-            'Juan De La Cruz',
-            style: AppTextStyles.headingText.copyWith(
-              color: textTheme,
-              fontSize: 20,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.calendar_today, size: 14, color: darkColor),
-              const SizedBox(width: 6),
-              Text(
-                'Mon/Sat/Sun',
-                style: TextStyle(color: textTheme, fontSize: 14),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Center(
-                  child: FractionallySizedBox(
-                    widthFactor: 0.8,
-                    child: Divider(color: darkColor, thickness: 1),
+                Container(
+                  width: double.infinity,
+                  height: _headerHeight,
+                  decoration: BoxDecoration(
+                    color: darkColor,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                RoleCardGroup(
-                  options: _roleOptions,
-                  selected: _role,
-                  onSelect: (role) => setState(() => _role = role),
+                Positioned(
+                  top: _headerHeight - (_avatarSize / 2),
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: _avatarSize,
+                          height: _avatarSize,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: lightColor, width: 4),
+                            image: const DecorationImage(
+                              image: NetworkImage(
+                                'https://placehold.co/240x240/png',
+                              ),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 4,
+                          right: 4,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(
+                              color: _accent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              size: 16,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: _avatarSize / 2 + 16),
+            Text(
+              'Juan De La Cruz',
+              style: AppTextStyles.headingText.copyWith(
+                color: textTheme,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.calendar_today, size: 14, color: darkColor),
+                const SizedBox(width: 6),
+                Text(
+                  'Mon/Sat/Sun',
+                  style: TextStyle(color: textTheme, fontSize: 14),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: FractionallySizedBox(
+                      widthFactor: 0.8,
+                      child: Divider(color: darkColor, thickness: 1),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  RoleCardGroup(
+                    options: _roleOptions,
+                    selected: _role,
+                    isEditing: _isEditing,
+                    onSelect: (role) => setState(() => _role = role),
+                  ),
+                  const SizedBox(height: 24),
+                  if (_role == OnboardingRole.learn ||
+                      _role == OnboardingRole.both) ...[
+                    SkillsCard.toLearn(
+                      isEditing: _isEditing,
+                      initialSkillIds: _learningSkillIds,
+                      onChanged: (updatedIds) =>
+                          setState(() => _learningSkillIds = updatedIds),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                  if (_role == OnboardingRole.teach ||
+                      _role == OnboardingRole.both)
+                    SkillsCard.toTeach(
+                      isEditing: _isEditing,
+                      initialSkillIds: _teachingSkillIds,
+                      onChanged: (updatedIds) =>
+                          setState(() => _teachingSkillIds = updatedIds),
+                      onAttachFile: (skillId) {
+                        debugPrint('Attach file for $skillId');
+                      },
+                    ),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

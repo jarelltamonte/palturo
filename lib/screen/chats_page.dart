@@ -124,7 +124,7 @@ class ChatProfileItem extends StatelessWidget {
             height: 100,
             decoration: BoxDecoration(
               color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(12), // adjust or remove for sharp corners
+              borderRadius: BorderRadius.circular(12), 
               image: avatarImage != null
                   ? DecorationImage(
                       image: avatarImage!,

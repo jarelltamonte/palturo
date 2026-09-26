@@ -11,6 +11,8 @@ class RequestPage extends StatefulWidget {
 }
 
 class _RequestPageState extends State<RequestPage> {
+  String _selectedSort = 'Newest first';
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
@@ -27,14 +29,81 @@ class _RequestPageState extends State<RequestPage> {
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Requests',
-            style: AppTextStyles.headingText.copyWith(
-              color: textTheme,
+        title: Row(
+          children: [
+            Text(
+              'Requests',
+              style: AppTextStyles.headingText.copyWith(
+                color: textTheme,
+              ),
             ),
-          ),
+            const Spacer(),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                setState(() {
+                  _selectedSort = value;
+                });
+              },
+              offset: const Offset(0, 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              color: Theme.of(context).colorScheme.surface,
+              elevation: 6,
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'Newest first',
+                  child: _buildSortOption(
+                    'Newest first',
+                    textTheme,
+                    primaryColor,
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'Oldest first',
+                  child: _buildSortOption(
+                    'Oldest first',
+                    textTheme,
+                    primaryColor,
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'Alphabetically (A–Z)',
+                  child: _buildSortOption(
+                    'Alphabetically (A–Z)',
+                    textTheme,
+                    primaryColor,
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'Alphabetically (Z–A)',
+                  child: _buildSortOption(
+                    'Alphabetically (Z–A)',
+                    textTheme,
+                    primaryColor,
+                  ),
+                ),
+              ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sort,
+                    size: 20,
+                    color: textTheme,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Sort by',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
       body: SingleChildScrollView(
@@ -45,6 +114,37 @@ class _RequestPageState extends State<RequestPage> {
           primaryColor,
         ),
       ),
+    );
+  }
+
+  Widget _buildSortOption(
+    String option,
+    Color textTheme,
+    Color primaryColor,
+  ) {
+    final isSelected = _selectedSort == option;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 20,
+          child: isSelected
+              ? Icon(
+                  Icons.check,
+                  size: 18,
+                  color: primaryColor,
+                )
+              : null,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          option,
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme,
+            fontSize: 13,
+          ),
+        ),
+      ],
     );
   }
 
@@ -70,7 +170,6 @@ class _RequestPageState extends State<RequestPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Headline zone: "Seeking a learner in" + subject
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -89,9 +188,7 @@ class _RequestPageState extends State<RequestPage> {
               ),
             ],
           ),
-
           const SizedBox(height: 4),
-
           Text(
             'Parol Making',
             style: AppTextStyles.boldText.copyWith(
@@ -99,14 +196,9 @@ class _RequestPageState extends State<RequestPage> {
               fontSize: 20,
             ),
           ),
-
           const SizedBox(height: 16),
-
           const Divider(height: 1, thickness: 0.5),
-
           const SizedBox(height: 16),
-
-          // Identity + meta row
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -123,9 +215,7 @@ class _RequestPageState extends State<RequestPage> {
                   color: Colors.grey,
                 ),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,10 +264,7 @@ class _RequestPageState extends State<RequestPage> {
               ),
             ],
           ),
-
           const SizedBox(height: 20),
-
-          // Actions
           Row(
             children: [
               Expanded(
@@ -192,13 +279,11 @@ class _RequestPageState extends State<RequestPage> {
                   ),
                 ),
               ),
-
               Container(
                 width: 2,
                 height: 40,
                 color: Colors.black,
               ),
-
               Expanded(
                 child: TextButton(
                   onPressed: () {},

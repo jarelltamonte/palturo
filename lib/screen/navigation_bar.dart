@@ -19,7 +19,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   int _selectedIndex = 0;
 
   final List<IconData> _navigationIcons = [
-    CupertinoIcons.home,
+    CupertinoIcons.arrowtriangle_left,
     CupertinoIcons.compass,
     CupertinoIcons.heart,
     CupertinoIcons.chat_bubble,
@@ -27,7 +27,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   final List<IconData> _selectedIcons = [
-    CupertinoIcons.house_fill,
+    CupertinoIcons.arrowtriangle_left_fill,
     CupertinoIcons.compass_fill,
     CupertinoIcons.heart_fill,
     CupertinoIcons.chat_bubble_fill,
@@ -35,7 +35,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   final List<String> _navigationLabels = [
-    'Home',
+    'People',
     'Explore',
     'Requests',
     'Chats',

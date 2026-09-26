@@ -106,9 +106,9 @@ class _RequestPageState extends State<RequestPage> {
         child: Column(
           children: [
             Text(
-              'They/’re want to connect with you. Like back to start exchanging skills right away!',
+              'They want to connect with you. Like back to start exchanging skills right away!',
               style: AppTextStyles.regularText.copyWith(
-                color: primaryColor.withValues(alpha: 0.7),
+                color: textTheme.withValues(alpha: 0.7),
                 fontSize: 16,
               ),
             ),

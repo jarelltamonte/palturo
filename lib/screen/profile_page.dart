@@ -182,7 +182,7 @@ class _ProfilePageState extends State<ProfilePage> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.calendar_today, size: 14, color: darkColor),
+                Icon(Icons.calendar_today_outlined, size: 14, color: darkColor),
                 const SizedBox(width: 6),
                 Text(
                   'Mon/Sat/Sun',
@@ -191,7 +191,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -201,7 +201,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Divider(color: darkColor, thickness: 1),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   RoleCardGroup(
                     options: _roleOptions,
                     selected: _role,

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
 class RequestPage extends StatefulWidget {
@@ -13,6 +14,8 @@ class _RequestPageState extends State<RequestPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
@@ -25,18 +28,192 @@ class _RequestPageState extends State<RequestPage> {
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: Align(
-            alignment: Alignment.centerLeft,
-            child: Text (
-              'Requests',
-              style: AppTextStyles.headingText.copyWith(
-                color: textTheme,
-              ),
-            )
-              
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Requests',
+            style: AppTextStyles.headingText.copyWith(
+              color: textTheme,
+            ),
+          ),
         ),
       ),
-      body: Center(
-        child: Text('Request Page'),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        child: _buildRequestCard(
+          context,
+          textTheme,
+          primaryColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequestCard(
+    BuildContext context,
+    Color textTheme,
+    Color primaryColor,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Headline zone: "Seeking a learner in" + subject
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SvgPicture.asset(
+                'assets/icons/rlearner.svg',
+                width: 22,
+                height: 22,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Seeking a learner in',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            'Parol Making',
+            style: AppTextStyles.boldText.copyWith(
+              color: primaryColor,
+              fontSize: 20,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          const Divider(height: 1, thickness: 0.5),
+
+          const SizedBox(height: 16),
+
+          // Identity + meta row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFE8E8E8),
+                ),
+                child: const Icon(
+                  Icons.person,
+                  size: 28,
+                  color: Colors.grey,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RJ',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 13,
+                          color: textTheme,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Mon/Wed/Sat',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: textTheme,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Icon(
+                          Icons.translate,
+                          size: 13,
+                          color: textTheme,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'English',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: textTheme,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Actions
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    'Accept',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: primaryColor,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+
+              Container(
+                width: 2,
+                height: 40,
+                color: Colors.black,
+              ),
+
+              Expanded(
+                child: TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    'Decline',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: Colors.red,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -162,7 +162,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       color: Colors.black,
                                     ),
                                   )
-                                  : const SizedBox.shrink(), 
+                                  : const SizedBox.shrink(),
                         ),
                       ],
                     ),
@@ -232,10 +232,17 @@ class _ProfilePageState extends State<ProfilePage> {
                         debugPrint('Attach file for $skillId');
                       },
                     ),
-                  const SizedBox(height: 80),
                 ],
               ),
             ),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Logout logic here
+              },
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Logout'),
+            ),
+            const SizedBox(height: 120),
           ],
         ),
       ),

@@ -266,14 +266,14 @@ class ChatListItem extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.regularText.copyWith(
-                            color: textTheme.withAlpha(90),
+                            color: textTheme.withValues(alpha: 0.9),
                           ),
                         ),
                       ),
                       Text(
                         ' · $time',
                         style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withAlpha(70),
+                          color: textTheme.withValues(alpha: 0.7),
                           fontSize: 12,
                         ),
                       ),

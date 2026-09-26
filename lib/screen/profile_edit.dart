@@ -166,7 +166,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final textTheme2 = Theme.of(context).colorScheme.surface;
-    final darkColor = Theme.of(context).colorScheme.primary;
     final lightColor = Theme.of(context).colorScheme.surface;
 
     return Scaffold(
@@ -299,7 +298,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   Center(
                     child: FractionallySizedBox(
                       widthFactor: 0.8,
-                      child: Divider(color: darkColor, thickness: 1),
+                      child: Divider(color: textTheme.withValues(alpha:0.2), thickness: 1),
                     ),
                   ),
                   const SizedBox(height: 16),

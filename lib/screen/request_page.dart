@@ -193,7 +193,7 @@ class _RequestPageState extends State<RequestPage> {
             ),
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, thickness: 0.5),
+          Divider(height: 1, thickness: 0.5, color: textTheme.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,

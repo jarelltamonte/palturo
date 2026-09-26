@@ -13,6 +13,17 @@ class Scratch extends StatefulWidget {
 class _ChatRoomState extends State<Scratch> {
   final TextEditingController _messageController = TextEditingController();
 
+  bool _hasMessages = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _messageController.addListener(() {
+      setState(() {});
+    });
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
@@ -24,7 +35,9 @@ class _ChatRoomState extends State<Scratch> {
 
     if (message.isEmpty) return;
 
-    // Send message here
+    setState(() {
+      _hasMessages = true;
+    });
 
     _messageController.clear();
   }
@@ -37,6 +50,11 @@ class _ChatRoomState extends State<Scratch> {
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
+    final keyboardIsOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final isTyping = _messageController.text.isNotEmpty;
+
+    final showProfileInAppBar = _hasMessages || keyboardIsOpen || isTyping;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
 
@@ -48,19 +66,23 @@ class _ChatRoomState extends State<Scratch> {
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
-        title: Center(
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-              ),
 
+        title: Row(
+          children: [
+            IconButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+            ),
+
+            if (showProfileInAppBar) ...[
               const SizedBox(width: 4),
 
-              const CircleAvatar(radius: 20, backgroundColor: Colors.grey),
+              const CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.grey,
+              ),
 
               const SizedBox(width: 12),
 
@@ -68,7 +90,9 @@ class _ChatRoomState extends State<Scratch> {
                 child: Text(
                   'John Doe',
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.boldText.copyWith(color: textTheme),
+                  style: AppTextStyles.boldText.copyWith(
+                    color: textTheme,
+                  ),
                 ),
               ),
 
@@ -84,24 +108,47 @@ class _ChatRoomState extends State<Scratch> {
                     // Report user
                   }
                 },
-                itemBuilder:
-                    (context) => [
-                      const PopupMenuItem<String>(
-                        value: 'block',
-                        child: Text('Block'),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'report',
-                        child: Text('Report'),
-                      ),
-                    ],
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String>(
+                    value: 'block',
+                    child: Text('Block'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'report',
+                    child: Text('Report'),
+                  ),
+                ],
               ),
             ],
-          ),
+          ],
         ),
       ),
 
-      body: const Center(child: Text('Start messaging')),
+      body: !_hasMessages && !showProfileInAppBar
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'John Doe',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const Center(
+              child: Text('Start messaging'),
+            ),
 
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -115,8 +162,8 @@ class _ChatRoomState extends State<Scratch> {
                   minLines: 1,
                   maxLines: 3,
                   textInputAction: TextInputAction.newline,
-                  style:  AppTextStyles.regularText.copyWith(
-                    fontSize: 16, 
+                  style: AppTextStyles.regularText.copyWith(
+                    fontSize: 16,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
@@ -136,7 +183,10 @@ class _ChatRoomState extends State<Scratch> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(color: primaryColor, width: 1.5),
+                      borderSide: BorderSide(
+                        color: primaryColor,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -152,7 +202,10 @@ class _ChatRoomState extends State<Scratch> {
                   minimumSize: const Size(48, 48),
                   maximumSize: const Size(48, 48),
                 ),
-                icon: const Icon(Icons.send_rounded, size: 21),
+                icon: const Icon(
+                  Icons.send_rounded,
+                  size: 21,
+                ),
               ),
             ],
           ),

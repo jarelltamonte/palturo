@@ -27,11 +27,11 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   final List<IconData> _selectedIcons = [
-    CupertinoIcons.house_fill,   
-    CupertinoIcons.compass_fill,  
-    CupertinoIcons.heart_fill,   
-    CupertinoIcons.chat_bubble_fill, 
-    CupertinoIcons.person_fill,     
+    CupertinoIcons.house_fill,
+    CupertinoIcons.compass_fill,
+    CupertinoIcons.heart_fill,
+    CupertinoIcons.chat_bubble_fill,
+    CupertinoIcons.person_fill,
   ];
 
   final List<String> _navigationLabels = [
@@ -84,35 +84,107 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
           final activeColor = AppColors.primary;
           final inactiveColor = Colors.grey;
 
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
+          return _NavItem(
+            icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
+            label: _navigationLabels[index],
+            color: isSelected ? activeColor : inactiveColor,
             onTap: () {
               setState(() {
                 _selectedIndex = index;
               });
             },
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  isSelected ? _selectedIcons[index] : _navigationIcons[index],
-                  color: isSelected ? activeColor : inactiveColor,
-                  size: 24,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _navigationLabels[index],
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    color: isSelected ? activeColor : inactiveColor,
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
           );
         }),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _jiggle;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _jiggle = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.15), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -0.15, end: 0.15), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 0.15, end: -0.1), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -0.1, end: 0.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _controller.forward(from: 0);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _jiggle,
+              builder: (context, child) {
+                return Transform.rotate(
+                  angle: _jiggle.value,
+                  child: child,
+                );
+              },
+              child: Icon(
+                widget.icon,
+                color: widget.color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                color: widget.color,
+                fontSize: 11,
+                fontWeight: widget.color == AppColors.primary
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

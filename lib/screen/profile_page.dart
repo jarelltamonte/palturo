@@ -62,6 +62,7 @@ class _ProfilePageState extends State<ProfilePage> {
         toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: Align(

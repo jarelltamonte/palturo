@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/foundation.dart';
-import 'package:palturo/screen/chat_room.dart'; 
+import 'package:palturo/screen/chats_room.dart'; 
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -39,6 +39,7 @@ class _ChatsPageState extends State<ChatsPage> {
         toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: Row(

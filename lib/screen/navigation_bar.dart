@@ -21,32 +21,32 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   final List<IconData> _navigationIcons = [
     CupertinoIcons.arrowtriangle_left,
     CupertinoIcons.compass,
-    CupertinoIcons.heart,
     CupertinoIcons.chat_bubble,
+    CupertinoIcons.heart,
     CupertinoIcons.person,
   ];
 
   final List<IconData> _selectedIcons = [
     CupertinoIcons.arrowtriangle_left_fill,
     CupertinoIcons.compass_fill,
-    CupertinoIcons.heart_fill,
     CupertinoIcons.chat_bubble_fill,
+    CupertinoIcons.heart_fill,
     CupertinoIcons.person_fill,
   ];
 
   final List<String> _navigationLabels = [
     'People',
     'Explore',
-    'Requests',
     'Chats',
+    'Requests',
     'Profile',
   ];
 
   final List<Widget> _pages = [
     const HomePage(),
     const ExplorePage(),
-    const RequestPage(),
     const ChatsPage(),
+    const RequestPage(),
     const ProfilePage(),
   ];
 

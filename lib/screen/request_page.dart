@@ -33,9 +33,7 @@ class _RequestPageState extends State<RequestPage> {
           children: [
             Text(
               'Requests',
-              style: AppTextStyles.headingText.copyWith(
-                color: textTheme,
-              ),
+              style: AppTextStyles.headingText.copyWith(color: textTheme),
             ),
             const Spacer(),
             PopupMenuButton<String>(
@@ -50,48 +48,45 @@ class _RequestPageState extends State<RequestPage> {
               ),
               color: Theme.of(context).colorScheme.surface,
               elevation: 6,
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'Newest first',
-                  child: _buildSortOption(
-                    'Newest first',
-                    textTheme,
-                    primaryColor,
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'Oldest first',
-                  child: _buildSortOption(
-                    'Oldest first',
-                    textTheme,
-                    primaryColor,
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'Alphabetically (A–Z)',
-                  child: _buildSortOption(
-                    'Alphabetically (A–Z)',
-                    textTheme,
-                    primaryColor,
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'Alphabetically (Z–A)',
-                  child: _buildSortOption(
-                    'Alphabetically (Z–A)',
-                    textTheme,
-                    primaryColor,
-                  ),
-                ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    PopupMenuItem<String>(
+                      value: 'Newest first',
+                      child: _buildSortOption(
+                        'Newest first',
+                        textTheme,
+                        primaryColor,
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Oldest first',
+                      child: _buildSortOption(
+                        'Oldest first',
+                        textTheme,
+                        primaryColor,
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Alphabetically (A–Z)',
+                      child: _buildSortOption(
+                        'Alphabetically (A–Z)',
+                        textTheme,
+                        primaryColor,
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'Alphabetically (Z–A)',
+                      child: _buildSortOption(
+                        'Alphabetically (Z–A)',
+                        textTheme,
+                        primaryColor,
+                      ),
+                    ),
+                  ],
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.sort,
-                    size: 20,
-                    color: textTheme,
-                  ),
+                  Icon(Icons.sort, size: 20, color: textTheme),
                   const SizedBox(width: 6),
                   Text(
                     'Sort by',
@@ -108,33 +103,34 @@ class _RequestPageState extends State<RequestPage> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        child: _buildRequestCard(
-          context,
-          textTheme,
-          primaryColor,
+        child: Column(
+          children: [
+            Text(
+              'They/’re eager to connect with you. Like back to start exchanging skills right away!',
+              style: AppTextStyles.regularText.copyWith(
+                color: primaryColor.withValues(alpha: 0.7),
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildRequestCard(context, textTheme, primaryColor),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSortOption(
-    String option,
-    Color textTheme,
-    Color primaryColor,
-  ) {
+  Widget _buildSortOption(String option, Color textTheme, Color primaryColor) {
     final isSelected = _selectedSort == option;
 
     return Row(
       children: [
         SizedBox(
           width: 20,
-          child: isSelected
-              ? Icon(
-                  Icons.check,
-                  size: 18,
-                  color: primaryColor,
-                )
-              : null,
+          child:
+              isSelected
+                  ? Icon(Icons.check, size: 18, color: primaryColor)
+                  : null,
         ),
         const SizedBox(width: 8),
         Text(
@@ -209,11 +205,7 @@ class _RequestPageState extends State<RequestPage> {
                   shape: BoxShape.circle,
                   color: Color(0xFFE8E8E8),
                 ),
-                child: const Icon(
-                  Icons.person,
-                  size: 28,
-                  color: Colors.grey,
-                ),
+                child: const Icon(Icons.person, size: 28, color: Colors.grey),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -244,11 +236,7 @@ class _RequestPageState extends State<RequestPage> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Icon(
-                          Icons.translate,
-                          size: 13,
-                          color: textTheme,
-                        ),
+                        Icon(Icons.translate, size: 13, color: textTheme),
                         const SizedBox(width: 4),
                         Text(
                           'English',
@@ -279,11 +267,7 @@ class _RequestPageState extends State<RequestPage> {
                   ),
                 ),
               ),
-              Container(
-                width: 2,
-                height: 40,
-                color: Colors.black,
-              ),
+              Container(width: 2, height: 40, color: Colors.black),
               Expanded(
                 child: TextButton(
                   onPressed: () {},

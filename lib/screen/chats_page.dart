@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/foundation.dart';
-import 'package:palturo/screen/chats_room.dart'; 
+import 'package:palturo/screen/chats_room.dart';
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -12,17 +12,15 @@ class ChatsPage extends StatefulWidget {
 }
 
 class _ChatsPageState extends State<ChatsPage> {
-  void _openChatRoom(BuildContext context, {
+  void _openChatRoom(
+    BuildContext context, {
     required String name,
     ImageProvider? avatarImage,
   }) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ChatRoom(
-          name: name,
-          avatarImage: avatarImage,
-        ),
+        builder: (context) => ChatRoom(name: name, avatarImage: avatarImage),
       ),
     );
   }
@@ -49,17 +47,24 @@ class _ChatsPageState extends State<ChatsPage> {
               'Chats',
               style: AppTextStyles.headingText.copyWith(color: textTheme),
             ),
-            Icon(
-              CupertinoIcons.search,
-              color: textTheme,
-              size: 24,
-            ),
+            Icon(CupertinoIcons.search, color: textTheme, size: 24),
           ],
         ),
       ),
       body: SafeArea(
         child: Column(
           children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16.0),
+                child: Text(
+                  'Your matches',
+                  style: AppTextStyles.boldText.copyWith(color: textTheme),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 8),
             SizedBox(
               height: 160,
@@ -74,34 +79,26 @@ class _ChatsPageState extends State<ChatsPage> {
                   return ChatProfileItem(
                     name: name,
                     avatarImage: avatarImage,
-                    onTap: () => _openChatRoom(
-                      context,
-                      name: name,
-                      avatarImage: avatarImage,
-                    ),
+                    onTap:
+                        () => _openChatRoom(
+                          context,
+                          name: name,
+                          avatarImage: avatarImage,
+                        ),
                   );
                 },
               ),
             ),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 16.0),
-                  child: Text(
-                    'Messages',
-                    style: AppTextStyles.boldText.copyWith(color: textTheme),
-                  ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16.0),
+                child: Text(
+                  'Messages',
+                  style: AppTextStyles.boldText.copyWith(color: textTheme),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 16.0),
-                  child: Text(
-                    'Requests',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                ),
-              ],
+              ),
             ),
 
             const SizedBox(height: 8),
@@ -119,11 +116,12 @@ class _ChatsPageState extends State<ChatsPage> {
                     time: 'Just now',
                     hasUnread: true,
                     avatarImage: avatarImage,
-                    onTap: () => _openChatRoom(
-                      context,
-                      name: name,
-                      avatarImage: avatarImage,
-                    ),
+                    onTap:
+                        () => _openChatRoom(
+                          context,
+                          name: name,
+                          avatarImage: avatarImage,
+                        ),
                   );
                 },
               ),
@@ -165,16 +163,18 @@ class ChatProfileItem extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(12),
-                image: avatarImage != null
-                    ? DecorationImage(
-                        image: avatarImage!,
-                        fit: BoxFit.cover,
-                      )
-                    : null,
+                image:
+                    avatarImage != null
+                        ? DecorationImage(
+                          image: avatarImage!,
+                          fit: BoxFit.cover,
+                        )
+                        : null,
               ),
-              child: avatarImage == null
-                  ? Icon(Icons.person, color: Colors.grey[600], size: 28)
-                  : null,
+              child:
+                  avatarImage == null
+                      ? Icon(Icons.person, color: Colors.grey[600], size: 28)
+                      : null,
             ),
             const SizedBox(height: 4),
             SizedBox(
@@ -230,9 +230,10 @@ class ChatListItem extends StatelessWidget {
               radius: 28,
               backgroundColor: Colors.grey[300],
               backgroundImage: avatarImage,
-              child: avatarImage == null
-                  ? Icon(Icons.person, color: Colors.grey[600], size: 28)
-                  : null,
+              child:
+                  avatarImage == null
+                      ? Icon(Icons.person, color: Colors.grey[600], size: 28)
+                      : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -243,7 +244,9 @@ class ChatListItem extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: AppTextStyles.boldText.copyWith(color: textTheme),
+                        style: AppTextStyles.boldText.copyWith(
+                          color: textTheme,
+                        ),
                       ),
                       if (hasUnread) ...[
                         const SizedBox(width: 6),

@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/request_card.dart';
+import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/card/request_detail.dart';
 
 class ConnectionRequest {
   final String id;
@@ -13,6 +16,8 @@ class ConnectionRequest {
   final DateTime requestedAt;
   final String iconAsset;
   final String seekingLabel;
+  final PersonRole role;
+  final List<String?> photoUrls;
 
   const ConnectionRequest({
     required this.id,
@@ -24,7 +29,22 @@ class ConnectionRequest {
     required this.requestedAt,
     this.iconAsset = 'assets/icons/rlearner.svg',
     this.seekingLabel = 'Seeking a learner in',
+    this.role = PersonRole.learner,
+    this.photoUrls = const [null],
   });
+
+  Person toPerson() {
+    return Person(
+      id: id,
+      name: requesterName,
+      schedule: schedule,
+      language: language,
+      learningStyle: learningStyle,
+      skillName: skillName,
+      role: role,
+      photoUrls: photoUrls,
+    );
+  }
 }
 
 String timeAgo(DateTime dateTime) {
@@ -37,6 +57,10 @@ String timeAgo(DateTime dateTime) {
   return '${(diff.inDays / 30).floor()}mo ago';
 }
 
+enum DateFilter { all, today, thisWeek, thisMonth, thisYear }
+enum RoleFilter { all, learner, mentor }
+enum SortFilter { newest, oldest, ascending, descending }
+
 class RequestPage extends StatefulWidget {
   const RequestPage({super.key});
 
@@ -45,7 +69,9 @@ class RequestPage extends StatefulWidget {
 }
 
 class _RequestPageState extends State<RequestPage> {
-  String _selectedSort = 'Newest first';
+  DateFilter _dateFilter = DateFilter.all;
+  RoleFilter _roleFilter = RoleFilter.all;
+  SortFilter _sortFilter = SortFilter.newest;
 
   final List<ConnectionRequest> _requests = [
     ConnectionRequest(
@@ -56,6 +82,8 @@ class _RequestPageState extends State<RequestPage> {
       language: 'English',
       learningStyle: 'Discussion',
       requestedAt: DateTime.now().subtract(const Duration(minutes: 2)),
+      role: PersonRole.learner,
+      photoUrls: const [null, null],
     ),
     ConnectionRequest(
       id: '2',
@@ -65,26 +93,54 @@ class _RequestPageState extends State<RequestPage> {
       language: 'Tagalog',
       learningStyle: 'Hands-on Practice',
       requestedAt: DateTime.now().subtract(const Duration(days: 1)),
+      role: PersonRole.mentor,
+      photoUrls: const [null],
     ),
   ];
 
-  List<ConnectionRequest> get _sortedRequests {
-    final sorted = List<ConnectionRequest>.from(_requests);
-    switch (_selectedSort) {
-      case 'Newest first':
-        sorted.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
+  bool _matchesDateFilter(DateTime date) {
+    final now = DateTime.now();
+    switch (_dateFilter) {
+      case DateFilter.all:
+        return true;
+      case DateFilter.today:
+        return date.year == now.year &&
+            date.month == now.month &&
+            date.day == now.day;
+      case DateFilter.thisWeek:
+        return now.difference(date).inDays <= 7;
+      case DateFilter.thisMonth:
+        return date.year == now.year && date.month == now.month;
+      case DateFilter.thisYear:
+        return date.year == now.year;
+    }
+  }
+
+  List<ConnectionRequest> get _filteredAndSortedRequests {
+    var filtered = _requests.where((r) {
+      final matchesDate = _matchesDateFilter(r.requestedAt);
+      final matchesRole = _roleFilter == RoleFilter.all ||
+          (_roleFilter == RoleFilter.learner &&
+              r.role == PersonRole.learner) ||
+          (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
+      return matchesDate && matchesRole;
+    }).toList();
+
+    switch (_sortFilter) {
+      case SortFilter.newest:
+        filtered.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
         break;
-      case 'Oldest first':
-        sorted.sort((a, b) => a.requestedAt.compareTo(b.requestedAt));
+      case SortFilter.oldest:
+        filtered.sort((a, b) => a.requestedAt.compareTo(b.requestedAt));
         break;
-      case 'Alphabetically (A–Z)':
-        sorted.sort((a, b) => a.requesterName.compareTo(b.requesterName));
+      case SortFilter.ascending:
+        filtered.sort((a, b) => a.requesterName.compareTo(b.requesterName));
         break;
-      case 'Alphabetically (Z–A)':
-        sorted.sort((a, b) => b.requesterName.compareTo(a.requesterName));
+      case SortFilter.descending:
+        filtered.sort((a, b) => b.requesterName.compareTo(a.requesterName));
         break;
     }
-    return sorted;
+    return filtered;
   }
 
   void _removeRequest(String id) {
@@ -93,15 +149,200 @@ class _RequestPageState extends State<RequestPage> {
     });
   }
 
+  void _openDetail(ConnectionRequest request) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (_) => RequestDetailDialog(
+        person: request.toPerson(),
+        onAccept: () => _removeRequest(request.id),
+        onDecline: () => _removeRequest(request.id),
+      ),
+    );
+  }
+
+  void _openFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final textColor = Theme.of(context).colorScheme.secondary;
+        final primaryColor = Theme.of(context).colorScheme.primary;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Filters',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: textColor,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _sheetSectionLabel('Date', textColor),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _filterChip('All', _dateFilter == DateFilter.all,
+                            () => setModalState(() => _dateFilter = DateFilter.all),
+                            primaryColor, textColor),
+                        _filterChip('Today', _dateFilter == DateFilter.today,
+                            () => setModalState(() => _dateFilter = DateFilter.today),
+                            primaryColor, textColor),
+                        _filterChip('This Week', _dateFilter == DateFilter.thisWeek,
+                            () => setModalState(() => _dateFilter = DateFilter.thisWeek),
+                            primaryColor, textColor),
+                        _filterChip('This Month', _dateFilter == DateFilter.thisMonth,
+                            () => setModalState(() => _dateFilter = DateFilter.thisMonth),
+                            primaryColor, textColor),
+                        _filterChip('This Year', _dateFilter == DateFilter.thisYear,
+                            () => setModalState(() => _dateFilter = DateFilter.thisYear),
+                            primaryColor, textColor),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sheetSectionLabel('Role', textColor),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _filterChip('All', _roleFilter == RoleFilter.all,
+                            () => setModalState(() => _roleFilter = RoleFilter.all),
+                            primaryColor, textColor),
+                        _filterChip('Learner', _roleFilter == RoleFilter.learner,
+                            () => setModalState(() => _roleFilter = RoleFilter.learner),
+                            primaryColor, textColor),
+                        _filterChip('Mentor', _roleFilter == RoleFilter.mentor,
+                            () => setModalState(() => _roleFilter = RoleFilter.mentor),
+                            primaryColor, textColor),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sheetSectionLabel('Skills', textColor),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Coming soon',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textColor.withValues(alpha: 0.4),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _sheetSectionLabel('Filter', textColor),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _filterChip('Newest', _sortFilter == SortFilter.newest,
+                            () => setModalState(() => _sortFilter = SortFilter.newest),
+                            primaryColor, textColor),
+                        _filterChip('Oldest', _sortFilter == SortFilter.oldest,
+                            () => setModalState(() => _sortFilter = SortFilter.oldest),
+                            primaryColor, textColor),
+                        _filterChip('Ascending', _sortFilter == SortFilter.ascending,
+                            () => setModalState(() => _sortFilter = SortFilter.ascending),
+                            primaryColor, textColor),
+                        _filterChip('Descending', _sortFilter == SortFilter.descending,
+                            () => setModalState(() => _sortFilter = SortFilter.descending),
+                            primaryColor, textColor),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          setState(() {});
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Apply',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _sheetSectionLabel(String label, Color textColor) {
+    return Text(
+      label,
+      style: AppTextStyles.regularText.copyWith(
+        color: textColor,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _filterChip(
+    String label,
+    bool isSelected,
+    VoidCallback onTap,
+    Color primaryColor,
+    Color textColor,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.secondary : textColor.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.regularText.copyWith(
+            color: isSelected ? AppColors.black : textColor,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
 
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
-    final requests = _sortedRequests;
+    final requests = _filteredAndSortedRequests;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -119,54 +360,9 @@ class _RequestPageState extends State<RequestPage> {
               style: AppTextStyles.headingText.copyWith(color: textTheme),
             ),
             const Spacer(),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                setState(() {
-                  _selectedSort = value;
-                });
-              },
-              offset: const Offset(0, 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              color: Theme.of(context).colorScheme.surface,
-              elevation: 6,
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'Newest first',
-                  child: _buildSortOption(
-                      'Newest first', textTheme, primaryColor),
-                ),
-                PopupMenuItem<String>(
-                  value: 'Oldest first',
-                  child: _buildSortOption(
-                      'Oldest first', textTheme, primaryColor),
-                ),
-                PopupMenuItem<String>(
-                  value: 'Alphabetically (A–Z)',
-                  child: _buildSortOption(
-                      'Alphabetically (A–Z)', textTheme, primaryColor),
-                ),
-                PopupMenuItem<String>(
-                  value: 'Alphabetically (Z–A)',
-                  child: _buildSortOption(
-                      'Alphabetically (Z–A)', textTheme, primaryColor),
-                ),
-              ],
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.sort, size: 20, color: textTheme),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Sort by',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textTheme,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
+            IconButton(
+              onPressed: _openFilterSheet,
+              icon: Icon(Icons.tune, color: textTheme, size: 22),
             ),
           ],
         ),
@@ -190,44 +386,24 @@ class _RequestPageState extends State<RequestPage> {
           final request = requests[index - 1];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: RequestCard(
-              skillName: request.skillName,
-              requesterName: request.requesterName,
-              schedule: request.schedule,
-              language: request.language,
-              learningStyle: request.learningStyle,
-              timeAgo: timeAgo(request.requestedAt),
-              iconAsset: request.iconAsset,
-              seekingLabel: request.seekingLabel,
-              onAccept: () => _removeRequest(request.id),
-              onDecline: () => _removeRequest(request.id),
+            child: GestureDetector(
+              onTap: () => _openDetail(request),
+              child: RequestCard(
+                skillName: request.skillName,
+                requesterName: request.requesterName,
+                schedule: request.schedule,
+                language: request.language,
+                learningStyle: request.learningStyle,
+                timeAgo: timeAgo(request.requestedAt),
+                iconAsset: request.iconAsset,
+                seekingLabel: request.seekingLabel,
+                onAccept: () => _removeRequest(request.id),
+                onDecline: () => _removeRequest(request.id),
+              ),
             ),
           );
         },
       ),
-    );
-  }
-
-  Widget _buildSortOption(String option, Color textTheme, Color primaryColor) {
-    final isSelected = _selectedSort == option;
-
-    return Row(
-      children: [
-        SizedBox(
-          width: 20,
-          child: isSelected
-              ? Icon(Icons.check, size: 18, color: primaryColor)
-              : null,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          option,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 13,
-          ),
-        ),
-      ],
     );
   }
 }

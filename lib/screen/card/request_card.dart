@@ -64,6 +64,22 @@ class RequestCard extends StatelessWidget {
                   ),
                 ),
               ),
+              Icon(Icons.keyboard_arrow_up, color: textTheme),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  skillName,
+                  style: AppTextStyles.boldText.copyWith(
+                    color: primaryColor,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
               Text(
                 timeAgo,
                 style: AppTextStyles.regularText.copyWith(
@@ -72,14 +88,6 @@ class RequestCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            skillName,
-            style: AppTextStyles.boldText.copyWith(
-              color: primaryColor,
-              fontSize: 20,
-            ),
           ),
           const SizedBox(height: 16),
           Divider(

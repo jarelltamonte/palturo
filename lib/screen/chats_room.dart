@@ -149,7 +149,7 @@ class _ChatRoomState extends State<ChatRoom> {
                 padding: const EdgeInsets.all(6),
                 margin: const EdgeInsets.only(right: 8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.06),
+                  color: Colors.transparent,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

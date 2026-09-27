@@ -79,12 +79,14 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ? photoUrls[_photoIndex]
             : null;
 
-    final roleIconAsset = widget.person.role == PersonRole.learner
-        ? 'assets/icons/rlearner.svg'
-        : 'assets/icons/rmentor.svg';
-    final roleLabel = widget.person.role == PersonRole.learner
-        ? 'Wants to learn'
-        : 'Wants to teach';
+    final roleIconAsset =
+        widget.person.role == PersonRole.learner
+            ? 'assets/icons/rlearner.svg'
+            : 'assets/icons/rmentor.svg';
+    final roleLabel =
+        widget.person.role == PersonRole.learner
+            ? 'Wants to learn'
+            : 'Wants to teach';
 
     return Container(
       width: double.infinity,
@@ -153,39 +155,43 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   widget.onBlock?.call();
                 }
               },
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'report',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flag_outlined,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Report',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
+              itemBuilder:
+                  (context) => [
+                    PopupMenuItem<String>(
+                      value: 'report',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.flag_outlined,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Report',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'block',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Block',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'block',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block, color: Colors.red, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Block',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -236,7 +242,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6,),
+                    const SizedBox(width: 6),
                     SvgPicture.asset(
                       roleIconAsset,
                       width: 16,
@@ -267,8 +273,11 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ),
-                    const Icon(Icons.calendar_today_outlined,
-                        size: 16, color: Colors.white),
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       widget.person.schedule,
@@ -292,8 +301,11 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.translate,
-                            size: 15, color: Colors.white70),
+                        const Icon(
+                          Icons.translate,
+                          size: 15,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           widget.person.language,
@@ -313,8 +325,11 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.psychology,
-                            size: 15, color: Colors.white70),
+                        const Icon(
+                          Icons.psychology,
+                          size: 15,
+                          color: Colors.white70,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           widget.person.learningStyle,
@@ -339,19 +354,24 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 78,
+            bottom: 100,
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 for (int i = 0; i < photoUrls.length; i++) ...[
-                  Expanded(
+                  GestureDetector(
+                    onTap: () => setState(() => _photoIndex = i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      height: 4,
+                      curve: Curves.easeOut,
+                      width: i == _photoIndex ? 24 : 8,
+                      height: 8,
                       decoration: BoxDecoration(
-                        color: i == _photoIndex
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(2),
+                        color:
+                            i == _photoIndex
+                                ? AppColors.primary
+                                : Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
@@ -371,14 +391,18 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     onPressed: widget.onSkip,
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.textPrimary),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 24),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                       ),
                     ),
-                    child: const Text('Skip',
-                        style:
-                            TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+                    child: const Text(
+                      'Skip',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -387,14 +411,16 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     onPressed: widget.onAdd,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 24),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                       ),
                       elevation: 0,
                     ),
-                    child: Text('Add',
-                        style: TextStyle(color: AppColors.black, fontSize: 16)),
+                    child: Text(
+                      'Add',
+                      style: TextStyle(color: AppColors.black, fontSize: 16),
+                    ),
                   ),
                 ),
               ],

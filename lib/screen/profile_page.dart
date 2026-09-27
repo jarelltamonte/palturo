@@ -6,6 +6,7 @@ import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/onboarding/widgets/skills_card.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
+import 'settings.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -72,7 +73,24 @@ class _ProfilePageState extends State<ProfilePage> {
             style: AppTextStyles.headingText.copyWith(color: textTheme),
           ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(
+              right: 16.0,
+            ), 
+            child: IconButton(
+              icon: Icon(Icons.settings, color: textTheme),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const Settings()),
+                );
+              },
+            ),
+          ),
+        ],
       ),
+
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -115,9 +133,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 // Logout logic here
               },
               icon: const Icon(Icons.logout_rounded),
-              label: Text('Logout', style: AppTextStyles.regularText.copyWith(
-                    color: Theme.of(context).colorScheme.primary, fontSize: 16,
-                  ),),
+              label: Text(
+                'Logout',
+                style: AppTextStyles.regularText.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 16,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Center(
@@ -127,7 +149,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Report a Problem',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.regularText.copyWith(
-                    color: Theme.of(context).colorScheme.primary, fontSize: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: 16,
                   ),
                 ),
               ),

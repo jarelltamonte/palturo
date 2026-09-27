@@ -5,13 +5,13 @@ import 'package:palturo/theme/app_colors.dart';
 
 class SkillsCard extends StatefulWidget {
   final bool isEditing;
-  final String labelSuffix; // e.g. 'Learn' or 'Teach'
-  final List<OnboardingOption> options; // kLearningOptions or kTeachingOptions
+  final String labelSuffix; 
+  final List<OnboardingOption> options; 
   final int maxSkills;
   final List<String> initialSkillIds;
-  final bool showAttachFile; // 💡 mentor-only feature
+  final bool showAttachFile;
   final ValueChanged<List<String>>? onChanged;
-  final ValueChanged<String>? onAttachFile; // called with the skill id
+  final ValueChanged<String>? onAttachFile;
 
   const SkillsCard({
     super.key,
@@ -25,7 +25,7 @@ class SkillsCard extends StatefulWidget {
     this.onAttachFile,
   });
 
-  // 💡 Convenience constructors matching your two use cases
+
   factory SkillsCard.toLearn({
     Key? key,
     required bool isEditing,

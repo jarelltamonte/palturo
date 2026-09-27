@@ -18,6 +18,9 @@ void main() async {
     ),
   );
 }
+mixin MyAppThemeController on State<MyApp> {
+  void setThemeMode(bool isDark);
+}
 
 class MyApp extends StatefulWidget {
   final bool isOnboardingDone;
@@ -27,7 +30,7 @@ class MyApp extends StatefulWidget {
     required this.isOnboardingDone,
   });
 
-  static _MyAppState of(BuildContext context) {
+  static MyAppThemeController of(BuildContext context) {
     return context.findAncestorStateOfType<_MyAppState>()!;
   }
 
@@ -35,9 +38,10 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with MyAppThemeController {
   ThemeMode _themeMode = ThemeMode.light;
 
+  @override
   void setThemeMode(bool isDark) {
     setState(() {
       _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;

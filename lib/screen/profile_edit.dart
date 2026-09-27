@@ -5,7 +5,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
-import 'package:palturo/onboarding/widgets/skills_card.dart';
+import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show kLearningStyleOptions, kDayOptions, kLanguageOptions;
 import 'profile_data.dart';

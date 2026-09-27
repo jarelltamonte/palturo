@@ -64,7 +64,6 @@ class _ChatRoomState extends State<ChatRoom> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-
       appBar: AppBar(
         toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
@@ -73,7 +72,6 @@ class _ChatRoomState extends State<ChatRoom> {
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
-
         title: Row(
           children: [
             IconButton(
@@ -82,18 +80,14 @@ class _ChatRoomState extends State<ChatRoom> {
               },
               icon: const Icon(Icons.arrow_back_ios_new, size: 20),
             ),
-
             if (showProfileInAppBar) ...[
               const SizedBox(width: 4),
-
               CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.grey,
                 backgroundImage: widget.avatarImage,
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Text(
                   widget.name,
@@ -103,35 +97,71 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                 ),
               ),
-
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                onSelected: (value) {
-                  if (value == 'block') {
-                    // Block user
-                  } else if (value == 'report') {
-                    // Report user
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem<String>(
-                    value: 'block',
-                    child: Text('Block'),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: 'report',
-                    child: Text('Report'),
-                  ),
-                ],
+            ] else
+              const Spacer(),
+            PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ],
+              color: Theme.of(context).colorScheme.surface,
+              elevation: 6,
+              offset: const Offset(0, 40),
+              onSelected: (value) {
+                if (value == 'block') {
+                } else if (value == 'report') {
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flag_outlined,
+                          color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Report',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.block, color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Block',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.more_horiz,
+                  color: textTheme,
+                  size: 22,
+                ),
+              ),
+            ),
           ],
         ),
       ),
-
       body: !_hasMessages && !showProfileInAppBar
           ? Center(
               child: Column(
@@ -142,9 +172,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     backgroundColor: Colors.grey,
                     backgroundImage: widget.avatarImage,
                   ),
-
                   const SizedBox(height: 12),
-
                   Text(
                     widget.name,
                     style: AppTextStyles.boldText.copyWith(
@@ -158,7 +186,6 @@ class _ChatRoomState extends State<ChatRoom> {
           : const Center(
               child: Text('Start messaging'),
             ),
-
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -200,9 +227,7 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 8),
-
               IconButton(
                 onPressed: _sendMessage,
                 style: IconButton.styleFrom(

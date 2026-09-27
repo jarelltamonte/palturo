@@ -128,33 +128,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-            ElevatedButton.icon(
-              onPressed: () {
-                // Logout logic here
-              },
-              icon: const Icon(Icons.logout_rounded),
-              label: Text(
-                'Logout',
-                style: AppTextStyles.regularText.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: GestureDetector(
-                onTap: () {},
-                child: Text(
-                  'Report a Problem',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.regularText.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),

@@ -207,7 +207,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     fillColor: AppColors.secondary,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 12,
+                      vertical: 20,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
@@ -233,8 +233,8 @@ class _ChatRoomState extends State<ChatRoom> {
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.background,
-                  minimumSize: const Size(48, 48),
-                  maximumSize: const Size(48, 48),
+                  minimumSize: const Size(58, 58),
+                  maximumSize: const Size(58, 58),
                 ),
                 icon: const Icon(
                   Icons.send_rounded,

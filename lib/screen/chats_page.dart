@@ -52,10 +52,9 @@ class _ChatsPageState extends State<ChatsPage> {
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(left: 16.0),
                 child: Text(
@@ -64,68 +63,63 @@ class _ChatsPageState extends State<ChatsPage> {
                 ),
               ),
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 160,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                  itemCount: 8,
+                  itemBuilder: (context, index) {
+                    const name = 'Random Name';
+                    const ImageProvider? avatarImage = null;
 
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 160,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                itemCount: 8, // placeholder count until wired to DB
-                itemBuilder: (context, index) {
-                  const name = 'Random Name'; // swap for real data later
-                  const avatarImage = null; // swap for real data later
-
-                  return ChatProfileItem(
-                    name: name,
-                    avatarImage: avatarImage,
-                    onTap:
-                        () => _openChatRoom(
-                          context,
-                          name: name,
-                          avatarImage: avatarImage,
-                        ),
-                  );
-                },
+                    return ChatProfileItem(
+                      name: name,
+                      avatarImage: avatarImage,
+                      onTap:
+                          () => _openChatRoom(
+                            context,
+                            name: name,
+                            avatarImage: avatarImage,
+                          ),
+                    );
+                  },
+                ),
               ),
             ),
-
-            Align(
-              alignment: Alignment.centerLeft,
+            SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(left: 16.0),
+                padding: const EdgeInsets.only(left: 16.0, bottom: 8),
                 child: Text(
                   'Messages',
                   style: AppTextStyles.boldText.copyWith(color: textTheme),
                 ),
               ),
             ),
+            SliverList.builder(
+              itemCount: 8,
+              itemBuilder: (context, index) {
+                const name = 'Random Name';
+                const ImageProvider? avatarImage = null;
 
-            const SizedBox(height: 8),
-
-            Expanded(
-              child: ListView.builder(
-                itemCount: 8, // placeholder count until wired to DB
-                itemBuilder: (context, index) {
-                  const name = 'Random Name'; // swap for real data later
-                  const avatarImage = null; // swap for real data later
-
-                  return ChatListItem(
-                    name: name,
-                    message: 'Random chat message goes here',
-                    time: 'Just now',
-                    hasUnread: true,
-                    avatarImage: avatarImage,
-                    onTap:
-                        () => _openChatRoom(
-                          context,
-                          name: name,
-                          avatarImage: avatarImage,
-                        ),
-                  );
-                },
-              ),
+                return ChatListItem(
+                  name: name,
+                  message: 'Random chat message goes here',
+                  time: 'Just now',
+                  hasUnread: true,
+                  avatarImage: avatarImage,
+                  onTap:
+                      () => _openChatRoom(
+                        context,
+                        name: name,
+                        avatarImage: avatarImage,
+                      ),
+                );
+              },
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 110)),
           ],
         ),
       ),

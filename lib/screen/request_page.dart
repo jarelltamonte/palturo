@@ -58,7 +58,9 @@ String timeAgo(DateTime dateTime) {
 }
 
 enum DateFilter { all, today, thisWeek, thisMonth, thisYear }
+
 enum RoleFilter { all, learner, mentor }
+
 enum SortFilter { newest, oldest, ascending, descending }
 
 class RequestPage extends StatefulWidget {
@@ -164,6 +166,8 @@ class _RequestPageState extends State<RequestPage> {
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -188,86 +192,156 @@ class _RequestPageState extends State<RequestPage> {
                         fontSize: 18,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Date', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip('All', _dateFilter == DateFilter.all,
-                            () => setModalState(() => _dateFilter = DateFilter.all),
-                            primaryColor, textColor),
-                        _filterChip('Today', _dateFilter == DateFilter.today,
-                            () => setModalState(() => _dateFilter = DateFilter.today),
-                            primaryColor, textColor),
-                        _filterChip('This Week', _dateFilter == DateFilter.thisWeek,
-                            () => setModalState(() => _dateFilter = DateFilter.thisWeek),
-                            primaryColor, textColor),
-                        _filterChip('This Month', _dateFilter == DateFilter.thisMonth,
-                            () => setModalState(() => _dateFilter = DateFilter.thisMonth),
-                            primaryColor, textColor),
-                        _filterChip('This Year', _dateFilter == DateFilter.thisYear,
-                            () => setModalState(() => _dateFilter = DateFilter.thisYear),
-                            primaryColor, textColor),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Role', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip('All', _roleFilter == RoleFilter.all,
-                            () => setModalState(() => _roleFilter = RoleFilter.all),
-                            primaryColor, textColor),
-                        _filterChip('Learner', _roleFilter == RoleFilter.learner,
-                            () => setModalState(() => _roleFilter = RoleFilter.learner),
-                            primaryColor, textColor),
-                        _filterChip('Mentor', _roleFilter == RoleFilter.mentor,
-                            () => setModalState(() => _roleFilter = RoleFilter.mentor),
-                            primaryColor, textColor),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Skills', textColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coming soon',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.4),
-                        fontSize: 13,
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _sheetSectionLabel('Date', textColor),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _filterChip(
+                                  'All',
+                                  _dateFilter == DateFilter.all,
+                                  () => setModalState(
+                                      () => _dateFilter = DateFilter.all),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'Today',
+                                  _dateFilter == DateFilter.today,
+                                  () => setModalState(
+                                      () => _dateFilter = DateFilter.today),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'This Week',
+                                  _dateFilter == DateFilter.thisWeek,
+                                  () => setModalState(
+                                      () => _dateFilter = DateFilter.thisWeek),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'This Month',
+                                  _dateFilter == DateFilter.thisMonth,
+                                  () => setModalState(
+                                      () => _dateFilter = DateFilter.thisMonth),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'This Year',
+                                  _dateFilter == DateFilter.thisYear,
+                                  () => setModalState(
+                                      () => _dateFilter = DateFilter.thisYear),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            _sheetSectionLabel('Role', textColor),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _filterChip(
+                                  'All',
+                                  _roleFilter == RoleFilter.all,
+                                  () => setModalState(
+                                      () => _roleFilter = RoleFilter.all),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'Learner',
+                                  _roleFilter == RoleFilter.learner,
+                                  () => setModalState(
+                                      () => _roleFilter = RoleFilter.learner),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'Mentor',
+                                  _roleFilter == RoleFilter.mentor,
+                                  () => setModalState(
+                                      () => _roleFilter = RoleFilter.mentor),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            _sheetSectionLabel('Skills', textColor),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Coming soon',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textColor.withValues(alpha: 0.4),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _sheetSectionLabel('Filter', textColor),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _filterChip(
+                                  'Newest',
+                                  _sortFilter == SortFilter.newest,
+                                  () => setModalState(
+                                      () => _sortFilter = SortFilter.newest),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'Oldest',
+                                  _sortFilter == SortFilter.oldest,
+                                  () => setModalState(
+                                      () => _sortFilter = SortFilter.oldest),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'Ascending (A-Z)',
+                                  _sortFilter == SortFilter.ascending,
+                                  () => setModalState(
+                                      () => _sortFilter = SortFilter.ascending),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                                _filterChip(
+                                  'Descending (Z-A)',
+                                  _sortFilter == SortFilter.descending,
+                                  () => setModalState(() =>
+                                      _sortFilter = SortFilter.descending),
+                                  primaryColor,
+                                  textColor,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Filter', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip('Newest', _sortFilter == SortFilter.newest,
-                            () => setModalState(() => _sortFilter = SortFilter.newest),
-                            primaryColor, textColor),
-                        _filterChip('Oldest', _sortFilter == SortFilter.oldest,
-                            () => setModalState(() => _sortFilter = SortFilter.oldest),
-                            primaryColor, textColor),
-                        _filterChip('Ascending', _sortFilter == SortFilter.ascending,
-                            () => setModalState(() => _sortFilter = SortFilter.ascending),
-                            primaryColor, textColor),
-                        _filterChip('Descending', _sortFilter == SortFilter.descending,
-                            () => setModalState(() => _sortFilter = SortFilter.descending),
-                            primaryColor, textColor),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          padding: const EdgeInsets.symmetric(vertical: 20),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
@@ -320,7 +394,9 @@ class _RequestPageState extends State<RequestPage> {
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.secondary : textColor.withValues(alpha: 0.3),
+            color: isSelected
+                ? AppColors.secondary
+                : textColor.withValues(alpha: 0.3),
           ),
         ),
         child: Text(

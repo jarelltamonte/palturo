@@ -57,7 +57,52 @@ class _ExplorePageState extends State<ExplorePage> {
               'Explore',
               style: AppTextStyles.headingText.copyWith(color: textTheme),
             ),
-            Icon(CupertinoIcons.search, color: textTheme, size: 24),
+            IconButton(
+              icon: Icon(
+                CupertinoIcons.question_circle,
+                color: textTheme,
+                size: 24,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog.adaptive(
+                      title: Text(
+                        'Explore',
+                        style: AppTextStyles.headingText.copyWith(
+                          color: textTheme,
+                          fontSize: 20,
+                        ),
+                      ),
+                      content: Text(
+                        'Explore different categories to discover skills and knowledge shared by other users.',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                          fontSize: 14,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Text(
+                            'Okay',
+                            style: AppTextStyles.boldText.copyWith(
+                              fontSize: 16,
+                              color: AppColors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -148,9 +193,7 @@ class _CategoryCard extends StatelessWidget {
                 stops: const [0.35, 1.0],
                 colors: [
                   Colors.transparent,
-                  Colors.black.withValues(
-                    alpha: hasImage ? 0.75 : 0.45,
-                  ),
+                  Colors.black.withValues(alpha: hasImage ? 0.75 : 0.45),
                 ],
               ),
             ),

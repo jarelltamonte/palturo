@@ -281,6 +281,7 @@ class _ChatsPageState extends State<ChatsPage> {
                 : null,
       ),
       body: SafeArea(
+        bottom: false,
         child: CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [

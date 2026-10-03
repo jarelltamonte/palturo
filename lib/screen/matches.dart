@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:palturo/theme/app_colors.dart';
 
 enum PalRole { learner, mentor }
 
@@ -227,7 +228,6 @@ class _MatchesState extends State<Matches> {
   void _showFilterSheet() {
     final bgColor = Theme.of(context).colorScheme.surface;
     final textColor = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
     RoleFilter draftRole = _roleFilter;
 
     showModalBottomSheet(
@@ -281,7 +281,7 @@ class _MatchesState extends State<Matches> {
                           'All',
                           draftRole == RoleFilter.all,
                           () => setModalState(() => draftRole = RoleFilter.all),
-                          primaryColor,
+                          AppColors.primary,
                           textColor,
                         ),
                         _filterChip(
@@ -289,7 +289,7 @@ class _MatchesState extends State<Matches> {
                           draftRole == RoleFilter.learner,
                           () => setModalState(
                               () => draftRole = RoleFilter.learner),
-                          primaryColor,
+                          AppColors.primary,
                           textColor,
                         ),
                         _filterChip(
@@ -297,7 +297,7 @@ class _MatchesState extends State<Matches> {
                           draftRole == RoleFilter.mentor,
                           () =>
                               setModalState(() => draftRole = RoleFilter.mentor),
-                          primaryColor,
+                          AppColors.primary,
                           textColor,
                         ),
                       ],
@@ -317,8 +317,8 @@ class _MatchesState extends State<Matches> {
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
@@ -385,6 +385,9 @@ class _MatchesState extends State<Matches> {
           PopupMenuButton<String>(
             icon: Icon(Icons.more_horiz, color: textTheme),
             padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             onSelected: (value) => _handleAction(value, pal),
             itemBuilder: (context) => [
               PopupMenuItem<String>(
@@ -529,7 +532,7 @@ class _MatchesState extends State<Matches> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: 0,
         title: _isSearching
             ? Container(
                 height: 40,
@@ -631,7 +634,7 @@ class _MatchesState extends State<Matches> {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: primaryColor,
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -645,6 +648,7 @@ class _MatchesState extends State<Matches> {
       ),
       body: SafeArea(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: SingleChildScrollView(

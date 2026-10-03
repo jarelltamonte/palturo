@@ -52,6 +52,8 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   final List<int> _history = [];
 
+  bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
+
   List<Person> get _filteredPeople {
     if (_roleFilter == RoleFilter.all) return _people;
     return _people
@@ -87,6 +89,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openFilterSheet() {
+    RoleFilter draftRole = _roleFilter;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -106,14 +110,30 @@ class _HomePageState extends State<HomePage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Filters',
-                      style: AppTextStyles.boldText.copyWith(
-                        color: textColor,
-                        fontSize: 18,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Filters',
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textColor,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              setModalState(() => draftRole = RoleFilter.all),
+                          child: Text(
+                            'Reset',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textColor.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     _sheetSectionLabel('Role', textColor),
                     const SizedBox(height: 8),
                     Wrap(
@@ -122,20 +142,22 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         _filterChip(
                             'All',
-                            _roleFilter == RoleFilter.all,
-                            () => setModalState(() => _roleFilter = RoleFilter.all),
+                            draftRole == RoleFilter.all,
+                            () => setModalState(() => draftRole = RoleFilter.all),
                             primaryColor,
                             textColor),
                         _filterChip(
                             'Learner',
-                            _roleFilter == RoleFilter.learner,
-                            () => setModalState(() => _roleFilter = RoleFilter.learner),
+                            draftRole == RoleFilter.learner,
+                            () => setModalState(
+                                () => draftRole = RoleFilter.learner),
                             primaryColor,
                             textColor),
                         _filterChip(
                             'Mentor',
-                            _roleFilter == RoleFilter.mentor,
-                            () => setModalState(() => _roleFilter = RoleFilter.mentor),
+                            draftRole == RoleFilter.mentor,
+                            () => setModalState(
+                                () => draftRole = RoleFilter.mentor),
                             primaryColor,
                             textColor),
                       ],
@@ -164,6 +186,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         onPressed: () {
                           setState(() {
+                            _roleFilter = draftRole;
                             _currentIndex = 0;
                             _history.clear();
                           });
@@ -263,9 +286,27 @@ class _HomePageState extends State<HomePage> {
                     size: 24,
                   ),
                 ),
-                IconButton(
-                  onPressed: _openFilterSheet,
-                  icon: Icon(Icons.tune, color: textTheme, size: 24),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      onPressed: _openFilterSheet,
+                      icon: Icon(Icons.tune, color: textTheme, size: 24),
+                    ),
+                    if (_hasActiveFilter)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),

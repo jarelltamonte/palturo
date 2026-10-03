@@ -75,6 +75,13 @@ class _RequestPageState extends State<RequestPage> {
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
 
+  Color get _filterDotColor => AppColors.primary;
+
+  bool get _hasActiveFilter =>
+      _dateFilter != DateFilter.all ||
+      _roleFilter != RoleFilter.all ||
+      _sortFilter != SortFilter.newest;
+
   final List<ConnectionRequest> _requests = [
     ConnectionRequest(
       id: '1',
@@ -164,6 +171,10 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   void _openFilterSheet() {
+    DateFilter draftDate = _dateFilter;
+    RoleFilter draftRole = _roleFilter;
+    SortFilter draftSort = _sortFilter;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -185,12 +196,31 @@ class _RequestPageState extends State<RequestPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Filters',
-                      style: AppTextStyles.boldText.copyWith(
-                        color: textColor,
-                        fontSize: 18,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Filters',
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textColor,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setModalState(() {
+                            draftDate = DateFilter.all;
+                            draftRole = RoleFilter.all;
+                            draftSort = SortFilter.newest;
+                          }),
+                          child: Text(
+                            'Reset',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textColor.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Flexible(
@@ -206,41 +236,41 @@ class _RequestPageState extends State<RequestPage> {
                               children: [
                                 _filterChip(
                                   'All',
-                                  _dateFilter == DateFilter.all,
+                                  draftDate == DateFilter.all,
                                   () => setModalState(
-                                      () => _dateFilter = DateFilter.all),
+                                      () => draftDate = DateFilter.all),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'Today',
-                                  _dateFilter == DateFilter.today,
+                                  draftDate == DateFilter.today,
                                   () => setModalState(
-                                      () => _dateFilter = DateFilter.today),
+                                      () => draftDate = DateFilter.today),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'This Week',
-                                  _dateFilter == DateFilter.thisWeek,
+                                  draftDate == DateFilter.thisWeek,
                                   () => setModalState(
-                                      () => _dateFilter = DateFilter.thisWeek),
+                                      () => draftDate = DateFilter.thisWeek),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'This Month',
-                                  _dateFilter == DateFilter.thisMonth,
+                                  draftDate == DateFilter.thisMonth,
                                   () => setModalState(
-                                      () => _dateFilter = DateFilter.thisMonth),
+                                      () => draftDate = DateFilter.thisMonth),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'This Year',
-                                  _dateFilter == DateFilter.thisYear,
+                                  draftDate == DateFilter.thisYear,
                                   () => setModalState(
-                                      () => _dateFilter = DateFilter.thisYear),
+                                      () => draftDate = DateFilter.thisYear),
                                   primaryColor,
                                   textColor,
                                 ),
@@ -255,25 +285,25 @@ class _RequestPageState extends State<RequestPage> {
                               children: [
                                 _filterChip(
                                   'All',
-                                  _roleFilter == RoleFilter.all,
+                                  draftRole == RoleFilter.all,
                                   () => setModalState(
-                                      () => _roleFilter = RoleFilter.all),
+                                      () => draftRole = RoleFilter.all),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'Learner',
-                                  _roleFilter == RoleFilter.learner,
+                                  draftRole == RoleFilter.learner,
                                   () => setModalState(
-                                      () => _roleFilter = RoleFilter.learner),
+                                      () => draftRole = RoleFilter.learner),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'Mentor',
-                                  _roleFilter == RoleFilter.mentor,
+                                  draftRole == RoleFilter.mentor,
                                   () => setModalState(
-                                      () => _roleFilter = RoleFilter.mentor),
+                                      () => draftRole = RoleFilter.mentor),
                                   primaryColor,
                                   textColor,
                                 ),
@@ -298,33 +328,33 @@ class _RequestPageState extends State<RequestPage> {
                               children: [
                                 _filterChip(
                                   'Newest',
-                                  _sortFilter == SortFilter.newest,
+                                  draftSort == SortFilter.newest,
                                   () => setModalState(
-                                      () => _sortFilter = SortFilter.newest),
+                                      () => draftSort = SortFilter.newest),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'Oldest',
-                                  _sortFilter == SortFilter.oldest,
+                                  draftSort == SortFilter.oldest,
                                   () => setModalState(
-                                      () => _sortFilter = SortFilter.oldest),
+                                      () => draftSort = SortFilter.oldest),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'Ascending (A-Z)',
-                                  _sortFilter == SortFilter.ascending,
+                                  draftSort == SortFilter.ascending,
                                   () => setModalState(
-                                      () => _sortFilter = SortFilter.ascending),
+                                      () => draftSort = SortFilter.ascending),
                                   primaryColor,
                                   textColor,
                                 ),
                                 _filterChip(
                                   'Descending (Z-A)',
-                                  _sortFilter == SortFilter.descending,
-                                  () => setModalState(() =>
-                                      _sortFilter = SortFilter.descending),
+                                  draftSort == SortFilter.descending,
+                                  () => setModalState(
+                                      () => draftSort = SortFilter.descending),
                                   primaryColor,
                                   textColor,
                                 ),
@@ -348,7 +378,11 @@ class _RequestPageState extends State<RequestPage> {
                           elevation: 0,
                         ),
                         onPressed: () {
-                          setState(() {});
+                          setState(() {
+                            _dateFilter = draftDate;
+                            _roleFilter = draftRole;
+                            _sortFilter = draftSort;
+                          });
                           Navigator.pop(context);
                         },
                         child: const Text(
@@ -436,9 +470,27 @@ class _RequestPageState extends State<RequestPage> {
               style: AppTextStyles.headingText.copyWith(color: textTheme),
             ),
             const Spacer(),
-            IconButton(
-              onPressed: _openFilterSheet,
-              icon: Icon(Icons.tune, color: textTheme, size: 22),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  onPressed: _openFilterSheet,
+                  icon: Icon(Icons.tune, color: textTheme, size: 22),
+                ),
+                if (_hasActiveFilter)
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _filterDotColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

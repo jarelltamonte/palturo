@@ -50,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 56),
 
                       const TopLabeledField(label: 'Email'),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       TopLabeledField(
                         label: 'Password',
@@ -69,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       SizedBox(
                         width: double.infinity,
@@ -95,7 +95,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             textStyle: AppTextStyles.boldText,
                             foregroundColor: AppColors.textSecondary,
                             shape: RoundedRectangleBorder(
@@ -105,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: const Text('Log In'),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       Center(
                         child: GestureDetector(
                           onTap: () {
@@ -154,7 +154,7 @@ class _LoginPageState extends State<LoginPage> {
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     foregroundColor: Theme.of(context).colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     side: BorderSide(
                       color: Theme.of(context).colorScheme.primary,
@@ -168,7 +168,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: const Text('Create new account'),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               Center(child: Image.asset('assets/images/brand.png', width: 145)),
             ],
           ),

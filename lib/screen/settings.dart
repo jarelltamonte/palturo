@@ -232,6 +232,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             activeTrackColor: AppColors.primary,
+            activeThumbColor: AppColors.white,
             value: _notificationsEnabled,
             onChanged: (bool value) {
               setState(() {
@@ -247,6 +248,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             activeTrackColor: AppColors.primary,
+            activeThumbColor: AppColors.white,
             value: _soundEnabled,
             onChanged: (bool value) {
               setState(() {
@@ -262,6 +264,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             activeTrackColor: AppColors.primary,
+            activeThumbColor: AppColors.white,
             value: _vibrationEnabled,
             onChanged: (bool value) {
               setState(() {
@@ -277,6 +280,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             activeTrackColor: AppColors.primary,
+            activeThumbColor: AppColors.white,
             value: _darkModeEnabled,
             onChanged: (bool value) {
               setState(() {

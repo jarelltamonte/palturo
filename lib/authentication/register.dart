@@ -81,7 +81,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 56),
+                      const SizedBox(height: 44),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
@@ -90,9 +90,9 @@ class _RegisterPageState extends State<RegisterPage> {
                           Expanded(child: TopLabeledField(label: 'Last name')),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       const TopLabeledField(label: 'Email'),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       TopLabeledField(
                         label: 'Password',
                         obscureText: _isPasswordObscured,
@@ -111,7 +111,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       TopLabeledField(
                         label: 'Confirm password',
                         obscureText: _isConfirmPasswordObscured,
@@ -131,7 +131,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 64),
                         child: RichText(
@@ -212,7 +212,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     foregroundColor: AppColors.textSecondary,
                     shape: RoundedRectangleBorder(

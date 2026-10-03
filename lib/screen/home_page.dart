@@ -273,7 +273,7 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
         child: hasMore
             ? Dismissible(
                 key: ValueKey(people[_currentIndex].id),

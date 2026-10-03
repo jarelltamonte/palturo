@@ -72,7 +72,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 32, top: 50),
         child: Column(
           spacing: 20,
           children: [
@@ -113,7 +113,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
                 onPressed: _next,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   textStyle: AppTextStyles.boldText,
                   foregroundColor: AppColors.textSecondary,
                   shape: RoundedRectangleBorder(

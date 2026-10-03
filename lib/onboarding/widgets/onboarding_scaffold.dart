@@ -114,7 +114,7 @@ class OnboardingScaffold extends StatelessWidget {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,7 +127,7 @@ class OnboardingScaffold extends StatelessWidget {
                     backgroundColor: AppColors.primary,
                     disabledBackgroundColor:
                         AppColors.primary.withValues(alpha: 0.3),
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     foregroundColor: AppColors.textSecondary,
                     shape: RoundedRectangleBorder(

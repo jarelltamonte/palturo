@@ -130,7 +130,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       textStyle: AppTextStyles.boldText,
                       foregroundColor: AppColors.textSecondary,
                       shape: RoundedRectangleBorder(

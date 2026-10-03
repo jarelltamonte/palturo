@@ -231,7 +231,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ),
                     Text(
                       widget.person.skillName,
-                      style: AppTextStyles.regularText.copyWith(
+                      style: AppTextStyles.boldText.copyWith(
                         color: AppColors.primary,
                         fontSize: 14,
                         shadows: [
@@ -354,7 +354,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 100,
+            bottom: 90,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -391,9 +391,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     onPressed: widget.onSkip,
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.textPrimary),
-                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(32),
                       ),
                     ),
                     child: const Text(
@@ -411,9 +411,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     onPressed: widget.onAdd,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(32),
                       ),
                       elevation: 0,
                     ),

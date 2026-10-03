@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
 class RequestCard extends StatelessWidget {
@@ -35,7 +36,7 @@ class RequestCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(28),
@@ -179,7 +180,7 @@ class RequestCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -194,7 +195,11 @@ class RequestCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(width: 2, height: 40, color: Colors.black),
+              Container(
+                width: 2,
+                height: 30,
+                color: AppColors.black.withValues(alpha: 0.2),
+              ),
               Expanded(
                 child: TextButton(
                   onPressed: onDecline,

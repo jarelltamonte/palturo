@@ -82,7 +82,7 @@ class _RoleCard extends StatelessWidget {
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 16 : 8,
-          vertical: 8,
+          vertical: compact ? 8 : 6,
         ),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : cardColor,

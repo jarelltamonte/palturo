@@ -65,7 +65,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   Widget _buildNavBar() {
     return Container(
       height: 60,
-      margin: const EdgeInsets.only(right: 16, left: 16, bottom: 32),
+      margin: const EdgeInsets.only(right: 16, left: 16, bottom: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         color: Theme.of(context).colorScheme.surface,

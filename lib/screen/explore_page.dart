@@ -107,7 +107,7 @@ class _ExplorePageState extends State<ExplorePage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
         child: LayoutBuilder(
           builder: (context, constraints) {
             const spacing = 16.0;

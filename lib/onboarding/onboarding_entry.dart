@@ -168,7 +168,7 @@ class _OnboardingEntryState extends State<OnboardingEntry>
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -179,7 +179,7 @@ class _OnboardingEntryState extends State<OnboardingEntry>
                   onPressed: widget.onContinue,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     foregroundColor: AppColors.textSecondary,
                     shape: RoundedRectangleBorder(

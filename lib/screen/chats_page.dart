@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/matches.dart';
 
 class ChatPreview {
   final String name;
@@ -132,6 +134,13 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
+  void _openMatches(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const Matches()),
+    );
+  }
+
   Widget _buildSearchField(Color textTheme, Color primaryColor) {
     return Container(
       height: 40,
@@ -219,6 +228,7 @@ class _ChatsPageState extends State<ChatsPage> {
     final matches = _filteredMatches;
     final messages = _filteredMessages;
     final nothingFound = matches.isEmpty && messages.isEmpty;
+    final showShortcut = _query.trim().isEmpty;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -291,9 +301,14 @@ class _ChatsPageState extends State<ChatsPage> {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    itemCount: matches.length,
+                    itemCount: matches.length + (showShortcut ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final chat = matches[index];
+                      if (showShortcut && index == 0) {
+                        return MatchesShortcutItem(
+                          onTap: () => _openMatches(context),
+                        );
+                      }
+                      final chat = matches[showShortcut ? index - 1 : index];
                       const ImageProvider? avatarImage = null;
 
                       return ChatProfileItem(
@@ -346,6 +361,57 @@ class _ChatsPageState extends State<ChatsPage> {
             if (nothingFound)
               SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
             const SliverToBoxAdapter(child: SizedBox(height: 110)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MatchesShortcutItem extends StatelessWidget {
+  final VoidCallback? onTap;
+
+  const MatchesShortcutItem({super.key, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 100,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                CupertinoIcons.person_3_fill,
+                color: textTheme,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: 100,
+              child: Text(
+                'All',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                  fontSize: 16,
+                ),
+              ),
+            ),
           ],
         ),
       ),

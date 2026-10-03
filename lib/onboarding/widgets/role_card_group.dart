@@ -20,9 +20,8 @@ class RoleCardGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleOptions = isEditing
-        ? options
-        : options.where((o) => o.role == selected).toList();
+    final visibleOptions =
+        isEditing ? options : options.where((o) => o.role == selected).toList();
 
     final isCompact = visibleOptions.length == 1;
 
@@ -64,9 +63,10 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected
-        ? AppColors.textSecondary
-        : Theme.of(context).colorScheme.secondary;
+    final fg =
+        selected
+            ? AppColors.textSecondary
+            : Theme.of(context).colorScheme.secondary;
 
     final cardColor = Theme.of(context).colorScheme.surface;
 
@@ -89,74 +89,70 @@ class _RoleCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: 0.1),
+              spreadRadius: 0,
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-        child: compact
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    option.iconAsset,
-                    width: 20,
-                    height: 20,
-                    colorFilter: ColorFilter.mode(
-                      fg,
-                      BlendMode.srcIn,
+        child:
+            compact
+                ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SvgPicture.asset(
+                      option.iconAsset,
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  RichText(
-                    text: TextSpan(
-                      style: AppTextStyles.regularText.copyWith(color: fg),
-                      children: [
-                        TextSpan(text: '$firstLine '),
-                        TextSpan(
-                          text: secondLine,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.regularText.copyWith(color: fg),
+                        children: [
+                          TextSpan(text: '$firstLine '),
+                          TextSpan(
+                            text: secondLine,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    option.iconAsset,
-                    width: 24,
-                    height: 24,
-                    colorFilter: ColorFilter.mode(
-                      fg,
-                      BlendMode.srcIn,
+                  ],
+                )
+                : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SvgPicture.asset(
+                      option.iconAsset,
+                      width: 24,
+                      height: 24,
+                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: '$firstLine\n'),
-                        TextSpan(
-                          text: secondLine,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: '$firstLine\n'),
+                          TextSpan(
+                            text: secondLine,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: fg,
+                        height: 1.1,
+                        leadingDistribution: TextLeadingDistribution.even,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: fg,
-                      height: 1.1,
-                      leadingDistribution: TextLeadingDistribution.even,
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
       ),
     );
   }

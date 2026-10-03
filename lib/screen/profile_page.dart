@@ -128,9 +128,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
+                              color: Colors.black.withValues(alpha: 0.1),
+                              spreadRadius: 0,
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
@@ -221,10 +222,11 @@ class _ProfileSummaryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
+            color: Colors.black.withValues(alpha: 0.1),
+            spreadRadius: 0,
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
           ],
         ),
         child: Column(

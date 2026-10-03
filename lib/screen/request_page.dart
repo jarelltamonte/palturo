@@ -438,7 +438,6 @@ class _RequestPageState extends State<RequestPage> {
           style: AppTextStyles.regularText.copyWith(
             color: isSelected ? AppColors.black : textColor,
             fontSize: 13,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ),

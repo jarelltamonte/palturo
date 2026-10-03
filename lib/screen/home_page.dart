@@ -243,7 +243,6 @@ class _HomePageState extends State<HomePage> {
           style: AppTextStyles.regularText.copyWith(
             color: isSelected ? Colors.black : textColor,
             fontSize: 13,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ),

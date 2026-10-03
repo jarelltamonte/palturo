@@ -295,8 +295,8 @@ class _MatchesState extends State<Matches> {
                         _filterChip(
                           'Mentor',
                           draftRole == RoleFilter.mentor,
-                          () =>
-                              setModalState(() => draftRole = RoleFilter.mentor),
+                          () => setModalState(
+                              () => draftRole = RoleFilter.mentor),
                           AppColors.primary,
                           textColor,
                         ),
@@ -385,9 +385,9 @@ class _MatchesState extends State<Matches> {
           PopupMenuButton<String>(
             icon: Icon(Icons.more_horiz, color: textTheme),
             padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             onSelected: (value) => _handleAction(value, pal),
             itemBuilder: (context) => [
               PopupMenuItem<String>(
@@ -532,7 +532,7 @@ class _MatchesState extends State<Matches> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 0,
+        titleSpacing: 16,
         title: _isSearching
             ? Container(
                 height: 40,
@@ -586,20 +586,26 @@ class _MatchesState extends State<Matches> {
               )
             : Align(
                 alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: Icon(
-                    Icons.arrow_back_ios,
-                    color: textTheme,
-                    size: 16,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.pop(context),
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      top: 12,
+                      bottom: 12,
+                      right: 24,
+                    ),
+                    child: Icon(
+                      Icons.arrow_back_ios_new,
+                      color: textTheme,
+                      size: 16,
+                    ),
                   ),
                 ),
               ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.only(right: 4.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -618,7 +624,6 @@ class _MatchesState extends State<Matches> {
                     icon: Icon(CupertinoIcons.search, color: textTheme),
                     onPressed: _startSearch,
                   ),
-                const SizedBox(width: 8),
                 Stack(
                   clipBehavior: Clip.none,
                   children: [

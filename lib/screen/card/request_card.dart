@@ -36,7 +36,7 @@ class RequestCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(28),
@@ -196,7 +196,7 @@ class RequestCard extends StatelessWidget {
                 ),
               ),
               Container(
-                width: 2,
+                width: 1,
                 height: 30,
                 color: AppColors.black.withValues(alpha: 0.2),
               ),

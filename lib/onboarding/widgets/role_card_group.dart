@@ -82,7 +82,7 @@ class _RoleCard extends StatelessWidget {
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 16 : 8,
-          vertical: compact ? 8 : 6,
+          vertical: compact ? 8 : 4,
         ),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : cardColor,
@@ -138,17 +138,21 @@ class _RoleCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    firstLine,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(color: fg),
-                  ),
-                  Text(
-                    secondLine,
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '$firstLine\n'),
+                        TextSpan(
+                          text: secondLine,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                     textAlign: TextAlign.center,
                     style: AppTextStyles.regularText.copyWith(
                       color: fg,
-                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                      leadingDistribution: TextLeadingDistribution.even,
                     ),
                   ),
                 ],

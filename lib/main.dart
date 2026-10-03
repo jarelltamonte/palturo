@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/landing_page.dart';
 import 'package:palturo/onboarding_intro.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   PreferencesService.instance.init();
 
@@ -18,6 +21,7 @@ void main() async {
     ),
   );
 }
+
 mixin MyAppThemeController on State<MyApp> {
   void setThemeMode(bool isDark);
 }
@@ -40,6 +44,13 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with MyAppThemeController {
   ThemeMode _themeMode = ThemeMode.light;
+
+  @override
+  void initState() {
+    super.initState();
+    // 5. Dismiss the splash screen cleanly as soon as the first frame loads
+    FlutterNativeSplash.remove();
+  }
 
   @override
   void setThemeMode(bool isDark) {

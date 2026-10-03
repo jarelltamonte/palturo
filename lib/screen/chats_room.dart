@@ -108,11 +108,26 @@ class _ChatRoomState extends State<ChatRoom> {
               elevation: 6,
               offset: const Offset(0, 40),
               onSelected: (value) {
-                if (value == 'block') {
+                if (value == 'unmatch') {
                 } else if (value == 'report') {
                 }
               },
               itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'unmatch',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Unmatch',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 PopupMenuItem<String>(
                   value: 'report',
                   child: Row(
@@ -122,21 +137,6 @@ class _ChatRoomState extends State<ChatRoom> {
                       const SizedBox(width: 12),
                       Text(
                         'Report',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'block',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Block',
                         style: AppTextStyles.regularText.copyWith(
                           color: textTheme,
                         ),
@@ -188,7 +188,7 @@ class _ChatRoomState extends State<ChatRoom> {
             ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [

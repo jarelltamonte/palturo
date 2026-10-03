@@ -52,7 +52,7 @@ class OnboardingScaffold extends StatelessWidget {
                 elevation: 0,
                 scrolledUnderElevation: 0,
                 automaticallyImplyLeading: false,
-                titleSpacing: 24,
+                titleSpacing: 16,
                 title: Row(
                   children: [
                     if (showBackButton)
@@ -67,7 +67,7 @@ class OnboardingScaffold extends StatelessWidget {
                     if (progress > 0)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(right: 24),
+                          padding: const EdgeInsets.only(right: 0),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
@@ -89,7 +89,7 @@ class OnboardingScaffold extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -114,7 +114,7 @@ class OnboardingScaffold extends StatelessWidget {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,

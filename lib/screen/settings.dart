@@ -26,6 +26,163 @@ class _SettingsState extends State<Settings> {
     super.dispose();
   }
 
+  void _showFeedbackDialog() {
+    int selectedRating = 0;
+
+    showAdaptiveDialog(
+      context: context,
+      builder: (dialogContext) {
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final textTheme = Theme.of(context).colorScheme.secondary;
+
+            final ratingContent = Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'How would you rate your experience with PalTuro?',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    5,
+                    (index) {
+                      final rating = index + 1;
+
+                      return IconButton(
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedRating = rating;
+                          });
+                        },
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        icon: Icon(
+                          rating <= selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 34,
+                          color: AppColors.primary,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  selectedRating == 0
+                      ? 'Tap a star to rate'
+                      : '$selectedRating out of 5',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme.withValues(alpha: .5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            );
+
+            if (isIOS) {
+              return CupertinoAlertDialog(
+                title: Text(
+                  'Submit a Feedback',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme,
+                    fontSize: 18,
+                  ),
+                ),
+                content: Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ratingContent,
+                  ),
+                ),
+                actions: [
+                  CupertinoDialogAction(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                    },
+                    child: Text(
+                      'Cancel',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                  ),
+                  CupertinoDialogAction(
+                    onPressed: selectedRating == 0
+                        ? null
+                        : () {
+                            Navigator.pop(dialogContext);
+                          },
+                    child: Text(
+                      'Submit',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: Text(
+                'Submit a Feedback',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                  fontSize: 18,
+                ),
+              ),
+              content: ratingContent,
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  child: Text(
+                    'Cancel',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: selectedRating == 0
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext);
+                        },
+                  child: Text(
+                    'Submit',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showReportDialog() {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
@@ -133,6 +290,10 @@ class _SettingsState extends State<Settings> {
         }
 
         return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           title: Text(
             'Report a Problem',
             style: AppTextStyles.regularText.copyWith(
@@ -289,7 +450,27 @@ class _SettingsState extends State<Settings> {
               MyApp.of(context).setThemeMode(value);
             },
           ),
-          const Divider(height: 32),
+          Divider(
+            height: 20,
+            color: AppColors.black.withValues(alpha: 0.2),
+          ),
+          ListTile(
+            leading: Icon(
+              Icons.feedback_outlined,
+              color: textTheme,
+            ),
+            title: Text(
+              'Submit a Feedback',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+              ),
+            ),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: textTheme,
+            ),
+            onTap: _showFeedbackDialog,
+          ),
           ListTile(
             leading: Icon(
               Icons.report_problem_outlined,

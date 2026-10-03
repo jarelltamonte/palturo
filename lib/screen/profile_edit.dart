@@ -13,15 +13,16 @@ import 'profile_data.dart';
 class ProfileEditPage extends StatefulWidget {
   final ProfileData profile;
 
-  const ProfileEditPage({super.key, required this.profile});
+  const ProfileEditPage({
+    super.key,
+    required this.profile,
+  });
 
   @override
   State<ProfileEditPage> createState() => _ProfileEditPageState();
 }
 
 class _ProfileEditPageState extends State<ProfileEditPage> {
-  late TextEditingController _nameController;
-
   late String _schedulePlaceholder;
   late String _languagesPlaceholder;
   late String _learningStylesPlaceholder;
@@ -46,28 +47,27 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       'assets/icons/rmentor.svg',
       'I want to\nteach',
     ),
-    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
+    RoleOption(
+      OnboardingRole.both,
+      'assets/icons/rboth.svg',
+      'I can do\nboth',
+    ),
   ];
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.profile.name);
+
     _schedulePlaceholder = widget.profile.schedule;
     _languagesPlaceholder = widget.profile.languages.join(', ');
     _learningStylesPlaceholder = widget.profile.interests.join(', ');
     _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);
     _teachingSkillIds = List.from(widget.profile.teachingSkillIds);
+
     if (widget.profile.avatarUrl != null) {
       _photos[0] = widget.profile.avatarUrl;
     }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
   }
 
   Future<void> _pickMultiSelect({
@@ -80,11 +80,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
       ),
       builder: (context) {
         final secondary = Theme.of(context).colorScheme.secondary;
         var tempSelected = List<String>.from(selected);
+
         return StatefulBuilder(
           builder: (context, setModalState) {
             return SafeArea(
@@ -96,7 +99,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   children: [
                     Text(
                       title,
-                      style: AppTextStyles.boldText.copyWith(color: secondary),
+                      style: AppTextStyles.boldText.copyWith(
+                        color: secondary,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Flexible(
@@ -104,35 +109,57 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         shrinkWrap: true,
                         children: [
                           for (final option in options)
-                            CheckboxListTile(
+                            ListTile(
                               contentPadding: EdgeInsets.zero,
-                              activeColor: AppColors.primary,
-                              checkColor: Colors.black,
-                              value: tempSelected.contains(option),
+                              onTap: () {
+                                setModalState(() {
+                                  if (tempSelected.contains(option)) {
+                                    tempSelected.remove(option);
+                                  } else {
+                                    tempSelected.add(option);
+                                  }
+                                });
+                              },
                               title: Text(
                                 option,
                                 style: AppTextStyles.regularText.copyWith(
                                   color: secondary,
                                 ),
                               ),
-                              onChanged: (checked) {
-                                setModalState(() {
-                                  if (checked == true) {
-                                    tempSelected.add(option);
-                                  } else {
-                                    tempSelected.remove(option);
-                                  }
-                                });
-                              },
+                              trailing: Checkbox.adaptive(
+                                value: tempSelected.contains(option),
+                                activeColor: AppColors.primary,
+                                onChanged: (_) {
+                                  setModalState(() {
+                                    if (tempSelected.contains(option)) {
+                                      tempSelected.remove(option);
+                                    } else {
+                                      tempSelected.add(option);
+                                    }
+                                  });
+                                },
+                              ),
                             ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context, tempSelected),
+                        onPressed: () {
+                          Navigator.pop(context, tempSelected);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                          foregroundColor: AppColors.textSecondary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
                         child: const Text('Done'),
                       ),
                     ),
@@ -144,21 +171,29 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         );
       },
     );
-    if (result != null) onSaved(result);
+
+    if (result != null) {
+      onSaved(result);
+    }
   }
 
   void _save() {
     final updated = widget.profile.copyWith(
-      name: _nameController.text,
       avatarUrl: _photos[0],
-      schedule: _schedule.isEmpty ? _schedulePlaceholder : _schedule.join('/'),
-      languages: _languages.isEmpty ? widget.profile.languages : _languages,
-      interests:
-          _learningStyles.isEmpty ? widget.profile.interests : _learningStyles,
+      schedule: _schedule.isEmpty
+          ? _schedulePlaceholder
+          : _schedule.join('/'),
+      languages: _languages.isEmpty
+          ? widget.profile.languages
+          : _languages,
+      interests: _learningStyles.isEmpty
+          ? widget.profile.interests
+          : _learningStyles,
       role: _role,
       learningSkillIds: _learningSkillIds,
       teachingSkillIds: _teachingSkillIds,
     );
+
     Navigator.pop(context, updated);
   }
 
@@ -174,10 +209,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: textTheme2),
+        iconTheme: IconThemeData(
+          color: textTheme2,
+        ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: textTheme,
-                size: 16),
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: textTheme,
+            size: 16,
+          ),
           onPressed: () {
             Navigator.of(context).pop();
           },
@@ -199,7 +239,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
               onPressed: _save,
               child: Text(
                 'Save',
-                style: AppTextStyles.regularText.copyWith(color: textTheme2),
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme2,
+                ),
               ),
             ),
           ),
@@ -215,27 +257,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _PhotoPickerRow(
                 photoPaths: _photos,
-                onChanged: (updated) => setState(() => _photos = updated),
+                onChanged: (updated) {
+                  setState(() => _photos = updated);
+                },
               ),
             ),
             const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                controller: _nameController,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.headingText.copyWith(
-                  color: textTheme,
-                  fontSize: 20,
-                ),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: 'Your name',
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -243,17 +270,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 children: [
                   _DropdownInfoField(
                     icon: Icons.calendar_today_outlined,
-                    label: 'Schedule',
+                    label: 'Availability',
                     value: _schedule.join('/'),
                     hint: _schedulePlaceholder,
-                    onTap:
-                        () => _pickMultiSelect(
-                          title: 'Schedule',
-                          options: kDayOptions,
-                          selected: _schedule,
-                          onSaved:
-                              (result) => setState(() => _schedule = result),
-                        ),
+                    onTap: () => _pickMultiSelect(
+                      title: 'Availability',
+                      options: kDayOptions,
+                      selected: _schedule,
+                      onSaved: (result) {
+                        setState(() => _schedule = result);
+                      },
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _DropdownInfoField(
@@ -261,14 +288,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     label: 'Language',
                     value: _languages.join(', '),
                     hint: _languagesPlaceholder,
-                    onTap:
-                        () => _pickMultiSelect(
-                          title: 'Language Preference',
-                          options: kLanguageOptions,
-                          selected: _languages,
-                          onSaved:
-                              (result) => setState(() => _languages = result),
-                        ),
+                    onTap: () => _pickMultiSelect(
+                      title: 'Language Preference',
+                      options: kLanguageOptions,
+                      selected: _languages,
+                      onSaved: (result) {
+                        setState(() => _languages = result);
+                      },
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _DropdownInfoField(
@@ -276,15 +303,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     label: 'Learning Style',
                     value: _learningStyles.join(', '),
                     hint: _learningStylesPlaceholder,
-                    onTap:
-                        () => _pickMultiSelect(
-                          title: 'Learning Style',
-                          options: kLearningStyleOptions,
-                          selected: _learningStyles,
-                          onSaved:
-                              (result) =>
-                                  setState(() => _learningStyles = result),
-                        ),
+                    onTap: () => _pickMultiSelect(
+                      title: 'Learning Style',
+                      options: kLearningStyleOptions,
+                      selected: _learningStyles,
+                      onSaved: (result) {
+                        setState(() => _learningStyles = result);
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -298,7 +324,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   Center(
                     child: FractionallySizedBox(
                       widthFactor: 0.8,
-                      child: Divider(color: textTheme.withValues(alpha:0.2), thickness: 1),
+                      child: Divider(
+                        color: textTheme.withValues(alpha: 0.2),
+                        thickness: 1,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -306,7 +335,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     options: _roleOptions,
                     selected: _role,
                     isEditing: true,
-                    onSelect: (role) => setState(() => _role = role),
+                    onSelect: (role) {
+                      setState(() => _role = role);
+                    },
                   ),
                   const SizedBox(height: 24),
                   if (_role == OnboardingRole.learn ||
@@ -314,9 +345,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     SkillsCard.toLearn(
                       isEditing: true,
                       initialSkillIds: _learningSkillIds,
-                      onChanged:
-                          (updatedIds) =>
-                              setState(() => _learningSkillIds = updatedIds),
+                      onChanged: (updatedIds) {
+                        setState(() => _learningSkillIds = updatedIds);
+                      },
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -325,9 +356,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     SkillsCard.toTeach(
                       isEditing: true,
                       initialSkillIds: _teachingSkillIds,
-                      onChanged:
-                          (updatedIds) =>
-                              setState(() => _teachingSkillIds = updatedIds),
+                      onChanged: (updatedIds) {
+                        setState(() => _teachingSkillIds = updatedIds);
+                      },
                       onAttachFile: (skillId) {
                         debugPrint('Attach file for $skillId');
                       },
@@ -343,12 +374,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 }
 
-class _DropdownInfoField extends StatelessWidget {
+class _DropdownInfoField extends StatefulWidget {
   final IconData icon;
   final String label;
   final String value;
   final String hint;
-  final VoidCallback onTap;
+  final Future<void> Function() onTap;
 
   const _DropdownInfoField({
     required this.icon,
@@ -359,21 +390,41 @@ class _DropdownInfoField extends StatelessWidget {
   });
 
   @override
+  State<_DropdownInfoField> createState() => _DropdownInfoFieldState();
+}
+
+class _DropdownInfoFieldState extends State<_DropdownInfoField> {
+  bool _isOpen = false;
+
+  Future<void> _handleTap() async {
+    setState(() => _isOpen = true);
+    await widget.onTap();
+
+    if (mounted) {
+      setState(() => _isOpen = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final showHint = value.isEmpty;
+    final showHint = widget.value.isEmpty;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: _handleTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: textColor),
+          Icon(
+            widget.icon,
+            size: 18,
+            color: textColor,
+          ),
           const SizedBox(width: 8),
           SizedBox(
             width: 120,
             child: Text(
-              label,
+              widget.label,
               style: TextStyle(
                 color: textColor,
                 fontSize: 16,
@@ -386,21 +437,25 @@ class _DropdownInfoField extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    showHint ? hint : value,
+                    showHint ? widget.hint : widget.value,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color:
-                          showHint
-                              ? textColor.withValues(alpha: 0.4)
-                              : textColor,
+                      color: showHint
+                          ? textColor.withValues(alpha: 0.4)
+                          : textColor,
                       fontSize: 16,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 20,
-                  color: textColor.withValues(alpha: 0.6),
+                AnimatedRotation(
+                  turns: _isOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: textColor.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
             ),
@@ -415,15 +470,21 @@ class _PhotoPickerRow extends StatelessWidget {
   final List<String?> photoPaths;
   final ValueChanged<List<String?>> onChanged;
 
-  const _PhotoPickerRow({required this.photoPaths, required this.onChanged});
+  const _PhotoPickerRow({
+    required this.photoPaths,
+    required this.onChanged,
+  });
 
   Future<void> _pickPhoto(int index) async {
     final picker = ImagePicker();
+
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
     );
+
     if (picked == null) return;
+
     final updated = List<String?>.from(photoPaths);
     updated[index] = picked.path;
     onChanged(updated);
@@ -479,21 +540,26 @@ class _PhotoSlot extends StatelessWidget {
               decoration: BoxDecoration(
                 color: hasImage ? null : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.primary, width: 3),
-                image:
-                    hasImage
-                        ? DecorationImage(
-                          image: FileImage(File(path!)),
-                          fit: BoxFit.cover,
-                        )
-                        : null,
+                border: Border.all(
+                  color: AppColors.primary,
+                  width: 3,
+                ),
+                image: hasImage
+                    ? DecorationImage(
+                        image: FileImage(File(path!)),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-              child:
-                  hasImage
-                      ? null
-                      : const Center(
-                        child: Icon(Icons.add, size: 32, color: Colors.black54),
+              child: hasImage
+                  ? null
+                  : const Center(
+                      child: Icon(
+                        Icons.add,
+                        size: 32,
+                        color: Colors.black54,
                       ),
+                    ),
             ),
             if (hasImage)
               Positioned(

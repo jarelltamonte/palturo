@@ -1,9 +1,14 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
-class OnboardingSelectField extends StatelessWidget {
+bool get _isCupertino => defaultTargetPlatform == TargetPlatform.iOS;
+
+class OnboardingSelectField extends StatefulWidget {
   final String? label;
+  final IconData? labelIcon;
   final String hint;
   final String displayValue;
   final List<String> options;
@@ -14,6 +19,7 @@ class OnboardingSelectField extends StatelessWidget {
   const OnboardingSelectField({
     super.key,
     this.label,
+    this.labelIcon,
     required this.hint,
     required this.displayValue,
     required this.options,
@@ -22,21 +28,49 @@ class OnboardingSelectField extends StatelessWidget {
     this.multiSelect = false,
   });
 
+  @override
+  State<OnboardingSelectField> createState() => _OnboardingSelectFieldState();
+}
+
+class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
+  bool _isOpen = false;
+
   Future<void> _openPicker(BuildContext context) async {
-    final result = await showModalBottomSheet<Set<String>>(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _SelectSheet(
-        title: label ?? hint,
-        options: options,
-        initialSelected: selected,
-        multiSelect: multiSelect,
-      ),
-    );
-    if (result != null) onChanged(result);
+    setState(() => _isOpen = true);
+
+    final result = (widget.multiSelect && _isCupertino)
+        ? await Navigator.of(context).push<Set<String>>(
+            CupertinoPageRoute(
+              builder: (context) => _CupertinoSelectPage(
+                title: widget.label ?? widget.hint,
+                options: widget.options,
+                initialSelected: widget.selected,
+              ),
+            ),
+          )
+        : await showModalBottomSheet<Set<String>>(
+            context: context,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            builder: (context) => _SelectSheet(
+              title: widget.label ?? widget.hint,
+              options: widget.options,
+              initialSelected: widget.selected,
+              multiSelect: widget.multiSelect,
+            ),
+          );
+
+    if (mounted) {
+      setState(() => _isOpen = false);
+    }
+
+    if (result != null) {
+      widget.onChanged(result);
+    }
   }
 
   @override
@@ -46,10 +80,24 @@ class OnboardingSelectField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (label != null) ...[
-          Text(
-            label!,
-            style: AppTextStyles.regularText.copyWith(color: secondary),
+        if (widget.label != null) ...[
+          Row(
+            children: [
+              if (widget.labelIcon != null) ...[
+                Icon(
+                  widget.labelIcon,
+                  size: 18,
+                  color: secondary,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                widget.label!,
+                style: AppTextStyles.regularText.copyWith(
+                  color: secondary,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
         ],
@@ -57,26 +105,40 @@ class OnboardingSelectField extends StatelessWidget {
           onTap: () => _openPicker(context),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: secondary.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: secondary.withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    displayValue.isEmpty ? hint : displayValue,
+                    widget.displayValue.isEmpty
+                        ? widget.hint
+                        : widget.displayValue,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.regularText.copyWith(
-                      color: displayValue.isEmpty
+                      color: widget.displayValue.isEmpty
                           ? secondary.withValues(alpha: 0.5)
                           : secondary,
                     ),
                   ),
                 ),
-                Icon(Icons.keyboard_arrow_down_rounded,
-                    color: secondary.withValues(alpha: 0.7)),
+                AnimatedRotation(
+                  turns: _isOpen ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: secondary.withValues(alpha: 0.7),
+                  ),
+                ),
               ],
             ),
           ),
@@ -104,7 +166,17 @@ class _SelectSheet extends StatefulWidget {
 }
 
 class _SelectSheetState extends State<_SelectSheet> {
-  late Set<String> _selected = {...widget.initialSelected};
+  late final Set<String> _selected = {...widget.initialSelected};
+
+  void _selectOption(String option) {
+    setState(() {
+      _selected
+        ..clear()
+        ..add(option);
+    });
+
+    Navigator.pop(context, _selected);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,35 +189,56 @@ class _SelectSheetState extends State<_SelectSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.title,
-                style: AppTextStyles.boldText.copyWith(color: secondary)),
+            Text(
+              widget.title,
+              style: AppTextStyles.boldText.copyWith(
+                color: secondary,
+              ),
+            ),
             const SizedBox(height: 12),
             Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final option in widget.options)
-                    _OptionTile(
-                      label: option,
-                      selected: _selected.contains(option),
-                      multiSelect: widget.multiSelect,
-                      onTap: () {
-                        setState(() {
-                          if (widget.multiSelect) {
-                            _selected.contains(option)
-                                ? _selected.remove(option)
-                                : _selected.add(option);
-                          } else {
-                            _selected = {option};
-                          }
-                        });
-                        if (!widget.multiSelect) {
-                          Navigator.pop(context, _selected);
+              child: widget.multiSelect
+                  ? ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final option in widget.options)
+                          _OptionTile(
+                            label: option,
+                            selected: _selected.contains(option),
+                            multiSelect: true,
+                            onTap: () {
+                              setState(() {
+                                if (_selected.contains(option)) {
+                                  _selected.remove(option);
+                                } else {
+                                  _selected.add(option);
+                                }
+                              });
+                            },
+                          ),
+                      ],
+                    )
+                  : RadioGroup<String>(
+                      groupValue:
+                          _selected.isEmpty ? null : _selected.first,
+                      onChanged: (value) {
+                        if (value != null) {
+                          _selectOption(value);
                         }
                       },
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final option in widget.options)
+                            _OptionTile(
+                              label: option,
+                              selected: _selected.contains(option),
+                              multiSelect: false,
+                              onTap: () => _selectOption(option),
+                            ),
+                        ],
+                      ),
                     ),
-                ],
-              ),
             ),
             if (widget.multiSelect) ...[
               const SizedBox(height: 12),
@@ -192,13 +285,113 @@ class _OptionTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       onTap: onTap,
-      title: Text(label,
-          style: AppTextStyles.regularText.copyWith(color: secondary)),
-      trailing: Icon(
-        multiSelect
-            ? (selected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
-            : (selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded),
-        color: selected ? AppColors.primary : secondary.withValues(alpha: 0.4),
+      title: Text(
+        label,
+        style: AppTextStyles.regularText.copyWith(
+          color: secondary,
+        ),
+      ),
+      trailing: multiSelect
+          ? Checkbox.adaptive(
+              value: selected,
+              activeColor: AppColors.primary,
+              onChanged: (_) => onTap(),
+            )
+          : Radio<String>(
+              value: label,
+              activeColor: AppColors.primary,
+            ),
+    );
+  }
+}
+
+class _CupertinoSelectPage extends StatefulWidget {
+  final String title;
+  final List<String> options;
+  final Set<String> initialSelected;
+
+  const _CupertinoSelectPage({
+    required this.title,
+    required this.options,
+    required this.initialSelected,
+  });
+
+  @override
+  State<_CupertinoSelectPage> createState() => _CupertinoSelectPageState();
+}
+
+class _CupertinoSelectPageState extends State<_CupertinoSelectPage> {
+  late final Set<String> _selected = {...widget.initialSelected};
+
+  void _pop() {
+    Navigator.pop(context, _selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.pop(context, _selected);
+        }
+      },
+      child: CupertinoPageScaffold(
+        child: CustomScrollView(
+          slivers: [
+            CupertinoSliverNavigationBar(
+              largeTitle: Text(widget.title),
+              leading: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _pop,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.back),
+                    Text('Back'),
+                  ],
+                ),
+              ),
+            ),
+            SliverSafeArea(
+              top: false,
+              sliver: SliverList.separated(
+                itemCount: widget.options.length,
+                separatorBuilder: (context, index) => const Padding(
+                  padding: EdgeInsets.only(left: 16),
+                  child: Divider(height: 1),
+                ),
+                itemBuilder: (context, index) {
+                  final option = widget.options[index];
+                  final isSelected = _selected.contains(option);
+
+                  return CupertinoListTile(
+                    title: Text(option),
+                    leading: SizedBox(
+                      width: 24,
+                      child: isSelected
+                          ? const Icon(
+                              CupertinoIcons.check_mark,
+                              color: AppColors.primary,
+                              size: 20,
+                            )
+                          : null,
+                    ),
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selected.remove(option);
+                        } else {
+                          _selected.add(option);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

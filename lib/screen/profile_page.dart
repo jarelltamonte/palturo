@@ -4,6 +4,8 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/skills_card.dart';
+import 'package:palturo/theme/app_colors.dart';
+import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
@@ -75,9 +77,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(
-              right: 16.0,
-            ), 
+            padding: const EdgeInsets.only(right: 16.0),
             child: IconButton(
               icon: Icon(Icons.settings, color: textTheme),
               onPressed: () {
@@ -100,10 +100,74 @@ class _ProfilePageState extends State<ProfilePage> {
               child: _ProfileSummaryCard(profile: _profile, onTap: _openEdit),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const Matches(),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        height: 56,
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Friends',
+                                    style: AppTextStyles.boldText.copyWith(
+                                      color: textTheme,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '142',
+                                    style: AppTextStyles.regularText.copyWith(
+                                      color: textTheme.withValues(alpha: 0.6),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: textTheme),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Divider(
+                    color: textTheme.withValues(alpha: 0.2),
+                    thickness: 1,
+                  ),
+                  const SizedBox(height: 16),
                   RoleCardGroup(
                     options: _roleOptions,
                     selected: _profile.role,
@@ -128,7 +192,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
-          const SizedBox(height: 120),
+            const SizedBox(height: 120),
           ],
         ),
       ),
@@ -151,7 +215,7 @@ class _ProfileSummaryCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(24),

@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/chats_page.dart' show SkillTag;
 
 class ChatRoom extends StatefulWidget {
   final String name;
   final ImageProvider? avatarImage;
+  final String? skillName;
+  final PersonRole? role;
 
   const ChatRoom({
     super.key,
     required this.name,
     this.avatarImage,
+    this.skillName,
+    this.role,
   });
 
   @override
@@ -65,7 +71,7 @@ class _ChatRoomState extends State<ChatRoom> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
+        toolbarHeight: adaptiveHeight + (widget.skillName != null ? 8 : 0),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -89,12 +95,27 @@ class _ChatRoomState extends State<ChatRoom> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  widget.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.boldText.copyWith(
-                    color: textTheme,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.boldText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    if (widget.skillName != null) ...[
+                      const SizedBox(height: 2),
+                      SkillTag(
+                        skillName: widget.skillName!,
+                        role: widget.role,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ] else
@@ -180,6 +201,21 @@ class _ChatRoomState extends State<ChatRoom> {
                       fontSize: 18,
                     ),
                   ),
+                  if (widget.skillName != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'You matched on',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.6),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SkillTag(
+                      skillName: widget.skillName!,
+                      role: widget.role,
+                    ),
+                  ],
                 ],
               ),
             )
@@ -207,7 +243,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     fillColor: AppColors.secondary,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 20,
+                      vertical: 16,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),

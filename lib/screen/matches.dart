@@ -3,18 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
-
-enum PalRole { learner, mentor }
+import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/chats_page.dart' show SkillTag;
 
 enum RoleFilter { all, learner, mentor }
-
-class Pal {
-  final String id;
-  final String name;
-  final PalRole role;
-
-  const Pal({required this.id, required this.name, required this.role});
-}
 
 class Matches extends StatefulWidget {
   const Matches({super.key});
@@ -49,34 +42,7 @@ class _MatchesState extends State<Matches> {
   String _query = '';
   RoleFilter _roleFilter = RoleFilter.all;
 
-  final List<Pal> _pals = [
-    const Pal(id: '1', name: 'Aaliyah Reyes', role: PalRole.mentor),
-    const Pal(id: '2', name: 'Andrei Santos', role: PalRole.learner),
-    const Pal(id: '3', name: 'Bea Villanueva', role: PalRole.learner),
-    const Pal(id: '4', name: 'Benjie Cruz', role: PalRole.mentor),
-    const Pal(id: '5', name: 'Carla Mendoza', role: PalRole.learner),
-    const Pal(id: '6', name: 'Carlo Dizon', role: PalRole.mentor),
-    const Pal(id: '7', name: 'Dani Navarro', role: PalRole.learner),
-    const Pal(id: '8', name: 'Elise Tan', role: PalRole.mentor),
-    const Pal(id: '9', name: 'Enzo Bautista', role: PalRole.learner),
-    const Pal(id: '10', name: 'Faye Ramos', role: PalRole.learner),
-    const Pal(id: '11', name: 'Gab Aquino', role: PalRole.mentor),
-    const Pal(id: '12', name: 'Hannah Lim', role: PalRole.learner),
-    const Pal(id: '13', name: 'Ian Castillo', role: PalRole.mentor),
-    const Pal(id: '14', name: 'Jasmine Flores', role: PalRole.learner),
-    const Pal(id: '15', name: 'Jio Hernandez', role: PalRole.learner),
-    const Pal(id: '16', name: 'Kyla Garcia', role: PalRole.mentor),
-    const Pal(id: '17', name: 'Leo Fernandez', role: PalRole.learner),
-    const Pal(id: '18', name: 'Maya Domingo', role: PalRole.mentor),
-    const Pal(id: '19', name: 'Migs Salvador', role: PalRole.learner),
-    const Pal(id: '20', name: 'Nina Pascual', role: PalRole.mentor),
-    const Pal(id: '21', name: 'Orly Mercado', role: PalRole.learner),
-    const Pal(id: '22', name: 'Paolo Soriano', role: PalRole.mentor),
-    const Pal(id: '23', name: 'Rhea Delos Santos', role: PalRole.learner),
-    const Pal(id: '24', name: 'Sofia Valdez', role: PalRole.mentor),
-    const Pal(id: '25', name: 'Tomas Ocampo', role: PalRole.learner),
-    const Pal(id: '26', name: 'Yna Lacson', role: PalRole.learner),
-  ];
+  final List<MatchedUser> _pals = [...dumpUsers];
 
   @override
   void dispose() {
@@ -87,23 +53,23 @@ class _MatchesState extends State<Matches> {
 
   bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
 
-  List<Pal> _filteredPals() {
+  List<MatchedUser> _filteredPals() {
     final q = _query.trim().toLowerCase();
     return _pals.where((pal) {
       final matchesRole = switch (_roleFilter) {
         RoleFilter.all => true,
-        RoleFilter.learner => pal.role == PalRole.learner,
-        RoleFilter.mentor => pal.role == PalRole.mentor,
+        RoleFilter.learner => pal.role == PersonRole.learner,
+        RoleFilter.mentor => pal.role == PersonRole.mentor,
       };
       final matchesQuery = q.isEmpty || pal.name.toLowerCase().contains(q);
       return matchesRole && matchesQuery;
     }).toList();
   }
 
-  Map<String, List<Pal>> _groupedPals(List<Pal> pals) {
+  Map<String, List<MatchedUser>> _groupedPals(List<MatchedUser> pals) {
     final sorted = [...pals]
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    final Map<String, List<Pal>> grouped = {};
+    final Map<String, List<MatchedUser>> grouped = {};
     for (final pal in sorted) {
       final letter = pal.name[0].toUpperCase();
       grouped.putIfAbsent(letter, () => []).add(pal);
@@ -119,10 +85,6 @@ class _MatchesState extends State<Matches> {
 
   Color _colorFor(String name) {
     return _avatarColors[name.hashCode.abs() % _avatarColors.length];
-  }
-
-  String _roleLabel(PalRole role) {
-    return role == PalRole.mentor ? 'Mentor' : 'Learner';
   }
 
   void _startSearch() {
@@ -141,7 +103,7 @@ class _MatchesState extends State<Matches> {
     });
   }
 
-  void _jumpToLetter(String letter, Map<String, List<Pal>> grouped) {
+  void _jumpToLetter(String letter, Map<String, List<MatchedUser>> grouped) {
     final startIndex = _alphabet.indexOf(letter);
     String? target;
     for (int i = startIndex; i < _alphabet.length; i++) {
@@ -172,7 +134,7 @@ class _MatchesState extends State<Matches> {
     }
   }
 
-  void _handleAction(String action, Pal pal) {
+  void _handleAction(String action, MatchedUser pal) {
     if (action == 'unmatch') {
       setState(() => _pals.removeWhere((p) => p.id == pal.id));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -344,7 +306,7 @@ class _MatchesState extends State<Matches> {
     );
   }
 
-  Widget _buildPalTile(Pal pal, Color textTheme) {
+  Widget _buildPalTile(MatchedUser pal, Color textTheme) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -352,13 +314,17 @@ class _MatchesState extends State<Matches> {
           CircleAvatar(
             radius: 24,
             backgroundColor: _colorFor(pal.name),
-            child: Text(
-              _initials(pal.name),
-              style: AppTextStyles.regularText.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            backgroundImage: pal.avatarImage,
+            child:
+                pal.avatarImage == null
+                    ? Text(
+                      _initials(pal.name),
+                      style: AppTextStyles.regularText.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                    : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -372,13 +338,7 @@ class _MatchesState extends State<Matches> {
                   style: AppTextStyles.regularText.copyWith(color: textTheme),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  _roleLabel(pal.role),
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.5),
-                    fontSize: 12,
-                  ),
-                ),
+                SkillTag(skillName: pal.skillName, role: pal.role),
               ],
             ),
           ),
@@ -430,7 +390,7 @@ class _MatchesState extends State<Matches> {
   }
 
   Widget _buildAlphabetIndex(
-    Map<String, List<Pal>> grouped,
+    Map<String, List<MatchedUser>> grouped,
     Color textTheme,
   ) {
     return LayoutBuilder(

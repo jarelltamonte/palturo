@@ -1,24 +1,18 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lottie/lottie.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/matches.dart';
+import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/users_dump.dart';
 
-class ChatPreview {
-  final String name;
-  final String message;
-  final String time;
-  final bool hasUnread;
+enum ChatRoleFilter { all, learner, mentor }
 
-  const ChatPreview({
-    required this.name,
-    required this.message,
-    required this.time,
-    this.hasUnread = false,
-  });
-}
+enum ChatReadFilter { all, unread, read }
 
 class ChatsPage extends StatefulWidget {
   const ChatsPage({super.key});
@@ -33,52 +27,10 @@ class _ChatsPageState extends State<ChatsPage> {
 
   bool _isSearching = false;
   String _query = '';
+  ChatRoleFilter _roleFilter = ChatRoleFilter.all;
+  ChatReadFilter _readFilter = ChatReadFilter.all;
 
-  final List<ChatPreview> _chats = const [
-    ChatPreview(
-      name: 'Aaliyah Reyes',
-      message: 'Are we still on for tomorrow?',
-      time: 'Just now',
-      hasUnread: true,
-    ),
-    ChatPreview(
-      name: 'Benjie Cruz',
-      message: 'Thanks for the tips on the project!',
-      time: '5m',
-      hasUnread: true,
-    ),
-    ChatPreview(
-      name: 'Carla Mendoza',
-      message: 'Sent you the notes from class',
-      time: '23m',
-    ),
-    ChatPreview(
-      name: 'Dani Navarro',
-      message: 'Can we move our session to Friday?',
-      time: '1h',
-      hasUnread: true,
-    ),
-    ChatPreview(
-      name: 'Elise Tan',
-      message: 'That sounds great, let me know',
-      time: '3h',
-    ),
-    ChatPreview(
-      name: 'Gab Aquino',
-      message: 'Haha that was so funny',
-      time: 'Yesterday',
-    ),
-    ChatPreview(
-      name: 'Jasmine Flores',
-      message: 'See you at the meetup!',
-      time: 'Yesterday',
-    ),
-    ChatPreview(
-      name: 'Maya Domingo',
-      message: 'I will send the files later tonight',
-      time: 'Mon',
-    ),
-  ];
+  final List<MatchedUser> _chats = dumpUsers;
 
   @override
   void dispose() {
@@ -87,22 +39,49 @@ class _ChatsPageState extends State<ChatsPage> {
     super.dispose();
   }
 
-  List<ChatPreview> get _filteredMatches {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _chats;
-    return _chats.where((c) => c.name.toLowerCase().contains(q)).toList();
+  bool get _hasActiveFilter =>
+      _roleFilter != ChatRoleFilter.all || _readFilter != ChatReadFilter.all;
+
+  bool _matchesRole(MatchedUser chat) {
+    switch (_roleFilter) {
+      case ChatRoleFilter.all:
+        return true;
+      case ChatRoleFilter.learner:
+        return chat.role == PersonRole.learner;
+      case ChatRoleFilter.mentor:
+        return chat.role == PersonRole.mentor;
+    }
   }
 
-  List<ChatPreview> get _filteredMessages {
+  bool _matchesRead(MatchedUser chat) {
+    switch (_readFilter) {
+      case ChatReadFilter.all:
+        return true;
+      case ChatReadFilter.unread:
+        return chat.hasUnread;
+      case ChatReadFilter.read:
+        return !chat.hasUnread;
+    }
+  }
+
+  List<MatchedUser> get _filteredMatches {
     final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _chats;
-    return _chats
-        .where(
-          (c) =>
-              c.name.toLowerCase().contains(q) ||
-              c.message.toLowerCase().contains(q),
-        )
-        .toList();
+    return _chats.where((c) {
+      final matchesQuery = q.isEmpty || c.name.toLowerCase().contains(q);
+      return matchesQuery && _matchesRole(c);
+    }).toList();
+  }
+
+  List<MatchedUser> get _filteredMessages {
+    final q = _query.trim().toLowerCase();
+    return _chats.where((c) {
+      if (c.lastMessage == null) return false;
+      final matchesQuery =
+          q.isEmpty ||
+          c.name.toLowerCase().contains(q) ||
+          c.lastMessage!.toLowerCase().contains(q);
+      return matchesQuery && _matchesRole(c) && _matchesRead(c);
+    }).toList();
   }
 
   void _startSearch() {
@@ -125,11 +104,19 @@ class _ChatsPageState extends State<ChatsPage> {
     BuildContext context, {
     required String name,
     ImageProvider? avatarImage,
+    String? skillName,
+    PersonRole? role,
   }) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ChatRoom(name: name, avatarImage: avatarImage),
+        builder:
+            (context) => ChatRoom(
+              name: name,
+              avatarImage: avatarImage,
+              skillName: skillName,
+              role: role,
+            ),
       ),
     );
   }
@@ -138,6 +125,212 @@ class _ChatsPageState extends State<ChatsPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const Matches()),
+    );
+  }
+
+  Widget _sheetSectionLabel(String label, Color textColor) {
+    return Text(
+      label,
+      style: AppTextStyles.regularText.copyWith(
+        color: textColor.withValues(alpha: 0.6),
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _filterChip(
+    String label,
+    bool selected,
+    VoidCallback onTap,
+    Color primaryColor,
+    Color textColor,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? primaryColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? primaryColor : textColor.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.regularText.copyWith(
+            color: selected ? Colors.black : textColor,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openFilterSheet() {
+    final bgColor = Theme.of(context).colorScheme.surface;
+    final textColor = Theme.of(context).colorScheme.secondary;
+    ChatRoleFilter draftRole = _roleFilter;
+    ChatReadFilter draftRead = _readFilter;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: bgColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Filters',
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textColor,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed:
+                              () => setModalState(() {
+                                draftRole = ChatRoleFilter.all;
+                                draftRead = ChatReadFilter.all;
+                              }),
+                          child: Text(
+                            'Reset',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textColor.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _sheetSectionLabel('Role', textColor),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _filterChip(
+                          'All',
+                          draftRole == ChatRoleFilter.all,
+                          () => setModalState(
+                            () => draftRole = ChatRoleFilter.all,
+                          ),
+                          AppColors.primary,
+                          textColor,
+                        ),
+                        _filterChip(
+                          'Learner',
+                          draftRole == ChatRoleFilter.learner,
+                          () => setModalState(
+                            () => draftRole = ChatRoleFilter.learner,
+                          ),
+                          AppColors.primary,
+                          textColor,
+                        ),
+                        _filterChip(
+                          'Mentor',
+                          draftRole == ChatRoleFilter.mentor,
+                          () => setModalState(
+                            () => draftRole = ChatRoleFilter.mentor,
+                          ),
+                          AppColors.primary,
+                          textColor,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sheetSectionLabel('Status', textColor),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _filterChip(
+                          'All',
+                          draftRead == ChatReadFilter.all,
+                          () => setModalState(
+                            () => draftRead = ChatReadFilter.all,
+                          ),
+                          AppColors.primary,
+                          textColor,
+                        ),
+                        _filterChip(
+                          'Unread',
+                          draftRead == ChatReadFilter.unread,
+                          () => setModalState(
+                            () => draftRead = ChatReadFilter.unread,
+                          ),
+                          AppColors.primary,
+                          textColor,
+                        ),
+                        _filterChip(
+                          'Read',
+                          draftRead == ChatReadFilter.read,
+                          () => setModalState(
+                            () => draftRead = ChatReadFilter.read,
+                          ),
+                          AppColors.primary,
+                          textColor,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _sheetSectionLabel('Skills', textColor),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Coming soon',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textColor.withValues(alpha: 0.4),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = draftRole;
+                            _readFilter = draftRead;
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Apply',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -218,6 +411,41 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
+  Widget _buildNoMatchesState(Color textTheme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 0, 32, 110),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Lottie.asset(
+              'assets/lottie/empty.json',
+              width: 220,
+              height: 220,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No matches yet',
+              style: AppTextStyles.boldText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Once you match with someone, your chats will show up here.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
@@ -229,6 +457,7 @@ class _ChatsPageState extends State<ChatsPage> {
     final messages = _filteredMessages;
     final nothingFound = matches.isEmpty && messages.isEmpty;
     final showShortcut = _query.trim().isEmpty;
+    final hasNoChats = _chats.isEmpty;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -251,14 +480,43 @@ class _ChatsPageState extends State<ChatsPage> {
                         color: textTheme,
                       ),
                     ),
-                    GestureDetector(
-                      onTap: _startSearch,
-                      behavior: HitTestBehavior.opaque,
-                      child: Icon(
-                        CupertinoIcons.search,
-                        color: textTheme,
-                        size: 24,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: _startSearch,
+                          behavior: HitTestBehavior.opaque,
+                          child: Icon(
+                            CupertinoIcons.search,
+                            color: textTheme,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: _openFilterSheet,
+                          behavior: HitTestBehavior.opaque,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(Icons.tune, color: textTheme, size: 24),
+                              if (_hasActiveFilter)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -285,7 +543,7 @@ class _ChatsPageState extends State<ChatsPage> {
         child: CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
-            if (matches.isNotEmpty) ...[
+            if (!hasNoChats && (matches.isNotEmpty || showShortcut)) ...[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16.0),
@@ -310,7 +568,7 @@ class _ChatsPageState extends State<ChatsPage> {
                         );
                       }
                       final chat = matches[showShortcut ? index - 1 : index];
-                      const ImageProvider? avatarImage = null;
+                      final ImageProvider? avatarImage = chat.avatarImage;
 
                       return ChatProfileItem(
                         name: chat.name,
@@ -320,6 +578,8 @@ class _ChatsPageState extends State<ChatsPage> {
                               context,
                               name: chat.name,
                               avatarImage: avatarImage,
+                              skillName: chat.skillName,
+                              role: chat.role,
                             ),
                       );
                     },
@@ -341,27 +601,38 @@ class _ChatsPageState extends State<ChatsPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
                   final chat = messages[index];
-                  const ImageProvider? avatarImage = null;
+                  final ImageProvider? avatarImage = chat.avatarImage;
 
                   return ChatListItem(
                     name: chat.name,
-                    message: chat.message,
-                    time: chat.time,
+                    message: chat.lastMessage!,
+                    time: chat.lastMessageTime ?? '',
                     hasUnread: chat.hasUnread,
+                    skillName: chat.skillName,
+                    role: chat.role,
                     avatarImage: avatarImage,
                     onTap:
                         () => _openChatRoom(
                           context,
                           name: chat.name,
                           avatarImage: avatarImage,
+                          skillName: chat.skillName,
+                          role: chat.role,
                         ),
                   );
                 },
               ),
             ],
-            if (nothingFound)
-              SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
-            const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            if (hasNoChats)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _buildNoMatchesState(textTheme),
+              )
+            else ...[
+              if (nothingFound)
+                SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
+              const SliverToBoxAdapter(child: SizedBox(height: 110)),
+            ],
           ],
         ),
       ),
@@ -489,6 +760,8 @@ class ChatListItem extends StatelessWidget {
   final String message;
   final String time;
   final bool hasUnread;
+  final String? skillName;
+  final PersonRole? role;
   final ImageProvider? avatarImage;
   final VoidCallback? onTap;
 
@@ -498,6 +771,8 @@ class ChatListItem extends StatelessWidget {
     this.message = 'Random chat message goes here',
     this.time = 'Just now',
     this.hasUnread = true,
+    this.skillName,
+    this.role,
     this.avatarImage,
     this.onTap,
   });
@@ -529,10 +804,14 @@ class ChatListItem extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        name,
-                        style: AppTextStyles.boldText.copyWith(
-                          color: textTheme,
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.boldText.copyWith(
+                            color: textTheme,
+                          ),
                         ),
                       ),
                       if (hasUnread) ...[
@@ -544,6 +823,12 @@ class ChatListItem extends StatelessWidget {
                             color: Colors.red,
                             shape: BoxShape.circle,
                           ),
+                        ),
+                      ],
+                      if (skillName != null) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: SkillTag(skillName: skillName!, role: role),
                         ),
                       ],
                     ],
@@ -575,6 +860,50 @@ class ChatListItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class SkillTag extends StatelessWidget {
+  final String skillName;
+  final PersonRole? role;
+
+  const SkillTag({super.key, required this.skillName, this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final iconAsset =
+        role == PersonRole.mentor
+            ? 'assets/icons/rmentor.svg'
+            : 'assets/icons/rlearner.svg';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: textTheme.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (role != null) ...[
+            SvgPicture.asset(iconAsset, width: 14, height: 14),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Text(
+              skillName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

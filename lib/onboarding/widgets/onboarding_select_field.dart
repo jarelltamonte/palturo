@@ -12,31 +12,32 @@ Future<Set<String>?> showMultiSelectPicker({
   required List<String> options,
   required Set<String> selected,
 }) async {
-  final result = _isCupertino
-      ? await Navigator.of(context).push<Set<String>>(
-          CupertinoPageRoute(
-            builder: (context) => _CupertinoSelectPage(
-              title: title,
-              options: options,
-              initialSelected: selected,
+  final result =
+      _isCupertino
+          ? await Navigator.of(context).push<Set<String>>(
+            CupertinoPageRoute(
+              builder:
+                  (context) => _CupertinoSelectPage(
+                    title: title,
+                    options: options,
+                    initialSelected: selected,
+                  ),
             ),
-          ),
-        )
-      : await showModalBottomSheet<Set<String>>(
-          context: context,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(20),
+          )
+          : await showModalBottomSheet<Set<String>>(
+            context: context,
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-          ),
-          builder: (context) => _SelectSheet(
-            title: title,
-            options: options,
-            initialSelected: selected,
-            multiSelect: true,
-          ),
-        );
+            builder:
+                (context) => _SelectSheet(
+                  title: title,
+                  options: options,
+                  initialSelected: selected,
+                  multiSelect: true,
+                ),
+          );
 
   return result;
 }
@@ -73,28 +74,28 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
   Future<void> _openPicker(BuildContext context) async {
     setState(() => _isOpen = true);
 
-    final result = widget.multiSelect
-        ? await showMultiSelectPicker(
-            context: context,
-            title: widget.label ?? widget.hint,
-            options: widget.options,
-            selected: widget.selected,
-          )
-        : await showModalBottomSheet<Set<String>>(
-            context: context,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-            ),
-            builder: (context) => _SelectSheet(
+    final result =
+        widget.multiSelect
+            ? await showMultiSelectPicker(
+              context: context,
               title: widget.label ?? widget.hint,
               options: widget.options,
-              initialSelected: widget.selected,
-              multiSelect: false,
-            ),
-          );
+              selected: widget.selected,
+            )
+            : await showModalBottomSheet<Set<String>>(
+              context: context,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder:
+                  (context) => _SelectSheet(
+                    title: widget.label ?? widget.hint,
+                    options: widget.options,
+                    initialSelected: widget.selected,
+                    multiSelect: false,
+                  ),
+            );
 
     if (mounted) {
       setState(() => _isOpen = false);
@@ -116,18 +117,12 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
           Row(
             children: [
               if (widget.labelIcon != null) ...[
-                Icon(
-                  widget.labelIcon,
-                  size: 18,
-                  color: secondary,
-                ),
+                Icon(widget.labelIcon, size: 18, color: secondary),
                 const SizedBox(width: 6),
               ],
               Text(
                 widget.label!,
-                style: AppTextStyles.regularText.copyWith(
-                  color: secondary,
-                ),
+                style: AppTextStyles.regularText.copyWith(color: secondary),
               ),
             ],
           ),
@@ -137,15 +132,10 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
           onTap: () => _openPicker(context),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: secondary.withValues(alpha: 0.3),
-              ),
+              border: Border.all(color: secondary.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -156,9 +146,10 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
                         : widget.displayValue,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.regularText.copyWith(
-                      color: widget.displayValue.isEmpty
-                          ? secondary.withValues(alpha: 0.5)
-                          : secondary,
+                      color:
+                          widget.displayValue.isEmpty
+                              ? secondary.withValues(alpha: 0.5)
+                              : secondary,
                     ),
                   ),
                 ),
@@ -223,54 +214,52 @@ class _SelectSheetState extends State<_SelectSheet> {
           children: [
             Text(
               widget.title,
-              style: AppTextStyles.boldText.copyWith(
-                color: secondary,
-              ),
+              style: AppTextStyles.boldText.copyWith(color: secondary),
             ),
             const SizedBox(height: 12),
             Flexible(
-              child: widget.multiSelect
-                  ? ListView(
-                      shrinkWrap: true,
-                      children: [
-                        for (final option in widget.options)
-                          _OptionTile(
-                            label: option,
-                            selected: _selected.contains(option),
-                            multiSelect: true,
-                            onTap: () {
-                              setState(() {
-                                if (_selected.contains(option)) {
-                                  _selected.remove(option);
-                                } else {
-                                  _selected.add(option);
-                                }
-                              });
-                            },
-                          ),
-                      ],
-                    )
-                  : RadioGroup<String>(
-                      groupValue:
-                          _selected.isEmpty ? null : _selected.first,
-                      onChanged: (value) {
-                        if (value != null) {
-                          _selectOption(value);
-                        }
-                      },
-                      child: ListView(
+              child:
+                  widget.multiSelect
+                      ? ListView(
                         shrinkWrap: true,
                         children: [
                           for (final option in widget.options)
                             _OptionTile(
                               label: option,
                               selected: _selected.contains(option),
-                              multiSelect: false,
-                              onTap: () => _selectOption(option),
+                              multiSelect: true,
+                              onTap: () {
+                                setState(() {
+                                  if (_selected.contains(option)) {
+                                    _selected.remove(option);
+                                  } else {
+                                    _selected.add(option);
+                                  }
+                                });
+                              },
                             ),
                         ],
+                      )
+                      : RadioGroup<String>(
+                        groupValue: _selected.isEmpty ? null : _selected.first,
+                        onChanged: (value) {
+                          if (value != null) {
+                            _selectOption(value);
+                          }
+                        },
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            for (final option in widget.options)
+                              _OptionTile(
+                                label: option,
+                                selected: _selected.contains(option),
+                                multiSelect: false,
+                                onTap: () => _selectOption(option),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
             ),
             if (widget.multiSelect) ...[
               const SizedBox(height: 12),
@@ -286,7 +275,13 @@ class _SelectSheetState extends State<_SelectSheet> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: const Text('Apply'),
+                  child: Text(
+                    'Apply',
+                    style: AppTextStyles.boldText.copyWith(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -319,20 +314,16 @@ class _OptionTile extends StatelessWidget {
       onTap: onTap,
       title: Text(
         label,
-        style: AppTextStyles.regularText.copyWith(
-          color: secondary,
-        ),
+        style: AppTextStyles.regularText.copyWith(color: secondary),
       ),
-      trailing: multiSelect
-          ? Checkbox.adaptive(
-              value: selected,
-              activeColor: AppColors.primary,
-              onChanged: (_) => onTap(),
-            )
-          : Radio<String>(
-              value: label,
-              activeColor: AppColors.primary,
-            ),
+      trailing:
+          multiSelect
+              ? Checkbox.adaptive(
+                value: selected,
+                activeColor: AppColors.primary,
+                onChanged: (_) => onTap(),
+              )
+              : Radio<String>(value: label, activeColor: AppColors.primary),
     );
   }
 }
@@ -378,10 +369,7 @@ class _CupertinoSelectPageState extends State<_CupertinoSelectPage> {
                 onPressed: _pop,
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.back),
-                    Text('Back'),
-                  ],
+                  children: [Icon(CupertinoIcons.back), Text('Back')],
                 ),
               ),
             ),
@@ -389,10 +377,11 @@ class _CupertinoSelectPageState extends State<_CupertinoSelectPage> {
               top: false,
               sliver: SliverList.separated(
                 itemCount: widget.options.length,
-                separatorBuilder: (context, index) => const Padding(
-                  padding: EdgeInsets.only(left: 16),
-                  child: Divider(height: 1),
-                ),
+                separatorBuilder:
+                    (context, index) => const Padding(
+                      padding: EdgeInsets.only(left: 16),
+                      child: Divider(height: 1),
+                    ),
                 itemBuilder: (context, index) {
                   final option = widget.options[index];
                   final isSelected = _selected.contains(option);
@@ -401,13 +390,14 @@ class _CupertinoSelectPageState extends State<_CupertinoSelectPage> {
                     title: Text(option),
                     leading: SizedBox(
                       width: 24,
-                      child: isSelected
-                          ? const Icon(
-                              CupertinoIcons.check_mark,
-                              color: AppColors.primary,
-                              size: 20,
-                            )
-                          : null,
+                      child:
+                          isSelected
+                              ? const Icon(
+                                CupertinoIcons.check_mark,
+                                color: AppColors.primary,
+                                size: 20,
+                              )
+                              : null,
                     ),
                     onTap: () {
                       setState(() {

@@ -186,11 +186,11 @@ class RequestCard extends StatelessWidget {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: onAccept,
+                  onPressed: onDecline,
                   child: Text(
-                    'Accept',
+                    'Decline',
                     style: AppTextStyles.regularText.copyWith(
-                      color: primaryColor,
+                      color: Colors.red,
                       fontSize: 16,
                     ),
                   ),
@@ -203,11 +203,11 @@ class RequestCard extends StatelessWidget {
               ),
               Expanded(
                 child: TextButton(
-                  onPressed: onDecline,
+                  onPressed: onAccept,
                   child: Text(
-                    'Decline',
+                    'Accept',
                     style: AppTextStyles.regularText.copyWith(
-                      color: Colors.red,
+                      color: primaryColor,
                       fontSize: 16,
                     ),
                   ),

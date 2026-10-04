@@ -39,14 +39,21 @@ class _ProfilePageState extends State<ProfilePage> {
       'assets/icons/rmentor.svg',
       'I want to\nteach',
     ),
-    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
+    RoleOption(
+      OnboardingRole.both,
+      'assets/icons/rboth.svg',
+      'I can do\nboth',
+    ),
   ];
 
   Future<void> _openEdit() async {
     final updated = await Navigator.push<ProfileData>(
       context,
-      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: _profile)),
+      MaterialPageRoute(
+        builder: (_) => ProfileEditPage(profile: _profile),
+      ),
     );
+
     if (updated != null) {
       setState(() => _profile = updated);
     }
@@ -72,32 +79,41 @@ class _ProfilePageState extends State<ProfilePage> {
           alignment: Alignment.centerLeft,
           child: Text(
             'Profile',
-            style: AppTextStyles.headingText.copyWith(color: textTheme),
+            style: AppTextStyles.headingText.copyWith(
+              color: textTheme,
+            ),
           ),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.only(right: 16),
             child: IconButton(
-              icon: Icon(Icons.settings, color: textTheme),
+              icon: Icon(
+                Icons.settings,
+                color: textTheme,
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const Settings()),
+                  MaterialPageRoute(
+                    builder: (context) => const Settings(),
+                  ),
                 );
               },
             ),
           ),
         ],
       ),
-
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: _ProfileSummaryCard(profile: _profile, onTap: _openEdit),
+              child: _ProfileSummaryCard(
+                profile: _profile,
+                onTap: _openEdit,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -157,7 +173,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ],
                               ),
                             ),
-                            Icon(Icons.chevron_right, color: textTheme),
+                            Icon(
+                              Icons.chevron_right,
+                              color: textTheme,
+                            ),
                           ],
                         ),
                       ),
@@ -205,7 +224,45 @@ class _ProfileSummaryCard extends StatelessWidget {
   final ProfileData profile;
   final VoidCallback onTap;
 
-  const _ProfileSummaryCard({required this.profile, required this.onTap});
+  const _ProfileSummaryCard({
+    required this.profile,
+    required this.onTap,
+  });
+
+  static const _dayOrder = {
+    'Monday': 0,
+    'Tuesday': 1,
+    'Wednesday': 2,
+    'Thursday': 3,
+    'Friday': 4,
+    'Saturday': 5,
+    'Sunday': 6,
+    'Mon': 0,
+    'Tue': 1,
+    'Wed': 2,
+    'Thu': 3,
+    'Fri': 4,
+    'Sat': 5,
+    'Sun': 6,
+  };
+
+  String _formatSchedule(String schedule) {
+    final days = schedule
+        .split('/')
+        .map((day) => day.trim())
+        .where((day) => day.isNotEmpty)
+        .toList();
+
+    days.sort(
+      (a, b) => (_dayOrder[a] ?? 999).compareTo(
+        _dayOrder[b] ?? 999,
+      ),
+    );
+
+    return days
+        .map((day) => day.length > 3 ? day.substring(0, 3) : day)
+        .join('/');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -216,17 +273,17 @@ class _ProfileSummaryCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            spreadRadius: 0,
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
+              color: Colors.black.withValues(alpha: 0.1),
+              spreadRadius: 0,
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
         child: Column(
@@ -238,18 +295,16 @@ class _ProfileSummaryCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: Colors.grey[300],
-                  backgroundImage:
-                      profile.avatarUrl != null
-                          ? NetworkImage(profile.avatarUrl!)
-                          : null,
-                  child:
-                      profile.avatarUrl == null
-                          ? Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Colors.grey[600],
-                          )
-                          : null,
+                  backgroundImage: profile.avatarUrl != null
+                      ? NetworkImage(profile.avatarUrl!)
+                      : null,
+                  child: profile.avatarUrl == null
+                      ? Icon(
+                          Icons.person,
+                          size: 40,
+                          color: Colors.grey[600],
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -274,38 +329,60 @@ class _ProfileSummaryCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            profile.schedule,
-                            style: TextStyle(color: textColor, fontSize: 14),
+                            _formatSchedule(profile.schedule),
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: textColor),
+                Icon(
+                  Icons.chevron_right,
+                  color: textColor,
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            Divider(color: textColor.withValues(alpha: 0.2)),
+            Divider(
+              color: textColor.withValues(alpha: 0.2),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.translate, size: 18, color: textColor),
+                Icon(
+                  Icons.translate,
+                  size: 18,
+                  color: textColor,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     profile.languages.join(', '),
-                    style: TextStyle(color: textColor, fontSize: 14),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 14,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Icon(Icons.psychology, size: 18, color: textColor),
+                Icon(
+                  Icons.psychology,
+                  size: 18,
+                  color: textColor,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     profile.interests.join(', '),
-                    style: TextStyle(color: textColor, fontSize: 14),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 14,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

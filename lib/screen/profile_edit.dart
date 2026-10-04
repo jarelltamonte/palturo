@@ -71,12 +71,38 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     }
   }
 
+  String _shortenDay(String day) {
+    return day.length >= 3 ? day.substring(0, 3) : day;
+  }
+
+  List<String> _sortDays(Iterable<String> days) {
+    const dayOrder = {
+      'Monday': 0,
+      'Tuesday': 1,
+      'Wednesday': 2,
+      'Thursday': 3,
+      'Friday': 4,
+      'Saturday': 5,
+      'Sunday': 6,
+    };
+
+    final sorted = days.toList();
+
+    sorted.sort(
+      (a, b) => (dayOrder[a] ?? 999).compareTo(dayOrder[b] ?? 999),
+    );
+
+    return sorted;
+  }
+
   void _save() {
+    final sortedSchedule = _sortDays(_schedule);
+
     final updated = widget.profile.copyWith(
       avatarUrl: _photos[0],
-      schedule: _schedule.isEmpty
+      schedule: sortedSchedule.isEmpty
           ? _schedulePlaceholder
-          : _schedule.join('/'),
+          : sortedSchedule.join('/'),
       languages: _languages.isEmpty
           ? widget.profile.languages
           : _languages,
@@ -101,7 +127,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
     if (result != null) {
       setState(() {
-        _schedule = result.toList();
+        _schedule = _sortDays(result);
       });
     }
   }
@@ -210,7 +236,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   _DropdownInfoField(
                     icon: Icons.calendar_today_outlined,
                     label: 'Availability',
-                    value: _schedule.join('/'),
+                    value: _schedule
+                        .map(_shortenDay)
+                        .join('/'),
                     hint: _schedulePlaceholder,
                     onTap: _selectAvailability,
                   ),

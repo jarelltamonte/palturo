@@ -11,6 +11,8 @@ import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show kLearningStyleOptions, kDayOptions, kLanguageOptions;
 import 'profile_data.dart';
 
+const kBioMaxLength = 100;
+
 class ProfileEditPage extends StatefulWidget {
   final ProfileData profile;
 
@@ -27,6 +29,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late String _schedulePlaceholder;
   late String _languagesPlaceholder;
   late String _learningStylesPlaceholder;
+  late final TextEditingController _bioController;
 
   List<String> _schedule = [];
   List<String> _languages = [];
@@ -62,6 +65,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _schedulePlaceholder = widget.profile.schedule;
     _languagesPlaceholder = widget.profile.languages.join(', ');
     _learningStylesPlaceholder = widget.profile.interests.join(', ');
+    _bioController = TextEditingController(text: widget.profile.bio);
     _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);
     _teachingSkillIds = List.from(widget.profile.teachingSkillIds);
@@ -69,6 +73,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (widget.profile.avatarUrl != null) {
       _photos[0] = widget.profile.avatarUrl;
     }
+  }
+
+  @override
+  void dispose() {
+    _bioController.dispose();
+    super.dispose();
   }
 
   String _shortenDay(String day) {
@@ -100,6 +110,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
     final updated = widget.profile.copyWith(
       avatarUrl: _photos[0],
+      bio: _bioController.text.trim(),
       schedule: sortedSchedule.isEmpty
           ? _schedulePlaceholder
           : sortedSchedule.join('/'),
@@ -214,6 +225,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       ),
       body: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -226,6 +238,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   setState(() => _photos = updated);
                 },
               ),
+            ),
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _BioField(controller: _bioController),
             ),
             const SizedBox(height: 24),
             Padding(
@@ -315,6 +332,61 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BioField extends StatelessWidget {
+  final TextEditingController controller;
+
+  const _BioField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+
+    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return TextField(
+      controller: controller,
+      minLines: 2,
+      maxLines: 3,
+      maxLength: kBioMaxLength,
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.done,
+      textCapitalization: TextCapitalization.sentences,
+      cursorColor: textColor,
+      style: TextStyle(color: textColor, fontSize: 16),
+      buildCounter: (
+        context, {
+        required int currentLength,
+        required bool isFocused,
+        required int? maxLength,
+      }) {
+        return Text(
+          '$currentLength/$maxLength',
+          style: TextStyle(
+            fontSize: 12,
+            color: textColor.withValues(alpha: 0.5),
+          ),
+        );
+      },
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: AppColors.secondary,
+        hintText: 'Write a short bio about yourself',
+        hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 14,
+        ),
+        border: border(Colors.transparent, 0),
+        enabledBorder: border(Colors.transparent, 0),
+        focusedBorder: border(textColor, 1.5),
       ),
     );
   }

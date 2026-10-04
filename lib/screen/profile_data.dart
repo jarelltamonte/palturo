@@ -4,6 +4,7 @@ class ProfileData {
   final String name;
   final String schedule;
   final String? avatarUrl;
+  final String bio;
   final List<String> languages;
   final List<String> interests;
   final OnboardingRole? role;
@@ -14,6 +15,7 @@ class ProfileData {
     required this.name,
     required this.schedule,
     this.avatarUrl,
+    this.bio = '',
     this.languages = const [],
     this.interests = const [],
     this.role,
@@ -25,6 +27,7 @@ class ProfileData {
     String? name,
     String? schedule,
     String? avatarUrl,
+    String? bio,
     List<String>? languages,
     List<String>? interests,
     OnboardingRole? role,
@@ -35,6 +38,7 @@ class ProfileData {
       name: name ?? this.name,
       schedule: schedule ?? this.schedule,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      bio: bio ?? this.bio,
       languages: languages ?? this.languages,
       interests: interests ?? this.interests,
       role: role ?? this.role,

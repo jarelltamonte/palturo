@@ -420,7 +420,7 @@ class _SkillRowState extends State<_SkillRow> {
               border: border(Colors.transparent, 0),
               enabledBorder: border(Colors.transparent, 0),
               disabledBorder: border(Colors.transparent, 0),
-              focusedBorder: border(textColor, 1.5),
+              focusedBorder: border(AppColors.primary, 1.5),
             ),
           ),
           const SizedBox(height: 16),

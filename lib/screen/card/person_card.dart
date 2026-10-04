@@ -55,12 +55,14 @@ class PersonCardOverlay extends StatefulWidget {
 
 class _PersonCardOverlayState extends State<PersonCardOverlay> {
   int _photoIndex = 0;
+  bool _bioExpanded = false;
 
   @override
   void didUpdateWidget(covariant PersonCardOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.person.id != widget.person.id) {
       _photoIndex = 0;
+      _bioExpanded = false;
     }
   }
 
@@ -75,6 +77,66 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
     if (_photoIndex > 0) {
       setState(() => _photoIndex--);
     }
+  }
+
+  Widget _buildBio(BuildContext context, String bio) {
+    final style = AppTextStyles.regularText.copyWith(
+      color: Colors.white,
+      fontSize: 13,
+      height: 1.35,
+      shadows: [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.6),
+          blurRadius: 6,
+        ),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: bio, style: style),
+          maxLines: 2,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth - 24);
+        final overflows = painter.didExceedMaxLines;
+        painter.dispose();
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: overflows
+              ? () => setState(() => _bioExpanded = !_bioExpanded)
+              : null,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.format_quote_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  alignment: Alignment.topLeft,
+                  child: Text(
+                    bio,
+                    maxLines: _bioExpanded ? null : 2,
+                    overflow: _bioExpanded
+                        ? TextOverflow.visible
+                        : TextOverflow.ellipsis,
+                    style: style,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -357,35 +419,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 ),
                 if (bio.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.format_quote_rounded,
-                        size: 18,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          bio,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white,
-                            fontSize: 13,
-                            height: 1.35,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildBio(context, bio),
                 ],
               ],
             ),

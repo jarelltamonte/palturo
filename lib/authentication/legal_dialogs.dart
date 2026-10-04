@@ -1,4 +1,8 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 
 class LegalDialogs {
   LegalDialogs._();
@@ -38,20 +42,94 @@ PalTuro is primarily designed as a mobile application and does not rely on brows
     required String title,
     required String content,
   }) {
-    showAdaptiveDialog(
+    final textColor = Theme.of(context).colorScheme.secondary;
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) {
+          return CupertinoAlertDialog(
+            title: Text(
+              title,
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor,
+                fontSize: 18,
+              ),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Material(
+                color: Colors.transparent,
+                child: SingleChildScrollView(
+                  child: Text(
+                    content,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textColor,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Close',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
+      return;
+    }
+
+    showDialog(
       context: context,
-      builder: (context) => AlertDialog.adaptive(
-        title: Text(title),
-        content: SingleChildScrollView(
-          child: Text(content),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
           ),
-        ],
-      ),
+          title: Text(
+            title,
+            style: AppTextStyles.regularText.copyWith(
+              color: textColor,
+              fontSize: 18,
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Text(
+                content,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textColor,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Close',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

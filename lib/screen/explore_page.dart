@@ -20,10 +20,10 @@ class _ExplorePageState extends State<ExplorePage> {
   ];
 
   final List<String> _categoryDescription = [
-    'Some caption... blah blah blad',
-    'Some caption... blah blah blad',
-    'Some caption... blah blah blad',
-    'Some caption... blah blah blad',
+    'Weaving, embroidery, and handmade crafts',
+    'Dialects, stories, and living heritage',
+    'Cooking, repairs, and daily know-how',
+    'Farming, fishing, and local trades',
   ];
 
   final List<IconData> _categoryIcons = [
@@ -207,10 +207,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         title: title,
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Material(
-            color: Colors.transparent,
-            child: content,
-          ),
+          child: Material(color: Colors.transparent, child: content),
         ),
         actions: [
           if (_page > 0)
@@ -218,9 +215,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
               onPressed: _back,
               child: Text(
                 'Back',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                ),
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
           CupertinoDialogAction(
@@ -238,32 +233,23 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
 
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: title,
-      content: SizedBox(
-        width: double.maxFinite,
-        child: content,
-      ),
+      content: SizedBox(width: double.maxFinite, child: content),
       actions: [
         if (_page > 0)
           TextButton(
             onPressed: _back,
             child: Text(
               'Back',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
           ),
         TextButton(
           onPressed: _next,
           child: Text(
             _isLastPage ? 'Okay' : 'Next',
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.primary,
-            ),
+            style: AppTextStyles.regularText.copyWith(color: AppColors.primary),
           ),
         ),
       ],

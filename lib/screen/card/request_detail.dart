@@ -27,6 +27,8 @@ class RequestDetailDialog extends StatelessWidget {
           children: [
             PersonCardOverlay(
               person: person,
+              skipLabel: 'Decline',
+              addLabel: 'Accept',
               onAdd: () {
                 onAccept();
                 Navigator.pop(context);

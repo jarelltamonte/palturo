@@ -5,6 +5,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
+import 'package:palturo/onboarding/widgets/onboarding_select_field.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show kLearningStyleOptions, kDayOptions, kLanguageOptions;
@@ -70,113 +71,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     }
   }
 
-  Future<void> _pickMultiSelect({
-    required String title,
-    required List<String> options,
-    required List<String> selected,
-    required ValueChanged<List<String>> onSaved,
-  }) async {
-    final result = await showModalBottomSheet<List<String>>(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
-      ),
-      builder: (context) {
-        final secondary = Theme.of(context).colorScheme.secondary;
-        var tempSelected = List<String>.from(selected);
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTextStyles.boldText.copyWith(
-                        color: secondary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Flexible(
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: [
-                          for (final option in options)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () {
-                                setModalState(() {
-                                  if (tempSelected.contains(option)) {
-                                    tempSelected.remove(option);
-                                  } else {
-                                    tempSelected.add(option);
-                                  }
-                                });
-                              },
-                              title: Text(
-                                option,
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: secondary,
-                                ),
-                              ),
-                              trailing: Checkbox.adaptive(
-                                value: tempSelected.contains(option),
-                                activeColor: AppColors.primary,
-                                onChanged: (_) {
-                                  setModalState(() {
-                                    if (tempSelected.contains(option)) {
-                                      tempSelected.remove(option);
-                                    } else {
-                                      tempSelected.add(option);
-                                    }
-                                  });
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context, tempSelected);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                          ),
-                          foregroundColor: AppColors.textSecondary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                        child: const Text('Done'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (result != null) {
-      onSaved(result);
-    }
-  }
-
   void _save() {
     final updated = widget.profile.copyWith(
       avatarUrl: _photos[0],
@@ -195,6 +89,51 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
 
     Navigator.pop(context, updated);
+  }
+
+  Future<void> _selectAvailability() async {
+    final result = await showMultiSelectPicker(
+      context: context,
+      title: 'Availability',
+      options: kDayOptions,
+      selected: _schedule.toSet(),
+    );
+
+    if (result != null) {
+      setState(() {
+        _schedule = result.toList();
+      });
+    }
+  }
+
+  Future<void> _selectLanguages() async {
+    final result = await showMultiSelectPicker(
+      context: context,
+      title: 'Language Preference',
+      options: kLanguageOptions,
+      selected: _languages.toSet(),
+    );
+
+    if (result != null) {
+      setState(() {
+        _languages = result.toList();
+      });
+    }
+  }
+
+  Future<void> _selectLearningStyles() async {
+    final result = await showMultiSelectPicker(
+      context: context,
+      title: 'Learning Style',
+      options: kLearningStyleOptions,
+      selected: _learningStyles.toSet(),
+    );
+
+    if (result != null) {
+      setState(() {
+        _learningStyles = result.toList();
+      });
+    }
   }
 
   @override
@@ -273,14 +212,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     label: 'Availability',
                     value: _schedule.join('/'),
                     hint: _schedulePlaceholder,
-                    onTap: () => _pickMultiSelect(
-                      title: 'Availability',
-                      options: kDayOptions,
-                      selected: _schedule,
-                      onSaved: (result) {
-                        setState(() => _schedule = result);
-                      },
-                    ),
+                    onTap: _selectAvailability,
                   ),
                   const SizedBox(height: 12),
                   _DropdownInfoField(
@@ -288,14 +220,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     label: 'Language',
                     value: _languages.join(', '),
                     hint: _languagesPlaceholder,
-                    onTap: () => _pickMultiSelect(
-                      title: 'Language Preference',
-                      options: kLanguageOptions,
-                      selected: _languages,
-                      onSaved: (result) {
-                        setState(() => _languages = result);
-                      },
-                    ),
+                    onTap: _selectLanguages,
                   ),
                   const SizedBox(height: 12),
                   _DropdownInfoField(
@@ -303,14 +228,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     label: 'Learning Style',
                     value: _learningStyles.join(', '),
                     hint: _learningStylesPlaceholder,
-                    onTap: () => _pickMultiSelect(
-                      title: 'Learning Style',
-                      options: kLearningStyleOptions,
-                      selected: _learningStyles,
-                      onSaved: (result) {
-                        setState(() => _learningStyles = result);
-                      },
-                    ),
+                    onTap: _selectLearningStyles,
                   ),
                 ],
               ),
@@ -398,6 +316,7 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
 
   Future<void> _handleTap() async {
     setState(() => _isOpen = true);
+
     await widget.onTap();
 
     if (mounted) {

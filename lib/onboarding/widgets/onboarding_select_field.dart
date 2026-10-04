@@ -6,6 +6,41 @@ import '../../theme/app_text_styles.dart';
 
 bool get _isCupertino => defaultTargetPlatform == TargetPlatform.iOS;
 
+Future<Set<String>?> showMultiSelectPicker({
+  required BuildContext context,
+  required String title,
+  required List<String> options,
+  required Set<String> selected,
+}) async {
+  final result = _isCupertino
+      ? await Navigator.of(context).push<Set<String>>(
+          CupertinoPageRoute(
+            builder: (context) => _CupertinoSelectPage(
+              title: title,
+              options: options,
+              initialSelected: selected,
+            ),
+          ),
+        )
+      : await showModalBottomSheet<Set<String>>(
+          context: context,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(20),
+            ),
+          ),
+          builder: (context) => _SelectSheet(
+            title: title,
+            options: options,
+            initialSelected: selected,
+            multiSelect: true,
+          ),
+        );
+
+  return result;
+}
+
 class OnboardingSelectField extends StatefulWidget {
   final String? label;
   final IconData? labelIcon;
@@ -38,15 +73,12 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
   Future<void> _openPicker(BuildContext context) async {
     setState(() => _isOpen = true);
 
-    final result = (widget.multiSelect && _isCupertino)
-        ? await Navigator.of(context).push<Set<String>>(
-            CupertinoPageRoute(
-              builder: (context) => _CupertinoSelectPage(
-                title: widget.label ?? widget.hint,
-                options: widget.options,
-                initialSelected: widget.selected,
-              ),
-            ),
+    final result = widget.multiSelect
+        ? await showMultiSelectPicker(
+            context: context,
+            title: widget.label ?? widget.hint,
+            options: widget.options,
+            selected: widget.selected,
           )
         : await showModalBottomSheet<Set<String>>(
             context: context,
@@ -60,7 +92,7 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
               title: widget.label ?? widget.hint,
               options: widget.options,
               initialSelected: widget.selected,
-              multiSelect: widget.multiSelect,
+              multiSelect: false,
             ),
           );
 

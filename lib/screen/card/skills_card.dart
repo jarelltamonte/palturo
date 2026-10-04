@@ -1,12 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/theme/app_colors.dart';
 
+const kOtherId = 'other';
+const kOtherPrefix = 'other:';
+const kCustomSkillMaxLength = 30;
+
+const kSkillCategories = <({String id, String label, IconData icon})>[
+  (id: 'arts_design', label: 'Arts and Design', icon: Icons.palette_outlined),
+  (
+    id: 'language_culture',
+    label: 'Language and Cultural Knowledge',
+    icon: Icons.translate,
+  ),
+  (
+    id: 'everyday_skills',
+    label: 'Everyday Practical Skills',
+    icon: Icons.handyman_outlined,
+  ),
+  (
+    id: 'agriculture_livelihood',
+    label: 'Agriculture and Livelihood',
+    icon: Icons.agriculture_outlined,
+  ),
+];
+
+const _kSmallWords = <String>{
+  'ng',
+  'sa',
+  'na',
+  'at',
+  'ang',
+  'mga',
+  'ay',
+  'o',
+  'kay',
+  'ni',
+  'of',
+  'and',
+  'the',
+  'in',
+};
+
+class CustomSkill {
+  final String categoryId;
+  final String text;
+
+  const CustomSkill({this.categoryId = '', this.text = ''});
+
+  bool get isValid => categoryId.isNotEmpty && text.trim().isNotEmpty;
+
+  String encode() => '$kOtherPrefix$categoryId:${text.trim()}';
+
+  static CustomSkill? tryParse(String id) {
+    if (!id.startsWith(kOtherPrefix)) return null;
+    final rest = id.substring(kOtherPrefix.length);
+    final i = rest.indexOf(':');
+    if (i < 0) return CustomSkill(text: rest);
+    return CustomSkill(
+      categoryId: rest.substring(0, i),
+      text: rest.substring(i + 1),
+    );
+  }
+}
+
+bool isOtherOption(OnboardingOption o) {
+  final id = o.id.trim().toLowerCase();
+  final label = o.label.trim().toLowerCase();
+  return id == 'other' ||
+      id == 'others' ||
+      label == 'other' ||
+      label == 'others';
+}
+
+String toTitleCase(String input) {
+  final words = input.split(' ');
+  var seenFirstWord = false;
+  for (var i = 0; i < words.length; i++) {
+    final w = words[i];
+    if (w.isEmpty) continue;
+    final lower = w.toLowerCase();
+    if (seenFirstWord && _kSmallWords.contains(lower)) {
+      words[i] = lower;
+    } else {
+      words[i] = w[0].toUpperCase() + w.substring(1);
+    }
+    seenFirstWord = true;
+  }
+  return words.join(' ');
+}
+
+class TitleCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return newValue.copyWith(text: toTitleCase(newValue.text));
+  }
+}
+
+bool isSkillIdValid(String id) {
+  final lower = id.trim().toLowerCase();
+  if (lower == 'other' || lower == 'others') return false;
+  return CustomSkill.tryParse(id)?.isValid ?? true;
+}
+
 class SkillsCard extends StatefulWidget {
   final bool isEditing;
-  final String labelSuffix; 
-  final List<OnboardingOption> options; 
+  final String labelSuffix;
+  final List<OnboardingOption> options;
   final int maxSkills;
   final List<String> initialSkillIds;
   final bool showAttachFile;
@@ -24,7 +129,6 @@ class SkillsCard extends StatefulWidget {
     this.onChanged,
     this.onAttachFile,
   });
-
 
   factory SkillsCard.toLearn({
     Key? key,
@@ -87,8 +191,9 @@ class _SkillsCardState extends State<SkillsCard> {
 
   void _addSkill() {
     if (_skillIds.length >= widget.maxSkills) return;
-    final remaining =
-        widget.options.where((o) => !_skillIds.contains(o.id)).toList();
+    final remaining = widget.options
+        .where((o) => !isOtherOption(o) && !_skillIds.contains(o.id))
+        .toList();
     if (remaining.isEmpty) return;
     setState(() {
       _skillIds.add(remaining.first.id);
@@ -170,6 +275,7 @@ class _SkillsCardState extends State<SkillsCard> {
           const SizedBox(height: 16),
           for (int i = 0; i < _skillIds.length; i++) ...[
             _SkillRow(
+              key: ValueKey('skill_row_$i'),
               selectedId: _skillIds[i],
               alreadyUsedIds: _skillIds,
               isEditing: widget.isEditing,
@@ -182,7 +288,7 @@ class _SkillsCardState extends State<SkillsCard> {
                   ? null
                   : () => widget.onAttachFile!(_skillIds[i]),
             ),
-            if (i != _skillIds.length - 1) const SizedBox(height: 12),
+            if (i != _skillIds.length - 1) const SizedBox(height: 16),
           ],
         ],
       ),
@@ -190,7 +296,7 @@ class _SkillsCardState extends State<SkillsCard> {
   }
 }
 
-class _SkillRow extends StatelessWidget {
+class _SkillRow extends StatefulWidget {
   final String selectedId;
   final List<String> alreadyUsedIds;
   final bool isEditing;
@@ -202,6 +308,7 @@ class _SkillRow extends StatelessWidget {
   final VoidCallback? onAttachFile;
 
   const _SkillRow({
+    super.key,
     required this.selectedId,
     required this.alreadyUsedIds,
     required this.isEditing,
@@ -214,12 +321,177 @@ class _SkillRow extends StatelessWidget {
   });
 
   @override
+  State<_SkillRow> createState() => _SkillRowState();
+}
+
+class _SkillRowState extends State<_SkillRow> {
+  late final TextEditingController _controller;
+
+  String get _otherId {
+    for (final o in widget.options) {
+      if (isOtherOption(o)) return o.id;
+    }
+    return kOtherId;
+  }
+
+  CustomSkill? get _custom {
+    final parsed = CustomSkill.tryParse(widget.selectedId);
+    if (parsed != null) return parsed;
+    if (widget.selectedId == _otherId) return const CustomSkill();
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _custom?.text ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _emit({String? text, String? categoryId}) {
+    final current = _custom ?? const CustomSkill();
+    widget.onChanged(
+      CustomSkill(
+        categoryId: categoryId ?? current.categoryId,
+        text: text ?? current.text,
+      ).encode(),
+    );
+  }
+
+  Widget _buildCustomSection({
+    required CustomSkill custom,
+    required Color textColor,
+    required Color dim,
+  }) {
+    final needsCategory = custom.text.trim().isNotEmpty && custom.categoryId.isEmpty;
+    final errorColor = Theme.of(context).colorScheme.error;
+
+    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(28),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            enabled: widget.isEditing,
+            maxLength: kCustomSkillMaxLength,
+            textCapitalization: TextCapitalization.none,
+            textInputAction: TextInputAction.done,
+            inputFormatters: [TitleCaseFormatter()],
+            onChanged: (t) => _emit(text: t),
+            cursorColor: textColor,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: AppColors.secondary,
+              hintText: 'Name your skill (e.g. Pottery)',
+              hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+              counterText: '',
+              prefixIcon: Icon(Icons.edit_outlined, size: 18, color: dim),
+              suffixIcon: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    '${custom.text.length}/$kCustomSkillMaxLength',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: textColor.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              border: border(Colors.transparent, 0),
+              enabledBorder: border(Colors.transparent, 0),
+              disabledBorder: border(Colors.transparent, 0),
+              focusedBorder: border(textColor, 1.5),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Text(
+              'Category',
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final c in kSkillCategories)
+                _CategoryChip(
+                  label: c.label,
+                  icon: c.icon,
+                  selected: custom.categoryId == c.id,
+                  enabled: widget.isEditing,
+                  accentColor: widget.accentColor,
+                  textColor: textColor,
+                  onTap: () => _emit(categoryId: c.id),
+                ),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            alignment: Alignment.topLeft,
+            child: needsCategory && widget.isEditing
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8, left: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.info_outline, size: 14, color: errorColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Pick a category so others can find your skill',
+                          style: TextStyle(fontSize: 12, color: errorColor),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final availableOptions = options
-        .where((o) => o.id == selectedId || !alreadyUsedIds.contains(o.id))
-        .toList();
     final textColor = Theme.of(context).colorScheme.secondary;
     final themeColor = Theme.of(context).colorScheme.surface;
+    final dim = widget.isEditing ? textColor : textColor.withValues(alpha: 0.5);
+    final custom = _custom;
+    final dropdownValue = custom != null ? _otherId : widget.selectedId;
+
+    final availableOptions = widget.options
+        .where((o) =>
+            isOtherOption(o) ||
+            o.id == widget.selectedId ||
+            !widget.alreadyUsedIds.contains(o.id))
+        .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,77 +500,87 @@ class _SkillRow extends StatelessWidget {
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: isEditing ? textColor : textColor.withValues(alpha: 0.5),
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: dim, width: 1.5),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: selectedId,
+                    value: dropdownValue,
                     isExpanded: true,
                     borderRadius: BorderRadius.circular(16),
-                    icon: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: isEditing ? textColor : textColor.withValues(alpha: 0.5),
-                    ),
+                    icon: Icon(Icons.keyboard_arrow_down, color: dim),
                     dropdownColor: themeColor,
-                    style: TextStyle(
-                      color: isEditing ? textColor : textColor.withValues(alpha: 0.5),
-                      fontSize: 16,
-                    ),
-                    onChanged: isEditing
+                    style: TextStyle(color: dim, fontSize: 16),
+                    onChanged: widget.isEditing
                         ? (newId) {
-                            if (newId != null) onChanged(newId);
+                            if (newId == null) return;
+                            if (newId == _otherId) {
+                              if (!widget.selectedId.startsWith(kOtherPrefix)) {
+                                widget.onChanged(const CustomSkill().encode());
+                              }
+                            } else {
+                              _controller.clear();
+                              widget.onChanged(newId);
+                            }
                           }
                         : null,
                     items: availableOptions
-                        .map(
-                          (option) => DropdownMenuItem(
-                            value: option.id,
-                            child: Text(option.label),
-                          ),
-                        )
+                        .map((o) => DropdownMenuItem(
+                              value: o.id,
+                              child: Text(o.label),
+                            ))
                         .toList(),
                   ),
                 ),
               ),
             ),
-            if (isEditing) ...[
+            if (widget.isEditing) ...[
               const SizedBox(width: 12),
-              GestureDetector(
-                onTap: onRemove,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: textColor, width: 1.5),
+              Material(
+                color: Colors.transparent,
+                shape: CircleBorder(side: BorderSide(color: textColor, width: 1.5)),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: widget.onRemove,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Icon(Icons.close, color: textColor, size: 20),
                   ),
-                  child: Icon(Icons.close, color: textColor, size: 20),
                 ),
               ),
             ],
           ],
         ),
-        // 💡 Mentor-only "Attach a file" action, shown only while editing
-        if (showAttachFile && isEditing)
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          alignment: Alignment.topCenter,
+          child: custom == null
+              ? const SizedBox(width: double.infinity)
+              : _buildCustomSection(
+                  custom: custom,
+                  textColor: textColor,
+                  dim: dim,
+                ),
+        ),
+        if (widget.showAttachFile && widget.isEditing)
           Padding(
-            padding: const EdgeInsets.only(top: 6.0, left: 8.0),
+            padding: const EdgeInsets.only(top: 8.0, left: 8.0),
             child: GestureDetector(
-              onTap: onAttachFile,
+              onTap: widget.onAttachFile,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.attach_file, size: 16, color: accentColor),
+                  Icon(Icons.attach_file, size: 16, color: widget.accentColor),
                   const SizedBox(width: 4),
                   Text(
                     'Attach a file',
                     style: TextStyle(
-                      color: accentColor,
+                      color: widget.accentColor,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -308,6 +590,74 @@ class _SkillRow extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool enabled;
+  final Color accentColor;
+  final Color textColor;
+  final VoidCallback onTap;
+
+  const _CategoryChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.enabled,
+    required this.accentColor,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = selected ? accentColor : textColor.withValues(alpha: 0.35);
+
+    return Opacity(
+      opacity: enabled || selected ? 1 : 0.5,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: enabled ? onTap : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? accentColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  child: Icon(
+                    selected ? Icons.check : icon,
+                    key: ValueKey(selected),
+                    size: 16,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textColor,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -26,13 +26,11 @@ class _ExplorePageState extends State<ExplorePage> {
     'Some caption... blah blah blad',
   ];
 
-  // TODO: replace with your real asset paths (and declare them in pubspec.yaml)
-  // An empty string falls back to the plain grey card.
-  final List<String> _categoryImage = [
-    'assets/images/brand.png',
-    'assets/images/brand.png',
-    'assets/images/brand.png',
-    'assets/images/brand.png',
+  final List<IconData> _categoryIcons = [
+    Icons.palette_outlined,
+    Icons.translate,
+    Icons.handyman_outlined,
+    Icons.agriculture_outlined,
   ];
 
   @override
@@ -66,40 +64,9 @@ class _ExplorePageState extends State<ExplorePage> {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
               onPressed: () {
-                showDialog(
+                showAdaptiveDialog(
                   context: context,
-                  builder: (context) {
-                    return AlertDialog.adaptive(
-                      title: Text(
-                        'Explore',
-                        style: AppTextStyles.headingText.copyWith(
-                          color: textTheme,
-                          fontSize: 20,
-                        ),
-                      ),
-                      content: Text(
-                        'Explore different categories to discover skills and knowledge shared by other users.',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                          fontSize: 14,
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Text(
-                            'Okay',
-                            style: AppTextStyles.boldText.copyWith(
-                              fontSize: 16,
-                              color: AppColors.black,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                  builder: (context) => const _ExploreInfoDialog(),
                 );
               },
             ),
@@ -127,7 +94,7 @@ class _ExplorePageState extends State<ExplorePage> {
                 return _CategoryCard(
                   label: _categoryLabels[index],
                   description: _categoryDescription[index],
-                  imagePath: _categoryImage[index],
+                  icon: _categoryIcons[index],
                 );
               },
             );
@@ -138,94 +105,229 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 }
 
+class _ExploreInfoDialog extends StatefulWidget {
+  const _ExploreInfoDialog();
+
+  @override
+  State<_ExploreInfoDialog> createState() => _ExploreInfoDialogState();
+}
+
+class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
+  static const _titles = ['Explore', 'Heads up'];
+
+  static const _messages = [
+    'Browse categories to discover skills and knowledge shared by other users. Pick a category, then swipe through people who are teaching or learning in it.',
+    'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Explore is for discovering something new, so keep an open mind.',
+  ];
+
+  int _page = 0;
+
+  bool get _isLastPage => _page == _titles.length - 1;
+
+  void _next() {
+    if (_isLastPage) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _page++);
+    }
+  }
+
+  void _back() {
+    setState(() => _page--);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+    final title = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: Text(
+        _titles[_page],
+        key: ValueKey('title_$_page'),
+        style: AppTextStyles.regularText.copyWith(
+          color: textTheme,
+          fontSize: 18,
+        ),
+      ),
+    );
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Step ${_page + 1} of ${_titles.length}',
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme.withValues(alpha: 0.5),
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: (_page + 1) / _titles.length),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            builder: (context, value, _) {
+              return LinearProgressIndicator(
+                value: value,
+                minHeight: 4,
+                backgroundColor: textTheme.withValues(alpha: 0.1),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.primary,
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              _messages[_page],
+              key: ValueKey('message_$_page'),
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (isIOS) {
+      return CupertinoAlertDialog(
+        title: title,
+        content: Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Material(
+            color: Colors.transparent,
+            child: content,
+          ),
+        ),
+        actions: [
+          if (_page > 0)
+            CupertinoDialogAction(
+              onPressed: _back,
+              child: Text(
+                'Back',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                ),
+              ),
+            ),
+          CupertinoDialogAction(
+            onPressed: _next,
+            child: Text(
+              _isLastPage ? 'Okay' : 'Next',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return AlertDialog(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      title: title,
+      content: SizedBox(
+        width: double.maxFinite,
+        child: content,
+      ),
+      actions: [
+        if (_page > 0)
+          TextButton(
+            onPressed: _back,
+            child: Text(
+              'Back',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+              ),
+            ),
+          ),
+        TextButton(
+          onPressed: _next,
+          child: Text(
+            _isLastPage ? 'Okay' : 'Next',
+            style: AppTextStyles.regularText.copyWith(
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _CategoryCard extends StatelessWidget {
   const _CategoryCard({
     required this.label,
     required this.description,
-    required this.imagePath,
+    required this.icon,
   });
 
   final String label;
   final String description;
-  final String imagePath;
-
-  // Soft shadow behind text as a second layer of legibility.
-  static const _textShadows = [
-    Shadow(color: Color(0x99000000), blurRadius: 8, offset: Offset(0, 1)),
-    Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1)),
-  ];
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = imagePath.isNotEmpty;
+    final textColor = Theme.of(context).colorScheme.secondary;
 
     return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.secondary,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        // Optional soft drop shadow for the card itself
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.1),
+            spreadRadius: 0,
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 1. Background image
-          if (hasImage)
-            Image.asset(
-              imagePath,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-            ),
-
-          // 2. Dark gradient scrim: keeps text readable on bright images
-          DecoratedBox(
+          Container(
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const [0.35, 1.0],
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: hasImage ? 0.75 : 0.45),
-                ],
-              ),
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 36, color: AppColors.background),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.headingText.copyWith(
+              color: textColor,
+              fontSize: 16,
             ),
           ),
-
-          // 3. Text pinned to the bottom
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.headingText.copyWith(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    shadows: _textShadows,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textPrimary.withValues(alpha: 0.9),
-                    fontSize: 14,
-                    shadows: _textShadows,
-                  ),
-                ),
-                const SizedBox(height: 4),
-              ],
+          const SizedBox(height: 6),
+          Text(
+            description,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: textColor.withValues(alpha: 0.7),
+              fontSize: 13,
             ),
           ),
         ],

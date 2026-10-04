@@ -1,5 +1,5 @@
 name: palturo
-description: "A new Flutter project."
+description: "A mobile application for community-based Filipino cultural skill exchange."
 publish_to: "none"
 version: 0.1.0
 
@@ -51,10 +51,10 @@ flutter_native_splash:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/images/rlogo.png"
 
   adaptive_icon_background: "#262626"
-  adaptive_icon_foreground: "assets/images/logo.png"
+  adaptive_icon_foreground: "assets/images/rlogo.png"
 
 flutter:
   uses-material-design: true

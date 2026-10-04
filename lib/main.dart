@@ -6,13 +6,15 @@ import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
 
 void main() async {
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  FlutterNativeSplash.preserve(
+    widgetsBinding: widgetsBinding,
+  );
 
   PreferencesService.instance.init();
 
-  bool? isOnboardingDone =
+  final isOnboardingDone =
       await PreferencesService.instance.getBool('onboarding_done');
 
   runApp(
@@ -48,8 +50,13 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   @override
   void initState() {
     super.initState();
-    // 5. Dismiss the splash screen cleanly as soon as the first frame loads
-    FlutterNativeSplash.remove();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(
+        const Duration(seconds: 3),
+        FlutterNativeSplash.remove,
+      );
+    });
   }
 
   @override

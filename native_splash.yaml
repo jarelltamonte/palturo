@@ -3,20 +3,20 @@ flutter_native_splash:
   ios: true
   web: true
 
-  color: "#FFFFFF" 
+  color: "#FFFFFF"
   image: "assets/images/slogo_black.png"
-  branding: "assets/images/sbrand.png"
+  branding: "assets/images/brand.png"
 
   color_dark: "#262626"
   image_dark: "assets/images/slogo_white.png"
-  branding_dark: "assets/images/sbrand.png"
+  branding_dark: "assets/images/brand.png"
 
   fullscreen: false
-  branding_mode: bottom 
+  branding_mode: bottom
 
-android_12: 
-  color: "#FFFFFF"
-  color_dark: "#262626"
-  image: "assets/images/slogo_black.png"
-  image_dark: "assets/images/slogo_white.png"
-  branding: "assets/images/sbrand.png"
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#262626"
+    image: "assets/images/slogo_black.png"
+    image_dark: "assets/images/slogo_white.png"
+    branding: "assets/images/brand.png"

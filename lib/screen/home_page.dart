@@ -4,6 +4,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/users_dump.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -15,7 +16,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<Person> _people = const [
+  static const List<Person> _featuredPeople = [
     Person(
       id: '1',
       name: 'RJ Santos',
@@ -24,6 +25,7 @@ class _HomePageState extends State<HomePage> {
       learningStyle: 'Discussion',
       skillName: 'Parol Making',
       role: PersonRole.learner,
+      bio: 'Gusto kong matutong gumawa ng parol para sa pamilya ko.',
       photoUrls: [null, null, null],
     ),
     Person(
@@ -34,6 +36,7 @@ class _HomePageState extends State<HomePage> {
       learningStyle: 'Hands-on Practice',
       skillName: 'Weaving Inabel',
       role: PersonRole.mentor,
+      bio: 'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
       photoUrls: [null],
     ),
     Person(
@@ -44,9 +47,29 @@ class _HomePageState extends State<HomePage> {
       learningStyle: 'Visual Demonstration',
       skillName: 'Cooking Pinakbet',
       role: PersonRole.learner,
+      bio: 'Gusto kong lutuin ang pinakbet ni Nanay nang eksakto ang timpla.',
       photoUrls: [null, null],
     ),
   ];
+
+  late final List<Person> _people = [
+    ..._featuredPeople,
+    ...dumpUsers.map(_personFromMatchedUser),
+  ];
+
+  static Person _personFromMatchedUser(MatchedUser user) {
+    return Person(
+      id: 'dump_${user.id}',
+      name: user.name,
+      schedule: user.schedule,
+      language: user.language,
+      learningStyle: user.learningStyle,
+      skillName: user.skillName,
+      role: user.role,
+      bio: user.bio,
+      photoUrls: [user.avatarUrl],
+    );
+  }
 
   RoleFilter _roleFilter = RoleFilter.all;
   int _currentIndex = 0;

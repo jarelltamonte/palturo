@@ -5,6 +5,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
+import 'package:palturo/screen/users_dump.dart';
 
 class ConnectionRequest {
   final String id;
@@ -13,6 +14,7 @@ class ConnectionRequest {
   final String schedule;
   final String language;
   final String learningStyle;
+  final String bio;
   final DateTime requestedAt;
   final String iconAsset;
   final String seekingLabel;
@@ -27,11 +29,34 @@ class ConnectionRequest {
     required this.language,
     required this.learningStyle,
     required this.requestedAt,
+    this.bio = '',
     this.iconAsset = 'assets/icons/rlearner.svg',
     this.seekingLabel = 'Seeking a learner in',
     this.role = PersonRole.learner,
     this.photoUrls = const [null],
   });
+
+  factory ConnectionRequest.fromMatchedUser(
+    MatchedUser user, {
+    required DateTime requestedAt,
+  }) {
+    final isLearner = user.role == PersonRole.learner;
+    return ConnectionRequest(
+      id: 'dump_${user.id}',
+      skillName: user.skillName,
+      requesterName: user.name,
+      schedule: user.schedule,
+      language: user.language,
+      learningStyle: user.learningStyle,
+      bio: user.bio,
+      requestedAt: requestedAt,
+      iconAsset:
+          isLearner ? 'assets/icons/rlearner.svg' : 'assets/icons/rmentor.svg',
+      seekingLabel: isLearner ? 'Seeking a mentor in' : 'Seeking a learner in',
+      role: user.role,
+      photoUrls: [user.avatarUrl],
+    );
+  }
 
   Person toPerson() {
     return Person(
@@ -42,6 +67,7 @@ class ConnectionRequest {
       learningStyle: learningStyle,
       skillName: skillName,
       role: role,
+      bio: bio,
       photoUrls: photoUrls,
     );
   }
@@ -82,7 +108,7 @@ class _RequestPageState extends State<RequestPage> {
       _roleFilter != RoleFilter.all ||
       _sortFilter != SortFilter.newest;
 
-  final List<ConnectionRequest> _requests = [
+  late final List<ConnectionRequest> _requests = [
     ConnectionRequest(
       id: '1',
       skillName: 'Parol Making',
@@ -90,6 +116,7 @@ class _RequestPageState extends State<RequestPage> {
       schedule: 'Mon/Wed/Sat',
       language: 'English',
       learningStyle: 'Discussion',
+      bio: 'Gusto kong matutong gumawa ng parol para sa pamilya ko.',
       requestedAt: DateTime.now().subtract(const Duration(minutes: 2)),
       role: PersonRole.learner,
       photoUrls: const [null, null],
@@ -101,11 +128,26 @@ class _RequestPageState extends State<RequestPage> {
       schedule: 'Tue/Thu',
       language: 'Tagalog',
       learningStyle: 'Hands-on Practice',
+      bio: 'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
       requestedAt: DateTime.now().subtract(const Duration(days: 1)),
       role: PersonRole.mentor,
       photoUrls: const [null],
     ),
+    ..._dumpRequests(),
   ];
+
+  static List<ConnectionRequest> _dumpRequests() {
+    final candidates =
+        dumpUsers.where((u) => u.lastMessage == null).take(8).toList();
+    final now = DateTime.now();
+    return [
+      for (var i = 0; i < candidates.length; i++)
+        ConnectionRequest.fromMatchedUser(
+          candidates[i],
+          requestedAt: now.subtract(Duration(hours: 3 + i * 9)),
+        ),
+    ];
+  }
 
   bool _matchesDateFilter(DateTime date) {
     final now = DateTime.now();

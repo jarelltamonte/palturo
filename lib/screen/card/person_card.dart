@@ -13,6 +13,7 @@ class Person {
   final String learningStyle;
   final String skillName;
   final PersonRole role;
+  final String bio;
   final List<String?> photoUrls;
 
   const Person({
@@ -23,6 +24,7 @@ class Person {
     required this.learningStyle,
     required this.skillName,
     required this.role,
+    this.bio = '',
     this.photoUrls = const [null],
   });
 }
@@ -33,6 +35,8 @@ class PersonCardOverlay extends StatefulWidget {
   final VoidCallback onSkip;
   final VoidCallback? onBlock;
   final VoidCallback? onReport;
+  final String skipLabel;
+  final String addLabel;
 
   const PersonCardOverlay({
     super.key,
@@ -41,6 +45,8 @@ class PersonCardOverlay extends StatefulWidget {
     required this.onSkip,
     this.onBlock,
     this.onReport,
+    this.skipLabel = 'Skip',
+    this.addLabel = 'Add',
   });
 
   @override
@@ -87,6 +93,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         widget.person.role == PersonRole.learner
             ? 'Wants to learn'
             : 'Wants to teach';
+    final bio = widget.person.bio.trim();
 
     return Container(
       width: double.infinity,
@@ -348,6 +355,38 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ),
                   ],
                 ),
+                if (bio.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.format_quote_rounded,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          bio,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.regularText.copyWith(
+                            color: Colors.white,
+                            fontSize: 13,
+                            height: 1.35,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -396,9 +435,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         borderRadius: BorderRadius.circular(32),
                       ),
                     ),
-                    child: const Text(
-                      'Skip',
-                      style: TextStyle(
+                    child: Text(
+                      widget.skipLabel,
+                      style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 16,
                       ),
@@ -418,7 +457,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       elevation: 0,
                     ),
                     child: Text(
-                      'Add',
+                      widget.addLabel,
                       style: TextStyle(color: AppColors.black, fontSize: 16),
                     ),
                   ),

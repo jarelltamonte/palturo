@@ -1,10 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/screen/block_list.dart';
 
 class Settings extends StatefulWidget {
   const Settings({super.key});
@@ -723,6 +723,31 @@ class _SettingsState extends State<Settings> {
               color: textTheme,
             ),
             onTap: _showReportDialog,
+          ),
+
+          ListTile(
+            leading: Icon(
+              Icons.block,
+              color: textTheme,
+            ),
+            title: Text(
+              'Block People',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+              ),
+            ),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: textTheme,
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BlockListPage(),
+                ),
+              );
+            },
           ),
         ],
       ),

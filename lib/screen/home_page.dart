@@ -7,6 +7,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 
@@ -129,8 +130,8 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _block(String personId) {
-    debugPrint('Blocked $personId');
+  void _block(Person person) {
+    BlockedUsers.block(person);
     _next();
   }
 
@@ -384,7 +385,7 @@ class _HomePageState extends State<HomePage> {
                   person: people[_currentIndex],
                   onAdd: _next,
                   onSkip: _next,
-                  onBlock: () => _block(people[_currentIndex].id),
+                  onBlock: () => _block(people[_currentIndex]),
                   onReport: () => _report(people[_currentIndex].id),
                 ),
               )
@@ -413,7 +414,7 @@ class _HomePageState extends State<HomePage> {
                   color: textColor.withValues(alpha: 0.7),
                 ),
                 children: [
-                  const TextSpan(text: 'No more people to show.\n'),
+                  const TextSpan(text: 'Nothing to show here.\n'),
                   const TextSpan(text: 'Consider changing your '),
                   TextSpan(
                     text: 'Settings',

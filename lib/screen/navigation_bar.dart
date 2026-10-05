@@ -16,7 +16,11 @@ class NavigationBarWidget extends StatefulWidget {
 }
 
 class _NavigationBarWidgetState extends State<NavigationBarWidget> {
+  static const int _exploreIndex = 1;
+
   int _selectedIndex = 0;
+
+  final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
 
   final List<IconData> _navigationIcons = [
     CupertinoIcons.arrowtriangle_left,
@@ -42,13 +46,25 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
     'Profile',
   ];
 
-  final List<Widget> _pages = [
+  late final List<Widget> _pages = [
     const HomePage(),
-    const ExplorePage(),
+    _ExploreTab(
+      navigatorKey: _exploreNavKey,
+      isActive: () => _selectedIndex == _exploreIndex,
+    ),
     const ChatsPage(),
     const RequestPage(),
     const ProfilePage(),
   ];
+
+  void _onItemTapped(int index) {
+    if (index == _exploreIndex && _selectedIndex == _exploreIndex) {
+      _exploreNavKey.currentState?.popUntil((route) => route.isFirst);
+    }
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,16 +104,81 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
             label: _navigationLabels[index],
             color: isSelected ? activeColor : inactiveColor,
-            onTap: () {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
+            onTap: () => _onItemTapped(index),
           );
         }),
       ),
     );
   }
+}
+
+class _ExploreTab extends StatefulWidget {
+  final GlobalKey<NavigatorState> navigatorKey;
+  final bool Function() isActive;
+
+  const _ExploreTab({
+    required this.navigatorKey,
+    required this.isActive,
+  });
+
+  @override
+  State<_ExploreTab> createState() => _ExploreTabState();
+}
+
+class _ExploreTabState extends State<_ExploreTab> {
+  bool _canPop = false;
+
+  late final _ExploreObserver _observer = _ExploreObserver(_syncCanPop);
+
+  void _syncCanPop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final canPop = widget.navigatorKey.currentState?.canPop() ?? false;
+      if (canPop != _canPop) {
+        setState(() => _canPop = canPop);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigatorPopHandler(
+      enabled: _canPop && widget.isActive(),
+      onPop: () => widget.navigatorKey.currentState?.maybePop(),
+      child: Navigator(
+        key: widget.navigatorKey,
+        observers: [_observer],
+        onGenerateRoute: (settings) {
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (context) => const ExplorePage(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ExploreObserver extends NavigatorObserver {
+  final VoidCallback onChanged;
+
+  _ExploreObserver(this.onChanged);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      onChanged();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      onChanged();
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      onChanged();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      onChanged();
 }
 
 class _NavItem extends StatefulWidget {

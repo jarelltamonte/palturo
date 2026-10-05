@@ -310,8 +310,9 @@ class _ExploreExpandState extends State<ExploreExpand> {
         ),
       ),
       body: SafeArea(
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
           child: hasMore
               ? Dismissible(
                   key: ValueKey(people[_currentIndex].id),

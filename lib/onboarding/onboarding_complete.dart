@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../theme/app_text_styles.dart';
@@ -11,7 +13,41 @@ class OnboardingComplete extends StatefulWidget {
   State<OnboardingComplete> createState() => _OnboardingCompleteState();
 }
 
-class _OnboardingCompleteState extends State<OnboardingComplete> {
+class _OnboardingCompleteState extends State<OnboardingComplete>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  final AudioPlayer _player = AudioPlayer();
+  Timer? _soundTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _soundTimer = Timer(const Duration(milliseconds: 700), _playSound);
+      }
+    });
+    _player.setReleaseMode(ReleaseMode.stop);
+    _player.setSource(AssetSource('sounds/newmatch.wav'));
+  }
+
+  Future<void> _playSound() async {
+    if (!mounted) return;
+    try {
+      await _player.stop();
+      await _player.play(AssetSource('sounds/newmatch.wav'));
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _soundTimer?.cancel();
+    _controller.dispose();
+    _player.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,8 +60,12 @@ class _OnboardingCompleteState extends State<OnboardingComplete> {
               Lottie.asset(
                 'assets/lottie/lottie_finished.json',
                 width: 350,
-                repeat: false,
-                animate: true,
+                controller: _controller,
+                onLoaded: (composition) {
+                  _controller
+                    ..duration = composition.duration
+                    ..forward();
+                },
               ),
               Text(
                 'You\'re all set!',

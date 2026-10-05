@@ -6,6 +6,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
+import 'package:palturo/screen/chats_room.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -145,6 +146,26 @@ class _MatchesState extends State<Matches> {
         SnackBar(content: Text('You reported ${pal.name}')),
       );
     }
+  }
+
+  void _openChatRoom(MatchedUser pal) {
+    _searchFocus.unfocus();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatRoom(
+          name: pal.name,
+          avatarImage: pal.avatarImage,
+          skillName: pal.skillName,
+          role: pal.role,
+          person: pal.toPerson(),
+        ),
+      ),
+    );
+  }
+
+  void _openProfile(MatchedUser pal) {
+    showPersonProfileDialog(context, pal.toPerson());
   }
 
   Widget _sheetSectionLabel(String label, Color textColor) {
@@ -307,84 +328,90 @@ class _MatchesState extends State<Matches> {
   }
 
   Widget _buildPalTile(MatchedUser pal, Color textTheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: _colorFor(pal.name),
-            backgroundImage: pal.avatarImage,
-            child:
-                pal.avatarImage == null
-                    ? Text(
-                      _initials(pal.name),
-                      style: AppTextStyles.regularText.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+    return InkWell(
+      onTap: () => _openChatRoom(pal),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => _openProfile(pal),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: _colorFor(pal.name),
+                backgroundImage: pal.avatarImage,
+                child:
+                    pal.avatarImage == null
+                        ? Text(
+                          _initials(pal.name),
+                          style: AppTextStyles.regularText.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                        : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pal.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.regularText.copyWith(color: textTheme),
+                  ),
+                  const SizedBox(height: 2),
+                  SkillTag(skillName: pal.skillName, role: pal.role),
+                ],
+              ),
+            ),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_horiz, color: textTheme),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              onSelected: (value) => _handleAction(value, pal),
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'unmatch',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.remove_circle_outline,
+                          color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Unmatch',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
                       ),
-                    )
-                    : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  pal.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.regularText.copyWith(color: textTheme),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 2),
-                SkillTag(skillName: pal.skillName, role: pal.role),
+                PopupMenuItem<String>(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flag_outlined,
+                          color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Report',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_horiz, color: textTheme),
-            padding: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            onSelected: (value) => _handleAction(value, pal),
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                value: 'unmatch',
-                child: Row(
-                  children: [
-                    const Icon(Icons.remove_circle_outline,
-                        color: Colors.red, size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Unmatch',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'report',
-                child: Row(
-                  children: [
-                    const Icon(Icons.flag_outlined,
-                        color: Colors.red, size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Report',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

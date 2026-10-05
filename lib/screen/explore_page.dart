@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/screen/explore_expand.dart';
+import 'package:palturo/screen/users_dump.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -32,6 +34,22 @@ class _ExplorePageState extends State<ExplorePage> {
     Icons.handyman_outlined,
     Icons.agriculture_outlined,
   ];
+
+  final List<SkillCategory> _categories = [
+    SkillCategory.artsDesign,
+    SkillCategory.languageCulture,
+    SkillCategory.everydayPractical,
+    SkillCategory.agricultureLivelihood,
+  ];
+
+  void _openCategory(SkillCategory category) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ExploreExpand(category: category),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +113,7 @@ class _ExplorePageState extends State<ExplorePage> {
                   label: _categoryLabels[index],
                   description: _categoryDescription[index],
                   icon: _categoryIcons[index],
+                  onTap: () => _openCategory(_categories[index]),
                 );
               },
             );
@@ -262,20 +281,20 @@ class _CategoryCard extends StatelessWidget {
     required this.label,
     required this.description,
     required this.icon,
+    required this.onTap,
   });
 
   final String label;
   final String description;
   final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
 
     return Container(
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -286,37 +305,48 @@ class _CategoryCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 28, color: AppColors.background),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.headingText.copyWith(
+                    color: textColor,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor.withValues(alpha: 0.7),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
-            child: Icon(icon, size: 28, color: AppColors.background),
           ),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.headingText.copyWith(
-              color: textColor,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: textColor.withValues(alpha: 0.7),
-              fontSize: 13,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

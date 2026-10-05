@@ -510,3 +510,52 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
     );
   }
 }
+
+void showPersonProfileDialog(BuildContext context, Person person) {
+  FocusManager.instance.primaryFocus?.unfocus();
+
+  showDialog(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.7),
+    builder: (dialogContext) {
+      final screenSize = MediaQuery.of(dialogContext).size;
+
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+        child: SizedBox(
+          width: screenSize.width - 40,
+          height: screenSize.height * 0.75,
+          child: Stack(
+            children: [
+              PersonCardOverlay(
+                person: person,
+                showActions: false,
+                showMenu: false,
+              ),
+              Positioned(
+                top: 16,
+                left: 16,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(dialogContext),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter/material.dart';
@@ -9,13 +10,16 @@ import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/screen/home_page.dart';
 
 enum ChatRoleFilter { all, learner, mentor }
 
 enum ChatReadFilter { all, unread, read }
 
 class ChatsPage extends StatefulWidget {
-  const ChatsPage({super.key});
+  final VoidCallback? onStartSwiping;
+
+  const ChatsPage({super.key, this.onStartSwiping});
 
   @override
   State<ChatsPage> createState() => _ChatsPageState();
@@ -30,13 +34,31 @@ class _ChatsPageState extends State<ChatsPage> {
   ChatRoleFilter _roleFilter = ChatRoleFilter.all;
   ChatReadFilter _readFilter = ChatReadFilter.all;
 
+  static const int _maxMatchCards = 8;
+
   final List<MatchedUser> _chats = dumpUsers;
+
+  late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
+    ..onTap = _startSwiping;
 
   @override
   void dispose() {
+    _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _startSwiping() {
+    final callback = widget.onStartSwiping;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HomePage()),
+    );
   }
 
   bool get _hasActiveFilter =>
@@ -126,7 +148,9 @@ class _ChatsPageState extends State<ChatsPage> {
   void _openMatches(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const Matches()),
+      MaterialPageRoute(
+        builder: (context) => Matches(onStartSwiping: _startSwiping),
+      ),
     );
   }
 
@@ -427,20 +451,24 @@ class _ChatsPageState extends State<ChatsPage> {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 8),
-            Text(
-              'No matches yet',
-              style: AppTextStyles.boldText.copyWith(
-                color: textTheme,
-                fontSize: 18,
+            Text.rich(
+              TextSpan(
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.7),
+                ),
+                children: [
+                  const TextSpan(text: 'Start '),
+                  TextSpan(
+                    text: 'Swiping',
+                    recognizer: _swipeTap,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: textTheme,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Once you match with someone, your chats will show up here.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme.withValues(alpha: 0.6),
-              ),
             ),
           ],
         ),
@@ -456,6 +484,7 @@ class _ChatsPageState extends State<ChatsPage> {
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     final matches = _filteredMatches;
+    final visibleMatches = matches.take(_maxMatchCards).toList();
     final messages = _filteredMessages;
     final nothingFound = matches.isEmpty && messages.isEmpty;
     final showShortcut = _query.trim().isEmpty;
@@ -562,14 +591,15 @@ class _ChatsPageState extends State<ChatsPage> {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    itemCount: matches.length + (showShortcut ? 1 : 0),
+                    itemCount: visibleMatches.length + (showShortcut ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (showShortcut && index == 0) {
                         return MatchesShortcutItem(
                           onTap: () => _openMatches(context),
                         );
                       }
-                      final chat = matches[showShortcut ? index - 1 : index];
+                      final chat =
+                          visibleMatches[showShortcut ? index - 1 : index];
                       final ImageProvider? avatarImage = chat.avatarImage;
 
                       return ChatProfileItem(

@@ -1,10 +1,14 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/screen/profile_edit.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -71,9 +75,33 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  static const ProfileData _placeholderProfile = ProfileData(
+    name: 'You',
+    schedule: 'Select your availability',
+  );
+
+  late final TapGestureRecognizer _settingsTap = TapGestureRecognizer()
+    ..onTap = _openSettings;
+
   RoleFilter _roleFilter = RoleFilter.all;
   int _currentIndex = 0;
   final List<int> _history = [];
+
+  @override
+  void dispose() {
+    _settingsTap.dispose();
+    super.dispose();
+  }
+
+  void _openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const ProfileEditPage(profile: _placeholderProfile),
+      ),
+    );
+  }
 
   bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
 
@@ -360,12 +388,47 @@ class _HomePageState extends State<HomePage> {
                   onReport: () => _report(people[_currentIndex].id),
                 ),
               )
-            : Center(
-                child: Text(
-                  'No more people to show right now.',
-                  style: AppTextStyles.regularText.copyWith(color: textTheme),
+            : _buildEmptyState(textTheme),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(Color textColor) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Lottie.asset(
+              'assets/lottie/empty.json',
+              width: 220,
+              height: 220,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 8),
+            Text.rich(
+              TextSpan(
+                style: AppTextStyles.regularText.copyWith(
+                  color: textColor.withValues(alpha: 0.7),
                 ),
+                children: [
+                  const TextSpan(text: 'No more people to show.\n'),
+                  const TextSpan(text: 'Consider changing your '),
+                  TextSpan(
+                    text: 'Settings',
+                    recognizer: _settingsTap,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                    ),
+                  ),
+                ],
               ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

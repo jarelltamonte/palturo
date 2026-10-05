@@ -52,7 +52,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       navigatorKey: _exploreNavKey,
       isActive: () => _selectedIndex == _exploreIndex,
     ),
-    const ChatsPage(),
+    ChatsPage(onStartSwiping: () => _onItemTapped(0)),
     const RequestPage(),
     const ProfilePage(),
   ];
@@ -70,10 +70,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: _buildNavBar(),
     );
   }
@@ -116,10 +113,7 @@ class _ExploreTab extends StatefulWidget {
   final GlobalKey<NavigatorState> navigatorKey;
   final bool Function() isActive;
 
-  const _ExploreTab({
-    required this.navigatorKey,
-    required this.isActive,
-  });
+  const _ExploreTab({required this.navigatorKey, required this.isActive});
 
   @override
   State<_ExploreTab> createState() => _ExploreTabState();
@@ -144,7 +138,9 @@ class _ExploreTabState extends State<_ExploreTab> {
   Widget build(BuildContext context) {
     return NavigatorPopHandler(
       enabled: _canPop && widget.isActive(),
-      onPop: () => widget.navigatorKey.currentState?.maybePop(),
+      onPopWithResult: (result) {
+        widget.navigatorKey.currentState?.pop();
+      },
       child: Navigator(
         key: widget.navigatorKey,
         observers: [_observer],
@@ -198,7 +194,8 @@ class _NavItem extends StatefulWidget {
   State<_NavItem> createState() => _NavItemState();
 }
 
-class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin {
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _jiggle;
 
@@ -241,16 +238,9 @@ class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin 
             AnimatedBuilder(
               animation: _jiggle,
               builder: (context, child) {
-                return Transform.rotate(
-                  angle: _jiggle.value,
-                  child: child,
-                );
+                return Transform.rotate(angle: _jiggle.value, child: child);
               },
-              child: Icon(
-                widget.icon,
-                color: widget.color,
-                size: 24,
-              ),
+              child: Icon(widget.icon, color: widget.color, size: 24),
             ),
             const SizedBox(height: 2),
             Text(
@@ -259,9 +249,10 @@ class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin 
                 fontFamily: 'Inter',
                 color: widget.color,
                 fontSize: 11,
-                fontWeight: widget.color == AppColors.primary
-                    ? FontWeight.bold
-                    : FontWeight.normal,
+                fontWeight:
+                    widget.color == AppColors.primary
+                        ? FontWeight.bold
+                        : FontWeight.normal,
               ),
             ),
           ],

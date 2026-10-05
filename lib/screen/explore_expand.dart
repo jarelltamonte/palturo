@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
@@ -215,6 +216,33 @@ class _ExploreExpandState extends State<ExploreExpand> {
     );
   }
 
+  Widget _buildEmptyState(Color textColor) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Lottie.asset(
+              'assets/lottie/empty.json',
+              width: 220,
+              height: 220,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Nothing more to show',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _swipeBackground({
     required Alignment alignment,
     required Color color,
@@ -336,18 +364,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
                     onReport: () => _report(people[_currentIndex].id),
                   ),
                 )
-              : Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      'No more people in ${widget.category.label} right now.',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                  ),
-                ),
+              : _buildEmptyState(textTheme),
         ),
       ),
     );

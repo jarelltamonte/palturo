@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -11,7 +13,9 @@ import 'package:palturo/screen/chats_room.dart';
 enum RoleFilter { all, learner, mentor }
 
 class Matches extends StatefulWidget {
-  const Matches({super.key});
+  final VoidCallback? onStartSwiping;
+
+  const Matches({super.key, this.onStartSwiping});
 
   @override
   State<Matches> createState() => _MatchesState();
@@ -45,8 +49,18 @@ class _MatchesState extends State<Matches> {
 
   final List<MatchedUser> _pals = [...dumpUsers];
 
+  late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
+    ..onTap = _startSwiping;
+
+  void _startSwiping() {
+    final callback = widget.onStartSwiping;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    callback?.call();
+  }
+
   @override
   void dispose() {
+    _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -476,6 +490,47 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  Widget _buildNoPalsState(Color textTheme) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Lottie.asset(
+                'assets/lottie/empty.json',
+                width: 220,
+                height: 220,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 8),
+              Text.rich(
+                TextSpan(
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme.withValues(alpha: 0.7),
+                  ),
+                  children: [
+                    const TextSpan(text: 'Start '),
+                    TextSpan(
+                      text: 'Swiping',
+                      recognizer: _swipeTap,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: textTheme,
+                      ),
+                    ),
+                  ],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(Color textTheme) {
     return Padding(
       padding: const EdgeInsets.only(top: 80),
@@ -638,7 +693,9 @@ class _MatchesState extends State<Matches> {
           ),
         ],
       ),
-      body: SafeArea(
+      body: _pals.isEmpty
+          ? _buildNoPalsState(textTheme)
+          : SafeArea(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

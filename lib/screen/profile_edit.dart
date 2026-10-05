@@ -62,9 +62,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   void initState() {
     super.initState();
 
-    _schedulePlaceholder = widget.profile.schedule;
-    _languagesPlaceholder = widget.profile.languages.join(', ');
-    _learningStylesPlaceholder = widget.profile.interests.join(', ');
+    _schedulePlaceholder = widget.profile.schedule.trim().isEmpty
+        ? 'Select your availability'
+        : widget.profile.schedule;
+    _languagesPlaceholder = widget.profile.languages.isEmpty
+        ? 'Select your languages'
+        : widget.profile.languages.join(', ');
+    _learningStylesPlaceholder = widget.profile.interests.isEmpty
+        ? 'Select your learning style'
+        : widget.profile.interests.join(', ');
     _bioController = TextEditingController(text: widget.profile.bio);
     _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);

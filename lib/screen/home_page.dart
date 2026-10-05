@@ -414,7 +414,7 @@ class _HomePageState extends State<HomePage> {
                   color: textColor.withValues(alpha: 0.7),
                 ),
                 children: [
-                  const TextSpan(text: 'Nothing to show here.\n'),
+                  const TextSpan(text: 'Nothing more to show\n'),
                   const TextSpan(text: 'Consider changing your '),
                   TextSpan(
                     text: 'Settings',

@@ -25,7 +25,7 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
     _controller = AnimationController(vsync: this);
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        _soundTimer = Timer(const Duration(milliseconds: 700), _playSound);
+        _soundTimer = Timer(const Duration(milliseconds: 100), _playSound);
       }
     });
     _player.setReleaseMode(ReleaseMode.stop);

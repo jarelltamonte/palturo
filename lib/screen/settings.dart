@@ -25,12 +25,12 @@ class _SettingsState extends State<Settings> {
   final TextEditingController _feedbackController =
       TextEditingController();
 
-  // Five rating questions. The sixth step is the comment field.
   final List<String> _feedbackQuestions = [
     'How would you rate your experience with PalTuro?',
     'How easy was PalTuro to use?',
     'How would you rate the app design?',
     'How satisfied are you with the features?',
+    'How well did PalTuro’s AI recommendations match your interests and preferences?',
     'How likely are you to recommend PalTuro?',
   ];
 
@@ -40,10 +40,6 @@ class _SettingsState extends State<Settings> {
     _feedbackController.dispose();
     super.dispose();
   }
-
-  // --------------------------------------------------
-  // FEEDBACK DIALOG
-  // --------------------------------------------------
 
   void _showFeedbackDialog() {
     int currentStep = 0;
@@ -62,8 +58,6 @@ class _SettingsState extends State<Settings> {
             final textTheme =
                 Theme.of(context).colorScheme.secondary;
 
-            // Steps 0-4 are rating questions.
-            // Step 5 is the open-ended comment.
             final bool isCommentStep =
                 currentStep == _feedbackQuestions.length;
 
@@ -73,22 +67,18 @@ class _SettingsState extends State<Settings> {
             final Widget ratingContent = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Step indicator
                 Text(
-                  'Step ${currentStep + 1} of 6',
+                  'Step ${currentStep + 1} of ${_feedbackQuestions.length + 1}',
                   style: AppTextStyles.regularText.copyWith(
                     color: textTheme.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
-                // Progress bar
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value: (currentStep + 1) / 6,
+                    value: (currentStep + 1) / (_feedbackQuestions.length + 1),
                     minHeight: 4,
                     backgroundColor:
                         textTheme.withValues(alpha: 0.1),
@@ -98,14 +88,8 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 if (!isCommentStep) ...[
-                  // ------------------------------
-                  // STEPS 1-5: RATING QUESTIONS
-                  // ------------------------------
-
                   Text(
                     _feedbackQuestions[currentStep],
                     textAlign: TextAlign.center,
@@ -115,9 +99,7 @@ class _SettingsState extends State<Settings> {
                       fontSize: 14,
                     ),
                   ),
-
                   const SizedBox(height: 20),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
@@ -151,9 +133,7 @@ class _SettingsState extends State<Settings> {
                       },
                     ),
                   ),
-
                   const SizedBox(height: 4),
-
                   Text(
                     selectedRating == 0
                         ? 'Tap a star to rate'
@@ -166,10 +146,6 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ] else ...[
-                  // ------------------------------
-                  // STEP 6: OPEN-ENDED FEEDBACK
-                  // ------------------------------
-
                   Text(
                     'Anything else you would like to share?',
                     textAlign: TextAlign.center,
@@ -179,9 +155,7 @@ class _SettingsState extends State<Settings> {
                       fontSize: 14,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   Text(
                     'Tell us about your experience or how we can improve.',
                     textAlign: TextAlign.center,
@@ -192,9 +166,7 @@ class _SettingsState extends State<Settings> {
                       fontSize: 12,
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
                   TextField(
                     controller: _feedbackController,
                     minLines: 4,
@@ -254,7 +226,6 @@ class _SettingsState extends State<Settings> {
               ],
             );
 
-            // Handle Next and Submit.
             void nextOrSubmit() {
               if (!isCommentStep) {
                 setDialogState(() {
@@ -263,16 +234,17 @@ class _SettingsState extends State<Settings> {
                 return;
               }
 
-              // Collect all five ratings and the comment.
               final Map<String, dynamic> feedbackData = {
                 'ratings': {
-                  for (int i = 0; i < 5; i++)
+                  for (int i = 0;
+                      i < _feedbackQuestions.length;
+                      i++)
                     _feedbackQuestions[i]: ratings[i],
                 },
-                'comment': _feedbackController.text.trim(),
+                'comment':
+                    _feedbackController.text.trim(),
               };
 
-              // Placeholder until a database is connected.
               debugPrint(
                 'Feedback submitted: $feedbackData',
               );
@@ -288,10 +260,6 @@ class _SettingsState extends State<Settings> {
                 ),
               );
             }
-
-            // ------------------------------
-            // IOS DIALOG
-            // ------------------------------
 
             if (isIOS) {
               return CupertinoAlertDialog(
@@ -317,8 +285,8 @@ class _SettingsState extends State<Settings> {
                     },
                     child: Text(
                       'Cancel',
-                      style: AppTextStyles.regularText
-                          .copyWith(
+                      style:
+                          AppTextStyles.regularText.copyWith(
                         color: textTheme,
                       ),
                     ),
@@ -331,8 +299,8 @@ class _SettingsState extends State<Settings> {
                             : nextOrSubmit,
                     child: Text(
                       isCommentStep ? 'Submit' : 'Next',
-                      style: AppTextStyles.regularText
-                          .copyWith(
+                      style:
+                          AppTextStyles.regularText.copyWith(
                         color: AppColors.primary,
                       ),
                     ),
@@ -340,10 +308,6 @@ class _SettingsState extends State<Settings> {
                 ],
               );
             }
-
-            // ------------------------------
-            // ANDROID DIALOG
-            // ------------------------------
 
             return AlertDialog(
               backgroundColor:
@@ -370,8 +334,8 @@ class _SettingsState extends State<Settings> {
                   },
                   child: Text(
                     'Cancel',
-                    style: AppTextStyles.regularText
-                        .copyWith(
+                    style:
+                        AppTextStyles.regularText.copyWith(
                       color: textTheme,
                     ),
                   ),
@@ -384,8 +348,8 @@ class _SettingsState extends State<Settings> {
                           : nextOrSubmit,
                   child: Text(
                     isCommentStep ? 'Submit' : 'Next',
-                    style: AppTextStyles.regularText
-                        .copyWith(
+                    style:
+                        AppTextStyles.regularText.copyWith(
                       color: AppColors.primary,
                     ),
                   ),
@@ -397,10 +361,6 @@ class _SettingsState extends State<Settings> {
       },
     );
   }
-
-  // --------------------------------------------------
-  // REPORT A PROBLEM DIALOG
-  // --------------------------------------------------
 
   void _showReportDialog() {
     final textTheme =
@@ -481,7 +441,8 @@ class _SettingsState extends State<Settings> {
           return CupertinoAlertDialog(
             title: Text(
               'Report a Problem',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
                 fontSize: 18,
               ),
@@ -501,8 +462,8 @@ class _SettingsState extends State<Settings> {
                 },
                 child: Text(
                   'Cancel',
-                  style: AppTextStyles.regularText
-                      .copyWith(
+                  style:
+                      AppTextStyles.regularText.copyWith(
                     color: textTheme,
                   ),
                 ),
@@ -511,8 +472,8 @@ class _SettingsState extends State<Settings> {
                 onPressed: submitReport,
                 child: Text(
                   'Submit',
-                  style: AppTextStyles.regularText
-                      .copyWith(
+                  style:
+                      AppTextStyles.regularText.copyWith(
                     color: AppColors.primary,
                   ),
                 ),
@@ -546,7 +507,8 @@ class _SettingsState extends State<Settings> {
               },
               child: Text(
                 'Cancel',
-                style: AppTextStyles.regularText.copyWith(
+                style:
+                    AppTextStyles.regularText.copyWith(
                   color: textTheme,
                 ),
               ),
@@ -555,7 +517,8 @@ class _SettingsState extends State<Settings> {
               onPressed: submitReport,
               child: Text(
                 'Submit',
-                style: AppTextStyles.regularText.copyWith(
+                style:
+                    AppTextStyles.regularText.copyWith(
                   color: AppColors.primary,
                 ),
               ),
@@ -565,10 +528,6 @@ class _SettingsState extends State<Settings> {
       },
     );
   }
-
-  // --------------------------------------------------
-  // SETTINGS PAGE
-  // --------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -607,7 +566,6 @@ class _SettingsState extends State<Settings> {
           ),
         ),
       ),
-
       body: ListView(
         padding: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -617,7 +575,8 @@ class _SettingsState extends State<Settings> {
           SwitchListTile.adaptive(
             title: Text(
               'Notifications',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -630,11 +589,11 @@ class _SettingsState extends State<Settings> {
               });
             },
           ),
-
           SwitchListTile.adaptive(
             title: Text(
               'Sound',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -647,11 +606,11 @@ class _SettingsState extends State<Settings> {
               });
             },
           ),
-
           SwitchListTile.adaptive(
             title: Text(
               'Vibration',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -664,11 +623,11 @@ class _SettingsState extends State<Settings> {
               });
             },
           ),
-
           SwitchListTile.adaptive(
             title: Text(
               'Dark Mode',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -683,12 +642,10 @@ class _SettingsState extends State<Settings> {
               MyApp.of(context).setThemeMode(value);
             },
           ),
-
           Divider(
             height: 20,
             color: AppColors.black.withValues(alpha: 0.2),
           ),
-
           ListTile(
             leading: Icon(
               Icons.feedback_outlined,
@@ -696,7 +653,8 @@ class _SettingsState extends State<Settings> {
             ),
             title: Text(
               'Submit a Feedback',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -706,7 +664,6 @@ class _SettingsState extends State<Settings> {
             ),
             onTap: _showFeedbackDialog,
           ),
-
           ListTile(
             leading: Icon(
               Icons.report_problem_outlined,
@@ -714,7 +671,8 @@ class _SettingsState extends State<Settings> {
             ),
             title: Text(
               'Report a Problem',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -724,7 +682,6 @@ class _SettingsState extends State<Settings> {
             ),
             onTap: _showReportDialog,
           ),
-
           ListTile(
             leading: Icon(
               Icons.block,
@@ -732,7 +689,8 @@ class _SettingsState extends State<Settings> {
             ),
             title: Text(
               'Blocked Users',
-              style: AppTextStyles.regularText.copyWith(
+              style:
+                  AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),
             ),
@@ -744,33 +702,35 @@ class _SettingsState extends State<Settings> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const BlockListPage(),
+                  builder: (context) =>
+                      const BlockListPage(),
                 ),
               );
             },
           ),
         ],
       ),
-
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Logout
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.secondary.withValues(
                     alpha: 0.1,
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius:
+                      BorderRadius.circular(24),
                 ),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                      BorderRadius.circular(12),
                   onTap: () {},
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
+                    padding:
+                        const EdgeInsets.symmetric(
                       vertical: 16,
                     ),
                     child: Row(
@@ -795,20 +755,21 @@ class _SettingsState extends State<Settings> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 12),
-
-              // Delete account
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(24),
+                  color:
+                      Colors.red.withValues(alpha: 0.1),
+                  borderRadius:
+                      BorderRadius.circular(24),
                 ),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                      BorderRadius.circular(12),
                   onTap: () {},
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
+                    padding:
+                        const EdgeInsets.symmetric(
                       vertical: 16,
                     ),
                     child: Row(
@@ -833,21 +794,18 @@ class _SettingsState extends State<Settings> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 32),
-
               Image.asset(
                 isDarkMode
                     ? 'assets/images/vlogo_white.png'
                     : 'assets/images/vlogo_black.png',
                 height: 60,
               ),
-
               const SizedBox(height: 8),
-
               Text(
                 'Version 1.0.0',
-                style: AppTextStyles.regularText.copyWith(
+                style:
+                    AppTextStyles.regularText.copyWith(
                   color: textTheme.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),

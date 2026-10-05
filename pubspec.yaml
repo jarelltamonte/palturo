@@ -12,6 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   image_picker: ^1.1.2
+  audioplayers: ^6.1.0
 
   flutter_svg: ^2.0.0
   flutter_otp_text_field: ^1.1.0+2
@@ -63,6 +64,8 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/lottie/
+    - assets/fonts/
+    - assets/sounds/
 
   fonts:
     - family: Comfortaa

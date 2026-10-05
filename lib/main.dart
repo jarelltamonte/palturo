@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/landing_page.dart';
@@ -5,12 +6,24 @@ import 'package:palturo/onboarding_intro.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
 
+Future<void> playSplashSound() async {
+  final player = AudioPlayer();
+  try {
+    player.onPlayerComplete.listen((_) => player.dispose());
+    await player.play(AssetSource('sounds/splash.wav'));
+  } catch (_) {
+    await player.dispose();
+  }
+}
+
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
   FlutterNativeSplash.preserve(
     widgetsBinding: widgetsBinding,
   );
+
+  playSplashSound();
 
   PreferencesService.instance.init();
 
@@ -70,7 +83,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Palturo',
+      title: 'PalTuro',
       theme: lightMode,
       darkTheme: darkMode,
       themeMode: _themeMode,

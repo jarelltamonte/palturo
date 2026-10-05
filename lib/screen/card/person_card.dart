@@ -31,22 +31,26 @@ class Person {
 
 class PersonCardOverlay extends StatefulWidget {
   final Person person;
-  final VoidCallback onAdd;
-  final VoidCallback onSkip;
+  final VoidCallback? onAdd;
+  final VoidCallback? onSkip;
   final VoidCallback? onBlock;
   final VoidCallback? onReport;
   final String skipLabel;
   final String addLabel;
+  final bool showActions;
+  final bool showMenu;
 
   const PersonCardOverlay({
     super.key,
     required this.person,
-    required this.onAdd,
-    required this.onSkip,
+    this.onAdd,
+    this.onSkip,
     this.onBlock,
     this.onReport,
     this.skipLabel = 'Skip',
     this.addLabel = 'Add',
+    this.showActions = true,
+    this.showMenu = true,
   });
 
   @override
@@ -206,6 +210,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
           ),
+          if (widget.showMenu)
           Positioned(
             top: 16,
             right: 16,
@@ -278,7 +283,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 130,
+            bottom: widget.showActions ? 130 : 64,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -427,7 +432,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
           Positioned(
             left: 20,
             right: 20,
-            bottom: 90,
+            bottom: widget.showActions ? 90 : 28,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -453,6 +458,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ],
             ),
           ),
+          if (widget.showActions)
           Positioned(
             left: 20,
             right: 20,

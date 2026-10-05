@@ -10,6 +10,7 @@ class ChatRoom extends StatefulWidget {
   final ImageProvider? avatarImage;
   final String? skillName;
   final PersonRole? role;
+  final Person? person;
 
   const ChatRoom({
     super.key,
@@ -17,6 +18,7 @@ class ChatRoom extends StatefulWidget {
     this.avatarImage,
     this.skillName,
     this.role,
+    this.person,
   });
 
   @override
@@ -55,6 +57,59 @@ class _ChatRoomState extends State<ChatRoom> {
     _messageController.clear();
   }
 
+  void _showProfile() {
+    final person = widget.person;
+    if (person == null) return;
+
+    FocusScope.of(context).unfocus();
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogContext) {
+        final screenSize = MediaQuery.of(dialogContext).size;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          child: SizedBox(
+            width: screenSize.width - 40,
+            height: screenSize.height * 0.75,
+            child: Stack(
+              children: [
+                PersonCardOverlay(
+                  person: person,
+                  showActions: false,
+                  showMenu: false,
+                ),
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(dialogContext),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
@@ -88,34 +143,47 @@ class _ChatRoomState extends State<ChatRoom> {
             ),
             if (showProfileInAppBar) ...[
               const SizedBox(width: 4),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey,
-                backgroundImage: widget.avatarImage,
-              ),
-              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.boldText.copyWith(
-                        color: textTheme,
+                child: GestureDetector(
+                  onTap: _showProfile,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.grey,
+                        backgroundImage: widget.avatarImage,
                       ),
-                    ),
-                    if (widget.skillName != null) ...[
-                      const SizedBox(height: 2),
-                      SkillTag(
-                        skillName: widget.skillName!,
-                        role: widget.role,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.boldText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                            if (widget.skillName != null) ...[
+                              const SizedBox(height: 2),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: SkillTag(
+                                  skillName: widget.skillName!,
+                                  role: widget.role,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ] else
@@ -188,10 +256,13 @@ class _ChatRoomState extends State<ChatRoom> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey,
-                    backgroundImage: widget.avatarImage,
+                  GestureDetector(
+                    onTap: _showProfile,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey,
+                      backgroundImage: widget.avatarImage,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(

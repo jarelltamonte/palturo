@@ -321,6 +321,7 @@ class _OptionTile extends StatelessWidget {
               ? Checkbox.adaptive(
                 value: selected,
                 activeColor: AppColors.primary,
+                checkColor: AppColors.textSecondary,
                 onChanged: (_) => onTap(),
               )
               : Radio<String>(value: label, activeColor: AppColors.primary),

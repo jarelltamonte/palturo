@@ -106,6 +106,7 @@ class _ChatsPageState extends State<ChatsPage> {
     ImageProvider? avatarImage,
     String? skillName,
     PersonRole? role,
+    Person? person,
   }) {
     Navigator.push(
       context,
@@ -116,6 +117,7 @@ class _ChatsPageState extends State<ChatsPage> {
               avatarImage: avatarImage,
               skillName: skillName,
               role: role,
+              person: person,
             ),
       ),
     );
@@ -580,6 +582,7 @@ class _ChatsPageState extends State<ChatsPage> {
                               avatarImage: avatarImage,
                               skillName: chat.skillName,
                               role: chat.role,
+                              person: chat.toPerson(),
                             ),
                       );
                     },
@@ -618,6 +621,7 @@ class _ChatsPageState extends State<ChatsPage> {
                           avatarImage: avatarImage,
                           skillName: chat.skillName,
                           role: chat.role,
+                          person: chat.toPerson(),
                         ),
                   );
                 },

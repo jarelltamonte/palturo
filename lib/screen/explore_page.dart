@@ -296,7 +296,7 @@ class _CategoryCard extends StatelessWidget {
               color: AppColors.primary,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 36, color: AppColors.background),
+            child: Icon(icon, size: 28, color: AppColors.background),
           ),
           const SizedBox(height: 16),
           Text(

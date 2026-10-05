@@ -53,6 +53,20 @@ class MatchedUser {
 
   ImageProvider? get avatarImage =>
       avatarUrl == null ? null : NetworkImage(avatarUrl!);
+
+  Person toPerson() {
+    return Person(
+      id: 'dump_$id',
+      name: name,
+      schedule: schedule,
+      language: language,
+      learningStyle: learningStyle,
+      skillName: skillName,
+      role: role,
+      bio: bio,
+      photoUrls: [avatarUrl],
+    );
+  }
 }
 
 const List<MatchedUser> dumpUsers = [

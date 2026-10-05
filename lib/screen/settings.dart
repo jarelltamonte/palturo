@@ -731,7 +731,7 @@ class _SettingsState extends State<Settings> {
               color: textTheme,
             ),
             title: Text(
-              'Block People',
+              'Blocked Users',
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme,
               ),

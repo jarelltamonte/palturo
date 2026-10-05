@@ -45,7 +45,7 @@ class BlockListPage extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Block list',
+          'Blocked Users',
           style: AppTextStyles.regularText.copyWith(
             color: textTheme,
             fontSize: 16,
@@ -124,11 +124,11 @@ class _BlockedTile extends StatelessWidget {
     final photo = person.photoUrls.isNotEmpty ? person.photoUrls.first : null;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 24,
+            radius: 22,
             backgroundColor: Colors.grey[300],
             backgroundImage: photo != null ? NetworkImage(photo) : null,
             child: photo == null
@@ -137,45 +137,41 @@ class _BlockedTile extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  person.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.boldText.copyWith(color: textColor),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  person.skillName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textColor.withValues(alpha: 0.6),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
+            child: Text(
+              person.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.boldText.copyWith(color: textColor),
             ),
           ),
-          const SizedBox(width: 12),
-          OutlinedButton(
-            onPressed: onUnblock,
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: textColor.withValues(alpha: 0.4)),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_horiz, color: textColor),
+            padding: EdgeInsets.zero,
+            color: Theme.of(context).colorScheme.surface,
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              'Unblock',
-              style: AppTextStyles.regularText.copyWith(
-                color: textColor,
-                fontSize: 13,
+            onSelected: (value) {
+              if (value == 'unblock') onUnblock();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: 'unblock',
+                child: Row(
+                  children: [
+                    Icon(Icons.how_to_reg_outlined, color: textColor, size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Unblock',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

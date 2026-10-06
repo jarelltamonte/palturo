@@ -263,14 +263,14 @@ class _SettingsState extends State<Settings> {
 
             if (isIOS) {
               return CupertinoAlertDialog(
-                title: Text(
+                title: Center(child: Text(
                   'Submit a Feedback',
                   style:
                       AppTextStyles.regularText.copyWith(
                     color: textTheme,
                     fontSize: 18,
                   ),
-                ),
+                )),
                 content: Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: Material(
@@ -315,14 +315,14 @@ class _SettingsState extends State<Settings> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              title: Text(
+              title: Center(child: Text(
                 'Submit a Feedback',
                 style:
                     AppTextStyles.regularText.copyWith(
                   color: textTheme,
                   fontSize: 18,
                 ),
-              ),
+              )),
               content: SizedBox(
                 width: double.maxFinite,
                 child: ratingContent,
@@ -439,14 +439,14 @@ class _SettingsState extends State<Settings> {
 
         if (isIOS) {
           return CupertinoAlertDialog(
-            title: Text(
+            title: Center(child: Text(
               'Report a Problem',
               style:
                   AppTextStyles.regularText.copyWith(
                 color: textTheme,
                 fontSize: 18,
               ),
-            ),
+            )),
             content: Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Material(
@@ -488,13 +488,13 @@ class _SettingsState extends State<Settings> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: Text(
+          title: Center(child: Text(
             'Report a Problem',
             style: AppTextStyles.regularText.copyWith(
               color: textTheme,
               fontSize: 18,
             ),
-          ),
+          )),
           content: SizedBox(
             width: double.maxFinite,
             child: textField,
@@ -540,7 +540,7 @@ class _SettingsState extends State<Settings> {
             defaultTargetPlatform == TargetPlatform.iOS;
 
         final message = Text(
-          'Are you sure you want to log out?',
+          'Are you sure you want to log out of PalTuro?',
           textAlign: TextAlign.center,
           style: AppTextStyles.regularText.copyWith(
             color: textTheme,
@@ -563,14 +563,14 @@ class _SettingsState extends State<Settings> {
 
         if (isIOS) {
           return CupertinoAlertDialog(
-            title: Text(
+            title: Center(child: Text(
               'Logout',
               style:
                   AppTextStyles.regularText.copyWith(
                 color: textTheme,
                 fontSize: 18,
               ),
-            ),
+            )),
             content: Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Material(
@@ -611,13 +611,13 @@ class _SettingsState extends State<Settings> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: Text(
+          title: Center(child: Text(
             'Logout',
             style: AppTextStyles.regularText.copyWith(
               color: textTheme,
               fontSize: 18,
             ),
-          ),
+          )),
           content: SizedBox(
             width: double.maxFinite,
             child: message,
@@ -1071,13 +1071,13 @@ class _DeleteAccountDialogState
 
     if (isIOS) {
       return CupertinoAlertDialog(
-        title: Text(
+        title: Center(child: Text(
           'Delete Account',
           style: AppTextStyles.regularText.copyWith(
             color: textTheme,
             fontSize: 18,
           ),
-        ),
+        )),
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Material(
@@ -1119,13 +1119,13 @@ class _DeleteAccountDialogState
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
       ),
-      title: Text(
+      title: Center(child: Text(
         'Delete Account',
         style: AppTextStyles.regularText.copyWith(
           color: textTheme,
           fontSize: 18,
         ),
-      ),
+      )),
       content: SizedBox(
         width: double.maxFinite,
         child: content,

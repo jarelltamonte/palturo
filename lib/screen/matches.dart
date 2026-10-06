@@ -9,6 +9,8 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -149,15 +151,43 @@ class _MatchesState extends State<Matches> {
     }
   }
 
-  void _handleAction(String action, MatchedUser pal) {
+  Future<void> _handleAction(String action, MatchedUser pal) async {
     if (action == 'unmatch') {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Unmatch',
+        message:
+            'Unmatch ${pal.name}? You’ll lose this match and your chat history.',
+        confirmLabel: 'Unmatch',
+      );
+      if (!confirmed || !mounted) return;
+
       setState(() => _pals.removeWhere((p) => p.id == pal.id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('You unmatched ${pal.name}')),
       );
     } else if (action == 'report') {
+      final reason = await showReportReasonDialog(context, name: pal.name);
+      if (reason == null || !mounted) return;
+
+      debugPrint('Reported ${pal.id}: $reason');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You reported ${pal.name}')),
+        const SnackBar(content: Text('Thanks for your report.')),
+      );
+    } else if (action == 'block') {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Block',
+        message:
+            '${pal.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+        confirmLabel: 'Block',
+      );
+      if (!confirmed || !mounted) return;
+
+      BlockedUsers.block(pal.toPerson());
+      setState(() => _pals.removeWhere((p) => p.id == pal.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You blocked ${pal.name}')),
       );
     }
   }
@@ -415,6 +445,21 @@ class _MatchesState extends State<Matches> {
                       const SizedBox(width: 12),
                       Text(
                         'Report',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.block, color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Block',
                         style: AppTextStyles.regularText.copyWith(
                           color: textTheme,
                         ),

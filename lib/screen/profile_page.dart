@@ -2,13 +2,60 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
+import 'package:palturo/onboarding/onboarding_flow.dart'
+    show kLearningOptions, kTeachingOptions;
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
+import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
+
+const Map<String, int> _dayOrder = {
+  'Monday': 0,
+  'Tuesday': 1,
+  'Wednesday': 2,
+  'Thursday': 3,
+  'Friday': 4,
+  'Saturday': 5,
+  'Sunday': 6,
+  'Mon': 0,
+  'Tue': 1,
+  'Wed': 2,
+  'Thu': 3,
+  'Fri': 4,
+  'Sat': 5,
+  'Sun': 6,
+};
+
+String _formatSchedule(String schedule) {
+  final days = schedule
+      .split('/')
+      .map((day) => day.trim())
+      .where((day) => day.isNotEmpty)
+      .toList();
+
+  days.sort(
+    (a, b) => (_dayOrder[a] ?? 999).compareTo(
+      _dayOrder[b] ?? 999,
+    ),
+  );
+
+  return days
+      .map((day) => day.length > 3 ? day.substring(0, 3) : day)
+      .join('/');
+}
+
+String _skillLabel(String id, List<OnboardingOption> options) {
+  final custom = CustomSkill.tryParse(id);
+  if (custom != null) return custom.text;
+  for (final option in options) {
+    if (option.id == id) return option.label;
+  }
+  return id;
+}
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,6 +68,7 @@ class _ProfilePageState extends State<ProfilePage> {
   ProfileData _profile = const ProfileData(
     name: 'Juan De La Cruz',
     schedule: 'Mon/Sat/Sun',
+    bio: 'Mahilig akong magluto at matuto ng lumang gawang-kamay. Tara, magpalitan tayo ng kaalaman!',
     languages: ['English', 'Tagalog'],
     interests: ['Discussion', 'Visual Demons...'],
     role: OnboardingRole.both,
@@ -57,6 +105,53 @@ class _ProfilePageState extends State<ProfilePage> {
     if (updated != null) {
       setState(() => _profile = updated);
     }
+  }
+
+  Person _profileToPerson() {
+    final learnId = _profile.learningSkillIds.isNotEmpty
+        ? _profile.learningSkillIds.first
+        : null;
+    final teachId = _profile.teachingSkillIds.isNotEmpty
+        ? _profile.teachingSkillIds.first
+        : null;
+
+    PersonRole role;
+    String skillName;
+
+    if (_profile.role == OnboardingRole.teach) {
+      role = PersonRole.mentor;
+      skillName =
+          teachId == null ? '' : _skillLabel(teachId, kTeachingOptions);
+    } else if (_profile.role == OnboardingRole.learn) {
+      role = PersonRole.learner;
+      skillName =
+          learnId == null ? '' : _skillLabel(learnId, kLearningOptions);
+    } else if (learnId != null) {
+      role = PersonRole.learner;
+      skillName = _skillLabel(learnId, kLearningOptions);
+    } else if (teachId != null) {
+      role = PersonRole.mentor;
+      skillName = _skillLabel(teachId, kTeachingOptions);
+    } else {
+      role = PersonRole.learner;
+      skillName = '';
+    }
+
+    return Person(
+      id: 'me',
+      name: _profile.name,
+      schedule: _formatSchedule(_profile.schedule),
+      language: _profile.languages.join(', '),
+      learningStyle: _profile.interests.join(', '),
+      skillName: skillName,
+      role: role,
+      bio: _profile.bio,
+      photoUrls: [_profile.avatarUrl],
+    );
+  }
+
+  void _showMyProfile() {
+    showPersonProfileDialog(context, _profileToPerson());
   }
 
   @override
@@ -113,6 +208,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: _ProfileSummaryCard(
                 profile: _profile,
                 onTap: _openEdit,
+                onAvatarTap: _showMyProfile,
               ),
             ),
             Padding(
@@ -223,46 +319,13 @@ class _ProfilePageState extends State<ProfilePage> {
 class _ProfileSummaryCard extends StatelessWidget {
   final ProfileData profile;
   final VoidCallback onTap;
+  final VoidCallback onAvatarTap;
 
   const _ProfileSummaryCard({
     required this.profile,
     required this.onTap,
+    required this.onAvatarTap,
   });
-
-  static const _dayOrder = {
-    'Monday': 0,
-    'Tuesday': 1,
-    'Wednesday': 2,
-    'Thursday': 3,
-    'Friday': 4,
-    'Saturday': 5,
-    'Sunday': 6,
-    'Mon': 0,
-    'Tue': 1,
-    'Wed': 2,
-    'Thu': 3,
-    'Fri': 4,
-    'Sat': 5,
-    'Sun': 6,
-  };
-
-  String _formatSchedule(String schedule) {
-    final days = schedule
-        .split('/')
-        .map((day) => day.trim())
-        .where((day) => day.isNotEmpty)
-        .toList();
-
-    days.sort(
-      (a, b) => (_dayOrder[a] ?? 999).compareTo(
-        _dayOrder[b] ?? 999,
-      ),
-    );
-
-    return days
-        .map((day) => day.length > 3 ? day.substring(0, 3) : day)
-        .join('/');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -292,19 +355,22 @@ class _ProfileSummaryCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.grey[300],
-                  backgroundImage: profile.avatarUrl != null
-                      ? NetworkImage(profile.avatarUrl!)
-                      : null,
-                  child: profile.avatarUrl == null
-                      ? Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Colors.grey[600],
-                        )
-                      : null,
+                GestureDetector(
+                  onTap: onAvatarTap,
+                  child: CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: profile.avatarUrl != null
+                        ? NetworkImage(profile.avatarUrl!)
+                        : null,
+                    child: profile.avatarUrl == null
+                        ? Icon(
+                            Icons.person,
+                            size: 40,
+                            color: Colors.grey[600],
+                          )
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

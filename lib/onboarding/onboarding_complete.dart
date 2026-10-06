@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
@@ -7,6 +6,7 @@ import '../theme/app_colors.dart';
 
 class OnboardingComplete extends StatefulWidget {
   final VoidCallback onDone;
+
   const OnboardingComplete({super.key, required this.onDone});
 
   @override
@@ -17,32 +17,35 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   final AudioPlayer _player = AudioPlayer();
-  Timer? _soundTimer;
 
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(vsync: this);
+
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        _soundTimer = Timer(const Duration(milliseconds: 100), _playSound);
+        _playSound();
       }
     });
+
     _player.setReleaseMode(ReleaseMode.stop);
-    _player.setSource(AssetSource('sounds/newmatch.wav'));
   }
 
   Future<void> _playSound() async {
     if (!mounted) return;
+
     try {
       await _player.stop();
-      await _player.play(AssetSource('sounds/newmatch.wav'));
+      await _player.play(
+        AssetSource('sounds/newmatch.wav'),
+      );
     } catch (_) {}
   }
 
   @override
   void dispose() {
-    _soundTimer?.cancel();
     _controller.dispose();
     _player.dispose();
     super.dispose();
@@ -73,9 +76,7 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
                   color: Theme.of(context).colorScheme.secondary,
                 ),
               ),
-
               const SizedBox(height: 16),
-
               Text(
                 'Your account setup is complete.\nLet’s get started.',
                 textAlign: TextAlign.center,
@@ -89,28 +90,22 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: widget.onDone,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: AppTextStyles.boldText,
-                    foregroundColor: AppColors.textSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child: const Text('Done'),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: widget.onDone,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: AppTextStyles.boldText,
+                foregroundColor: AppColors.textSecondary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
                 ),
               ),
-            ],
+              child: const Text('Done'),
+            ),
           ),
         ),
       ),

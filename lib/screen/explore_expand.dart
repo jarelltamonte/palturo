@@ -7,6 +7,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 
 enum ExploreRoleFilter { all, learner, mentor }
 
@@ -56,13 +57,31 @@ class _ExploreExpandState extends State<ExploreExpand> {
     });
   }
 
-  void _block(Person person) {
+  Future<void> _confirmBlock(Person person) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Block',
+      message:
+          '${person.name} won’t be able to find or message you. You can unblock them anytime in Settings.',
+      confirmLabel: 'Block',
+    );
+    if (!confirmed || !mounted) return;
+
     BlockedUsers.block(person);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('You blocked ${person.name}')),
+    );
     _next();
   }
 
-  void _report(String personId) {
-    debugPrint('Reported $personId');
+  Future<void> _confirmReport(Person person) async {
+    final reason = await showReportReasonDialog(context, name: person.name);
+    if (reason == null || !mounted) return;
+
+    debugPrint('Reported ${person.id}: $reason');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thanks for your report.')),
+    );
     _next();
   }
 
@@ -362,8 +381,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
                     person: people[_currentIndex],
                     onAdd: _next,
                     onSkip: _next,
-                    onBlock: () => _block(people[_currentIndex]),
-                    onReport: () => _report(people[_currentIndex].id),
+                    onBlock: () => _confirmBlock(people[_currentIndex]),
+                    onReport: () => _confirmReport(people[_currentIndex]),
                   ),
                 )
               : _buildEmptyState(textTheme),

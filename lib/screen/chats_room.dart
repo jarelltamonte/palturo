@@ -4,6 +4,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
+import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 
 class ChatRoom extends StatefulWidget {
@@ -58,49 +59,86 @@ class _ChatRoomState extends State<ChatRoom> {
     _messageController.clear();
   }
 
+  Person get _personForBlock {
+    return widget.person ??
+        Person(
+          id: widget.name,
+          name: widget.name,
+          schedule: '',
+          language: '',
+          learningStyle: '',
+          skillName: widget.skillName ?? '',
+          role: widget.role ?? PersonRole.learner,
+        );
+  }
+
+  void _leaveChat(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _unmatch() {
+    _leaveChat('You unmatched ${widget.name}');
+  }
+
+  void _block() {
+    BlockedUsers.block(_personForBlock);
+    _leaveChat('You blocked ${widget.name}');
+  }
+
+  void _report(String reason) {
+    if (!mounted) return;
+    debugPrint('Reported ${widget.name}: $reason');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thanks for your report.')),
+    );
+  }
+
   void _showProfile() {
     final person = widget.person;
     if (person == null) return;
-    showPersonProfileDialog(context, person);
-  }
-
-  Future<void> _unmatch() async {
-    final confirmed = await showConfirmDialog(
+    showPersonProfileDialog(
       context,
-      title: 'Unmatch',
-      message: 'Are you sure you want to unmatch ${widget.name}?',
-      confirmLabel: 'Unmatch',
+      person,
+      onUnmatch: _unmatch,
+      onBlock: _block,
+      onReport: _report,
     );
-
-    if (!confirmed || !mounted) return;
-
-    Navigator.pop(context);
   }
 
-  Future<void> _block() async {
-    final confirmed = await showConfirmDialog(
-      context,
-      title: 'Block ${widget.name}?',
-      message:
-          'They will no longer be able to contact you or interact with you.',
-      confirmLabel: 'Block',
-    );
+  Future<void> _handleMenuAction(String action) async {
+    FocusScope.of(context).unfocus();
 
-    if (!confirmed || !mounted) return;
-
-    Navigator.pop(context);
-  }
-
-  Future<void> _report() async {
-    final reason = await showReportReasonDialog(context, name: widget.name);
-
-    if (reason == null || !mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Report submitted', style: AppTextStyles.regularText),
-      ),
-    );
+    if (action == 'unmatch') {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Unmatch',
+        message:
+            'Unmatch ${widget.name}? You’ll lose this match and your chat history.',
+        confirmLabel: 'Unmatch',
+      );
+      if (!confirmed) return;
+      _unmatch();
+    } else if (action == 'report') {
+      final reason = await showReportReasonDialog(
+        context,
+        name: widget.name,
+      );
+      if (reason == null) return;
+      _report(reason);
+    } else if (action == 'block') {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'Block',
+        message:
+            '${widget.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+        confirmLabel: 'Block',
+      );
+      if (!confirmed) return;
+      _block();
+    }
   }
 
   @override
@@ -189,126 +227,114 @@ class _ChatRoomState extends State<ChatRoom> {
               color: Theme.of(context).colorScheme.surface,
               elevation: 6,
               offset: const Offset(0, 40),
-              onSelected: (value) {
-                if (value == 'unmatch') {
-                  _unmatch();
-                } else if (value == 'report') {
-                  _report();
-                } else if (value == 'block') {
-                  _block();
-                }
-              },
-              itemBuilder:
-                  (context) => [
-                    PopupMenuItem<String>(
-                      value: 'unmatch',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.remove_circle_outline,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Unmatch',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+              onSelected: _handleMenuAction,
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'unmatch',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Unmatch',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
                       ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'report',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.flag_outlined,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Report',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'report',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flag_outlined,
+                          color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Report',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
                       ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'block',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.block_outlined,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Block',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.block, color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Block',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+              ],
               child: Container(
                 padding: const EdgeInsets.all(6),
                 margin: const EdgeInsets.only(right: 8),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Colors.transparent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.more_horiz, color: textTheme, size: 22),
+                child: Icon(
+                  Icons.more_horiz,
+                  color: textTheme,
+                  size: 22,
+                ),
               ),
             ),
           ],
         ),
       ),
-      body:
-          !_hasMessages && !showProfileInAppBar
-              ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: _showProfile,
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey,
-                        backgroundImage: widget.avatarImage,
-                      ),
+      body: !_hasMessages && !showProfileInAppBar
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: _showProfile,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey,
+                      backgroundImage: widget.avatarImage,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.name,
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
+                  ),
+                  if (widget.skillName != null) ...[
                     const SizedBox(height: 12),
                     Text(
-                      widget.name,
-                      style: AppTextStyles.boldText.copyWith(
-                        color: textTheme,
-                        fontSize: 18,
+                      'You matched on',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.6),
+                        fontSize: 13,
                       ),
                     ),
-                    if (widget.skillName != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'You matched on',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.6),
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      SkillTag(skillName: widget.skillName!, role: widget.role),
-                    ],
+                    const SizedBox(height: 6),
+                    SkillTag(
+                      skillName: widget.skillName!,
+                      role: widget.role,
+                    ),
                   ],
-                ),
-              )
-              : const Center(child: Text('Start messaging')),
+                ],
+              ),
+            )
+          : const Center(
+              child: Text('Start messaging'),
+            ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -321,7 +347,9 @@ class _ChatRoomState extends State<ChatRoom> {
                   minLines: 1,
                   maxLines: 3,
                   textInputAction: TextInputAction.newline,
-                  style: AppTextStyles.regularText.copyWith(fontSize: 16),
+                  style: AppTextStyles.regularText.copyWith(
+                    fontSize: 16,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
                     filled: true,
@@ -340,7 +368,10 @@ class _ChatRoomState extends State<ChatRoom> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(color: primaryColor, width: 1.5),
+                      borderSide: BorderSide(
+                        color: primaryColor,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -354,7 +385,10 @@ class _ChatRoomState extends State<ChatRoom> {
                   minimumSize: const Size(58, 58),
                   maximumSize: const Size(58, 58),
                 ),
-                icon: const Icon(Icons.send_rounded, size: 21),
+                icon: const Icon(
+                  Icons.send_rounded,
+                  size: 21,
+                ),
               ),
             ],
           ),

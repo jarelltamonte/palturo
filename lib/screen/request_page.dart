@@ -6,6 +6,7 @@ import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
 import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/screen/block_list.dart';
 
 class ConnectionRequest {
   final String id;
@@ -200,6 +201,23 @@ class _RequestPageState extends State<RequestPage> {
     });
   }
 
+  void _blockRequester(ConnectionRequest request) {
+    if (!mounted) return;
+    BlockedUsers.block(request.toPerson());
+    _removeRequest(request.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('You blocked ${request.requesterName}')),
+    );
+  }
+
+  void _reportRequester(ConnectionRequest request, String reason) {
+    if (!mounted) return;
+    debugPrint('Reported ${request.id}: $reason');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thanks for your report.')),
+    );
+  }
+
   void _openDetail(ConnectionRequest request) {
     showDialog(
       context: context,
@@ -208,6 +226,8 @@ class _RequestPageState extends State<RequestPage> {
         person: request.toPerson(),
         onAccept: () => _removeRequest(request.id),
         onDecline: () => _removeRequest(request.id),
+        onBlock: () => _blockRequester(request),
+        onReport: (reason) => _reportRequester(request, reason),
       ),
     );
   }

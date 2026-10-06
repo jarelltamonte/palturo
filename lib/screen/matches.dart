@@ -151,6 +151,31 @@ class _MatchesState extends State<Matches> {
     }
   }
 
+  void _unmatchPal(MatchedUser pal) {
+    if (!mounted) return;
+    setState(() => _pals.removeWhere((p) => p.id == pal.id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('You unmatched ${pal.name}')),
+    );
+  }
+
+  void _blockPal(MatchedUser pal) {
+    if (!mounted) return;
+    BlockedUsers.block(pal.toPerson());
+    setState(() => _pals.removeWhere((p) => p.id == pal.id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('You blocked ${pal.name}')),
+    );
+  }
+
+  void _reportPal(MatchedUser pal, String reason) {
+    if (!mounted) return;
+    debugPrint('Reported ${pal.id}: $reason');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thanks for your report.')),
+    );
+  }
+
   Future<void> _handleAction(String action, MatchedUser pal) async {
     if (action == 'unmatch') {
       final confirmed = await showConfirmDialog(
@@ -160,20 +185,12 @@ class _MatchesState extends State<Matches> {
             'Unmatch ${pal.name}? You’ll lose this match and your chat history.',
         confirmLabel: 'Unmatch',
       );
-      if (!confirmed || !mounted) return;
-
-      setState(() => _pals.removeWhere((p) => p.id == pal.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You unmatched ${pal.name}')),
-      );
+      if (!confirmed) return;
+      _unmatchPal(pal);
     } else if (action == 'report') {
       final reason = await showReportReasonDialog(context, name: pal.name);
-      if (reason == null || !mounted) return;
-
-      debugPrint('Reported ${pal.id}: $reason');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      if (reason == null) return;
+      _reportPal(pal, reason);
     } else if (action == 'block') {
       final confirmed = await showConfirmDialog(
         context,
@@ -182,13 +199,8 @@ class _MatchesState extends State<Matches> {
             '${pal.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
         confirmLabel: 'Block',
       );
-      if (!confirmed || !mounted) return;
-
-      BlockedUsers.block(pal.toPerson());
-      setState(() => _pals.removeWhere((p) => p.id == pal.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You blocked ${pal.name}')),
-      );
+      if (!confirmed) return;
+      _blockPal(pal);
     }
   }
 
@@ -209,7 +221,13 @@ class _MatchesState extends State<Matches> {
   }
 
   void _openProfile(MatchedUser pal) {
-    showPersonProfileDialog(context, pal.toPerson());
+    showPersonProfileDialog(
+      context,
+      pal.toPerson(),
+      onUnmatch: () => _unmatchPal(pal),
+      onBlock: () => _blockPal(pal),
+      onReport: (reason) => _reportPal(pal, reason),
+    );
   }
 
   Widget _sheetSectionLabel(String label, Color textColor) {

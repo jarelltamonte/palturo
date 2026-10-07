@@ -16,6 +16,11 @@ class Person {
   final PersonRole role;
   final String bio;
   final List<String?> photoUrls;
+  /// FR-5 short-form showcase media (image/video thumbnails) — shown first on
+  /// the card per spec §6.3 recommendation card.
+  final List<String?> showcaseUrls;
+  /// Reciprocal compatibility (0..1) from the pipeline — spec §6.3 indicator.
+  final double? compatibility;
 
   const Person({
     required this.id,
@@ -27,7 +32,15 @@ class Person {
     required this.role,
     this.bio = '',
     this.photoUrls = const [null],
+    this.showcaseUrls = const [null],
+    this.compatibility,
   });
+
+  /// Card page media: showcase content first, profile photos after.
+  List<String?> get cardMedia => [
+        ...showcaseUrls,
+        ...photoUrls,
+      ];
 }
 
 class PersonCardOverlay extends StatefulWidget {
@@ -147,7 +160,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final photoUrls = widget.person.photoUrls;
+    final photoUrls = widget.person.cardMedia;
     final currentPhoto =
         photoUrls.isNotEmpty && _photoIndex < photoUrls.length
             ? photoUrls[_photoIndex]
@@ -162,6 +175,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ? 'Wants to learn'
             : 'Wants to teach';
     final bio = widget.person.bio.trim();
+    final compat = widget.person.compatibility;
+    final compatPct =
+        compat == null ? null : ((compat * 100).clamp(0, 100)).round();
 
     return Container(
       width: double.infinity,
@@ -181,8 +197,31 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         fit: StackFit.expand,
         children: [
           currentPhoto != null
-              ? Image.network(currentPhoto, fit: BoxFit.cover)
+              ? Image.network(currentPhoto,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: Colors.grey[400]))
               : Container(color: Colors.grey[400]),
+          if (compatPct != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$compatPct% match',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
           Row(
             children: [
               Expanded(
@@ -319,30 +358,36 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '$roleLabel ',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ],
+                    Flexible(
+                      child: Text(
+                        '$roleLabel ',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    Text(
-                      widget.person.skillName,
-                      style: AppTextStyles.boldText.copyWith(
-                        color: AppColors.primary,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ],
+                    Flexible(
+                      child: Text(
+                        widget.person.skillName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.boldText.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -180,7 +180,7 @@ class _ExplorePageState extends State<ExplorePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Couldn’t load categories.\nPlease check your connection.',
+            'Couldnâ€™t load categories.\nPlease check your connection.',
             style: AppTextStyles.regularText.copyWith(color: textTheme),
             textAlign: TextAlign.center,
           ),
@@ -412,30 +412,36 @@ class _CategoryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(icon, size: 28, color: AppColors.background),
+                  child: Icon(icon, size: 22, color: AppColors.background),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 Text(
                   label,
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.headingText.copyWith(
                     color: textColor,
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  description,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.7),
-                    fontSize: 13,
+                const SizedBox(height: 4),
+                Flexible(
+                  child: Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: textColor.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],

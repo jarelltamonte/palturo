@@ -15,6 +15,9 @@ class ProfileData {
   final List<String> teachingSkillIds;
   final List<String> skillCategories;
   final Map<String, String> teachingSkillImages;
+  /// Per-placement notes keyed by taxonomy leaf id (DEV-22).
+  final Map<String, String> learningNotes;
+  final Map<String, String> teachingNotes;
   final bool hasCompletedOnboarding;
   final bool isProfileCompleted;
 
@@ -34,6 +37,8 @@ class ProfileData {
     this.teachingSkillIds = const [],
     this.skillCategories = const [],
     this.teachingSkillImages = const {},
+    this.learningNotes = const {},
+    this.teachingNotes = const {},
     this.hasCompletedOnboarding = false,
     this.isProfileCompleted = false,
   }) : firstName = firstName ?? (name != null ? name.split(' ').first : 'User'),
@@ -63,6 +68,8 @@ class ProfileData {
     List<String>? teachingSkillIds,
     List<String>? skillCategories,
     Map<String, String>? teachingSkillImages,
+    Map<String, String>? learningNotes,
+    Map<String, String>? teachingNotes,
     bool? hasCompletedOnboarding,
     bool? isProfileCompleted,
   }) {
@@ -81,6 +88,8 @@ class ProfileData {
       teachingSkillIds: teachingSkillIds ?? this.teachingSkillIds,
       skillCategories: skillCategories ?? this.skillCategories,
       teachingSkillImages: teachingSkillImages ?? this.teachingSkillImages,
+      learningNotes: learningNotes ?? this.learningNotes,
+      teachingNotes: teachingNotes ?? this.teachingNotes,
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,

@@ -153,30 +153,43 @@ class MatchApi {
   static Future<Person?> getPersonFromPublicProfile(String userId) async {
     final p = await getPublicProfile(userId);
     if (p == null) return null;
-    String name = (p['p_name'] ?? '') as String;
+    String name = ((p['p_name'] ?? '') as String).trim();
+    if (name.isEmpty) name = 'Community member';
     String skill = '';
     final teaching = (p['p_teaching'] as List?) ?? [];
     final learning = (p['p_learning'] as List?) ?? [];
-    dynamic first;
     if (teaching.isNotEmpty) {
-      first = teaching.first;
-      skill = ((first as Map)['skill'] ?? '').toString();
+      final t = teaching.first as Map;
+      // leaf name only (short-form template) — full chain lives in the profile dialog
+      final raw = ((t['path'] ?? '') as String);
+      skill = raw.isEmpty
+          ? ((t['skill'] ?? '') as String)
+          : raw.split('.').last.replaceAll('_', ' ').trim();
     } else if (learning.isNotEmpty) {
-      first = learning.first;
-      skill = ((first as Map)['skill'] ?? '').toString();
+      final l = learning.first as Map;
+      final raw = ((l['path'] ?? '') as String);
+      skill = raw.isEmpty
+          ? ((l['skill'] ?? '') as String)
+          : raw.split('.').last.replaceAll('_', ' ').trim();
     }
+    final showcases = ((p['p_showcases'] as List?) ?? [])
+        .whereType<Map>()
+        .map((m) => m['media'] as String?)
+        .whereType<String>()
+        .toList();
     return Person(
       id: userId,
       name: name,
       schedule: '', // availability lives in p_availability jsonb (legacy shape)
       language: (p['p_languages'] ?? '') as String,
       learningStyle: (p['p_styles'] ?? '') as String,
-      skillName: skill.replaceAll(' > ', '  •  '),
+      skillName: skill,
       role: (p['p_role'] == 'learner')
           ? PersonRole.learner
           : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
       photoUrls: [(p['p_avatar'] as String?)],
+      showcaseUrls: showcases.isNotEmpty ? showcases : const [null],
     );
   }
 
@@ -335,4 +348,52 @@ class MatchApi {
 
   static Future<void> markNotificationsRead() =>
       _Client.c.rpc('mark_notifications_read');
+
+  // ---- Skill selection (spec: taxonomy + notes + classify) ----
+
+  static List<Map<String, dynamic>>? _leafCache;
+
+  /// Cached taxonomy leaves (OnboardingOption-friendly: id = node id).
+  static Future<List<Map<String, dynamic>>> taxonomyLeaves(
+      {bool forceRefresh = false}) async {
+    if (_leafCache != null && !forceRefresh) return _leafCache!;
+    final nodes = await taxonomyVisible();
+    _leafCache = nodes
+        .where((n) => (n['is_leaf'] as bool?) == true)
+        .toList();
+    return _leafCache!;
+  }
+
+  /// Custom ("Others") skill flow. Body: {name, note, kind: learn|teach}.
+  /// Returns the raw verdict:
+  /// {status: attached|pending|queued|rejected, node: {id,name,path}, ...}
+  static Future<Map<String, dynamic>?> classifySkill({
+    required String name,
+    String? note,
+    required String kind,
+  }) async {
+    final res = await _Client.c.functions.invoke('classify-skill', body: {
+      'name': name,
+      if (note != null && note.isNotEmpty) 'note': note,
+      'kind': kind,
+    });
+    if (res.data == null) return null;
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// The caller's placements: [{kind, note, id, name, path}].
+  static Future<List<Map<String, dynamic>>> mySkills() async {
+    final res = await _Client.c.from('user_skills').select(
+        'kind, note, skill:skill_id(id, name, path)') as List;
+    return res.whereType<Map>().map((m) {
+      final skill = (m['skill'] as Map?) ?? {};
+      return {
+        'kind': m['kind'],
+        'note': m['note'],
+        'id': skill['id'],
+        'name': skill['name'],
+        'path': skill['path'],
+      };
+    }).toList();
+  }
 }

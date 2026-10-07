@@ -5,30 +5,66 @@ import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
-import 'package:palturo/screen/users_dump.dart';
-import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/services/match_api.dart';
 
 enum ExploreRoleFilter { all, learner, mentor }
 
 class ExploreExpand extends StatefulWidget {
-  final SkillCategory category;
+  final String nodePath;
+  final String nodeLabel;
 
-  const ExploreExpand({super.key, required this.category});
+  const ExploreExpand({
+    super.key,
+    required this.nodePath,
+    required this.nodeLabel,
+  });
 
   @override
   State<ExploreExpand> createState() => _ExploreExpandState();
 }
 
 class _ExploreExpandState extends State<ExploreExpand> {
-  late final List<Person> _people = dumpUsers
-      .where((u) => u.category == widget.category)
-      .map((u) => u.toPerson())
-      .toList();
+  List<Person> _people = const [];
+  bool _loading = true;
+  String? _error;
 
   ExploreRoleFilter _roleFilter = ExploreRoleFilter.all;
   int _currentIndex = 0;
   final List<int> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPeople();
+  }
+
+  /// Live data: users teaching within this taxonomy subtree (FR-13 browse).
+  Future<void> _loadPeople() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _currentIndex = 0;
+      _history.clear();
+    });
+    try {
+      final users = await MatchApi.browseSkillUsers(
+        widget.nodePath,
+        kind: 'teach',
+      );
+      if (!mounted) return;
+      setState(() {
+        _people = users;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
 
   bool get _hasActiveFilter => _roleFilter != ExploreRoleFilter.all;
 
@@ -67,10 +103,18 @@ class _ExploreExpandState extends State<ExploreExpand> {
     );
     if (!confirmed || !mounted) return;
 
-    BlockedUsers.block(person);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${person.name}')),
-    );
+    try {
+      await MatchApi.blockUser(person.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You blocked ${person.name}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Block failed: $e')),
+      );
+    }
     _next();
   }
 
@@ -78,10 +122,18 @@ class _ExploreExpandState extends State<ExploreExpand> {
     final reason = await showReportReasonDialog(context, name: person.name);
     if (reason == null || !mounted) return;
 
-    debugPrint('Reported ${person.id}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
+    try {
+      await MatchApi.reportUser(person.id, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks for your report.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Report failed: $e')),
+      );
+    }
     _next();
   }
 
@@ -314,7 +366,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
             ),
             Expanded(
               child: Text(
-                widget.category.label,
+                widget.nodeLabel,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.headingText.copyWith(
@@ -362,31 +414,60 @@ class _ExploreExpandState extends State<ExploreExpand> {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-          child: hasMore
-              ? Dismissible(
-                  key: ValueKey(people[_currentIndex].id),
-                  direction: DismissDirection.horizontal,
-                  background: _swipeBackground(
-                    alignment: Alignment.centerLeft,
-                    color: AppColors.primary,
-                    icon: Icons.check,
-                  ),
-                  secondaryBackground: _swipeBackground(
-                    alignment: Alignment.centerRight,
-                    color: Colors.red,
-                    icon: Icons.close,
-                  ),
-                  onDismissed: (_) => _next(),
-                  child: PersonCardOverlay(
-                    person: people[_currentIndex],
-                    onAdd: _next,
-                    onSkip: _next,
-                    onBlock: () => _confirmBlock(people[_currentIndex]),
-                    onReport: () => _confirmReport(people[_currentIndex]),
-                  ),
-                )
-              : _buildEmptyState(textTheme),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _buildErrorState(textTheme)
+                  : hasMore
+                      ? Dismissible(
+                          key: ValueKey(people[_currentIndex].id),
+                          direction: DismissDirection.horizontal,
+                          background: _swipeBackground(
+                            alignment: Alignment.centerLeft,
+                            color: AppColors.primary,
+                            icon: Icons.check,
+                          ),
+                          secondaryBackground: _swipeBackground(
+                            alignment: Alignment.centerRight,
+                            color: Colors.red,
+                            icon: Icons.close,
+                          ),
+                          onDismissed: (_) => _next(),
+                          child: PersonCardOverlay(
+                            person: people[_currentIndex],
+                            onAdd: null,
+                            onSkip: _next,
+                            onBlock: () => _confirmBlock(people[_currentIndex]),
+                            onReport: () =>
+                                _confirmReport(people[_currentIndex]),
+                          ),
+                        )
+                      : _buildEmptyState(textTheme),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Color textTheme2) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Couldn’t load users for ${widget.nodeLabel}.\nPlease check your connection.',
+            style: AppTextStyles.regularText.copyWith(color: textTheme2),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadPeople,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text(
+              'Retry',
+              style: TextStyle(color: Colors.black, fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }

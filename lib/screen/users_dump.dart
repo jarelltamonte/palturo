@@ -34,6 +34,10 @@ class MatchedUser {
   final String? lastMessage;
   final String? lastMessageTime;
   final bool hasUnread;
+  /// Live-data extras: the connection row + counterpart profile id (null for
+  /// the static dump catalog).
+  final String? connectionId;
+  final String? otherUserId;
 
   const MatchedUser({
     required this.id,
@@ -49,6 +53,8 @@ class MatchedUser {
     this.lastMessage,
     this.lastMessageTime,
     this.hasUnread = false,
+    this.connectionId,
+    this.otherUserId,
   });
 
   ImageProvider? get avatarImage =>

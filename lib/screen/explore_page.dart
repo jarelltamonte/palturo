@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/explore_expand.dart';
-import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/services/match_api.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -14,39 +14,63 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
-  final List<String> _categoryLabels = [
-    'Arts and Design',
-    'Language and Cultural Knowledge',
-    'Everyday Practical Skills',
-    'Agriculture and Livelihood',
-  ];
+  List<Map<String, dynamic>> _roots = const [];
+  bool _loading = true;
+  String? _error;
 
-  final List<String> _categoryDescription = [
-    'Weaving, embroidery, and handmade crafts',
-    'Dialects, stories, and living heritage',
-    'Cooking, repairs, and daily know-how',
-    'Farming, fishing, and local trades',
-  ];
+  static const Map<String, IconData> _rootIcons = {
+    'cooking_culinary': Icons.restaurant_outlined,
+    'traditional_crafts': Icons.palette_outlined,
+    'performing_arts': Icons.music_note_outlined,
+    'martial_arts': Icons.sports_martial_arts,
+    'language_writing': Icons.translate,
+    'household_skills': Icons.home_repair_service_outlined,
+    'agriculture_livelihood': Icons.agriculture_outlined,
+    'modern_practical_skills': Icons.handyman_outlined,
+    'visual_arts_design': Icons.brush_outlined,
+  };
 
-  final List<IconData> _categoryIcons = [
-    Icons.palette_outlined,
-    Icons.translate,
-    Icons.handyman_outlined,
-    Icons.agriculture_outlined,
-  ];
+  static const String _fallbackDescription =
+      'Skills shared by the PalTuro community';
 
-  final List<SkillCategory> _categories = [
-    SkillCategory.artsDesign,
-    SkillCategory.languageCulture,
-    SkillCategory.everydayPractical,
-    SkillCategory.agricultureLivelihood,
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadTaxonomy();
+  }
 
-  void _openCategory(SkillCategory category) {
+  /// Live data: 9 taxonomy roots from `skill_nodes` (DEV-20).
+  Future<void> _loadTaxonomy() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final nodes = await MatchApi.taxonomyVisible();
+      final roots =
+          nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
+      if (!mounted) return;
+      setState(() {
+        _roots = roots;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _openCategory(Map<String, dynamic> root) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ExploreExpand(category: category),
+        builder: (context) => ExploreExpand(
+          nodePath: (root['path'] ?? '') as String,
+          nodeLabel: (root['name'] ?? '') as String,
+        ),
       ),
     );
   }
@@ -93,39 +117,89 @@ class _ExplorePageState extends State<ExplorePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            const spacing = 16.0;
-            final itemHeight = (constraints.maxHeight - spacing) / 2;
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildErrorState(textTheme)
+                : (_roots.length <= 4
+                    ? _buildGrid2x2(textTheme)
+                    : _buildGridAuto(textTheme)),
+      ),
+    );
+  }
+  Widget _buildGrid2x2(Color textTheme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 16.0;
+        final itemHeight = (constraints.maxHeight - spacing) / 2;
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            mainAxisExtent: itemHeight,
+          ),
+          itemCount: _roots.length,
+          itemBuilder: (context, index) => _buildCard(index),
+        );
+      },
+    );
+  }
 
-            return GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: spacing,
-                mainAxisSpacing: spacing,
-                mainAxisExtent: itemHeight,
-              ),
-              itemCount: _categoryLabels.length,
-              itemBuilder: (context, index) {
-                return _CategoryCard(
-                  label: _categoryLabels[index],
-                  description: _categoryDescription[index],
-                  icon: _categoryIcons[index],
-                  onTap: () => _openCategory(_categories[index]),
-                );
-              },
-            );
-          },
-        ),
+  Widget _buildGridAuto(Color textTheme) {
+    return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        mainAxisExtent: 150,
+      ),
+      itemCount: _roots.length,
+      itemBuilder: (context, index) => _buildCard(index),
+    );
+  }
+
+  Widget _buildCard(int index) {
+    final node = _roots[index];
+    final path = (node['path'] ?? '') as String;
+    return _CategoryCard(
+      label: (node['name'] ?? '') as String,
+      description: _fallbackDescription,
+      icon: _rootIcons[path] ?? Icons.category_outlined,
+      onTap: () => _openCategory(node),
+    );
+  }
+
+  Widget _buildErrorState(Color textTheme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Couldn’t load categories.\nPlease check your connection.',
+            style: AppTextStyles.regularText.copyWith(color: textTheme),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadTaxonomy,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text(
+              'Retry',
+              style: TextStyle(color: Colors.black, fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ExploreInfoDialog extends StatefulWidget {
-  const _ExploreInfoDialog();
+class _ExploreInfoDialog extends StatefulWidget {  const _ExploreInfoDialog();
 
   @override
   State<_ExploreInfoDialog> createState() => _ExploreInfoDialogState();

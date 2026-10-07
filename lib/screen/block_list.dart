@@ -1,9 +1,13 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/services/match_api.dart';
 
+/// In-memory helpers kept for transitional callers; blocks are persisted
+/// through MatchApi.blockUser / unblockUser (DEV-11 resolved).
 class BlockedUsers {
   BlockedUsers._();
 
@@ -23,8 +27,63 @@ class BlockedUsers {
   }
 }
 
-class BlockListPage extends StatelessWidget {
+/// Live blocked list from the `blocks` table (FR-15).
+class BlockListPage extends StatefulWidget {
   const BlockListPage({super.key});
+
+  @override
+  State<BlockListPage> createState() => _BlockListPageState();
+}
+
+class _BlockListPageState extends State<BlockListPage> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _blocked = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final rows = await MatchApi.getBlockList();
+      if (!mounted) return;
+      setState(() {
+        _blocked = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _unblock(Map<String, dynamic> entry) async {
+    final id = entry['blocked_id'] as String? ?? '';
+    final name = entry['name'] as String? ?? 'user';
+    try {
+      await MatchApi.unblockUser(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You unblocked $name')),
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unblock failed: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,34 +111,71 @@ class BlockListPage extends StatelessWidget {
           ),
         ),
       ),
-      body: ValueListenableBuilder<List<Person>>(
-        valueListenable: BlockedUsers.notifier,
-        builder: (context, blocked, _) {
-          if (blocked.isEmpty) {
-            return _buildEmptyState(textTheme);
-          }
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildErrorState(textTheme)
+              : _blocked.isEmpty
+                  ? _buildEmptyState(textTheme)
+                  : _buildList(textTheme),
+    );
+  }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            itemCount: blocked.length,
-            separatorBuilder: (context, index) => Divider(
-              height: 1,
-              color: textTheme.withValues(alpha: 0.1),
+  Widget _buildList(Color textTheme) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: _blocked.length,
+      separatorBuilder: (context, index) => Divider(
+        height: 1,
+        color: textTheme.withValues(alpha: 0.1),
+      ),
+      itemBuilder: (context, index) {
+        final entry = _blocked[index];
+        final person = Person(
+          id: entry['blocked_id'] as String? ?? '',
+          name: entry['name'] as String? ?? '',
+          schedule: '',
+          language: '',
+          learningStyle: '',
+          skillName: '',
+          role: PersonRole.learner,
+          photoUrls: [entry['avatar_url'] as String?],
+        );
+        return _BlockedTile(
+          person: person,
+          onUnblock: () => _unblock(entry),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorState(Color textColor) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Couldnâ€™t load blocked users.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor.withValues(alpha: 0.7),
+              ),
             ),
-            itemBuilder: (context, index) {
-              final person = blocked[index];
-              return _BlockedTile(
-                person: person,
-                onUnblock: () {
-                  BlockedUsers.unblock(person.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('You unblocked ${person.name}')),
-                  );
-                },
-              );
-            },
-          );
-        },
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _load,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -120,58 +216,38 @@ class _BlockedTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-    final photo = person.photoUrls.isNotEmpty ? person.photoUrls.first : null;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.grey[300],
-            backgroundImage: photo != null ? NetworkImage(photo) : null,
-            child: photo == null
-                ? Icon(Icons.person, color: Colors.grey[600], size: 24)
-                : null,
+            radius: 24,
+            backgroundColor: Colors.grey.withValues(alpha: 0.3),
+            backgroundImage:
+                person.photoUrls[0] == null ? null : NetworkImage(person.photoUrls[0]!),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               person.name,
-              maxLines: 1,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.boldText.copyWith(color: textColor),
             ),
           ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_horiz, color: textColor),
-            padding: EdgeInsets.zero,
-            color: Theme.of(context).colorScheme.surface,
-            elevation: 6,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            onSelected: (value) {
-              if (value == 'unblock') onUnblock();
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                value: 'unblock',
-                child: Row(
-                  children: [
-                    Icon(Icons.how_to_reg_outlined, color: textColor, size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Unblock',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor,
-                      ),
-                    ),
-                  ],
-                ),
+          OutlinedButton(
+            onPressed: onUnblock,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: textTheme,
+              side: BorderSide(color: textTheme.withValues(alpha: 0.4)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
+            ),
+            child: const Text(
+              'Unblock',
+              style: TextStyle(fontSize: 13),
+            ),
           ),
         ],
       ),

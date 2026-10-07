@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:lottie/lottie.dart';
@@ -9,8 +9,8 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/chats_room.dart';
-import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/services/match_api.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -49,7 +49,55 @@ class _MatchesState extends State<Matches> {
   String _query = '';
   RoleFilter _roleFilter = RoleFilter.all;
 
-  final List<MatchedUser> _pals = [...dumpUsers];
+  List<MatchedUser> _pals = const [];
+  bool _loadingPals = true;
+  String? _palsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPals();
+  }
+
+  /// Live data: accepted connections as an alphabetical "Your Pals" list.
+  Future<void> _loadPals() async {
+    setState(() {
+      _loadingPals = true;
+      _palsError = null;
+    });
+    try {
+      final convos = await MatchApi.getConversations();
+      final pals = convos
+          .where((c) => c.status == 'accepted')
+          .map((c) => MatchedUser(
+                id: '${c.connectionId}|${c.otherUserId}',
+                name: c.otherName,
+                role: c.otherRole == 'learner'
+                    ? PersonRole.learner
+                    : PersonRole.mentor,
+                skillName: '',
+                category: SkillCategory.everydayPractical,
+                schedule: '',
+                language: '',
+                learningStyle: '',
+                avatarUrl: c.otherAvatar,
+                connectionId: c.connectionId,
+                otherUserId: c.otherUserId,
+              ))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _pals = pals;
+        _loadingPals = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _palsError = e.toString();
+        _loadingPals = false;
+      });
+    }
+  }
 
   late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
     ..onTap = _startSwiping;
@@ -159,21 +207,39 @@ class _MatchesState extends State<Matches> {
     );
   }
 
-  void _blockPal(MatchedUser pal) {
+  Future<void> _blockPal(MatchedUser pal) async {
     if (!mounted) return;
-    BlockedUsers.block(pal.toPerson());
+    try {
+      final target = pal.otherUserId ?? pal.id;
+      await MatchApi.blockUser(target);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Block failed: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('You blocked ${pal.name}')),
     );
   }
 
-  void _reportPal(MatchedUser pal, String reason) {
+  Future<void> _reportPal(MatchedUser pal, String reason) async {
     if (!mounted) return;
-    debugPrint('Reported ${pal.id}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
+    try {
+      await MatchApi.reportUser(pal.otherUserId ?? pal.id, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks for your report.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Report failed: $e')),
+      );
+    }
   }
 
   Future<void> _handleAction(String action, MatchedUser pal) async {
@@ -182,7 +248,7 @@ class _MatchesState extends State<Matches> {
         context,
         title: 'Unmatch',
         message:
-            'Unmatch ${pal.name}? You’ll lose this match and your chat history.',
+            'Unmatch ${pal.name}? Youâ€™ll lose this match and your chat history.',
         confirmLabel: 'Unmatch',
       );
       if (!confirmed) return;
@@ -196,7 +262,7 @@ class _MatchesState extends State<Matches> {
         context,
         title: 'Block',
         message:
-            '${pal.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+            '${pal.name} wonâ€™t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
         confirmLabel: 'Block',
       );
       if (!confirmed) return;
@@ -215,6 +281,7 @@ class _MatchesState extends State<Matches> {
           skillName: pal.skillName,
           role: pal.role,
           person: pal.toPerson(),
+          connectionId: pal.connectionId,
         ),
       ),
     );
@@ -756,7 +823,35 @@ class _MatchesState extends State<Matches> {
           ),
         ],
       ),
-      body: _pals.isEmpty
+      body: _loadingPals
+          ? const Center(child: CircularProgressIndicator())
+          : _palsError != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Couldn’t load your pals.\nPlease check your connection.',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadPals,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                        ),
+                        child: const Text(
+                          'Retry',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : _pals.isEmpty
           ? _buildNoPalsState(textTheme)
           : SafeArea(
         child: Row(

@@ -8,6 +8,7 @@ import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/services/match_api.dart';
 import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
@@ -65,6 +66,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final ProfileService _profileService = ProfileService();
   ProfileData? _profile;
   bool _isLoading = true;
+  int? _friendCount;
 
   static const _roleOptions = [
     RoleOption(
@@ -84,6 +86,15 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadFriendCount();
+  }
+
+  Future<void> _loadFriendCount() async {
+    try {
+      final convos = await MatchApi.getConversations();
+      final accepted = convos.where((c) => c.status == 'accepted').length;
+      if (mounted) setState(() => _friendCount = accepted);
+    } catch (_) {/* keep null → renders plain label */}
   }
 
   Future<void> _loadProfile() async {
@@ -276,7 +287,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                         child: Row(
                                           children: [
                                             Text(
-                                              'Friends',
+                                              _friendCount == null
+                                                  ? 'Friends'
+                                                  : 'Friends ($_friendCount)',
                                               style: AppTextStyles.boldText
                                                   .copyWith(color: textTheme),
                                             ),

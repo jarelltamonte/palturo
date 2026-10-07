@@ -1,13 +1,16 @@
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
-import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 
 class ChatRoom extends StatefulWidget {
+  final String? connectionId;
   final String name;
   final ImageProvider? avatarImage;
   final String? skillName;
@@ -16,6 +19,7 @@ class ChatRoom extends StatefulWidget {
 
   const ChatRoom({
     super.key,
+    this.connectionId,
     required this.name,
     this.avatarImage,
     this.skillName,
@@ -29,47 +33,107 @@ class ChatRoom extends StatefulWidget {
 
 class _ChatRoomState extends State<ChatRoom> {
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
-  bool _hasMessages = false;
+  List<Map<String, dynamic>> _messages = [];
+  bool _loadingMessages = false;
+  StreamSubscription? _messageStream;
 
   @override
   void initState() {
     super.initState();
-
     _messageController.addListener(() {
       setState(() {});
     });
+    _loadMessages();
+    _subscribeRealtime();
   }
 
   @override
   void dispose() {
+    _messageStream?.cancel();
+    _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
   }
 
-  void _sendMessage() {
-    final message = _messageController.text.trim();
+  SupabaseClient get _client => Supabase.instance.client;
 
-    if (message.isEmpty) return;
-
-    setState(() {
-      _hasMessages = true;
-    });
-
-    _messageController.clear();
+  Future<void> _loadMessages() async {
+    if (widget.connectionId == null) return;
+    setState(() => _loadingMessages = true);
+    try {
+      final msgs = await MatchApi.getMessages(widget.connectionId!);
+      if (!mounted) return;
+      setState(() {
+        _messages = _sortMessages(msgs);
+        _loadingMessages = false;
+      });
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingMessages = false);
+    }
   }
 
-  Person get _personForBlock {
-    return widget.person ??
-        Person(
-          id: widget.name,
-          name: widget.name,
-          schedule: '',
-          language: '',
-          learningStyle: '',
-          skillName: widget.skillName ?? '',
-          role: widget.role ?? PersonRole.learner,
-        );
+  void _subscribeRealtime() {
+    if (widget.connectionId == null) return;
+    _messageStream = _client
+        .from('messages')
+        .stream(primaryKey: ['id'])
+        .eq('connection_id', widget.connectionId!)
+        .listen((rows) {
+          if (!mounted) return;
+          setState(() {
+            _messages = _sortMessages(rows);
+          });
+          _scrollToBottom();
+        });
+  }
+
+  List<Map<String, dynamic>> _sortMessages(List<Map<String, dynamic>> rows) {
+    final sorted = [...rows];
+    sorted.sort(
+      (a, b) => (DateTime.tryParse(a['created_at']?.toString() ?? '')
+              ?.compareTo(
+                DateTime.tryParse(b['created_at']?.toString() ?? '')
+                    ?? DateTime(1900),
+              ))
+          ?? 0,
+    );
+    return sorted;
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) return;
+    if (widget.connectionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This chat is not connected to the backend yet.'),
+        ),
+      );
+      return;
+    }
+    _messageController.clear();
+    try {
+      await MatchApi.sendMessage(widget.connectionId!, message);
+      // realtime stream refreshes the thread
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+    }
   }
 
   void _leaveChat(String message) {
@@ -79,21 +143,36 @@ class _ChatRoomState extends State<ChatRoom> {
     messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _unmatch() {
-    _leaveChat('You unmatched ${widget.name}');
-  }
-
-  void _block() {
-    BlockedUsers.block(_personForBlock);
+  Future<void> _block() async {
+    final target =
+        widget.person?.id ?? widget.connectionId ?? widget.name;
+    try {
+      await MatchApi.blockUser(target);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+      return;
+    }
     _leaveChat('You blocked ${widget.name}');
   }
 
-  void _report(String reason) {
-    if (!mounted) return;
-    debugPrint('Reported ${widget.name}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
+  Future<void> _report(String reason) async {
+    final target =
+        widget.person?.id ?? widget.connectionId ?? widget.name;
+    try {
+      await MatchApi.reportUser(target, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks for your report.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+    }
   }
 
   void _showProfile() {
@@ -102,26 +181,16 @@ class _ChatRoomState extends State<ChatRoom> {
     showPersonProfileDialog(
       context,
       person,
-      onUnmatch: _unmatch,
+      onUnmatch: null,
       onBlock: _block,
-      onReport: _report,
+      onReport: (reason) => _report(reason),
     );
   }
 
   Future<void> _handleMenuAction(String action) async {
     FocusScope.of(context).unfocus();
 
-    if (action == 'unmatch') {
-      final confirmed = await showConfirmDialog(
-        context,
-        title: 'Unmatch',
-        message:
-            'Unmatch ${widget.name}? You’ll lose this match and your chat history.',
-        confirmLabel: 'Unmatch',
-      );
-      if (!confirmed) return;
-      _unmatch();
-    } else if (action == 'report') {
+    if (action == 'report') {
       final reason = await showReportReasonDialog(
         context,
         name: widget.name,
@@ -151,8 +220,9 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final keyboardIsOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isTyping = _messageController.text.isNotEmpty;
+    final hasMessages = _messages.isNotEmpty;
 
-    final showProfileInAppBar = _hasMessages || keyboardIsOpen || isTyping;
+    final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -230,21 +300,6 @@ class _ChatRoomState extends State<ChatRoom> {
               onSelected: _handleMenuAction,
               itemBuilder: (context) => [
                 PopupMenuItem<String>(
-                  value: 'unmatch',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Unmatch',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
                   value: 'report',
                   child: Row(
                     children: [
@@ -293,7 +348,7 @@ class _ChatRoomState extends State<ChatRoom> {
           ],
         ),
       ),
-      body: !_hasMessages && !showProfileInAppBar
+      body: !hasMessages && !showProfileInAppBar
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -332,9 +387,9 @@ class _ChatRoomState extends State<ChatRoom> {
                 ],
               ),
             )
-          : const Center(
-              child: Text('Start messaging'),
-            ),
+          : _loadingMessages
+              ? const Center(child: CircularProgressIndicator())
+              : _buildMessageList(textTheme),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -394,6 +449,41 @@ class _ChatRoomState extends State<ChatRoom> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMessageList(Color textTheme) {
+    final myId = Supabase.instance.client.auth.currentUser?.id;
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      itemCount: _messages.length,
+      itemBuilder: (context, i) {
+        final msg = _messages[i];
+        final mine = msg['sender_id'] == myId;
+        return Align(
+          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.75,
+            ),
+            decoration: BoxDecoration(
+              color: mine
+                  ? AppColors.primary.withValues(alpha: 0.9)
+                  : Colors.grey.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              (msg['body'] ?? '').toString(),
+              style: AppTextStyles.regularText.copyWith(
+                color: mine ? Colors.black : textTheme,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

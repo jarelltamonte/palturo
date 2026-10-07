@@ -98,6 +98,7 @@ class RequestLite {
     final skill = skills.isNotEmpty ? skills.first : 'Skill sharing';
     return ConnectionRequest(
       id: connectionId,
+      requesterId: requesterId,
       skillName: skill,
       requesterName: requesterName,
       schedule: '',

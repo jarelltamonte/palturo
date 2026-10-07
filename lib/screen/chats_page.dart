@@ -11,6 +11,7 @@ import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/home_page.dart';
+import 'package:palturo/services/match_api.dart';
 
 enum ChatRoleFilter { all, learner, mentor }
 
@@ -36,10 +37,74 @@ class _ChatsPageState extends State<ChatsPage> {
 
   static const int _maxMatchCards = 8;
 
-  final List<MatchedUser> _chats = dumpUsers;
+  List<MatchedUser> _chats = const [];
+  bool _loadingChats = true;
+  String? _chatsError;
 
   late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
     ..onTap = _startSwiping;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadChats();
+  }
+
+  /// Live data: accepted conversations rendered as matches/messages.
+  Future<void> _loadChats() async {
+    setState(() {
+      _loadingChats = true;
+      _chatsError = null;
+    });
+    try {
+      final convos = await MatchApi.getConversations();
+      final mapped = convos
+          .where((c) => c.status == 'accepted')
+          .map((c) => MatchedUser(
+                id: '${c.connectionId}|${c.otherUserId}',
+                name: c.otherName,
+                role: c.otherRole == 'learner'
+                    ? PersonRole.learner
+                    : PersonRole.mentor,
+                skillName: '',
+                category: SkillCategory.everydayPractical,
+                schedule: '',
+                language: '',
+                learningStyle: '',
+                lastMessage: c.lastMessage,
+                lastMessageTime:
+                    c.lastAt == null ? null : _formatChatTime(c.lastAt!),
+                hasUnread: c.unread > 0,
+                avatarUrl: c.otherAvatar,
+                connectionId: c.connectionId,
+                otherUserId: c.otherUserId,
+              ))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _chats = mapped;
+        _loadingChats = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _chatsError = e.toString();
+        _loadingChats = false;
+      });
+    }
+  }
+
+  String _formatChatTime(DateTime t) {
+    final now = DateTime.now();
+    if (t.year == now.year &&
+        t.month == now.month &&
+        t.day == now.day) {
+      final hh = t.hour.toString().padLeft(2, '0');
+      final mm = t.minute.toString().padLeft(2, '0');
+      return '$hh:$mm';
+    }
+    return '${t.month}/${t.day}';
+  }
 
   @override
   void dispose() {
@@ -129,6 +194,7 @@ class _ChatsPageState extends State<ChatsPage> {
     String? skillName,
     PersonRole? role,
     Person? person,
+    String? connectionId,
   }) {
     Navigator.push(
       context,
@@ -140,6 +206,7 @@ class _ChatsPageState extends State<ChatsPage> {
               skillName: skillName,
               role: role,
               person: person,
+              connectionId: connectionId,
             ),
       ),
     );
@@ -490,6 +557,52 @@ class _ChatsPageState extends State<ChatsPage> {
     final showShortcut = _query.trim().isEmpty;
     final hasNoChats = _chats.isEmpty;
 
+    if (_loadingChats) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_chatsError != null) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        appBar: AppBar(
+          toolbarHeight: adaptiveHeight,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          titleSpacing: 16,
+          title: Text(
+            'Chats',
+            style: AppTextStyles.headingText.copyWith(color: textTheme),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Couldn’t load your chats.\nPlease check your connection.',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadChats,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Colors.black, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -613,6 +726,7 @@ class _ChatsPageState extends State<ChatsPage> {
                               skillName: chat.skillName,
                               role: chat.role,
                               person: chat.toPerson(),
+                              connectionId: chat.connectionId,
                             ),
                       );
                     },
@@ -652,6 +766,7 @@ class _ChatsPageState extends State<ChatsPage> {
                           skillName: chat.skillName,
                           role: chat.role,
                           person: chat.toPerson(),
+                          connectionId: chat.connectionId,
                         ),
                   );
                 },

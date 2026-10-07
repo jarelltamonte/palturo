@@ -6,10 +6,11 @@ import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
 import 'package:palturo/screen/users_dump.dart';
-import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/services/match_api.dart';
 
 class ConnectionRequest {
   final String id;
+  final String requesterId;
   final String skillName;
   final String requesterName;
   final String schedule;
@@ -24,6 +25,7 @@ class ConnectionRequest {
 
   const ConnectionRequest({
     required this.id,
+    this.requesterId = '',
     required this.skillName,
     required this.requesterName,
     required this.schedule,
@@ -109,45 +111,27 @@ class _RequestPageState extends State<RequestPage> {
       _roleFilter != RoleFilter.all ||
       _sortFilter != SortFilter.newest;
 
-  late final List<ConnectionRequest> _requests = [
-    ConnectionRequest(
-      id: '1',
-      skillName: 'Parol Making',
-      requesterName: 'RJ',
-      schedule: 'Mon/Wed/Sat',
-      language: 'English',
-      learningStyle: 'Discussion',
-      bio: 'Gusto kong matutong gumawa ng parol para sa pamilya ko.',
-      requestedAt: DateTime.now().subtract(const Duration(minutes: 2)),
-      role: PersonRole.learner,
-      photoUrls: const [null, null],
-    ),
-    ConnectionRequest(
-      id: '2',
-      skillName: 'Weaving Inabel',
-      requesterName: 'Maria',
-      schedule: 'Tue/Thu',
-      language: 'Tagalog',
-      learningStyle: 'Hands-on Practice',
-      bio: 'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
-      requestedAt: DateTime.now().subtract(const Duration(days: 1)),
-      role: PersonRole.mentor,
-      photoUrls: const [null],
-    ),
-    ..._dumpRequests(),
-  ];
+  late List<ConnectionRequest> _requests = const [];
 
-  static List<ConnectionRequest> _dumpRequests() {
-    final candidates =
-        dumpUsers.where((u) => u.lastMessage == null).take(8).toList();
-    final now = DateTime.now();
-    return [
-      for (var i = 0; i < candidates.length; i++)
-        ConnectionRequest.fromMatchedUser(
-          candidates[i],
-          requestedAt: now.subtract(Duration(hours: 3 + i * 9)),
-        ),
-    ];
+  @override
+  void initState() {
+    super.initState();
+    _loadRequests();
+  }
+
+  Future<void> _loadRequests() async {
+    try {
+      final incoming = await MatchApi.getIncomingRequests();
+      if (!mounted) return;
+      setState(() {
+        _requests = incoming.map((r) => r.toConnectionRequest()).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load requests: $e')),
+      );
+    }
   }
 
   bool _matchesDateFilter(DateTime date) {
@@ -201,21 +185,60 @@ class _RequestPageState extends State<RequestPage> {
     });
   }
 
-  void _blockRequester(ConnectionRequest request) {
+  void _blockRequester(ConnectionRequest request) async {
     if (!mounted) return;
-    BlockedUsers.block(request.toPerson());
+    try {
+      await MatchApi.blockUser(request.requesterId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Block failed: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
     _removeRequest(request.id);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('You blocked ${request.requesterName}')),
     );
   }
 
-  void _reportRequester(ConnectionRequest request, String reason) {
+  void _reportRequester(ConnectionRequest request, String reason) async {
     if (!mounted) return;
-    debugPrint('Reported ${request.id}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
+    try {
+      await MatchApi.reportUser(request.requesterId, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks for your report.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Report failed: $e')),
+      );
+    }
+  }
+
+  void _respond(ConnectionRequest request, bool accept) async {
+    try {
+      await MatchApi.respondToRequest(request.id, accept);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            accept
+                ? 'Connected with ${request.requesterName}!'
+                : 'Request from ${request.requesterName} declined.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to respond: $e')),
+      );
+    }
+    _removeRequest(request.id);
   }
 
   void _openDetail(ConnectionRequest request) {
@@ -224,8 +247,14 @@ class _RequestPageState extends State<RequestPage> {
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (_) => RequestDetailDialog(
         person: request.toPerson(),
-        onAccept: () => _removeRequest(request.id),
-        onDecline: () => _removeRequest(request.id),
+        onAccept: () {
+          Navigator.pop(context);
+          _respond(request, true);
+        },
+        onDecline: () {
+          Navigator.pop(context);
+          _respond(request, false);
+        },
         onBlock: () => _blockRequester(request),
         onReport: (reason) => _reportRequester(request, reason),
       ),
@@ -586,8 +615,8 @@ class _RequestPageState extends State<RequestPage> {
                 timeAgo: timeAgo(request.requestedAt),
                 iconAsset: request.iconAsset,
                 seekingLabel: request.seekingLabel,
-                onAccept: () => _removeRequest(request.id),
-                onDecline: () => _removeRequest(request.id),
+                onAccept: () => _respond(request, true),
+                onDecline: () => _respond(request, false),
               ),
             ),
           );

@@ -52,9 +52,13 @@ class _ExploreExpandState extends State<ExploreExpand> {
         widget.nodePath,
         kind: 'teach',
       );
+      // defensive de-dupe: same user must never appear as two deck cards
+      final seen = <String>{};
+      final unique =
+          users.where((u) => seen.add(u.id)).toList();
       if (!mounted) return;
       setState(() {
-        _people = users;
+        _people = unique;
         _loading = false;
       });
     } catch (e) {

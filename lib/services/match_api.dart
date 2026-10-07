@@ -1,6 +1,7 @@
 // PalTuro — MatchApi: typed bridge between the UI screens and the live backend
 // (RPCs + Edge Functions). One place to adapt backend shapes into the legacy
 // UI models (Person / ConnectionRequest / MatchedUser) so screens stay intact.
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart' show ConnectionRequest;
@@ -126,13 +127,23 @@ class MatchApi {
       'get-matches',
       body: {'as_role': asRole, 'refresh': refresh},
     );
-    final data = (res.data as Map? ?? {});
+    // supabase_flutter may hand res.data back as a decoded Map or a raw JSON
+    // string depending on platform — handle both before reading keys.
+    final dynamic raw = res.data;
+    late final Map<String, dynamic> data;
+    if (raw is Map) {
+      data = Map<String, dynamic>.from(raw);
+    } else if (raw is String && raw.isNotEmpty) {
+      data = (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } else {
+      data = {};
+    }
     final results = (data['results'] as List? ?? []);
     return results
         .whereType<Map>()
         .map((r) => MatchLite(
               userId: r['user_id'] as String,
-              rank: (r['rank'] as num).toInt(),
+              rank: (r['rank'] as num?)?.toInt() ?? 0,
               displayName: (r['display_name'] ?? '') as String,
               role: (r['role'] ?? 'both') as String,
               compatibility: (r['compatibility'] as num?)?.toDouble() ?? 0.0,
@@ -367,6 +378,9 @@ class MatchApi {
   /// Custom ("Others") skill flow. Body: {name, note, kind: learn|teach}.
   /// Returns the raw verdict:
   /// {status: attached|pending|queued|rejected, node: {id,name,path}, ...}
+  /// Custom ("Others") skill flow. Body: {name, note, kind: learn|teach}.
+  /// Returns the raw verdict:
+  /// {status: attached|pending|queued|rejected, node: {id,name,path}, ...}
   static Future<Map<String, dynamic>?> classifySkill({
     required String name,
     String? note,
@@ -377,8 +391,12 @@ class MatchApi {
       if (note != null && note.isNotEmpty) 'note': note,
       'kind': kind,
     });
-    if (res.data == null) return null;
-    return Map<String, dynamic>.from(res.data as Map);
+    final dynamic raw = res.data;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is String && raw.isNotEmpty) {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    }
+    return null;
   }
 
   /// The caller's placements: [{kind, note, id, name, path}].

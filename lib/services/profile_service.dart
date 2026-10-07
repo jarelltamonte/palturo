@@ -1,7 +1,8 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
+import '../onboarding/onboarding_models.dart' show OnboardingRoleDb;
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
@@ -58,10 +59,19 @@ class ProfileService {
     }
   }
 
+  /// Fire-and-forget re-vectorization: recomputes this user's passage
+  /// embeddings in profile_embeddings (FR-4/FR-6).
+  Future<void> refreshEmbeddings() async {
+    try {
+      await _supabase.functions.invoke('generate-embeddings', body: {});
+    } catch (_) {
+      // Non-fatal: get-matches self-heals stale embeddings on next read.
+    }
+  }
+
   Future<void> saveOnboardingPreferences(
     OnboardingController controller,
-  ) async {
-    final user = _supabase.auth.currentUser;
+  ) async {    final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('User is not authenticated. Cannot save preferences.');
     }
@@ -101,7 +111,7 @@ class ProfileService {
       await _supabase
           .from('profiles')
           .update({
-            'role': controller.role?.name ?? 'learn',
+            'role': controller.role?.dbValue ?? 'learner',
             'learning_skills': resolvedLearning,
             'teaching_skills': resolvedTeaching,
             'learning_styles': controller.learningStyles.toList(),
@@ -116,6 +126,7 @@ class ProfileService {
     } catch (e) {
       throw Exception('Failed to save profile preferences: $e');
     }
+    await refreshEmbeddings();
   }
 
   Future<ProfileData?> getCurrentUserProfile() async {
@@ -376,7 +387,7 @@ class ProfileService {
           'avatar_url': primaryAvatar,
           'photos': uploadedPhotoUrls.whereType<String>().toList(),
           'teaching_skill_images': uploadedSkillImages,
-          'role': updatedProfile.role?.name ?? 'learn',
+          'role': updatedProfile.role?.dbValue ?? 'learner',
           'learning_skills': resolvedLearning,
           'teaching_skills': resolvedTeaching,
           'skill_categories': allCategorySlugs.toList(),
@@ -389,6 +400,9 @@ class ProfileService {
         .eq('id', user.id);
 
     final refreshed = await getCurrentUserProfile();
+
+    await refreshEmbeddings();
+
     return refreshed ?? updatedProfile;
   }
 }

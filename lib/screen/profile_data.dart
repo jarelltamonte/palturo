@@ -94,9 +94,7 @@ class ProfileData {
   }) {
     OnboardingRole? parsedRole;
     final roleStr = map['role'] as String?;
-    if (roleStr == 'learn') parsedRole = OnboardingRole.learn;
-    if (roleStr == 'teach') parsedRole = OnboardingRole.teach;
-    if (roleStr == 'both') parsedRole = OnboardingRole.both;
+    if (roleStr != null) parsedRole = OnboardingRoleDb.fromDb(roleStr);
 
     String formattedSchedule = '';
     if (map['availability'] is Map && (map['availability'] as Map).isNotEmpty) {

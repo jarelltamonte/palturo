@@ -1,0 +1,4 @@
+project_id = "palturo"
+
+[functions.classify-skill]
+verify_jwt = true

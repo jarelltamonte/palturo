@@ -6,11 +6,12 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
-import 'package:palturo/screen/users_dump.dart';
-import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
+import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/onboarding/onboarding_models.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -22,63 +23,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const List<Person> _featuredPeople = [
-    Person(
-      id: '1',
-      name: 'RJ Santos',
-      schedule: 'Mon/Wed/Sat',
-      language: 'English',
-      learningStyle: 'Discussion',
-      skillName: 'Parol Making',
-      role: PersonRole.learner,
-      bio: 'Gusto kong matutong gumawa ng parol para sa pamilya ko.',
-      photoUrls: [null, null, null],
-    ),
-    Person(
-      id: '2',
-      name: 'Maria Dela Cruz',
-      schedule: 'Tue/Thu',
-      language: 'Tagalog',
-      learningStyle: 'Hands-on Practice',
-      skillName: 'Weaving Inabel',
-      role: PersonRole.mentor,
-      bio:
-          'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
-      photoUrls: [null],
-    ),
-    Person(
-      id: '3',
-      name: 'Jarell Tamonte',
-      schedule: 'Mon/Sat/Sun',
-      language: 'English, Tagalog',
-      learningStyle: 'Visual Demonstration',
-      skillName: 'Cooking Pinakbet',
-      role: PersonRole.learner,
-      bio: 'Gusto kong lutuin ang pinakbet ni Nanay nang eksakto ang timpla.',
-      photoUrls: [null, null],
-    ),
-  ];
+  List<Person> _people = const [];
+  bool _loading = true;
+  String? _error;
+  ProfileData? _myProfile;
 
-  late final List<Person> _people = [
-    ..._featuredPeople,
-    ...dumpUsers.map(_personFromMatchedUser),
-  ];
-
-  static Person _personFromMatchedUser(MatchedUser user) {
-    return Person(
-      id: 'dump_${user.id}',
-      name: user.name,
-      schedule: user.schedule,
-      language: user.language,
-      learningStyle: user.learningStyle,
-      skillName: user.skillName,
-      role: user.role,
-      bio: user.bio,
-      photoUrls: [user.avatarUrl],
-    );
-  }
-
-  final ProfileData _placeholderProfile = ProfileData(
+  final ProfileData _fallbackSelfProfile = ProfileData(
     name: 'You',
     schedule: 'Select your availability',
   );
@@ -91,6 +41,62 @@ class _HomePageState extends State<HomePage> {
   final List<int> _history = [];
 
   @override
+  void initState() {
+    super.initState();
+    _loadDeck();
+  }
+
+  /// Loads the live recommendation deck (get-matches + public profiles).
+  Future<void> _loadDeck() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _currentIndex = 0;
+      _history.clear();
+    });
+    try {
+      final me = await ProfileService().getCurrentUserProfile();
+      if (!mounted) return;
+      setState(() => _myProfile = me);
+
+      // Candidate side for retrieval: chips pick directly, "All" = opposite role.
+      final String asRole = switch (_roleFilter) {
+        RoleFilter.learner => 'learner',
+        RoleFilter.mentor => 'mentor',
+        RoleFilter.all =>
+          (me?.role == OnboardingRole.teach) ? 'learner' : 'mentor',
+      };
+
+      final deck = await MatchApi.getMatchDeck(asRoleDb: asRole);
+      if (!mounted) return;
+      setState(() => _people = deck);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  /// Live "Add": sends a connection request from the feed (FR-9).
+  Future<void> _confirmAdd(Person person) async {
+    try {
+      await MatchApi.sendConnectionRequest(person.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connection request sent to ${person.name}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Request failed: $e')),
+      );
+    }
+    _next();
+  }
+
+  @override
   void dispose() {
     _settingsTap.dispose();
     super.dispose();
@@ -100,24 +106,16 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileEditPage(profile: _placeholderProfile),
+        builder: (context) =>
+            ProfileEditPage(profile: _myProfile ?? _fallbackSelfProfile),
       ),
     );
   }
 
   bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
 
-  List<Person> get _filteredPeople {
-    if (_roleFilter == RoleFilter.all) return _people;
-    return _people
-        .where(
-          (p) =>
-              (_roleFilter == RoleFilter.learner &&
-                  p.role == PersonRole.learner) ||
-              (_roleFilter == RoleFilter.mentor && p.role == PersonRole.mentor),
-        )
-        .toList();
-  }
+  /// Role selection happens at retrieval time (as_role) — deck is prefiltered.
+  List<Person> get _filteredPeople => _people;
 
   void _next() {
     setState(() {
@@ -143,10 +141,18 @@ class _HomePageState extends State<HomePage> {
     );
     if (!confirmed || !mounted) return;
 
-    BlockedUsers.block(person);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
+    try {
+      await MatchApi.blockUser(person.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You blocked ${person.name}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Block failed: $e')),
+      );
+    }
     _next();
   }
 
@@ -154,10 +160,18 @@ class _HomePageState extends State<HomePage> {
     final reason = await showReportReasonDialog(context, name: person.name);
     if (reason == null || !mounted) return;
 
-    debugPrint('Reported ${person.id}: $reason');
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+    try {
+      await MatchApi.reportUser(person.id, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+    }
     _next();
   }
 
@@ -265,12 +279,11 @@ class _HomePageState extends State<HomePage> {
                           elevation: 0,
                         ),
                         onPressed: () {
-                          setState(() {
-                            _roleFilter = draftRole;
-                            _currentIndex = 0;
-                            _history.clear();
-                          });
                           Navigator.pop(context);
+                          if (draftRole != _roleFilter) {
+                            _roleFilter = draftRole;
+                            _loadDeck();
+                          }
                         },
                         child: const Text(
                           'Apply',
@@ -395,31 +408,63 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        child:
-            hasMore
-                ? Dismissible(
-                  key: ValueKey(people[_currentIndex].id),
-                  direction: DismissDirection.horizontal,
-                  background: _swipeBackground(
-                    alignment: Alignment.centerLeft,
-                    color: AppColors.primary,
-                    icon: Icons.check,
-                  ),
-                  secondaryBackground: _swipeBackground(
-                    alignment: Alignment.centerRight,
-                    color: Colors.red,
-                    icon: Icons.close,
-                  ),
-                  onDismissed: (_) => _next(),
-                  child: PersonCardOverlay(
-                    person: people[_currentIndex],
-                    onAdd: _next,
-                    onSkip: _next,
-                    onBlock: () => _confirmBlock(people[_currentIndex]),
-                    onReport: () => _confirmReport(people[_currentIndex]),
-                  ),
-                )
-                : _buildEmptyState(textTheme),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildErrorState(textTheme)
+                : hasMore
+                    ? Dismissible(
+                        key: ValueKey(people[_currentIndex].id),
+                        direction: DismissDirection.horizontal,
+                        background: _swipeBackground(
+                          alignment: Alignment.centerLeft,
+                          color: AppColors.primary,
+                          icon: Icons.check,
+                        ),
+                        secondaryBackground: _swipeBackground(
+                          alignment: Alignment.centerRight,
+                          color: Colors.red,
+                          icon: Icons.close,
+                        ),
+                        onDismissed: (_) => _next(),
+                        child: PersonCardOverlay(
+                          person: people[_currentIndex],
+                          onAdd: () => _confirmAdd(people[_currentIndex]),
+                          onSkip: _next,
+                          onBlock: () => _confirmBlock(people[_currentIndex]),
+                          onReport: () => _confirmReport(people[_currentIndex]),
+                        ),
+                      )
+                    : _buildEmptyState(textTheme),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Color textColor) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Couldn’t load recommendations.\nPlease check your connection.',
+              style: AppTextStyles.regularText.copyWith(color: textColor),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadDeck,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

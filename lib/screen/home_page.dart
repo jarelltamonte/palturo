@@ -48,6 +48,7 @@ class _HomePageState extends State<HomePage> {
 
   /// Loads the live recommendation deck (get-matches + public profiles).
   Future<void> _loadDeck() async {
+    debugPrint('[People] _loadDeck start, roleFilter=$_roleFilter');
     setState(() {
       _loading = true;
       _error = null;
@@ -56,6 +57,7 @@ class _HomePageState extends State<HomePage> {
     });
     try {
       final me = await ProfileService().getCurrentUserProfile();
+      debugPrint('[People] profile fetched: ${me?.firstName} role=${me?.role}');
       if (!mounted) return;
       setState(() => _myProfile = me);
 
@@ -68,9 +70,14 @@ class _HomePageState extends State<HomePage> {
       };
 
       final deck = await MatchApi.getMatchDeck(asRoleDb: asRole);
+      debugPrint('[People] deck loaded: ${deck.length} people');
       if (!mounted) return;
-      setState(() => _people = deck);
-    } catch (e) {
+      setState(() {
+        _people = deck;
+        _loading = false;
+      });
+    } catch (e, st) {
+      debugPrint('[People] _loadDeck ERROR: $e\n$st');
       if (!mounted) return;
       setState(() {
         _error = e.toString();

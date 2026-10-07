@@ -2,6 +2,7 @@
 // (RPCs + Edge Functions). One place to adapt backend shapes into the legacy
 // UI models (Person / ConnectionRequest / MatchedUser) so screens stay intact.
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart' show ConnectionRequest;
@@ -134,11 +135,14 @@ class MatchApi {
     if (raw is Map) {
       data = Map<String, dynamic>.from(raw);
     } else if (raw is String && raw.isNotEmpty) {
+      debugPrint('[MatchApi] res.data was String: ${raw.substring(0, raw.length.clamp(0, 200))}');
       data = (jsonDecode(raw) as Map).cast<String, dynamic>();
     } else {
+      debugPrint('[MatchApi] res.data unexpected type: ${raw.runtimeType}');
       data = {};
     }
     final results = (data['results'] as List? ?? []);
+    debugPrint('[MatchApi] get-matches parsed: ${results.length} results');
     return results
         .whereType<Map>()
         .map((r) => MatchLite(
@@ -211,6 +215,7 @@ class MatchApi {
     int enrichLimit = 10,
   }) async {
     final matches = await getMatches(asRole: asRoleDb);
+    debugPrint('[MatchApi] deck candidates: ${matches.length} for asRole=$asRoleDb');
     // non-self, ranked, filtered by UI role filter (both passes all)
     final targetMatches = matches
         .where((m) =>
@@ -222,8 +227,14 @@ class MatchApi {
     final out = <Person>[];
     for (final m in targetMatches) {
       final person = await getPersonFromPublicProfile(m.userId);
-      if (person != null) out.add(person);
+      if (person != null) {
+        out.add(person);
+        debugPrint('[MatchApi] enriched ${person.name} (compat=${m.compatibility})');
+      } else {
+        debugPrint('[MatchApi] enrich failed for ${m.userId}');
+      }
     }
+    debugPrint('[MatchApi] deck enriched: ${out.length} people');
     return out;
   }
 

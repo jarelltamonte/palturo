@@ -42,7 +42,8 @@ class _HomePageState extends State<HomePage> {
       learningStyle: 'Hands-on Practice',
       skillName: 'Weaving Inabel',
       role: PersonRole.mentor,
-      bio: 'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
+      bio:
+          'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
       photoUrls: [null],
     ),
     Person(
@@ -77,13 +78,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  static const ProfileData _placeholderProfile = ProfileData(
+  final ProfileData _placeholderProfile = ProfileData(
     name: 'You',
     schedule: 'Select your availability',
   );
 
-  late final TapGestureRecognizer _settingsTap = TapGestureRecognizer()
-    ..onTap = _openSettings;
+  late final TapGestureRecognizer _settingsTap =
+      TapGestureRecognizer()..onTap = _openSettings;
 
   RoleFilter _roleFilter = RoleFilter.all;
   int _currentIndex = 0;
@@ -99,8 +100,7 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            const ProfileEditPage(profile: _placeholderProfile),
+        builder: (context) => ProfileEditPage(profile: _placeholderProfile),
       ),
     );
   }
@@ -110,10 +110,12 @@ class _HomePageState extends State<HomePage> {
   List<Person> get _filteredPeople {
     if (_roleFilter == RoleFilter.all) return _people;
     return _people
-        .where((p) =>
-            (_roleFilter == RoleFilter.learner &&
-                p.role == PersonRole.learner) ||
-            (_roleFilter == RoleFilter.mentor && p.role == PersonRole.mentor))
+        .where(
+          (p) =>
+              (_roleFilter == RoleFilter.learner &&
+                  p.role == PersonRole.learner) ||
+              (_roleFilter == RoleFilter.mentor && p.role == PersonRole.mentor),
+        )
         .toList();
   }
 
@@ -142,9 +144,9 @@ class _HomePageState extends State<HomePage> {
     if (!confirmed || !mounted) return;
 
     BlockedUsers.block(person);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${person.name}')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
     _next();
   }
 
@@ -153,9 +155,9 @@ class _HomePageState extends State<HomePage> {
     if (reason == null || !mounted) return;
 
     debugPrint('Reported ${person.id}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     _next();
   }
 
@@ -193,8 +195,10 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () =>
-                              setModalState(() => draftRole = RoleFilter.all),
+                          onPressed:
+                              () => setModalState(
+                                () => draftRole = RoleFilter.all,
+                              ),
                           child: Text(
                             'Reset',
                             style: AppTextStyles.regularText.copyWith(
@@ -212,25 +216,30 @@ class _HomePageState extends State<HomePage> {
                       runSpacing: 8,
                       children: [
                         _filterChip(
-                            'All',
-                            draftRole == RoleFilter.all,
-                            () => setModalState(() => draftRole = RoleFilter.all),
-                            primaryColor,
-                            textColor),
+                          'All',
+                          draftRole == RoleFilter.all,
+                          () => setModalState(() => draftRole = RoleFilter.all),
+                          primaryColor,
+                          textColor,
+                        ),
                         _filterChip(
-                            'Learner',
-                            draftRole == RoleFilter.learner,
-                            () => setModalState(
-                                () => draftRole = RoleFilter.learner),
-                            primaryColor,
-                            textColor),
+                          'Learner',
+                          draftRole == RoleFilter.learner,
+                          () => setModalState(
+                            () => draftRole = RoleFilter.learner,
+                          ),
+                          primaryColor,
+                          textColor,
+                        ),
                         _filterChip(
-                            'Mentor',
-                            draftRole == RoleFilter.mentor,
-                            () => setModalState(
-                                () => draftRole = RoleFilter.mentor),
-                            primaryColor,
-                            textColor),
+                          'Mentor',
+                          draftRole == RoleFilter.mentor,
+                          () => setModalState(
+                            () => draftRole = RoleFilter.mentor,
+                          ),
+                          primaryColor,
+                          textColor,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -350,9 +359,10 @@ class _HomePageState extends State<HomePage> {
                   onPressed: _history.isEmpty ? null : _undo,
                   icon: Icon(
                     CupertinoIcons.arrow_uturn_left,
-                    color: _history.isEmpty
-                        ? textTheme.withValues(alpha: 0.3)
-                        : textTheme,
+                    color:
+                        _history.isEmpty
+                            ? textTheme.withValues(alpha: 0.3)
+                            : textTheme,
                     size: 24,
                   ),
                 ),
@@ -385,30 +395,31 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        child: hasMore
-            ? Dismissible(
-                key: ValueKey(people[_currentIndex].id),
-                direction: DismissDirection.horizontal,
-                background: _swipeBackground(
-                  alignment: Alignment.centerLeft,
-                  color: AppColors.primary,
-                  icon: Icons.check,
-                ),
-                secondaryBackground: _swipeBackground(
-                  alignment: Alignment.centerRight,
-                  color: Colors.red,
-                  icon: Icons.close,
-                ),
-                onDismissed: (_) => _next(),
-                child: PersonCardOverlay(
-                  person: people[_currentIndex],
-                  onAdd: _next,
-                  onSkip: _next,
-                  onBlock: () => _confirmBlock(people[_currentIndex]),
-                  onReport: () => _confirmReport(people[_currentIndex]),
-                ),
-              )
-            : _buildEmptyState(textTheme),
+        child:
+            hasMore
+                ? Dismissible(
+                  key: ValueKey(people[_currentIndex].id),
+                  direction: DismissDirection.horizontal,
+                  background: _swipeBackground(
+                    alignment: Alignment.centerLeft,
+                    color: AppColors.primary,
+                    icon: Icons.check,
+                  ),
+                  secondaryBackground: _swipeBackground(
+                    alignment: Alignment.centerRight,
+                    color: Colors.red,
+                    icon: Icons.close,
+                  ),
+                  onDismissed: (_) => _next(),
+                  child: PersonCardOverlay(
+                    person: people[_currentIndex],
+                    onAdd: _next,
+                    onSkip: _next,
+                    onBlock: () => _confirmBlock(people[_currentIndex]),
+                    onReport: () => _confirmReport(people[_currentIndex]),
+                  ),
+                )
+                : _buildEmptyState(textTheme),
       ),
     );
   }

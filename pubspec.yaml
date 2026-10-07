@@ -20,11 +20,14 @@ dependencies:
   shared_preferences: ^2.5.5
   flutter_native_splash: ^2.4.8
 
+  supabase_flutter: ^2.17.2
+  app_links: ^7.2.1
+  flutter_dotenv: ^6.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.13.1
 
 flutter_native_splash:
   android: true
@@ -66,6 +69,7 @@ flutter:
     - assets/lottie/
     - assets/fonts/
     - assets/sounds/
+    - .env
 
   fonts:
     - family: Comfortaa

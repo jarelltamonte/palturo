@@ -92,10 +92,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       fontSize: 13,
       height: 1.35,
       shadows: [
-        Shadow(
-          color: Colors.black.withValues(alpha: 0.6),
-          blurRadius: 6,
-        ),
+        Shadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 6),
       ],
     );
 
@@ -112,9 +109,10 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: overflows
-              ? () => setState(() => _bioExpanded = !_bioExpanded)
-              : null,
+          onTap:
+              overflows
+                  ? () => setState(() => _bioExpanded = !_bioExpanded)
+                  : null,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -132,9 +130,10 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   child: Text(
                     bio,
                     maxLines: _bioExpanded ? null : 2,
-                    overflow: _bioExpanded
-                        ? TextOverflow.visible
-                        : TextOverflow.ellipsis,
+                    overflow:
+                        _bioExpanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
                     style: style,
                   ),
                 ),
@@ -214,41 +213,61 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ),
           ),
           if (widget.showMenu)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: PopupMenuButton<String>(
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              color: Theme.of(context).colorScheme.surface,
-              elevation: 6,
-              offset: const Offset(0, 40),
-              onSelected: (value) {
-                if (value == 'unmatch') {
-                  widget.onUnmatch?.call();
-                } else if (value == 'report') {
-                  widget.onReport?.call();
-                } else if (value == 'block') {
-                  widget.onBlock?.call();
-                }
-              },
-              itemBuilder:
-                  (context) => [
-                    if (widget.onUnmatch != null)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                color: Theme.of(context).colorScheme.surface,
+                elevation: 6,
+                offset: const Offset(0, 40),
+                onSelected: (value) {
+                  if (value == 'unmatch') {
+                    widget.onUnmatch?.call();
+                  } else if (value == 'report') {
+                    widget.onReport?.call();
+                  } else if (value == 'block') {
+                    widget.onBlock?.call();
+                  }
+                },
+                itemBuilder:
+                    (context) => [
+                      if (widget.onUnmatch != null)
+                        PopupMenuItem<String>(
+                          value: 'unmatch',
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.remove_circle_outline,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Unmatch',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       PopupMenuItem<String>(
-                        value: 'unmatch',
+                        value: 'report',
                         child: Row(
                           children: [
                             const Icon(
-                              Icons.remove_circle_outline,
+                              Icons.flag_outlined,
                               color: Colors.red,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Unmatch',
+                              'Report',
                               style: AppTextStyles.regularText.copyWith(
                                 color: Theme.of(context).colorScheme.secondary,
                               ),
@@ -256,55 +275,40 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           ],
                         ),
                       ),
-                    PopupMenuItem<String>(
-                      value: 'report',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.flag_outlined,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Report',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
+                      PopupMenuItem<String>(
+                        value: 'block',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.block,
+                              color: Colors.red,
+                              size: 20,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'block',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.block, color: Colors.red, size: 20),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Block',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
+                            const SizedBox(width: 12),
+                            Text(
+                              'Block',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.more_horiz,
-                  color: Colors.white,
-                  size: 22,
+                    ],
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.more_horiz,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
-          ),
           Positioned(
             left: 20,
             right: 20,
@@ -422,7 +426,6 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       ],
                     ),
                     Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
                           Icons.psychology,
@@ -430,17 +433,23 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           color: Colors.white70,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          widget.person.learningStyle,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 6,
-                              ),
-                            ],
+                        Expanded(
+                          child: Text(
+                            widget.person.learningStyle.isNotEmpty
+                                ? widget.person.learningStyle
+                                : 'No learning styles set',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -484,52 +493,52 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ),
           ),
           if (widget.showActions)
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 20,
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: widget.onSkip,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.textPrimary),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 20,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: widget.onSkip,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.textPrimary),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      widget.skipLabel,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
+                      child: Text(
+                        widget.skipLabel,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: widget.onAdd,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: widget.onAdd,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      widget.addLabel,
-                      style: TextStyle(color: AppColors.black, fontSize: 16),
+                      child: Text(
+                        widget.addLabel,
+                        style: TextStyle(color: AppColors.black, fontSize: 16),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -565,44 +574,47 @@ void showPersonProfileDialog(
                 person: person,
                 showActions: false,
                 showMenu: hasMenu,
-                onUnmatch: onUnmatch == null
-                    ? null
-                    : () async {
-                        final confirmed = await showConfirmDialog(
-                          dialogContext,
-                          title: 'Unmatch',
-                          message:
-                              'Unmatch ${person.name}? You’ll lose this match and your chat history.',
-                          confirmLabel: 'Unmatch',
-                        );
-                        if (!confirmed || !dialogContext.mounted) return;
-                        Navigator.pop(dialogContext);
-                        onUnmatch();
-                      },
-                onReport: onReport == null
-                    ? null
-                    : () async {
-                        final reason = await showReportReasonDialog(
-                          dialogContext,
-                          name: person.name,
-                        );
-                        if (reason == null || !dialogContext.mounted) return;
-                        onReport(reason);
-                      },
-                onBlock: onBlock == null
-                    ? null
-                    : () async {
-                        final confirmed = await showConfirmDialog(
-                          dialogContext,
-                          title: 'Block',
-                          message:
-                              '${person.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
-                          confirmLabel: 'Block',
-                        );
-                        if (!confirmed || !dialogContext.mounted) return;
-                        Navigator.pop(dialogContext);
-                        onBlock();
-                      },
+                onUnmatch:
+                    onUnmatch == null
+                        ? null
+                        : () async {
+                          final confirmed = await showConfirmDialog(
+                            dialogContext,
+                            title: 'Unmatch',
+                            message:
+                                'Unmatch ${person.name}? You’ll lose this match and your chat history.',
+                            confirmLabel: 'Unmatch',
+                          );
+                          if (!confirmed || !dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          onUnmatch();
+                        },
+                onReport:
+                    onReport == null
+                        ? null
+                        : () async {
+                          final reason = await showReportReasonDialog(
+                            dialogContext,
+                            name: person.name,
+                          );
+                          if (reason == null || !dialogContext.mounted) return;
+                          onReport(reason);
+                        },
+                onBlock:
+                    onBlock == null
+                        ? null
+                        : () async {
+                          final confirmed = await showConfirmDialog(
+                            dialogContext,
+                            title: 'Block',
+                            message:
+                                '${person.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+                            confirmLabel: 'Block',
+                          );
+                          if (!confirmed || !dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          onBlock();
+                        },
               ),
               Positioned(
                 top: 16,

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:palturo/onboarding/onboarding_flow.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
-import 'package:palturo/screen/navigation_bar.dart';
+import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,7 +14,50 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  final AuthService _authService = AuthService();
+
   bool _isObscured = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  bool _isLoggingIn = false;
+
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    setState(() => _isLoggingIn = true);
+
+    try {
+      await _authService.login(email, password);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoggingIn = false);
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Login Failed'),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,11 +91,15 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 56),
 
-                      const TopLabeledField(label: 'Email'),
+                      TopLabeledField(
+                        label: 'Email',
+                        controller: _emailController,
+                      ),
                       const SizedBox(height: 10),
 
                       TopLabeledField(
                         label: 'Password',
+                        controller: _passwordController,
                         obscureText: _isObscured,
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -75,23 +121,7 @@ class _LoginPageState extends State<LoginPage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => OnboardingFlow(
-                                      onFinished: () {
-                                        Navigator.pushAndRemoveUntil(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => const NavigationBarWidget(),
-                                          ),
-                                          (route) => false,
-                                        );
-                                      },
-                                    ),
-                              ),
-                            );
+                            _login();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
@@ -102,7 +132,17 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(24),
                             ),
                           ),
-                          child: const Text('Log In'),
+                          child:
+                              _isLoggingIn
+                                  ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  )
+                                  : const Text('Log In'),
                         ),
                       ),
                       const SizedBox(height: 10),

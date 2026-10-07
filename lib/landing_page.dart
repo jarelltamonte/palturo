@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'authentication/login.dart';
+import 'package:palturo/authentication/auth_gate.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -26,7 +26,7 @@ class _IntroScreenState extends State<IntroScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(builder: (context) => const AuthGate()),
         );
       }
     });
@@ -40,9 +40,9 @@ class _IntroScreenState extends State<IntroScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: Image.asset(
-          isDarkMode 
-                ? 'assets/images/vlogo_white.png'   
-                : 'assets/images/vlogo_black.png',
+          isDarkMode
+              ? 'assets/images/vlogo_white.png'
+              : 'assets/images/vlogo_black.png',
           width: 320,
         ),
       ),

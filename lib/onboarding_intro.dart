@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:lottie/lottie.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:palturo/landing_page.dart';
 import 'package:palturo/models/onboarding_item.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
-import 'package:palturo/landing_page.dart';
-
+import 'package:palturo/services/preferences_service.dart';
 
 class OnboardingIntro extends StatefulWidget {
   const OnboardingIntro({super.key});
@@ -56,8 +55,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
         curve: Curves.ease,
       );
     } else {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('onboarding_done', true);
+      await PreferencesService.instance.setBool('onboarding_done', true);
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -72,7 +70,12 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 32, top: 50),
+        padding: const EdgeInsets.only(
+          left: 16,
+          right: 16,
+          bottom: 32,
+          top: 50,
+        ),
         child: Column(
           spacing: 20,
           children: [
@@ -100,7 +103,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
                   decoration: BoxDecoration(
                     color:
                         _currentPage == index
-                            ? AppColors.primary 
+                            ? AppColors.primary
                             : AppColors.textSecondary,
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -149,17 +152,13 @@ class _OnboardItemView extends StatelessWidget {
         Text(
           item.title,
           textAlign: TextAlign.center,
-          style: AppTextStyles.headingText.copyWith(
-            color: textTheme,
-          ),
+          style: AppTextStyles.headingText.copyWith(color: textTheme),
         ),
         const SizedBox(height: 16),
         Text(
           item.description,
           textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-          ),
+          style: AppTextStyles.regularText.copyWith(color: textTheme),
         ),
       ],
     );

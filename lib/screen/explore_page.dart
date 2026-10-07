@@ -71,9 +71,7 @@ class _ExplorePageState extends State<ExplorePage> {
           children: [
             Text(
               'Explore',
-              style: AppTextStyles.headingText.copyWith(
-                color: textTheme,
-              ),
+              style: AppTextStyles.headingText.copyWith(color: textTheme),
             ),
             IconButton(
               icon: Icon(
@@ -134,20 +132,14 @@ class _ExploreInfoDialog extends StatefulWidget {
 }
 
 class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
-  static const _titles = [
-    'Explore',
-    'Heads up',
-  ];
+  static const _titles = ['Explore', 'Heads up'];
 
   static const _messages = [
     'Browse categories to discover skills and knowledge shared by other users. Pick a category, then swipe through people who are teaching or learning in it.',
     'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Explore is for discovering something new, so keep an open mind.',
   ];
 
-  static const _icons = [
-    CupertinoIcons.compass,
-    CupertinoIcons.lightbulb,
-  ];
+  static const _icons = [CupertinoIcons.compass, CupertinoIcons.lightbulb];
 
   int _page = 0;
 
@@ -211,9 +203,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: TweenAnimationBuilder<double>(
-            tween: Tween(
-              end: (_page + 1) / _titles.length,
-            ),
+            tween: Tween(end: (_page + 1) / _titles.length),
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
             builder: (context, value, _) {
@@ -253,10 +243,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         title: title,
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Material(
-            color: Colors.transparent,
-            child: content,
-          ),
+          child: Material(color: Colors.transparent, child: content),
         ),
         actions: [
           if (_page > 0)
@@ -264,9 +251,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
               onPressed: _back,
               child: Text(
                 'Back',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                ),
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
           CupertinoDialogAction(
@@ -284,32 +269,23 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
 
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: title,
-      content: SizedBox(
-        width: double.maxFinite,
-        child: content,
-      ),
+      content: SizedBox(width: double.maxFinite, child: content),
       actions: [
         if (_page > 0)
           TextButton(
             onPressed: _back,
             child: Text(
               'Back',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
           ),
         TextButton(
           onPressed: _next,
           child: Text(
             _isLastPage ? 'Okay' : 'Next',
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.primary,
-            ),
+            style: AppTextStyles.regularText.copyWith(color: AppColors.primary),
           ),
         ),
       ],
@@ -333,6 +309,7 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
+    final cardColor = Theme.of(context).colorScheme.surface;
 
     return Container(
       decoration: BoxDecoration(
@@ -347,7 +324,7 @@ class _CategoryCard extends StatelessWidget {
         ],
       ),
       child: Material(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(24),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -367,11 +344,7 @@ class _CategoryCard extends StatelessWidget {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    icon,
-                    size: 28,
-                    color: AppColors.background,
-                  ),
+                  child: Icon(icon, size: 28, color: AppColors.background),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -399,4 +372,3 @@ class _CategoryCard extends StatelessWidget {
     );
   }
 }
-

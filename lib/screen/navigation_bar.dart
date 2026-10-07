@@ -17,9 +17,9 @@ class NavigationBarWidget extends StatefulWidget {
 
 class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   static const int _exploreIndex = 1;
-
   int _selectedIndex = 0;
 
+  final List<int> _tabHistory = [0];
   final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
 
   final List<IconData> _navigationIcons = [
@@ -60,18 +60,50 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   void _onItemTapped(int index) {
     if (index == _exploreIndex && _selectedIndex == _exploreIndex) {
       _exploreNavKey.currentState?.popUntil((route) => route.isFirst);
+      return;
     }
+
+    if (_selectedIndex == index) return;
+
     setState(() {
       _selectedIndex = index;
+      _tabHistory.remove(index);
+      _tabHistory.add(index);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(index: _selectedIndex, children: _pages),
-      bottomNavigationBar: _buildNavBar(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+
+        if (_selectedIndex == _exploreIndex &&
+            (_exploreNavKey.currentState?.canPop() ?? false)) {
+          _exploreNavKey.currentState?.pop();
+          return;
+        }
+
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.pop();
+          return;
+        }
+
+        if (_tabHistory.length > 1) {
+          setState(() {
+            _tabHistory.removeLast();
+            _selectedIndex = _tabHistory.last;
+          });
+          return;
+        }
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: IndexedStack(index: _selectedIndex, children: _pages),
+        bottomNavigationBar: _buildNavBar(),
+      ),
     );
   }
 

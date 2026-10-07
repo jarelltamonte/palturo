@@ -7,7 +7,7 @@ import 'package:palturo/onboarding/onboarding_flow.dart'
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
-import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/services/profile_service.dart';
 import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
@@ -31,17 +31,14 @@ const Map<String, int> _dayOrder = {
 };
 
 String _formatSchedule(String schedule) {
-  final days = schedule
-      .split('/')
-      .map((day) => day.trim())
-      .where((day) => day.isNotEmpty)
-      .toList();
+  final days =
+      schedule
+          .split('/')
+          .map((day) => day.trim())
+          .where((day) => day.isNotEmpty)
+          .toList();
 
-  days.sort(
-    (a, b) => (_dayOrder[a] ?? 999).compareTo(
-      _dayOrder[b] ?? 999,
-    ),
-  );
+  days.sort((a, b) => (_dayOrder[a] ?? 999).compareTo(_dayOrder[b] ?? 999));
 
   return days
       .map((day) => day.length > 3 ? day.substring(0, 3) : day)
@@ -65,16 +62,9 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  ProfileData _profile = const ProfileData(
-    name: 'Juan De La Cruz',
-    schedule: 'Mon/Sat/Sun',
-    bio: 'Mahilig akong magluto at matuto ng lumang gawang-kamay. Tara, magpalitan tayo ng kaalaman!',
-    languages: ['English', 'Tagalog'],
-    interests: ['Discussion', 'Visual Demons...'],
-    role: OnboardingRole.both,
-    learningSkillIds: ['cooking_pinakbet', 'weaving_inabel', 'parol_making'],
-    teachingSkillIds: [],
-  );
+  final ProfileService _profileService = ProfileService();
+  ProfileData? _profile;
+  bool _isLoading = true;
 
   static const _roleOptions = [
     RoleOption(
@@ -87,45 +77,77 @@ class _ProfilePageState extends State<ProfilePage> {
       'assets/icons/rmentor.svg',
       'I want to\nteach',
     ),
-    RoleOption(
-      OnboardingRole.both,
-      'assets/icons/rboth.svg',
-      'I can do\nboth',
-    ),
+    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _isLoading = true);
+    final data = await _profileService.getCurrentUserProfile();
+    if (mounted) {
+      setState(() {
+        _profile =
+            data ??
+            ProfileData(
+              firstName: 'Juan',
+              lastName: 'De La Cruz',
+              schedule: 'Mon/Sat/Sun',
+              bio:
+                  'Mahilig akong magluto at matuto ng lumang gawang-kamay. Tara, magpalitan tayo ng kaalaman!',
+              languages: const ['English', 'Tagalog'],
+              interests: const ['Discussion', 'Visual Demons...'],
+              role: OnboardingRole.both,
+              learningSkillIds: const [
+                'cooking_pinakbet',
+                'weaving_inabel',
+                'parol_making',
+              ],
+              teachingSkillIds: const [],
+            );
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _openEdit() async {
+    if (_profile == null) return;
+
     final updated = await Navigator.push<ProfileData>(
       context,
-      MaterialPageRoute(
-        builder: (_) => ProfileEditPage(profile: _profile),
-      ),
+      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: _profile!)),
     );
 
-    if (updated != null) {
+    if (updated != null && mounted) {
       setState(() => _profile = updated);
+      await _loadProfile();
     }
   }
 
   Person _profileToPerson() {
-    final learnId = _profile.learningSkillIds.isNotEmpty
-        ? _profile.learningSkillIds.first
-        : null;
-    final teachId = _profile.teachingSkillIds.isNotEmpty
-        ? _profile.teachingSkillIds.first
-        : null;
+    final profile = _profile!;
+    final learnId =
+        profile.learningSkillIds.isNotEmpty
+            ? profile.learningSkillIds.first
+            : null;
+    final teachId =
+        profile.teachingSkillIds.isNotEmpty
+            ? profile.teachingSkillIds.first
+            : null;
 
     PersonRole role;
     String skillName;
 
-    if (_profile.role == OnboardingRole.teach) {
+    if (profile.role == OnboardingRole.teach) {
       role = PersonRole.mentor;
-      skillName =
-          teachId == null ? '' : _skillLabel(teachId, kTeachingOptions);
-    } else if (_profile.role == OnboardingRole.learn) {
+      skillName = teachId == null ? '' : _skillLabel(teachId, kTeachingOptions);
+    } else if (profile.role == OnboardingRole.learn) {
       role = PersonRole.learner;
-      skillName =
-          learnId == null ? '' : _skillLabel(learnId, kLearningOptions);
+      skillName = learnId == null ? '' : _skillLabel(learnId, kLearningOptions);
     } else if (learnId != null) {
       role = PersonRole.learner;
       skillName = _skillLabel(learnId, kLearningOptions);
@@ -138,19 +160,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     return Person(
-      id: 'me',
-      name: _profile.name,
-      schedule: _formatSchedule(_profile.schedule),
-      language: _profile.languages.join(', '),
-      learningStyle: _profile.interests.join(', '),
+      id: profile.id.isNotEmpty ? profile.id : 'me',
+      name: profile.name,
+      schedule: _formatSchedule(profile.schedule),
+      language: profile.languages.join(', '),
+      learningStyle: profile.interests.join(', '),
       skillName: skillName,
       role: role,
-      bio: _profile.bio,
-      photoUrls: [_profile.avatarUrl],
+      bio: profile.bio,
+      photoUrls: [profile.avatarUrl],
     );
   }
 
   void _showMyProfile() {
+    if (_profile == null) return;
     showPersonProfileDialog(context, _profileToPerson());
   }
 
@@ -174,144 +197,147 @@ class _ProfilePageState extends State<ProfilePage> {
           alignment: Alignment.centerLeft,
           child: Text(
             'Profile',
-            style: AppTextStyles.headingText.copyWith(
-              color: textTheme,
-            ),
+            style: AppTextStyles.headingText.copyWith(color: textTheme),
           ),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
-              icon: Icon(
-                Icons.settings,
-                color: textTheme,
-              ),
+              icon: Icon(Icons.settings, color: textTheme),
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const Settings(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const Settings()),
                 );
               },
             ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: _ProfileSummaryCard(
-                profile: _profile,
-                onTap: _openEdit,
-                onAvatarTap: _showMyProfile,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(24),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const Matches(),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        height: 56,
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                onRefresh: _loadProfile,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: _ProfileSummaryCard(
+                          profile: _profile!,
+                          onTap: _openEdit,
+                          onAvatarTap: _showMyProfile,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              spreadRadius: 0,
-                              blurRadius: 16,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Row(
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Friends',
-                                    style: AppTextStyles.boldText.copyWith(
-                                      color: textTheme,
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const Matches(),
                                     ),
+                                  );
+                                },
+                                child: Container(
+                                  height: 56,
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '142',
-                                    style: AppTextStyles.regularText.copyWith(
-                                      color: textTheme.withValues(alpha: 0.6),
-                                      fontSize: 12,
-                                    ),
+                                  decoration: BoxDecoration(
+                                    color: bgTheme,
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        spreadRadius: 0,
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              'Friends',
+                                              style: AppTextStyles.boldText
+                                                  .copyWith(color: textTheme),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '142',
+                                              style: AppTextStyles.regularText
+                                                  .copyWith(
+                                                    color: textTheme.withValues(
+                                                      alpha: 0.6,
+                                                    ),
+                                                    fontSize: 12,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.chevron_right,
+                                        color: textTheme,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                            Icon(
-                              Icons.chevron_right,
-                              color: textTheme,
+                            const SizedBox(height: 16),
+                            Divider(
+                              color: textTheme.withValues(alpha: 0.2),
+                              thickness: 1,
                             ),
+                            const SizedBox(height: 16),
+                            RoleCardGroup(
+                              options: _roleOptions,
+                              selected: _profile!.role,
+                              isEditing: false,
+                              onSelect: (_) {},
+                            ),
+                            const SizedBox(height: 24),
+                            if (_profile!.role == OnboardingRole.learn ||
+                                _profile!.role == OnboardingRole.both) ...[
+                              SkillsCard.toLearn(
+                                isEditing: false,
+                                initialSkillIds: _profile!.learningSkillIds,
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            if (_profile!.role == OnboardingRole.teach ||
+                                _profile!.role == OnboardingRole.both)
+                              SkillsCard.toTeach(
+                                isEditing: false,
+                                initialSkillIds: _profile!.teachingSkillIds,
+                              ),
                           ],
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 120),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Divider(
-                    color: textTheme.withValues(alpha: 0.2),
-                    thickness: 1,
-                  ),
-                  const SizedBox(height: 16),
-                  RoleCardGroup(
-                    options: _roleOptions,
-                    selected: _profile.role,
-                    isEditing: false,
-                    onSelect: (_) {},
-                  ),
-                  const SizedBox(height: 24),
-                  if (_profile.role == OnboardingRole.learn ||
-                      _profile.role == OnboardingRole.both) ...[
-                    SkillsCard.toLearn(
-                      isEditing: false,
-                      initialSkillIds: _profile.learningSkillIds,
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  if (_profile.role == OnboardingRole.teach ||
-                      _profile.role == OnboardingRole.both)
-                    SkillsCard.toTeach(
-                      isEditing: false,
-                      initialSkillIds: _profile.teachingSkillIds,
-                    ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 120),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -331,6 +357,10 @@ class _ProfileSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
     final cardColor = Theme.of(context).colorScheme.surface;
+    final displayAvatar =
+        (profile.photos.isNotEmpty && profile.photos[0] != null)
+            ? profile.photos[0]
+            : profile.avatarUrl;
 
     return GestureDetector(
       onTap: onTap,
@@ -360,16 +390,18 @@ class _ProfileSummaryCard extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 40,
                     backgroundColor: Colors.grey[300],
-                    backgroundImage: profile.avatarUrl != null
-                        ? NetworkImage(profile.avatarUrl!)
-                        : null,
-                    child: profile.avatarUrl == null
-                        ? Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Colors.grey[600],
-                          )
-                        : null,
+                    backgroundImage:
+                        displayAvatar != null
+                            ? NetworkImage(displayAvatar)
+                            : null,
+                    child:
+                        displayAvatar == null
+                            ? Icon(
+                              Icons.person,
+                              size: 40,
+                              color: Colors.grey[600],
+                            )
+                            : null,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -396,59 +428,37 @@ class _ProfileSummaryCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             _formatSchedule(profile.schedule),
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: textColor, fontSize: 14),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: textColor,
-                ),
+                Icon(Icons.chevron_right, color: textColor),
               ],
             ),
             const SizedBox(height: 16),
-            Divider(
-              color: textColor.withValues(alpha: 0.2),
-            ),
+            Divider(color: textColor.withValues(alpha: 0.2)),
             const SizedBox(height: 12),
             Row(
               children: [
-                Icon(
-                  Icons.translate,
-                  size: 18,
-                  color: textColor,
-                ),
+                Icon(Icons.translate, size: 18, color: textColor),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     profile.languages.join(', '),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: textColor, fontSize: 14),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Icon(
-                  Icons.psychology,
-                  size: 18,
-                  color: textColor,
-                ),
+                Icon(Icons.psychology, size: 18, color: textColor),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     profile.interests.join(', '),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: textColor, fontSize: 14),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

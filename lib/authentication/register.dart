@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:palturo/authentication/scratch.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/legal_dialogs.dart';
+import '../services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,8 +16,74 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  final AuthService _authService = AuthService();
+
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _register() async {
+    try {
+      final response = await _authService.register(
+        _firstNameController.text.trim(),
+        _lastNameController.text.trim(),
+        _emailController.text.trim(),
+        _passwordController.text,
+        _confirmPasswordController.text,
+      );
+
+      if (!mounted) return;
+
+      final isAlreadyConfirmed =
+          response.session != null || response.user?.emailConfirmedAt != null;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => ScratchWidget(
+                email: _emailController.text.trim(),
+                isConfirmedInitial: isAlreadyConfirmed,
+              ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Sign Up Failed'),
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,28 +101,21 @@ class _RegisterPageState extends State<RegisterPage> {
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                alignment: Alignment.centerLeft,
-              ),
-              icon: Icon(
-                Icons.arrow_back_ios,
-                color: textTheme,
-                size: 16,
-              ),
-              label: Text(
-                'Back to Log In',
-                style: TextStyle(
-                  color: textTheme,
-                  fontSize: 16,
-                ),
-              ),
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              alignment: Alignment.centerLeft,
             ),
+            icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
+            label: Text(
+              'Back to Log In',
+              style: TextStyle(color: textTheme, fontSize: 16),
+            ),
+          ),
         ),
       ),
 
@@ -84,25 +145,38 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 44),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Expanded(child: TopLabeledField(label: 'First name')),
-                          SizedBox(width: 16),
-                          Expanded(child: TopLabeledField(label: 'Last name')),
+                        children: [
+                          Expanded(
+                            child: TopLabeledField(
+                              label: 'First name',
+                              controller: _firstNameController,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TopLabeledField(
+                              label: 'Last name',
+                              controller: _lastNameController,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      const TopLabeledField(label: 'Email'),
+                      TopLabeledField(
+                        label: 'Email',
+                        controller: _emailController,
+                      ),
                       const SizedBox(height: 10),
                       TopLabeledField(
                         label: 'Password',
+                        controller: _passwordController,
                         obscureText: _isPasswordObscured,
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: textTheme
-                                .withAlpha((0.8 * 255).round()),
+                            color: textTheme.withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
                             setState(() {
@@ -114,14 +188,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 10),
                       TopLabeledField(
                         label: 'Confirm password',
+                        controller: _confirmPasswordController,
                         obscureText: _isConfirmPasswordObscured,
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isConfirmPasswordObscured
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
-                            color: textTheme
-                                .withAlpha((0.8 * 255).round()),
+                            color: textTheme.withAlpha((0.8 * 255).round()),
                           ),
                           onPressed: () {
                             setState(() {
@@ -138,9 +212,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           textAlign: TextAlign.center,
                           text: TextSpan(
                             style: TextStyle(
-                              color: textTheme.withAlpha(
-                                (0.7 * 255).round(),
-                              ),
+                              color: textTheme.withAlpha((0.7 * 255).round()),
                               fontSize: 12,
                               height: 1.4,
                             ),
@@ -154,11 +226,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                   color: textTheme,
                                   fontSize: 12,
                                 ),
-
                                 recognizer:
                                     TapGestureRecognizer()
                                       ..onTap = () {
-                                        LegalDialogs.showTermsOfService(context);
+                                        LegalDialogs.showTermsOfService(
+                                          context,
+                                        );
                                       },
                               ),
                               const TextSpan(text: ', '),
@@ -209,7 +282,7 @@ class _RegisterPageState extends State<RegisterPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),

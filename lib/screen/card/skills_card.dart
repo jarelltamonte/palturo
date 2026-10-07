@@ -55,7 +55,13 @@ class CustomSkill {
   String encode() => '$kOtherPrefix$categoryId:${text.trim()}';
 
   static CustomSkill? tryParse(String id) {
-    if (!id.startsWith(kOtherPrefix)) return null;
+    if (!id.startsWith(kOtherPrefix)) {
+      final lower = id.trim().toLowerCase();
+      if (lower == 'other' || lower == 'others') {
+        return const CustomSkill();
+      }
+      return null;
+    }
     final rest = id.substring(kOtherPrefix.length);
     final i = rest.indexOf(':');
     if (i < 0) return CustomSkill(text: rest);
@@ -115,8 +121,10 @@ class SkillsCard extends StatefulWidget {
   final int maxSkills;
   final List<String> initialSkillIds;
   final bool showAttachFile;
+  final Map<String, String>? attachments;
   final ValueChanged<List<String>>? onChanged;
   final ValueChanged<String>? onAttachFile;
+  final ValueChanged<String>? onRemoveAttachment;
 
   const SkillsCard({
     super.key,
@@ -126,8 +134,10 @@ class SkillsCard extends StatefulWidget {
     required this.maxSkills,
     this.initialSkillIds = const [],
     this.showAttachFile = false,
+    this.attachments,
     this.onChanged,
     this.onAttachFile,
+    this.onRemoveAttachment,
   });
 
   factory SkillsCard.toLearn({
@@ -152,8 +162,10 @@ class SkillsCard extends StatefulWidget {
     Key? key,
     required bool isEditing,
     List<String> initialSkillIds = const [],
+    Map<String, String>? attachments,
     ValueChanged<List<String>>? onChanged,
     ValueChanged<String>? onAttachFile,
+    ValueChanged<String>? onRemoveAttachment,
   }) {
     return SkillsCard(
       key: key,
@@ -163,8 +175,10 @@ class SkillsCard extends StatefulWidget {
       maxSkills: 2,
       initialSkillIds: initialSkillIds,
       showAttachFile: true,
+      attachments: attachments,
       onChanged: onChanged,
       onAttachFile: onAttachFile,
+      onRemoveAttachment: onRemoveAttachment,
     );
   }
 
@@ -174,6 +188,37 @@ class SkillsCard extends StatefulWidget {
 
 class _SkillsCardState extends State<SkillsCard> {
   late List<String> _skillIds;
+
+  String? _resolveAttachmentPath(String skillId) {
+    if (widget.attachments == null || widget.attachments!.isEmpty) return null;
+
+    if (widget.attachments!.containsKey(skillId)) {
+      return widget.attachments![skillId];
+    }
+
+    final matchOpt = widget.options.cast<OnboardingOption?>().firstWhere(
+      (o) => o?.id == skillId,
+      orElse: () => null,
+    );
+    if (matchOpt != null && widget.attachments!.containsKey(matchOpt.label)) {
+      return widget.attachments![matchOpt.label];
+    }
+
+    final custom = CustomSkill.tryParse(skillId);
+    if (custom != null && widget.attachments!.containsKey(custom.text)) {
+      return widget.attachments![custom.text];
+    }
+
+    final normalized = skillId.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    for (final entry in widget.attachments!.entries) {
+      if (entry.key.toLowerCase().replaceAll(RegExp(r'\s+'), '_') ==
+          normalized) {
+        return entry.value;
+      }
+    }
+
+    return null;
+  }
 
   @override
   void initState() {
@@ -191,9 +236,10 @@ class _SkillsCardState extends State<SkillsCard> {
 
   void _addSkill() {
     if (_skillIds.length >= widget.maxSkills) return;
-    final remaining = widget.options
-        .where((o) => !isOtherOption(o) && !_skillIds.contains(o.id))
-        .toList();
+    final remaining =
+        widget.options
+            .where((o) => !isOtherOption(o) && !_skillIds.contains(o.id))
+            .toList();
     if (remaining.isEmpty) return;
     setState(() {
       _skillIds.add(remaining.first.id);
@@ -282,11 +328,17 @@ class _SkillsCardState extends State<SkillsCard> {
               accentColor: accentColor,
               options: widget.options,
               showAttachFile: widget.showAttachFile,
+              attachmentPath: _resolveAttachmentPath(_skillIds[i]),
               onChanged: (newId) => _updateSkill(i, newId),
               onRemove: () => _removeSkill(i),
-              onAttachFile: widget.onAttachFile == null
-                  ? null
-                  : () => widget.onAttachFile!(_skillIds[i]),
+              onAttachFile:
+                  widget.onAttachFile == null
+                      ? null
+                      : () => widget.onAttachFile!(_skillIds[i]),
+              onRemoveAttachment:
+                  widget.onRemoveAttachment == null
+                      ? null
+                      : () => widget.onRemoveAttachment!(_skillIds[i]),
             ),
             if (i != _skillIds.length - 1) const SizedBox(height: 16),
           ],
@@ -303,9 +355,11 @@ class _SkillRow extends StatefulWidget {
   final Color accentColor;
   final List<OnboardingOption> options;
   final bool showAttachFile;
+  final String? attachmentPath;
   final ValueChanged<String> onChanged;
   final VoidCallback onRemove;
   final VoidCallback? onAttachFile;
+  final VoidCallback? onRemoveAttachment;
 
   const _SkillRow({
     super.key,
@@ -315,9 +369,11 @@ class _SkillRow extends StatefulWidget {
     required this.accentColor,
     required this.options,
     required this.showAttachFile,
+    this.attachmentPath,
     required this.onChanged,
     required this.onRemove,
     this.onAttachFile,
+    this.onRemoveAttachment,
   });
 
   @override
@@ -337,7 +393,10 @@ class _SkillRowState extends State<_SkillRow> {
   CustomSkill? get _custom {
     final parsed = CustomSkill.tryParse(widget.selectedId);
     if (parsed != null) return parsed;
-    if (widget.selectedId == _otherId) return const CustomSkill();
+    final lower = widget.selectedId.trim().toLowerCase();
+    if (lower == _otherId || lower == 'other' || lower == 'others') {
+      return const CustomSkill();
+    }
     return null;
   }
 
@@ -368,13 +427,14 @@ class _SkillRowState extends State<_SkillRow> {
     required Color textColor,
     required Color dim,
   }) {
-    final needsCategory = custom.text.trim().isNotEmpty && custom.categoryId.isEmpty;
+    final needsCategory =
+        custom.text.trim().isNotEmpty && custom.categoryId.isEmpty;
     final errorColor = Theme.of(context).colorScheme.error;
 
     OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(28),
-          borderSide: BorderSide(color: color, width: width),
-        );
+      borderRadius: BorderRadius.circular(28),
+      borderSide: BorderSide(color: color, width: width),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -415,8 +475,10 @@ class _SkillRowState extends State<_SkillRow> {
                   ),
                 ),
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 14,
+              ),
               border: border(Colors.transparent, 0),
               enabledBorder: border(Colors.transparent, 0),
               disabledBorder: border(Colors.transparent, 0),
@@ -456,26 +518,40 @@ class _SkillRowState extends State<_SkillRow> {
           AnimatedSize(
             duration: const Duration(milliseconds: 180),
             alignment: Alignment.topLeft,
-            child: needsCategory && widget.isEditing
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 8, left: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.info_outline, size: 14, color: errorColor),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Pick a category so others can find your skill',
-                          style: TextStyle(fontSize: 12, color: errorColor),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox(width: double.infinity),
+            child:
+                needsCategory && widget.isEditing
+                    ? Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.info_outline, size: 14, color: errorColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Pick a category so others can find your skill',
+                            style: TextStyle(fontSize: 12, color: errorColor),
+                          ),
+                        ],
+                      ),
+                    )
+                    : const SizedBox(width: double.infinity),
           ),
         ],
       ),
     );
+  }
+
+  String _getDisplayName(String path) {
+    final cleanPath = path.split('?').first;
+    String rawName = cleanPath.split('/').last;
+    if (rawName.startsWith('scaled_')) {
+      rawName = rawName.substring('scaled_'.length);
+    }
+    if (rawName.startsWith('image_picker_')) {
+      rawName = rawName.substring('image_picker_'.length);
+    }
+    rawName = rawName.replaceAll(RegExp(r'_\d{10,}\.'), '.');
+    return rawName;
   }
 
   @override
@@ -484,14 +560,46 @@ class _SkillRowState extends State<_SkillRow> {
     final themeColor = Theme.of(context).colorScheme.surface;
     final dim = widget.isEditing ? textColor : textColor.withValues(alpha: 0.5);
     final custom = _custom;
-    final dropdownValue = custom != null ? _otherId : widget.selectedId;
 
-    final availableOptions = widget.options
-        .where((o) =>
-            isOtherOption(o) ||
-            o.id == widget.selectedId ||
-            !widget.alreadyUsedIds.contains(o.id))
-        .toList();
+    final availableOptions =
+        widget.options
+            .where(
+              (o) =>
+                  isOtherOption(o) ||
+                  o.id == widget.selectedId ||
+                  o.label == widget.selectedId ||
+                  (!widget.alreadyUsedIds.contains(o.id) &&
+                      !widget.alreadyUsedIds.contains(o.label)),
+            )
+            .toList();
+
+    if (!availableOptions.any(isOtherOption)) {
+      availableOptions.add(const OnboardingOption(kOtherId, 'Other'));
+    }
+
+    String dropdownValue;
+    if (custom != null) {
+      dropdownValue = _otherId;
+    } else {
+      final match = availableOptions.cast<OnboardingOption?>().firstWhere(
+        (o) => o?.id == widget.selectedId || o?.label == widget.selectedId,
+        orElse: () => null,
+      );
+
+      if (match != null) {
+        dropdownValue = match.id;
+      } else if (widget.selectedId.trim().isNotEmpty &&
+          widget.selectedId != 'other' &&
+          widget.selectedId != 'others') {
+        availableOptions.insert(
+          0,
+          OnboardingOption(widget.selectedId, widget.selectedId),
+        );
+        dropdownValue = widget.selectedId;
+      } else {
+        dropdownValue = _otherId;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,8 +608,10 @@ class _SkillRowState extends State<_SkillRow> {
           children: [
             Expanded(
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(color: dim, width: 1.5),
@@ -514,25 +624,33 @@ class _SkillRowState extends State<_SkillRow> {
                     icon: Icon(Icons.keyboard_arrow_down, color: dim),
                     dropdownColor: themeColor,
                     style: TextStyle(color: dim, fontSize: 16),
-                    onChanged: widget.isEditing
-                        ? (newId) {
-                            if (newId == null) return;
-                            if (newId == _otherId) {
-                              if (!widget.selectedId.startsWith(kOtherPrefix)) {
-                                widget.onChanged(const CustomSkill().encode());
+                    onChanged:
+                        widget.isEditing
+                            ? (newId) {
+                              if (newId == null) return;
+                              if (newId == _otherId) {
+                                if (!widget.selectedId.startsWith(
+                                  kOtherPrefix,
+                                )) {
+                                  widget.onChanged(
+                                    const CustomSkill().encode(),
+                                  );
+                                }
+                              } else {
+                                _controller.clear();
+                                widget.onChanged(newId);
                               }
-                            } else {
-                              _controller.clear();
-                              widget.onChanged(newId);
                             }
-                          }
-                        : null,
-                    items: availableOptions
-                        .map((o) => DropdownMenuItem(
-                              value: o.id,
-                              child: Text(o.label),
-                            ))
-                        .toList(),
+                            : null,
+                    items:
+                        availableOptions
+                            .map(
+                              (o) => DropdownMenuItem(
+                                value: o.id,
+                                child: Text(o.label),
+                              ),
+                            )
+                            .toList(),
                   ),
                 ),
               ),
@@ -541,7 +659,9 @@ class _SkillRowState extends State<_SkillRow> {
               const SizedBox(width: 12),
               Material(
                 color: Colors.transparent,
-                shape: CircleBorder(side: BorderSide(color: textColor, width: 1.5)),
+                shape: CircleBorder(
+                  side: BorderSide(color: textColor, width: 1.5),
+                ),
                 child: InkWell(
                   customBorder: const CircleBorder(),
                   onTap: widget.onRemove,
@@ -559,35 +679,125 @@ class _SkillRowState extends State<_SkillRow> {
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
           alignment: Alignment.topCenter,
-          child: custom == null
-              ? const SizedBox(width: double.infinity)
-              : _buildCustomSection(
-                  custom: custom,
-                  textColor: textColor,
-                  dim: dim,
-                ),
+          child:
+              custom == null
+                  ? const SizedBox(width: double.infinity)
+                  : _buildCustomSection(
+                    custom: custom,
+                    textColor: textColor,
+                    dim: dim,
+                  ),
         ),
         if (widget.showAttachFile && widget.isEditing)
           Padding(
-            padding: const EdgeInsets.only(top: 8.0, left: 8.0),
-            child: GestureDetector(
-              onTap: widget.onAttachFile,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.attach_file, size: 16, color: widget.accentColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Attach a file',
-                    style: TextStyle(
-                      color: widget.accentColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+            padding: const EdgeInsets.only(top: 10.0, left: 4.0),
+            child:
+                widget.attachmentPath != null &&
+                        widget.attachmentPath!.isNotEmpty
+                    ? Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: widget.onAttachFile,
+                            borderRadius: const BorderRadius.horizontal(
+                              left: Radius.circular(20),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 7,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 170,
+                                    ),
+                                    child: Text(
+                                      _getDisplayName(widget.attachmentPath!),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6.0),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: widget.onRemoveAttachment,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    : GestureDetector(
+                      onTap: widget.onAttachFile,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.attach_file,
+                            size: 16,
+                            color: widget.accentColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Attach a file',
+                            style: TextStyle(
+                              color: widget.accentColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
           ),
       ],
     );
@@ -615,7 +825,8 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? accentColor : textColor.withValues(alpha: 0.35);
+    final borderColor =
+        selected ? accentColor : textColor.withValues(alpha: 0.35);
 
     return Opacity(
       opacity: enabled || selected ? 1 : 0.5,

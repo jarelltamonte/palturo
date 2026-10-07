@@ -29,16 +29,20 @@ class OnboardingInterestsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canProceed = selected.isNotEmpty;
+
     return OnboardingScaffold(
       title: 'What are you interested in $highlightWord?',
       highlightWord: highlightWord,
-      subtitle: 'Select $maxSelections that apply',
+      subtitle: 'Select up to $maxSelections that apply',
       progress: progress,
       showBackButton: true,
       onBack: onBack,
       onSkip: onSkip,
-      onPrimaryPressed: selected.isEmpty ? null : onContinue,
+      onPrimaryPressed: canProceed ? onContinue : null,
       child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 24),
         child: ChipSelector(
           options: options,
           selected: selected,

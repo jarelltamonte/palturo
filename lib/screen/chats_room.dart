@@ -93,14 +93,16 @@ class _ChatRoomState extends State<ChatRoom> {
 
   List<Map<String, dynamic>> _sortMessages(List<Map<String, dynamic>> rows) {
     final sorted = [...rows];
-    sorted.sort(
-      (a, b) => (DateTime.tryParse(a['created_at']?.toString() ?? '')
-              ?.compareTo(
-                DateTime.tryParse(b['created_at']?.toString() ?? '')
-                    ?? DateTime(1900),
-              ))
-          ?? 0,
-    );
+    sorted.sort((a, b) {
+      final ta = DateTime.tryParse(a['created_at']?.toString() ?? '')
+          ?? DateTime(1900);
+      final tb = DateTime.tryParse(b['created_at']?.toString() ?? '')
+          ?? DateTime(1900);
+      final byTime = ta.compareTo(tb);
+      if (byTime != 0) return byTime;
+      // stable tie-breaker for equal timestamps
+      return (a['id']?.toString() ?? '').compareTo(b['id']?.toString() ?? '');
+    });
     return sorted;
   }
 

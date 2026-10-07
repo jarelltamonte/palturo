@@ -25,6 +25,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Person> _people = const [];
   bool _loading = true;
+  bool _randomMode = false;
   String? _error;
   ProfileData? _myProfile;
 
@@ -43,38 +44,29 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    // Instant preload: served from the deck cache when present (no spinner on
+    // tab re-entry), refreshed silently when stale. Only a cold cache shows a
+    // spinner.
     _loadDeck();
   }
 
   /// Loads the live recommendation deck (get-matches + public profiles).
-  Future<void> _loadDeck() async {
-    debugPrint('[People] _loadDeck start, roleFilter=$_roleFilter');
+  Future<void> _loadDeck({bool force = false}) async {
+    final cached = MatchApi.hasCachedDeck(_roleKey);
     setState(() {
-      _loading = true;
+      _loading = !cached && _people.isEmpty;
       _error = null;
-      _currentIndex = 0;
-      _history.clear();
     });
     try {
-      final me = await ProfileService().getCurrentUserProfile();
-      debugPrint('[People] profile fetched: ${me?.firstName} role=${me?.role}');
-      if (!mounted) return;
-      setState(() => _myProfile = me);
-
-      // Candidate side for retrieval: chips pick directly, "All" = opposite role.
-      final String asRole = switch (_roleFilter) {
-        RoleFilter.learner => 'learner',
-        RoleFilter.mentor => 'mentor',
-        RoleFilter.all =>
-          (me?.role == OnboardingRole.teach) ? 'learner' : 'mentor',
-      };
-
-      final deck = await MatchApi.getMatchDeck(asRoleDb: asRole);
+      final deck = await _fetchDeck(force: force);
       debugPrint('[People] deck loaded: ${deck.length} people');
       if (!mounted) return;
       setState(() {
         _people = deck;
         _loading = false;
+        _randomMode = false;
+        _currentIndex = 0;
+        _history.clear();
       });
     } catch (e, st) {
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
@@ -84,6 +76,52 @@ class _HomePageState extends State<HomePage> {
         _loading = false;
       });
     }
+  }
+
+  /// Random discovery beyond the ranked deck (FR-13).
+  Future<void> _loadRandomDeck() async {
+    setState(() {
+      _loading = _people.isEmpty;
+      _error = null;
+    });
+    try {
+      final randoms = await MatchApi.getRandomDeck(limit: 20);
+      if (!mounted) return;
+      setState(() {
+        _people = randoms;
+        _randomMode = true;
+        _loading = false;
+        _currentIndex = 0;
+        _history.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  String get _roleKey => switch (_roleFilter) {
+        RoleFilter.learner => 'learner',
+        RoleFilter.mentor => 'mentor',
+        RoleFilter.all => _oppositeRoleKey,
+      };
+
+  String get _oppositeRoleKey {
+    final role = _myProfile?.role;
+    return role == OnboardingRole.teach ? 'learner' : 'mentor';
+  }
+
+  Future<List<Person>> _fetchDeck({bool force = false}) async {
+    final me = await ProfileService().getCurrentUserProfile();
+    if (mounted) setState(() => _myProfile = me);
+    return MatchApi.getMatchDeck(
+      asRoleDb: _roleKey,
+      force: force,
+      enrichLimit: 10,
+    );
   }
 
   /// Live "Add": sends a connection request from the feed (FR-9).
@@ -490,23 +528,55 @@ class _HomePageState extends State<HomePage> {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 8),
+            Text(
+              _randomMode
+                  ? 'You have seen everything for now.\nCome back later — profiles update as people delete nie add skills.'
+                  : 'You have seen all the top results.\nExplore more of the community!',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _randomMode
+                  ? () => _loadDeck(force: true)
+                  : _loadRandomDeck,
+              icon: Icon(
+                _randomMode
+                    ? CupertinoIcons.arrow_counterclockwise
+                    : CupertinoIcons.shuffle,
+                size: 18,
+              ),
+              label: Text(
+                _randomMode ? 'Back to recommendations' : 'Explore more people',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             Text.rich(
               TextSpan(
+                recognizer: _settingsTap,
+                children: [
+                  const TextSpan(text: 'Update your '),
+                  TextSpan(
+                    text: 'Settings',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
                 style: AppTextStyles.regularText.copyWith(
                   color: textColor.withValues(alpha: 0.7),
                 ),
-                children: [
-                  const TextSpan(text: 'Nothing more to show\n'),
-                  const TextSpan(text: 'Consider changing your '),
-                  TextSpan(
-                    text: 'Settings',
-                    recognizer: _settingsTap,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
-                  ),
-                ],
               ),
               textAlign: TextAlign.center,
             ),

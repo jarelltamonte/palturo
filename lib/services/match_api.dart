@@ -208,8 +208,86 @@ class MatchApi {
     );
   }
 
-  /// Recommended deck: get-matches + public-profile enrichment, capped.
+  // ---- Deck preloading (stale-while-revalidate) ----
+  static final Map<String, List<Person>> _deckCache = {};
+  static final Map<String, DateTime> _deckFetchedAt = {};
+  static const Duration _deckTtl = Duration(minutes: 10);
+
+  static bool hasCachedDeck(String asRoleDb) =>
+      _deckCache.containsKey(asRoleDb);
+
+  /// Cached deck instantly (no spinner); triggers a background refresh when
+  /// stale. force bypasses both.
   static Future<List<Person>> getMatchDeck({
+    required String asRoleDb,
+    String? learnerOrMentorFilter,
+    bool force = false,
+    int enrichLimit = 10,
+  }) async {
+    final cached = _deckCache[asRoleDb];
+    final fetchedAt = _deckFetchedAt[asRoleDb];
+    final fresh = cached != null &&
+        fetchedAt != null &&
+        DateTime.now().difference(fetchedAt) < _deckTtl;
+    if (cached != null && fresh && !force) return cached;
+    if (cached != null && !force) {
+      // stale-while-revalidate: serve the cached copy, refresh silently
+      getMatchDeck(asRoleDb: asRoleDb, force: true, enrichLimit: enrichLimit)
+          .then((_) {}, onError: (_) {});
+      return cached;
+    }
+    return fetchAndCacheDeck(asRoleDb, enrichLimit);
+  }
+
+  static Future<List<Person>> fetchAndCacheDeck(
+      String asRoleDb, int enrichLimit) async {
+    final matches = await getMatches(asRole: asRoleDb);
+    final targetMatches = matches.take(enrichLimit).toList();
+    final out = <Person>[];
+    for (final m in targetMatches) {
+      final person = await getPersonFromPublicProfile(m.userId);
+      if (person == null) continue;
+      // carry the compatibility score onto the card (spec §6.3 indicator)
+      final compat = m.compatibility;
+      out.add(Person(
+        id: person.id,
+        name: person.name,
+        schedule: person.schedule,
+        language: person.language,
+        learningStyle: person.learningStyle,
+        skillName: person.skillName,
+        role: person.role,
+        bio: person.bio,
+        photoUrls: person.photoUrls,
+        showcaseUrls: person.showcaseUrls,
+        compatibility: compat,
+      ));
+    }
+    _deckCache[asRoleDb] = out;
+    _deckFetchedAt[asRoleDb] = DateTime.now();
+    return out;
+  }
+
+  /// Random users after the deck is exhausted (FR-13 discovery).
+  static Future<List<Person>> getRandomDeck({int limit = 20}) async {
+    final res = await _Client.c.rpc('browse_random_users',
+        params: {'p_limit': limit}) as List;
+    final ids = res
+        .whereType<Map>()
+        .map((r) => r['user_id'] as String)
+        .toList();
+    final out = <Person>[];
+    for (final id in ids) {
+      final person = await getPersonFromPublicProfile(id);
+      if (person != null) {
+        out.add(person);
+      }
+    }
+    return out;
+  }
+
+  /// Recommended deck: get-matches + public-profile enrichment, capped.
+  static Future<List<Person>> getMatchDeckLegacy({
     required String asRoleDb,
     String? learnerOrMentorFilter,
     int enrichLimit = 10,
@@ -257,14 +335,20 @@ class MatchApi {
         .toList();
   }
 
-  /// Messages in one room (renders in ChatRoom).
+  /// Messages in one room (renders in ChatRoom). Keeps created_at so the
+  /// client-side sort is deterministic (BUGFIX: dropping it made the thread
+  /// render newest-first on open and flip when realtime kicked in).
   static Future<List<Map<String, dynamic>>> getMessages(
     String connectionId,
   ) async {
     final res = await _Client.c
         .rpc('get_conversation', params: {'p_connection': connectionId}) as List;
     return res.whereType<Map>().map((m) {
-      return {'sender_id': m['sender_id'], 'body': m['body']};
+      return {
+        'sender_id': m['sender_id'],
+        'body': m['body'],
+        'created_at': m['created_at'],
+      };
     }).toList();
   }
 

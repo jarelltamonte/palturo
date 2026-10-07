@@ -59,6 +59,52 @@ Deno.serve(async (req) => {
 
     const started = Date.now();
 
+    // ---------- CACHE-FIRST fast path ----------
+    // If the cached ranking is still valid (same config; nothing changed since
+    // refresh on either side), skip ALL NIM work and return the stored order.
+    if (payload.refresh !== false) {
+      const { data: fresh } = await admin.rpc("cache_is_fresh", {
+        p_user: user.id,
+        p_role: targetRole,
+        p_revision: cfg.configRevision,
+      });
+      if (fresh === true) {
+        const { data: cached } = await admin
+          .from("match_cache")
+          .select("candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode")
+          .eq("user_id", user.id)
+          .eq("as_role", targetRole)
+          .order("rank");
+        const rows = (cached ?? []) as Array<Record<string, unknown>>;
+        if (rows.length > 0) {
+          const ids = rows.map((r) => r.candidate_id as string).concat(user.id);
+          const { data: pRows } = await admin.rpc("profile_match_view", { p_users: ids });
+          const profiles = (pRows ?? []) as Array<{ user_id: string; name: string; role: string }>;
+          const nameOf = new Map(profiles.map((p) => [p.user_id, p]));
+          const results = rows.map((r) => {
+            const p = nameOf.get(r.candidate_id as string);
+            return {
+              user_id: r.candidate_id,
+              rank: Number(r.rank),
+              display_name: p?.name ?? "",
+              role: p?.role ?? "both",
+              compatibility: Number(r.calibrated_score ?? 0),
+              pipeline: String(r.pipeline_mode ?? "full"),
+              cached: true,
+            };
+          });
+          return json({
+            status: "ok",
+            mode: "cached",
+            healed: 0,
+            config_version: cfg.configRevision,
+            ms: Date.now() - started,
+            results,
+          });
+        }
+      }
+    }
+
     // ---------- determine candidate pool ----------
     const allUsers = await admin.from("profiles").select("id").neq("id", user.id).limit(500);
     const candidateIds = (allUsers.data ?? []).map((r: any) => r.id) as string[];

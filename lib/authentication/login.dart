@@ -83,6 +83,7 @@ class _LoginPageState extends State<LoginPage> {
                     0,
                     16,
                     MediaQuery.of(context).viewInsets.bottom,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,

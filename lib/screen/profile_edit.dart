@@ -132,6 +132,24 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     return days.join('/');
   }
 
+  String _formatAvailabilityDisplay(Iterable<String> selected) {
+    final set = selected.toSet();
+    const weekdays = {'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'};
+    const weekend = {'Saturday', 'Sunday'};
+
+    if (set.isEmpty) return '';
+    if (set.length == 7) return 'Everyday';
+    if (set.length == weekdays.length && set.containsAll(weekdays)) {
+      return 'Weekdays';
+    }
+    if (set.length == weekend.length && set.containsAll(weekend)) {
+      return 'Weekend';
+    }
+
+    final sorted = kDayOptions.where(set.contains).toList();
+    return sorted.map((d) => d.substring(0, 3)).join('/');
+  }
+
   bool _hasUnsavedChanges() {
     final initialAvail = _parseAvailability(widget.profile.schedule);
 
@@ -466,7 +484,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final textTheme2 = Theme.of(context).colorScheme.surface;
     final lightColor = Theme.of(context).colorScheme.surface;
 
-    final scheduleDisplay = _availability.keys.join('/');
+    final scheduleDisplay = _formatAvailabilityDisplay(_availability.keys);
 
     final hasChanges = _hasUnsavedChanges();
 
@@ -569,9 +587,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       children: [
                         _DropdownInfoField(
                           icon: Icons.calendar_today_outlined,
-                          label: 'Schedule',
+                          label: 'Availability',
                           value: scheduleDisplay,
-                          hint: 'Tap to set schedule',
+                          hint: 'Tap to set availability',
                           onTap: _pickSchedule,
                         ),
                         const SizedBox(height: 12),

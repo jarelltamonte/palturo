@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
 
 enum PersonRole { learner, mentor }
 
@@ -428,7 +429,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      widget.person.schedule,
+                      formatSchedule(widget.person.schedule),
                       style: AppTextStyles.regularText.copyWith(
                         color: Colors.white,
                         fontSize: 14,

@@ -621,7 +621,10 @@ class _SkillRowState extends State<_SkillRow> {
                     value: dropdownValue,
                     isExpanded: true,
                     borderRadius: BorderRadius.circular(16),
-                    icon: Icon(Icons.keyboard_arrow_down, color: dim),
+                    icon:
+                        widget.isEditing
+                            ? Icon(Icons.keyboard_arrow_down, color: dim)
+                            : const SizedBox.shrink(),
                     dropdownColor: themeColor,
                     style: TextStyle(color: dim, fontSize: 16),
                     onChanged:

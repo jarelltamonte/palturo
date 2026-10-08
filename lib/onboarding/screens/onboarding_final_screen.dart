@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding_controller.dart';
 import '../widgets/onboarding_scaffold.dart';
@@ -126,21 +127,6 @@ class OnboardingFinalScreen extends StatelessWidget {
     );
   }
 
-  String _formatDays(List<String> days) {
-    final set = days.toSet();
-    const weekdays = {'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'};
-    const weekend = {'Saturday', 'Sunday'};
-
-    if (set.length == 7) return 'Everyday';
-    if (set.length == weekdays.length && set.containsAll(weekdays)) {
-      return 'Weekdays';
-    }
-    if (set.length == weekend.length && set.containsAll(weekend)) {
-      return 'Weekend';
-    }
-    return days.map((d) => d.substring(0, 3)).join('/');
-  }
-
   void _setAvailableDays(Set<String> days) {
     final existing = controller.availability.keys.toList();
 
@@ -198,7 +184,7 @@ class OnboardingFinalScreen extends StatelessWidget {
                   label: 'Availability',
                   labelIcon: Icons.calendar_today_rounded,
                   hint: 'Select the days you\'re available',
-                  displayValue: _formatDays(selectedDays),
+                  displayValue: formatScheduleDays(selectedDays),
                   options: kDayOptions,
                   selected: selectedDays.toSet(),
                   multiSelect: true,

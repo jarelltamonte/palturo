@@ -26,6 +26,7 @@ Future<Set<String>?> showMultiSelectPicker({
           )
           : await showModalBottomSheet<Set<String>>(
             context: context,
+            isScrollControlled: true,
             backgroundColor: Theme.of(context).colorScheme.surface,
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -84,6 +85,7 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
             )
             : await showModalBottomSheet<Set<String>>(
               context: context,
+              isScrollControlled: true,
               backgroundColor: Theme.of(context).colorScheme.surface,
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -217,50 +219,45 @@ class _SelectSheetState extends State<_SelectSheet> {
               style: AppTextStyles.boldText.copyWith(color: secondary),
             ),
             const SizedBox(height: 12),
-            Flexible(
-              child:
-                  widget.multiSelect
-                      ? ListView(
-                        shrinkWrap: true,
-                        children: [
-                          for (final option in widget.options)
-                            _OptionTile(
-                              label: option,
-                              selected: _selected.contains(option),
-                              multiSelect: true,
-                              onTap: () {
-                                setState(() {
-                                  if (_selected.contains(option)) {
-                                    _selected.remove(option);
-                                  } else {
-                                    _selected.add(option);
-                                  }
-                                });
-                              },
-                            ),
-                        ],
-                      )
-                      : RadioGroup<String>(
-                        groupValue: _selected.isEmpty ? null : _selected.first,
-                        onChanged: (value) {
-                          if (value != null) {
-                            _selectOption(value);
-                          }
+            widget.multiSelect
+                ? Column(
+                  children: [
+                    for (final option in widget.options)
+                      _OptionTile(
+                        label: option,
+                        selected: _selected.contains(option),
+                        multiSelect: true,
+                        onTap: () {
+                          setState(() {
+                            if (_selected.contains(option)) {
+                              _selected.remove(option);
+                            } else {
+                              _selected.add(option);
+                            }
+                          });
                         },
-                        child: ListView(
-                          shrinkWrap: true,
-                          children: [
-                            for (final option in widget.options)
-                              _OptionTile(
-                                label: option,
-                                selected: _selected.contains(option),
-                                multiSelect: false,
-                                onTap: () => _selectOption(option),
-                              ),
-                          ],
-                        ),
                       ),
-            ),
+                  ],
+                )
+                : RadioGroup<String>(
+                  groupValue: _selected.isEmpty ? null : _selected.first,
+                  onChanged: (value) {
+                    if (value != null) {
+                      _selectOption(value);
+                    }
+                  },
+                  child: Column(
+                    children: [
+                      for (final option in widget.options)
+                        _OptionTile(
+                          label: option,
+                          selected: _selected.contains(option),
+                          multiSelect: false,
+                          onTap: () => _selectOption(option),
+                        ),
+                    ],
+                  ),
+                ),
             if (widget.multiSelect) ...[
               const SizedBox(height: 12),
               SizedBox(

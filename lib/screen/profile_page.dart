@@ -9,42 +9,11 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
 import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
-
-const Map<String, int> _dayOrder = {
-  'Monday': 0,
-  'Tuesday': 1,
-  'Wednesday': 2,
-  'Thursday': 3,
-  'Friday': 4,
-  'Saturday': 5,
-  'Sunday': 6,
-  'Mon': 0,
-  'Tue': 1,
-  'Wed': 2,
-  'Thu': 3,
-  'Fri': 4,
-  'Sat': 5,
-  'Sun': 6,
-};
-
-String _formatSchedule(String schedule) {
-  final days =
-      schedule
-          .split('/')
-          .map((day) => day.trim())
-          .where((day) => day.isNotEmpty)
-          .toList();
-
-  days.sort((a, b) => (_dayOrder[a] ?? 999).compareTo(_dayOrder[b] ?? 999));
-
-  return days
-      .map((day) => day.length > 3 ? day.substring(0, 3) : day)
-      .join('/');
-}
 
 String _skillLabel(String id, List<OnboardingOption> options) {
   final custom = CustomSkill.tryParse(id);
@@ -173,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Person(
       id: profile.id.isNotEmpty ? profile.id : 'me',
       name: profile.name,
-      schedule: _formatSchedule(profile.schedule),
+      schedule: formatSchedule(profile.schedule),
       language: profile.languages.join(', '),
       learningStyle: profile.interests.join(', '),
       skillName: skillName,
@@ -439,9 +408,12 @@ class _ProfileSummaryCard extends StatelessWidget {
                             color: textColor,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            _formatSchedule(profile.schedule),
-                            style: TextStyle(color: textColor, fontSize: 14),
+                          Flexible(
+                            child: Text(
+                              formatSchedule(profile.schedule),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: textColor, fontSize: 14),
+                            ),
                           ),
                         ],
                       ),

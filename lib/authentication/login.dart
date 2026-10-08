@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
@@ -41,22 +43,81 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoggingIn = false);
-      await showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Login Failed'),
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+      await _showLoginFailedDialog(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> _showLoginFailedDialog(String message) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    return showAdaptiveDialog(
+      context: context,
+      builder: (dialogContext) {
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+        final title = Center(
+          child: Text(
+            'Login Failed',
+            style: AppTextStyles.regularText.copyWith(
+              color: textTheme,
+              fontSize: 18,
+            ),
+          ),
+        );
+
+        final body = Text(
+          message,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme,
+            fontSize: 14,
+          ),
+        );
+
+        if (isIOS) {
+          return CupertinoAlertDialog(
+            title: title,
+            content: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Material(color: Colors.transparent, child: body),
+            ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
             ],
           );
-        },
-      );
-    }
+        }
+
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: title,
+          content: SizedBox(width: double.maxFinite, child: body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'OK',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

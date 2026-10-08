@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:palturo/authentication/scratch.dart';
 import '../theme/app_colors.dart';
@@ -65,24 +66,81 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       if (!mounted) return;
 
-      await showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Sign Up Failed'),
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+      await _showSignUpFailedDialog(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> _showSignUpFailedDialog(String message) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    return showAdaptiveDialog(
+      context: context,
+      builder: (dialogContext) {
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+        final title = Center(
+          child: Text(
+            'Sign Up Failed',
+            style: AppTextStyles.regularText.copyWith(
+              color: textTheme,
+              fontSize: 18,
+            ),
+          ),
+        );
+
+        final body = Text(
+          message,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme,
+            fontSize: 14,
+          ),
+        );
+
+        if (isIOS) {
+          return CupertinoAlertDialog(
+            title: title,
+            content: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Material(color: Colors.transparent, child: body),
+            ),
             actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text('OK'),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
             ],
           );
-        },
-      );
-    }
+        }
+
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: title,
+          content: SizedBox(width: double.maxFinite, child: body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'OK',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

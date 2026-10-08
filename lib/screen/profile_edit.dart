@@ -10,6 +10,7 @@ import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show kLearningStyleOptions, kDayOptions, kLanguageOptions;
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'profile_data.dart';
 
 const kBioMaxLength = 100;
@@ -112,10 +113,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       if (trimmed.contains(':')) {
         final colonIdx = trimmed.indexOf(':');
         final day = trimmed.substring(0, colonIdx).trim();
-        final time = trimmed.substring(colonIdx + 1).trim();
-        map[day] = time;
+        map[day] = '';
       } else {
-        map[trimmed] = 'Tap to set time';
+        map[trimmed] = '';
       }
     }
     return map;
@@ -123,10 +123,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   String _formatAvailabilityString(Map<String, String> map) {
     if (map.isEmpty) return '';
-    return map.entries
-        .where((e) => e.value.trim().isNotEmpty && e.value != 'Tap to set time')
-        .map((e) => '${e.key}: ${e.value}')
-        .join('/');
+    final days = map.keys.toList();
+    days.sort((a, b) {
+      final ia = kDayOptions.indexOf(a);
+      final ib = kDayOptions.indexOf(b);
+      return (ia == -1 ? 999 : ia).compareTo(ib == -1 ? 999 : ib);
+    });
+    return days.join('/');
   }
 
   bool _hasUnsavedChanges() {
@@ -156,26 +159,22 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   Future<bool> _confirmDiscardChanges() async {
     if (!_hasUnsavedChanges()) return true;
-    final result = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Unsaved Changes'),
-            content: const Text('You have unsaved changes. Wish to go back?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+    return showConfirmDialog(
+      context,
+      title: 'Unsaved Changes',
+      message: 'You have unsaved changes. Wish to go back?',
+      confirmLabel: 'OK',
+      destructive: false,
     );
-    return result ?? false;
   }
+
+  ButtonStyle get _doneButtonStyle => ElevatedButton.styleFrom(
+    backgroundColor: AppColors.primary,
+    foregroundColor: Colors.black,
+    elevation: 0,
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+  );
 
   Future<void> _pickSchedule() async {
     final tempAvail = Map<String, String>.from(_availability);
@@ -204,7 +203,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Schedule & Time Availability',
+                      'Availability',
                       style: AppTextStyles.boldText.copyWith(color: secondary),
                     ),
                     const SizedBox(height: 12),
@@ -215,7 +214,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       child: ListView(
                         shrinkWrap: true,
                         children: [
-                          for (final day in kDayOptions) ...[
+                          for (final day in kDayOptions)
                             CheckboxListTile(
                               contentPadding: EdgeInsets.zero,
                               activeColor: AppColors.primary,
@@ -227,103 +226,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                   color: secondary,
                                 ),
                               ),
-                              subtitle:
-                                  tempAvail.containsKey(day)
-                                      ? Text(
-                                        tempAvail[day] ?? 'Tap to set time',
-                                        style: TextStyle(
-                                          color:
-                                              tempAvail[day] ==
-                                                      'Tap to set time'
-                                                  ? secondary.withValues(
-                                                    alpha: 0.5,
-                                                  )
-                                                  : AppColors.primary,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      )
-                                      : null,
                               onChanged: (checked) {
                                 setModalState(() {
                                   if (checked == true) {
-                                    tempAvail[day] = 'Tap to set time';
+                                    tempAvail[day] = '';
                                   } else {
                                     tempAvail.remove(day);
                                   }
                                 });
                               },
                             ),
-                            if (tempAvail.containsKey(day))
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 16.0,
-                                  bottom: 8.0,
-                                ),
-                                child: InkWell(
-                                  onTap: () async {
-                                    final start = await showTimePicker(
-                                      context: context,
-                                      initialTime: const TimeOfDay(
-                                        hour: 9,
-                                        minute: 0,
-                                      ),
-                                      helpText: 'Select Start Time for $day',
-                                    );
-                                    if (start == null || !context.mounted) {
-                                      return;
-                                    }
-
-                                    final end = await showTimePicker(
-                                      context: context,
-                                      initialTime: TimeOfDay(
-                                        hour: (start.hour + 2) % 24,
-                                        minute: start.minute,
-                                      ),
-                                      helpText: 'Select End Time for $day',
-                                    );
-                                    if (end == null || !context.mounted) return;
-
-                                    setModalState(() {
-                                      tempAvail[day] =
-                                          '${start.format(context)} - ${end.format(context)}';
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: secondary.withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.access_time,
-                                          size: 14,
-                                          color: secondary,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          tempAvail[day] == 'Tap to set time'
-                                              ? 'Tap to select From & To time'
-                                              : 'Change Time (${tempAvail[day]})',
-                                          style: TextStyle(
-                                            color: secondary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
                         ],
                       ),
                     ),
@@ -331,8 +243,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
+                        style: _doneButtonStyle,
                         onPressed: () => Navigator.pop(context, tempAvail),
-                        child: const Text('Done'),
+                        child: const Text(
+                          'Done',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
                       ),
                     ),
                   ],
@@ -411,8 +327,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
+                        style: _doneButtonStyle,
                         onPressed: () => Navigator.pop(context, tempSelected),
-                        child: const Text('Done'),
+                        child: const Text(
+                          'Done',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
                       ),
                     ),
                   ],
@@ -651,7 +571,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           icon: Icons.calendar_today_outlined,
                           label: 'Schedule',
                           value: scheduleDisplay,
-                          hint: 'Tap to set schedule & time',
+                          hint: 'Tap to set schedule',
                           onTap: _pickSchedule,
                         ),
                         const SizedBox(height: 12),

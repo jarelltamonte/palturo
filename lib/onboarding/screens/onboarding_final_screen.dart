@@ -1,15 +1,8 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
-import '../../theme/app_text_styles.dart';
 import '../onboarding_controller.dart';
 import '../widgets/onboarding_scaffold.dart';
 import '../widgets/onboarding_select_field.dart';
-
-bool get _isCupertino =>
-    defaultTargetPlatform == TargetPlatform.iOS ||
-    defaultTargetPlatform == TargetPlatform.macOS;
 
 const kLearningStyleOptions = [
   'Visual Demonstration',
@@ -44,88 +37,6 @@ class OnboardingFinalScreen extends StatelessWidget {
     this.onBack,
     this.onSkip,
   });
-
-  Future<TimeOfDay?> _pickTime(
-    BuildContext context, {
-    required TimeOfDay initialTime,
-    String? helpText,
-  }) {
-    if (_isCupertino) {
-      return _showCupertinoTimePicker(
-        context,
-        initialTime: initialTime,
-        title: helpText,
-      );
-    }
-    return showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      helpText: helpText,
-    );
-  }
-
-  Future<TimeOfDay?> _showCupertinoTimePicker(
-    BuildContext context, {
-    required TimeOfDay initialTime,
-    String? title,
-  }) {
-    var selected = initialTime;
-    final initialDateTime = DateTime(
-      2022,
-      1,
-      1,
-      initialTime.hour,
-      initialTime.minute,
-    );
-    final secondary = Theme.of(context).colorScheme.secondary;
-
-    return showCupertinoModalPopup<TimeOfDay>(
-      context: context,
-      builder:
-          (context) => Container(
-            height: 260,
-            color: CupertinoColors.systemBackground.resolveFrom(context),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      CupertinoButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      Text(
-                        title ?? 'Time',
-                        style: AppTextStyles.boldText.copyWith(
-                          color: secondary,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                      CupertinoButton(
-                        onPressed: () => Navigator.pop(context, selected),
-                        child: const Text('Done'),
-                      ),
-                    ],
-                  ),
-                  Expanded(
-                    child: CupertinoDatePicker(
-                      mode: CupertinoDatePickerMode.time,
-                      initialDateTime: initialDateTime,
-                      use24hFormat: false,
-                      onDateTimeChanged: (newTime) {
-                        selected = TimeOfDay.fromDateTime(newTime);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-    );
-  }
 
   void _setAvailableDays(Set<String> days) {
     final existing = controller.availability.keys.toList();

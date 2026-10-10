@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/utils/schedule_format.dart';
 
 enum PersonRole { learner, mentor }
@@ -176,9 +177,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ? 'Wants to learn'
             : 'Wants to teach';
     final bio = widget.person.bio.trim();
-    final compat = widget.person.compatibility;
-    final compatPct =
-        compat == null ? null : ((compat * 100).clamp(0, 100)).round();
+    final scheduleText = formatSchedule(widget.person.schedule);
 
     return Container(
       width: double.infinity,
@@ -203,26 +202,6 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   errorBuilder: (_, __, ___) =>
                       Container(color: Colors.grey[400]))
               : Container(color: Colors.grey[400]),
-          if (compatPct != null)
-            Positioned(
-              top: 16,
-              left: 16,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$compatPct% match',
-                  style: AppTextStyles.boldText.copyWith(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
           Row(
             children: [
               Expanded(
@@ -376,7 +355,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ),
                     Flexible(
                       child: Text(
-                        widget.person.skillName,
+                        toTitleCase(widget.person.skillName),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.boldText.copyWith(
@@ -422,25 +401,27 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ),
-                    const Icon(
-                      Icons.calendar_today_outlined,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      formatSchedule(widget.person.schedule),
-                      style: AppTextStyles.regularText.copyWith(
+                    if (scheduleText.isNotEmpty) ...[
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 16,
                         color: Colors.white,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ],
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Text(
+                        scheduleText,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: Colors.white,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 8),

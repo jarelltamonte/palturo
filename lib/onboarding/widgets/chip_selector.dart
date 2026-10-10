@@ -19,19 +19,23 @@ class ChipSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        for (final option in options)
-          _Chip(
-            label: option.label,
-            selected: selected.contains(option.id),
-            disabled: !selected.contains(option.id) &&
-                selected.length >= maxSelections,
-            onTap: () => onToggle(option.id),
-          ),
-      ],
+    return SizedBox(
+      width: double.infinity,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final option in options)
+            _Chip(
+              label: option.label,
+              selected: selected.contains(option.id),
+              disabled: !selected.contains(option.id) &&
+                  selected.length >= maxSelections,
+              onTap: () => onToggle(option.id),
+            ),
+        ],
+      ),
     );
   }
 }

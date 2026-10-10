@@ -247,7 +247,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         style: _doneButtonStyle,
                         onPressed: () => Navigator.pop(context, tempAvail),
                         child: const Text(
-                          'Done',
+                          'Apply',
                           style: TextStyle(color: Colors.black, fontSize: 16),
                         ),
                       ),
@@ -331,7 +331,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         style: _doneButtonStyle,
                         onPressed: () => Navigator.pop(context, tempSelected),
                         child: const Text(
-                          'Done',
+                          'Apply',
                           style: TextStyle(color: Colors.black, fontSize: 16),
                         ),
                       ),

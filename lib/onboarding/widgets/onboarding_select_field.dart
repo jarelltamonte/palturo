@@ -1,46 +1,28 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-
-bool get _isCupertino => defaultTargetPlatform == TargetPlatform.iOS;
 
 Future<Set<String>?> showMultiSelectPicker({
   required BuildContext context,
   required String title,
   required List<String> options,
   required Set<String> selected,
-}) async {
-  final result =
-      _isCupertino
-          ? await Navigator.of(context).push<Set<String>>(
-            CupertinoPageRoute(
-              builder:
-                  (context) => _CupertinoSelectPage(
-                    title: title,
-                    options: options,
-                    initialSelected: selected,
-                  ),
-            ),
-          )
-          : await showModalBottomSheet<Set<String>>(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            builder:
-                (context) => _SelectSheet(
-                  title: title,
-                  options: options,
-                  initialSelected: selected,
-                  multiSelect: true,
-                ),
-          );
-
-  return result;
+}) {
+  return showModalBottomSheet<Set<String>>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder:
+        (context) => _SelectSheet(
+          title: title,
+          options: options,
+          initialSelected: selected,
+          multiSelect: true,
+        ),
+  );
 }
 
 class OnboardingSelectField extends StatefulWidget {
@@ -315,104 +297,13 @@ class _OptionTile extends StatelessWidget {
       ),
       trailing:
           multiSelect
-              ? Checkbox.adaptive(
+              ? Checkbox(
                 value: selected,
                 activeColor: AppColors.primary,
                 checkColor: AppColors.textSecondary,
                 onChanged: (_) => onTap(),
               )
               : Radio<String>(value: label, activeColor: AppColors.primary),
-    );
-  }
-}
-
-class _CupertinoSelectPage extends StatefulWidget {
-  final String title;
-  final List<String> options;
-  final Set<String> initialSelected;
-
-  const _CupertinoSelectPage({
-    required this.title,
-    required this.options,
-    required this.initialSelected,
-  });
-
-  @override
-  State<_CupertinoSelectPage> createState() => _CupertinoSelectPageState();
-}
-
-class _CupertinoSelectPageState extends State<_CupertinoSelectPage> {
-  late final Set<String> _selected = {...widget.initialSelected};
-
-  void _pop() {
-    Navigator.pop(context, _selected);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          Navigator.pop(context, _selected);
-        }
-      },
-      child: CupertinoPageScaffold(
-        child: CustomScrollView(
-          slivers: [
-            CupertinoSliverNavigationBar(
-              largeTitle: Text(widget.title),
-              leading: CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _pop,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [Icon(CupertinoIcons.back), Text('Back')],
-                ),
-              ),
-            ),
-            SliverSafeArea(
-              top: false,
-              sliver: SliverList.separated(
-                itemCount: widget.options.length,
-                separatorBuilder:
-                    (context, index) => const Padding(
-                      padding: EdgeInsets.only(left: 16),
-                      child: Divider(height: 1),
-                    ),
-                itemBuilder: (context, index) {
-                  final option = widget.options[index];
-                  final isSelected = _selected.contains(option);
-
-                  return CupertinoListTile(
-                    title: Text(option),
-                    leading: SizedBox(
-                      width: 24,
-                      child:
-                          isSelected
-                              ? const Icon(
-                                CupertinoIcons.check_mark,
-                                color: AppColors.primary,
-                                size: 20,
-                              )
-                              : null,
-                    ),
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selected.remove(option);
-                        } else {
-                          _selected.add(option);
-                        }
-                      });
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

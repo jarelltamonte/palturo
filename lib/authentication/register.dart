@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
-import 'package:palturo/authentication/scratch.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
@@ -40,7 +39,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _register() async {
     try {
-      final response = await _authService.register(
+      await _authService.register(
         _firstNameController.text.trim(),
         _lastNameController.text.trim(),
         _emailController.text.trim(),
@@ -50,19 +49,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (!mounted) return;
 
-      final isAlreadyConfirmed =
-          response.session != null || response.user?.emailConfirmedAt != null;
+      await _showAccountCreatedDialog();
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => ScratchWidget(
-                email: _emailController.text.trim(),
-                isConfirmedInitial: isAlreadyConfirmed,
-              ),
-        ),
-      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
 
@@ -70,6 +60,61 @@ class _RegisterPageState extends State<RegisterPage> {
         e.toString().replaceFirst('Exception: ', ''),
       );
     }
+  }
+
+  Future<void> _showAccountCreatedDialog() async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.primary,
+                  size: 42,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Account Created',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.boldText.copyWith(
+                    color: textTheme,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'Successfully created account. You may now log in.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            actionsAlignment: MainAxisAlignment.end,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'Set Up Account',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
   }
 
   Future<void> _showSignUpFailedDialog(String message) {

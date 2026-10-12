@@ -40,6 +40,10 @@ class _HomePageState extends State<HomePage> {
   RoleFilter _roleFilter = RoleFilter.all;
   int _currentIndex = 0;
   final List<int> _history = [];
+  final List<bool> _historyRight = [];
+  bool _undoActive = false;
+  bool _undoRight = false;
+  int _undoToken = 0;
 
   @override
   void initState() {
@@ -67,6 +71,8 @@ class _HomePageState extends State<HomePage> {
         _randomMode = false;
         _currentIndex = 0;
         _history.clear();
+        _historyRight.clear();
+        _undoActive = false;
       });
     } catch (e, st) {
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
@@ -93,6 +99,8 @@ class _HomePageState extends State<HomePage> {
         _loading = false;
         _currentIndex = 0;
         _history.clear();
+        _historyRight.clear();
+        _undoActive = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -138,7 +146,7 @@ class _HomePageState extends State<HomePage> {
         SnackBar(content: Text('Request failed: $e')),
       );
     }
-    _next();
+    _next(right: true);
   }
 
   @override
@@ -162,9 +170,11 @@ class _HomePageState extends State<HomePage> {
   /// Role selection happens at retrieval time (as_role) — deck is prefiltered.
   List<Person> get _filteredPeople => _people;
 
-  void _next() {
+  void _next({bool right = false}) {
     setState(() {
       _history.add(_currentIndex);
+      _historyRight.add(right);
+      _undoActive = false;
       _currentIndex++;
     });
   }
@@ -173,7 +183,30 @@ class _HomePageState extends State<HomePage> {
     if (_history.isEmpty) return;
     setState(() {
       _currentIndex = _history.removeLast();
+      _undoRight = _historyRight.removeLast();
+      _undoActive = true;
+      _undoToken++;
     });
+  }
+
+  Widget _wrapUndo(Widget child) {
+    if (!_undoActive) return child;
+    final size = MediaQuery.of(context).size;
+    final dir = _undoRight ? 1.0 : -1.0;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('undo$_undoToken'),
+      tween: Tween(begin: 1.0, end: 0.0),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, v, child) => Opacity(
+        opacity: 1 - v * 0.5,
+        child: Transform.translate(
+          offset: Offset(dir * v * size.width * 0.7, v * size.height * 0.35),
+          child: Transform.rotate(angle: dir * v * 0.25, child: child),
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmBlock(Person person) async {
@@ -458,26 +491,30 @@ class _HomePageState extends State<HomePage> {
             : _error != null
                 ? _buildErrorState(textTheme)
                 : hasMore
-                    ? Dismissible(
-                        key: ValueKey(people[_currentIndex].id),
-                        direction: DismissDirection.horizontal,
-                        background: _swipeBackground(
-                          alignment: Alignment.centerLeft,
-                          color: AppColors.primary,
-                          icon: Icons.check,
-                        ),
-                        secondaryBackground: _swipeBackground(
-                          alignment: Alignment.centerRight,
-                          color: Colors.red,
-                          icon: Icons.close,
-                        ),
-                        onDismissed: (_) => _next(),
-                        child: PersonCardOverlay(
-                          person: people[_currentIndex],
-                          onAdd: () => _confirmAdd(people[_currentIndex]),
-                          onSkip: _next,
-                          onBlock: () => _confirmBlock(people[_currentIndex]),
-                          onReport: () => _confirmReport(people[_currentIndex]),
+                    ? _wrapUndo(
+                        Dismissible(
+                          key: ValueKey(people[_currentIndex].id),
+                          direction: DismissDirection.horizontal,
+                          background: _swipeBackground(
+                            alignment: Alignment.centerLeft,
+                            color: AppColors.primary,
+                            icon: Icons.check,
+                          ),
+                          secondaryBackground: _swipeBackground(
+                            alignment: Alignment.centerRight,
+                            color: Colors.red,
+                            icon: Icons.close,
+                          ),
+                          onDismissed: (d) =>
+                              _next(right: d == DismissDirection.startToEnd),
+                          child: PersonCardOverlay(
+                            person: people[_currentIndex],
+                            onAdd: () => _confirmAdd(people[_currentIndex]),
+                            onSkip: _next,
+                            onBlock: () => _confirmBlock(people[_currentIndex]),
+                            onReport: () =>
+                                _confirmReport(people[_currentIndex]),
+                          ),
                         ),
                       )
                     : _buildEmptyState(textTheme),

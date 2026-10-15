@@ -29,7 +29,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   final ProfileService _profileService = ProfileService();
   bool _isSaving = false;
 
-  late final TextEditingController _nameController;
   late final TextEditingController _bioController;
 
   late Map<String, String> _availability;
@@ -58,7 +57,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.profile.name);
     _bioController = TextEditingController(text: widget.profile.bio);
     _availability = _parseAvailability(widget.profile.schedule);
     _languages = List.from(widget.profile.languages);
@@ -74,7 +72,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -136,7 +133,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   bool _hasUnsavedChanges() {
     final initialAvail = _parseAvailability(widget.profile.schedule);
 
-    if (_nameController.text.trim() != widget.profile.name.trim()) return true;
     if (_bioController.text.trim() != widget.profile.bio.trim()) return true;
     if (_role != widget.profile.role) return true;
     if (!mapEquals(_availability, initialAvail)) return true;
@@ -416,21 +412,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
-    final rawName = _nameController.text.trim();
-    String updatedFirst = widget.profile.firstName;
-    String updatedLast = widget.profile.lastName;
-
-    if (rawName.isNotEmpty) {
-      final parts = rawName.split(RegExp(r'\s+'));
-      updatedFirst = parts.first;
-      updatedLast = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-    }
-
     final scheduleFormatted = _formatAvailabilityString(_availability);
 
     final updated = widget.profile.copyWith(
-      firstName: updatedFirst,
-      lastName: updatedLast,
       bio: _bioController.text.trim(),
       schedule: scheduleFormatted,
       languages: _languages,
@@ -541,23 +525,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: TextField(
-                      controller: _nameController,
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.headingText.copyWith(
-                        color: textTheme,
-                        fontSize: 20,
-                      ),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: 'Your name',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _BioField(controller: _bioController),

@@ -256,7 +256,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         child: Row(
                                           children: [
                                             Text(
-                                              'Friends',
+                                              'Pals',
                                               style: AppTextStyles.boldText
                                                   .copyWith(color: textTheme),
                                             ),

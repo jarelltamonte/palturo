@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
@@ -7,6 +9,8 @@ import 'package:palturo/theme/app_colors.dart';
 const kOtherId = 'other';
 const kOtherPrefix = 'other:';
 const kCustomSkillMaxLength = 30;
+const kSkillNoteMaxLength = 150;
+const kMaxSuggestions = 5;
 
 const kSkillCategories = <({String id, String label, IconData icon})>[
   (id: 'arts_design', label: 'Arts and Design', icon: Icons.palette_outlined),
@@ -43,6 +47,14 @@ const _kSmallWords = <String>{
   'the',
   'in',
 };
+
+({String id, String label, IconData icon})? categoryById(String? id) {
+  if (id == null || id.isEmpty) return null;
+  for (final c in kSkillCategories) {
+    if (c.id == id) return c;
+  }
+  return null;
+}
 
 class CustomSkill {
   final String categoryId;
@@ -114,6 +126,121 @@ bool isSkillIdValid(String id) {
   return CustomSkill.tryParse(id)?.isValid ?? true;
 }
 
+bool isPendingSkillId(String id) {
+  if (id.trim().isEmpty) return true;
+  final custom = CustomSkill.tryParse(id);
+  return custom != null && custom.text.trim().isEmpty;
+}
+
+class SkillSuggestion {
+  final String id;
+  final String label;
+  final String categoryId;
+  final bool isCustom;
+
+  const SkillSuggestion({
+    required this.id,
+    required this.label,
+    required this.categoryId,
+    this.isCustom = false,
+  });
+}
+
+abstract class SkillSuggestionService {
+  Future<List<SkillSuggestion>> suggest(
+    String query, {
+    required List<OnboardingOption> options,
+    List<String> exclude = const [],
+  });
+}
+
+class LocalSkillSuggestionService implements SkillSuggestionService {
+  const LocalSkillSuggestionService();
+
+  static const _keywordCategories = <String, String>{
+    'cook': 'everyday_skills',
+    'bake': 'everyday_skills',
+    'repair': 'everyday_skills',
+    'martial': 'everyday_skills',
+    'sew': 'arts_design',
+    'weav': 'arts_design',
+    'embroid': 'arts_design',
+    'paint': 'arts_design',
+    'draw': 'arts_design',
+    'craft': 'arts_design',
+    'pottery': 'arts_design',
+    'carv': 'arts_design',
+    'dance': 'language_culture',
+    'sing': 'language_culture',
+    'music': 'language_culture',
+    'drum': 'language_culture',
+    'script': 'language_culture',
+    'language': 'language_culture',
+    'tagalog': 'language_culture',
+    'farm': 'agriculture_livelihood',
+    'plant': 'agriculture_livelihood',
+    'garden': 'agriculture_livelihood',
+    'harvest': 'agriculture_livelihood',
+    'fish': 'agriculture_livelihood',
+    'livestock': 'agriculture_livelihood',
+  };
+
+  String _guessCategory(String text) {
+    final lower = text.toLowerCase();
+    for (final entry in _keywordCategories.entries) {
+      if (lower.contains(entry.key)) return entry.value;
+    }
+    return 'everyday_skills';
+  }
+
+  @override
+  Future<List<SkillSuggestion>> suggest(
+    String query, {
+    required List<OnboardingOption> options,
+    List<String> exclude = const [],
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+
+    final q = query.trim().toLowerCase();
+    final results = <SkillSuggestion>[];
+
+    for (final o in options) {
+      if (isOtherOption(o)) continue;
+      if (exclude.contains(o.id) || exclude.contains(o.label)) continue;
+      if (q.isNotEmpty && !o.label.toLowerCase().contains(q)) continue;
+      results.add(
+        SkillSuggestion(
+          id: o.id,
+          label: o.label,
+          categoryId: kSkillToCategorySlug[o.id] ?? _guessCategory(o.label),
+        ),
+      );
+      if (results.length >= kMaxSuggestions) break;
+    }
+
+    if (q.isNotEmpty && !results.any((s) => s.label.toLowerCase() == q)) {
+      var label = toTitleCase(query.trim());
+      if (label.length > kCustomSkillMaxLength) {
+        label = label.substring(0, kCustomSkillMaxLength);
+      }
+      final categoryId = _guessCategory(label);
+      final id = CustomSkill(categoryId: categoryId, text: label).encode();
+      if (!exclude.contains(id)) {
+        results.add(
+          SkillSuggestion(
+            id: id,
+            label: label,
+            categoryId: categoryId,
+            isCustom: true,
+          ),
+        );
+      }
+    }
+
+    return results;
+  }
+}
+
 class SkillsCard extends StatefulWidget {
   final bool isEditing;
   final String labelSuffix;
@@ -122,7 +249,10 @@ class SkillsCard extends StatefulWidget {
   final List<String> initialSkillIds;
   final bool showAttachFile;
   final Map<String, String>? attachments;
+  final Map<String, String>? notes;
+  final SkillSuggestionService suggestionService;
   final ValueChanged<List<String>>? onChanged;
+  final void Function(String skillId, String note)? onNoteChanged;
   final ValueChanged<String>? onAttachFile;
   final ValueChanged<String>? onRemoveAttachment;
 
@@ -135,7 +265,10 @@ class SkillsCard extends StatefulWidget {
     this.initialSkillIds = const [],
     this.showAttachFile = false,
     this.attachments,
+    this.notes,
+    this.suggestionService = const LocalSkillSuggestionService(),
     this.onChanged,
+    this.onNoteChanged,
     this.onAttachFile,
     this.onRemoveAttachment,
   });
@@ -144,7 +277,11 @@ class SkillsCard extends StatefulWidget {
     Key? key,
     required bool isEditing,
     List<String> initialSkillIds = const [],
+    Map<String, String>? notes,
+    SkillSuggestionService suggestionService =
+        const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
+    void Function(String skillId, String note)? onNoteChanged,
   }) {
     return SkillsCard(
       key: key,
@@ -154,7 +291,10 @@ class SkillsCard extends StatefulWidget {
       maxSkills: 3,
       initialSkillIds: initialSkillIds,
       showAttachFile: false,
+      notes: notes,
+      suggestionService: suggestionService,
       onChanged: onChanged,
+      onNoteChanged: onNoteChanged,
     );
   }
 
@@ -163,7 +303,11 @@ class SkillsCard extends StatefulWidget {
     required bool isEditing,
     List<String> initialSkillIds = const [],
     Map<String, String>? attachments,
+    Map<String, String>? notes,
+    SkillSuggestionService suggestionService =
+        const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
+    void Function(String skillId, String note)? onNoteChanged,
     ValueChanged<String>? onAttachFile,
     ValueChanged<String>? onRemoveAttachment,
   }) {
@@ -176,7 +320,10 @@ class SkillsCard extends StatefulWidget {
       initialSkillIds: initialSkillIds,
       showAttachFile: true,
       attachments: attachments,
+      notes: notes,
+      suggestionService: suggestionService,
       onChanged: onChanged,
+      onNoteChanged: onNoteChanged,
       onAttachFile: onAttachFile,
       onRemoveAttachment: onRemoveAttachment,
     );
@@ -188,6 +335,9 @@ class SkillsCard extends StatefulWidget {
 
 class _SkillsCardState extends State<SkillsCard> {
   late List<String> _skillIds;
+  late List<String> _notes;
+  late List<int> _rowUids;
+  int _nextUid = 0;
 
   String? _resolveAttachmentPath(String skillId) {
     if (widget.attachments == null || widget.attachments!.isEmpty) return null;
@@ -220,45 +370,86 @@ class _SkillsCardState extends State<SkillsCard> {
     return null;
   }
 
+  String _resolveNote(String skillId) {
+    if (skillId.isEmpty) return '';
+    return widget.notes?[skillId] ?? '';
+  }
+
+  List<String> _committed(Iterable<String> ids) =>
+      ids.where((id) => !isPendingSkillId(id)).toList();
+
+  void _load() {
+    _skillIds =
+        widget.initialSkillIds
+            .map((id) => isPendingSkillId(id) ? '' : id)
+            .toList();
+    _notes = _skillIds.map(_resolveNote).toList();
+    _rowUids = List.generate(_skillIds.length, (_) => _nextUid++);
+  }
+
+  void _emit() {
+    widget.onChanged?.call(_committed(_skillIds));
+  }
+
   @override
   void initState() {
     super.initState();
-    _skillIds = List.from(widget.initialSkillIds);
+    _load();
   }
 
   @override
   void didUpdateWidget(covariant SkillsCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialSkillIds != widget.initialSkillIds) {
-      _skillIds = List.from(widget.initialSkillIds);
+      final incoming = _committed(widget.initialSkillIds);
+      final current = _committed(_skillIds);
+      final same =
+          incoming.length == current.length &&
+          Iterable<int>.generate(
+            incoming.length,
+          ).every((i) => incoming[i] == current[i]);
+      if (!same) _load();
     }
   }
 
   void _addSkill() {
     if (_skillIds.length >= widget.maxSkills) return;
-    final remaining =
-        widget.options
-            .where((o) => !isOtherOption(o) && !_skillIds.contains(o.id))
-            .toList();
-    if (remaining.isEmpty) return;
+    if (_skillIds.contains('')) return;
     setState(() {
-      _skillIds.add(remaining.first.id);
+      _skillIds.add('');
+      _notes.add('');
+      _rowUids.add(_nextUid++);
     });
-    widget.onChanged?.call(_skillIds);
   }
 
   void _removeSkill(int index) {
+    final old = _skillIds[index];
     setState(() {
       _skillIds.removeAt(index);
+      _notes.removeAt(index);
+      _rowUids.removeAt(index);
     });
-    widget.onChanged?.call(_skillIds);
+    if (old.isNotEmpty) widget.onNoteChanged?.call(old, '');
+    _emit();
   }
 
   void _updateSkill(int index, String newId) {
+    final old = _skillIds[index];
+    final note = _notes[index];
     setState(() {
       _skillIds[index] = newId;
     });
-    widget.onChanged?.call(_skillIds);
+    if (note.isNotEmpty) {
+      if (old.isNotEmpty) widget.onNoteChanged?.call(old, '');
+      if (newId.isNotEmpty) widget.onNoteChanged?.call(newId, note);
+    }
+    _emit();
+  }
+
+  void _updateNote(int index, String note) {
+    _notes[index] = note;
+    final id = _skillIds[index];
+    if (id.isNotEmpty) widget.onNoteChanged?.call(id, note);
   }
 
   @override
@@ -266,7 +457,8 @@ class _SkillsCardState extends State<SkillsCard> {
     const accentColor = AppColors.primary;
     final themeColor = Theme.of(context).colorScheme.surface;
     final textColor = Theme.of(context).colorScheme.secondary;
-    final canAddMore = _skillIds.length < widget.maxSkills;
+    final canAddMore =
+        _skillIds.length < widget.maxSkills && !_skillIds.contains('');
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -321,15 +513,20 @@ class _SkillsCardState extends State<SkillsCard> {
           const SizedBox(height: 16),
           for (int i = 0; i < _skillIds.length; i++) ...[
             _SkillRow(
-              key: ValueKey('skill_row_$i'),
+              key: ValueKey('skill_row_${_rowUids[i]}'),
               selectedId: _skillIds[i],
               alreadyUsedIds: _skillIds,
               isEditing: widget.isEditing,
               accentColor: accentColor,
               options: widget.options,
+              labelSuffix: widget.labelSuffix,
+              rowLabel: _skillIds.length > 1 ? 'Skill ${i + 1}' : null,
+              initialNote: _notes[i],
+              suggestionService: widget.suggestionService,
               showAttachFile: widget.showAttachFile,
               attachmentPath: _resolveAttachmentPath(_skillIds[i]),
               onChanged: (newId) => _updateSkill(i, newId),
+              onNoteChanged: (note) => _updateNote(i, note),
               onRemove: () => _removeSkill(i),
               onAttachFile:
                   widget.onAttachFile == null
@@ -354,9 +551,14 @@ class _SkillRow extends StatefulWidget {
   final bool isEditing;
   final Color accentColor;
   final List<OnboardingOption> options;
+  final String labelSuffix;
+  final String? rowLabel;
+  final String initialNote;
+  final SkillSuggestionService suggestionService;
   final bool showAttachFile;
   final String? attachmentPath;
   final ValueChanged<String> onChanged;
+  final ValueChanged<String> onNoteChanged;
   final VoidCallback onRemove;
   final VoidCallback? onAttachFile;
   final VoidCallback? onRemoveAttachment;
@@ -368,9 +570,14 @@ class _SkillRow extends StatefulWidget {
     required this.isEditing,
     required this.accentColor,
     required this.options,
+    required this.labelSuffix,
+    this.rowLabel,
+    required this.initialNote,
+    required this.suggestionService,
     required this.showAttachFile,
     this.attachmentPath,
     required this.onChanged,
+    required this.onNoteChanged,
     required this.onRemove,
     this.onAttachFile,
     this.onRemoveAttachment,
@@ -381,164 +588,107 @@ class _SkillRow extends StatefulWidget {
 }
 
 class _SkillRowState extends State<_SkillRow> {
-  late final TextEditingController _controller;
+  final _searchController = TextEditingController();
+  final _noteController = TextEditingController();
+  final _focusNode = FocusNode();
 
-  String get _otherId {
-    for (final o in widget.options) {
-      if (isOtherOption(o)) return o.id;
-    }
-    return kOtherId;
-  }
+  Timer? _debounce;
+  int _requestId = 0;
+  bool _loading = false;
+  List<SkillSuggestion> _suggestions = const [];
+  String? _pickedCategoryId;
 
-  CustomSkill? get _custom {
-    final parsed = CustomSkill.tryParse(widget.selectedId);
-    if (parsed != null) return parsed;
-    final lower = widget.selectedId.trim().toLowerCase();
-    if (lower == _otherId || lower == 'other' || lower == 'others') {
-      return const CustomSkill();
-    }
-    return null;
-  }
+  bool get _isLearn => widget.labelSuffix.toLowerCase() == 'learn';
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _custom?.text ?? '');
+    _noteController.text = widget.initialNote;
+    _focusNode.addListener(_onFocusChanged);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _debounce?.cancel();
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    _searchController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
-  void _emit({String? text, String? categoryId}) {
-    final current = _custom ?? const CustomSkill();
-    widget.onChanged(
-      CustomSkill(
-        categoryId: categoryId ?? current.categoryId,
-        text: text ?? current.text,
-      ).encode(),
-    );
+  void _onFocusChanged() {
+    if (_focusNode.hasFocus &&
+        _suggestions.isEmpty &&
+        _searchController.text.isEmpty) {
+      _search('');
+    }
   }
 
-  Widget _buildCustomSection({
-    required CustomSkill custom,
-    required Color textColor,
-    required Color dim,
-  }) {
-    final needsCategory =
-        custom.text.trim().isNotEmpty && custom.categoryId.isEmpty;
-    final errorColor = Theme.of(context).colorScheme.error;
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    if (query.trim().isEmpty) {
+      _search('');
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 250), () => _search(query));
+  }
 
-    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(28),
-      borderSide: BorderSide(color: color, width: width),
-    );
+  Future<void> _search(String query) async {
+    final requestId = ++_requestId;
+    if (mounted) setState(() => _loading = true);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _controller,
-            enabled: widget.isEditing,
-            maxLength: kCustomSkillMaxLength,
-            textCapitalization: TextCapitalization.none,
-            textInputAction: TextInputAction.done,
-            inputFormatters: [TitleCaseFormatter()],
-            onChanged: (t) => _emit(text: t),
-            cursorColor: textColor,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: AppColors.secondary,
-              hintText: 'Name your skill (e.g. Pottery)',
-              hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
-              counterText: '',
-              prefixIcon: Icon(Icons.edit_outlined, size: 18, color: dim),
-              suffixIcon: Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Center(
-                  widthFactor: 1,
-                  child: Text(
-                    '${custom.text.length}/$kCustomSkillMaxLength',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: textColor.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 14,
-              ),
-              border: border(Colors.transparent, 0),
-              enabledBorder: border(Colors.transparent, 0),
-              disabledBorder: border(Colors.transparent, 0),
-              focusedBorder: border(AppColors.primary, 1.5),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Text(
-              'Category',
-              style: TextStyle(
-                color: textColor.withValues(alpha: 0.7),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.6,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final c in kSkillCategories)
-                _CategoryChip(
-                  label: c.label,
-                  icon: c.icon,
-                  selected: custom.categoryId == c.id,
-                  enabled: widget.isEditing,
-                  accentColor: widget.accentColor,
-                  textColor: textColor,
-                  onTap: () => _emit(categoryId: c.id),
-                ),
-            ],
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 180),
-            alignment: Alignment.topLeft,
-            child:
-                needsCategory && widget.isEditing
-                    ? Padding(
-                      padding: const EdgeInsets.only(top: 8, left: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.info_outline, size: 14, color: errorColor),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Pick a category so others can find your skill',
-                            style: TextStyle(fontSize: 12, color: errorColor),
-                          ),
-                        ],
-                      ),
-                    )
-                    : const SizedBox(width: double.infinity),
-          ),
-        ],
-      ),
-    );
+    List<SkillSuggestion> results;
+    try {
+      results = await widget.suggestionService.suggest(
+        query,
+        options: widget.options,
+        exclude: widget.alreadyUsedIds,
+      );
+    } catch (_) {
+      results = const [];
+    }
+
+    if (!mounted || requestId != _requestId) return;
+    setState(() {
+      _suggestions = results;
+      _loading = false;
+    });
+  }
+
+  void _select(SkillSuggestion suggestion) {
+    _debounce?.cancel();
+    _requestId++;
+    _focusNode.unfocus();
+    _searchController.clear();
+    setState(() {
+      _pickedCategoryId = suggestion.categoryId;
+      _suggestions = const [];
+      _loading = false;
+    });
+    widget.onChanged(suggestion.id);
+  }
+
+  void _changeSelection() {
+    setState(() => _pickedCategoryId = null);
+    widget.onChanged('');
+  }
+
+  String _labelFor(String id) {
+    final custom = CustomSkill.tryParse(id);
+    if (custom != null) return custom.text;
+    for (final o in widget.options) {
+      if (o.id == id || o.label == id) return o.label;
+    }
+    return id;
+  }
+
+  String? _categoryIdFor(String id) {
+    final custom = CustomSkill.tryParse(id);
+    if (custom != null && custom.categoryId.isNotEmpty) {
+      return custom.categoryId;
+    }
+    return kSkillToCategorySlug[id] ?? _pickedCategoryId;
   }
 
   String _getDisplayName(String path) {
@@ -554,109 +704,367 @@ class _SkillRowState extends State<_SkillRow> {
     return rawName;
   }
 
+  OutlineInputBorder _border(Color color, double width, double radius) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
+  Widget _buildSearchField(Color textColor, Color dim) {
+    return TextField(
+      controller: _searchController,
+      focusNode: _focusNode,
+      autofocus: widget.isEditing,
+      enabled: widget.isEditing,
+      maxLength: kCustomSkillMaxLength,
+      textInputAction: TextInputAction.search,
+      onChanged: _onQueryChanged,
+      cursorColor: textColor,
+      style: TextStyle(
+        color: textColor,
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        hintText: 'Search a skill to ${widget.labelSuffix.toLowerCase()}',
+        hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+        counterText: '',
+        prefixIcon: Icon(Icons.search, size: 20, color: dim),
+        suffixIcon:
+            _loading
+                ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                )
+                : null,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
+        ),
+        border: _border(dim, 1.5, 28),
+        enabledBorder: _border(dim, 1.5, 28),
+        disabledBorder: _border(dim, 1.5, 28),
+        focusedBorder: _border(AppColors.primary, 1.5, 28),
+      ),
+    );
+  }
+
+  Widget _buildSelectedPill(Color dim) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        customBorder: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        onTap: widget.isEditing ? _changeSelection : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: dim, width: 1.5),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _labelFor(widget.selectedId),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: dim, fontSize: 16),
+                ),
+              ),
+              if (widget.isEditing)
+                Icon(Icons.edit_outlined, size: 18, color: dim),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSuggestions(Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: AppColors.secondary,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (final s in _suggestions)
+              InkWell(
+                onTap: () => _select(s),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        s.isCustom
+                            ? Icons.add_circle_outline
+                            : (categoryById(s.categoryId)?.icon ??
+                                Icons.label_outline),
+                        size: 20,
+                        color: s.isCustom ? AppColors.primary : textColor,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s.isCustom ? 'Add "${s.label}"' : s.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (categoryById(s.categoryId) != null)
+                              Text(
+                                categoryById(s.categoryId)!.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: textColor.withValues(alpha: 0.6),
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryTag(
+    ({String id, String label, IconData icon}) category,
+    Color textColor,
+    Color dim,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, left: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(category.icon, size: 14, color: dim),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              category.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: textColor.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoteField(Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: TextField(
+        controller: _noteController,
+        enabled: widget.isEditing,
+        minLines: 2,
+        maxLines: 3,
+        maxLength: kSkillNoteMaxLength,
+        textCapitalization: TextCapitalization.sentences,
+        onChanged: widget.onNoteChanged,
+        cursorColor: textColor,
+        style: TextStyle(color: textColor, fontSize: 14),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: AppColors.secondary,
+          hintText:
+              _isLearn
+                  ? 'Add a note (e.g. complete beginner, want to cook for my family)'
+                  : 'Add a note (e.g. 5 years of experience, can teach in Filipino)',
+          hintMaxLines: 2,
+          hintStyle: TextStyle(
+            color: textColor.withValues(alpha: 0.5),
+            fontSize: 14,
+          ),
+          counterStyle: TextStyle(
+            color: textColor.withValues(alpha: 0.5),
+            fontSize: 12,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
+          ),
+          border: _border(Colors.transparent, 0, 20),
+          enabledBorder: _border(Colors.transparent, 0, 20),
+          disabledBorder: _border(Colors.transparent, 0, 20),
+          focusedBorder: _border(AppColors.primary, 1.5, 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachment() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10.0, left: 4.0),
+      child:
+          widget.attachmentPath != null && widget.attachmentPath!.isNotEmpty
+              ? Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: widget.onAttachFile,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(20),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 170),
+                              child: Text(
+                                _getDisplayName(widget.attachmentPath!),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: widget.onRemoveAttachment,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : GestureDetector(
+                onTap: widget.onAttachFile,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.attach_file,
+                      size: 16,
+                      color: widget.accentColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Attach a file',
+                      style: TextStyle(
+                        color: widget.accentColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final themeColor = Theme.of(context).colorScheme.surface;
     final dim = widget.isEditing ? textColor : textColor.withValues(alpha: 0.5);
-    final custom = _custom;
-
-    final availableOptions =
-        widget.options
-            .where(
-              (o) =>
-                  isOtherOption(o) ||
-                  o.id == widget.selectedId ||
-                  o.label == widget.selectedId ||
-                  (!widget.alreadyUsedIds.contains(o.id) &&
-                      !widget.alreadyUsedIds.contains(o.label)),
-            )
-            .toList();
-
-    if (!availableOptions.any(isOtherOption)) {
-      availableOptions.add(const OnboardingOption(kOtherId, 'Other'));
-    }
-
-    String dropdownValue;
-    if (custom != null) {
-      dropdownValue = _otherId;
-    } else {
-      final match = availableOptions.cast<OnboardingOption?>().firstWhere(
-        (o) => o?.id == widget.selectedId || o?.label == widget.selectedId,
-        orElse: () => null,
-      );
-
-      if (match != null) {
-        dropdownValue = match.id;
-      } else if (widget.selectedId.trim().isNotEmpty &&
-          widget.selectedId != 'other' &&
-          widget.selectedId != 'others') {
-        availableOptions.insert(
-          0,
-          OnboardingOption(widget.selectedId, widget.selectedId),
-        );
-        dropdownValue = widget.selectedId;
-      } else {
-        dropdownValue = _otherId;
-      }
-    }
+    final hasSelection = widget.selectedId.isNotEmpty;
+    final category =
+        hasSelection ? categoryById(_categoryIdFor(widget.selectedId)) : null;
+    final showNote =
+        hasSelection &&
+        (widget.isEditing || _noteController.text.trim().isNotEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (widget.rowLabel != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              widget.rowLabel!,
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
         Row(
           children: [
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: dim, width: 1.5),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: dropdownValue,
-                    isExpanded: true,
-                    borderRadius: BorderRadius.circular(16),
-                    icon:
-                        widget.isEditing
-                            ? Icon(Icons.keyboard_arrow_down, color: dim)
-                            : const SizedBox.shrink(),
-                    dropdownColor: themeColor,
-                    style: TextStyle(color: dim, fontSize: 16),
-                    onChanged:
-                        widget.isEditing
-                            ? (newId) {
-                              if (newId == null) return;
-                              if (newId == _otherId) {
-                                if (!widget.selectedId.startsWith(
-                                  kOtherPrefix,
-                                )) {
-                                  widget.onChanged(
-                                    const CustomSkill().encode(),
-                                  );
-                                }
-                              } else {
-                                _controller.clear();
-                                widget.onChanged(newId);
-                              }
-                            }
-                            : null,
-                    items:
-                        availableOptions
-                            .map(
-                              (o) => DropdownMenuItem(
-                                value: o.id,
-                                child: Text(o.label),
-                              ),
-                            )
-                            .toList(),
-                  ),
-                ),
-              ),
+              child:
+                  hasSelection
+                      ? _buildSelectedPill(dim)
+                      : _buildSearchField(textColor, dim),
             ),
             if (widget.isEditing) ...[
               const SizedBox(width: 12),
@@ -683,195 +1091,15 @@ class _SkillRowState extends State<_SkillRow> {
           curve: Curves.easeOut,
           alignment: Alignment.topCenter,
           child:
-              custom == null
-                  ? const SizedBox(width: double.infinity)
-                  : _buildCustomSection(
-                    custom: custom,
-                    textColor: textColor,
-                    dim: dim,
-                  ),
+              !hasSelection && widget.isEditing && _suggestions.isNotEmpty
+                  ? _buildSuggestions(textColor)
+                  : const SizedBox(width: double.infinity),
         ),
-        if (widget.showAttachFile && widget.isEditing)
-          Padding(
-            padding: const EdgeInsets.only(top: 10.0, left: 4.0),
-            child:
-                widget.attachmentPath != null &&
-                        widget.attachmentPath!.isNotEmpty
-                    ? Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: AppColors.primary,
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: widget.onAttachFile,
-                            borderRadius: const BorderRadius.horizontal(
-                              left: Radius.circular(20),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 7,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle,
-                                    size: 16,
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 170,
-                                    ),
-                                    child: Text(
-                                      _getDisplayName(widget.attachmentPath!),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: AppColors.primary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6.0),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: widget.onRemoveAttachment,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 14,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                    : GestureDetector(
-                      onTap: widget.onAttachFile,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.attach_file,
-                            size: 16,
-                            color: widget.accentColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Attach a file',
-                            style: TextStyle(
-                              color: widget.accentColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-          ),
+        if (category != null) _buildCategoryTag(category, textColor, dim),
+        if (showNote) _buildNoteField(textColor),
+        if (widget.showAttachFile && widget.isEditing && hasSelection)
+          _buildAttachment(),
       ],
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final bool enabled;
-  final Color accentColor;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  const _CategoryChip({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.enabled,
-    required this.accentColor,
-    required this.textColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final borderColor =
-        selected ? accentColor : textColor.withValues(alpha: 0.35);
-
-    return Opacity(
-      opacity: enabled || selected ? 1 : 0.5,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: enabled ? onTap : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: selected ? accentColor : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: 1.5),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  child: Icon(
-                    selected ? Icons.check : icon,
-                    key: ValueKey(selected),
-                    size: 16,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: textColor,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

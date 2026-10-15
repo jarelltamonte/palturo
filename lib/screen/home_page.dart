@@ -567,7 +567,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             Text(
               _randomMode
-                  ? 'You have seen everything for now.\nCome back later — profiles update as people delete nie add skills.'
+                  ? 'You have seen everything for now.'
                   : 'You have seen all the top results.\nExplore more of the community!',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(

@@ -492,21 +492,9 @@ class _HomePageState extends State<HomePage> {
                 ? _buildErrorState(textTheme)
                 : hasMore
                     ? _wrapUndo(
-                        Dismissible(
+                        _SwipeableCard(
                           key: ValueKey(people[_currentIndex].id),
-                          direction: DismissDirection.horizontal,
-                          background: _swipeBackground(
-                            alignment: Alignment.centerLeft,
-                            color: AppColors.primary,
-                            icon: Icons.check,
-                          ),
-                          secondaryBackground: _swipeBackground(
-                            alignment: Alignment.centerRight,
-                            color: Colors.red,
-                            icon: Icons.close,
-                          ),
-                          onDismissed: (d) =>
-                              _next(right: d == DismissDirection.startToEnd),
+                          onSwiped: (right) => _next(right: right),
                           child: PersonCardOverlay(
                             person: people[_currentIndex],
                             onAdd: () => _confirmAdd(people[_currentIndex]),
@@ -622,20 +610,141 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+}
 
-  Widget _swipeBackground({
-    required Alignment alignment,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Icon(icon, color: color, size: 36),
+class _SwipeableCard extends StatefulWidget {
+  final Widget child;
+  final ValueChanged<bool> onSwiped;
+
+  const _SwipeableCard({
+    super.key,
+    required this.child,
+    required this.onSwiped,
+  });
+
+  @override
+  State<_SwipeableCard> createState() => _SwipeableCardState();
+}
+
+class _SwipeableCardState extends State<_SwipeableCard>
+    with SingleTickerProviderStateMixin {
+  static const double _maxAngle = 0.25;
+  static const double _exitFactor = 1.1;
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 280),
+  )..addListener(_onTick);
+
+  double _dx = 0;
+  double _from = 0;
+  double _to = 0;
+  double _width = 1;
+  bool _exiting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTick() {
+    setState(() {
+      _dx =
+          _from +
+          (_to - _from) * Curves.easeOutCubic.transform(_controller.value);
+    });
+  }
+
+  void _animateTo(double target, {VoidCallback? onDone}) {
+    _from = _dx;
+    _to = target;
+    _controller.forward(from: 0).whenComplete(() {
+      if (mounted) onDone?.call();
+    });
+  }
+
+  void _onDragStart(DragStartDetails d) {
+    if (_exiting) return;
+    _controller.stop();
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    if (_exiting) return;
+    setState(() => _dx += d.delta.dx);
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    if (_exiting) return;
+    final velocity = d.velocity.pixelsPerSecond.dx;
+    final flung = velocity.abs() > 800 && velocity.sign == _dx.sign;
+    final passed = _dx.abs() > _width * 0.35 || flung;
+
+    if (!passed) {
+      _animateTo(0);
+      return;
+    }
+
+    final right = _dx > 0;
+    _exiting = true;
+    _animateTo(
+      (right ? 1 : -1) * _width * _exitFactor,
+      onDone: () => widget.onSwiped(right),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screen = MediaQuery.of(context).size;
+    final driftRatio = (0.35 * screen.height) / (0.7 * screen.width);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _width = constraints.maxWidth;
+        final angle = (_dx / (_width * 0.7)) * _maxAngle;
+        final dy = _dx.abs() * driftRatio;
+        final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
+        final goingRight = _dx > 0;
+        final tint = goingRight ? AppColors.primary : Colors.red;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: _onDragStart,
+          onHorizontalDragUpdate: _onDragUpdate,
+          onHorizontalDragEnd: _onDragEnd,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (_dx != 0)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: tint.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    alignment:
+                        goingRight
+                            ? Alignment.centerLeft
+                            : Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Icon(
+                      goingRight ? Icons.check : Icons.close,
+                      color: tint,
+                      size: 36,
+                    ),
+                  ),
+                ),
+              Opacity(
+                opacity: 1 - fade,
+                child: Transform.translate(
+                  offset: Offset(_dx, dy),
+                  child: Transform.rotate(angle: angle, child: widget.child),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

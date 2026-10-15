@@ -256,15 +256,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                         child: Row(
                                           children: [
                                             Text(
-                                              _friendCount == null
-                                                  ? 'Friends'
-                                                  : 'Friends ($_friendCount)',
+                                              'Friends',
                                               style: AppTextStyles.boldText
                                                   .copyWith(color: textTheme),
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              '142',
+                                               _friendCount == null
+                                                  ? ''
+                                                  : '$_friendCount',
                                               style: AppTextStyles.regularText
                                                   .copyWith(
                                                     color: textTheme.withValues(

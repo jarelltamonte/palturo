@@ -145,13 +145,19 @@ class _ExplorePageState extends State<ExplorePage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+        padding: const EdgeInsets.only(top: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            ),
             const SizedBox(height: 8),
-            _buildCaption(textTheme),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildCaption(textTheme),
+            ),
             const SizedBox(height: 8),
             Expanded(child: _buildContent(textTheme)),
           ],
@@ -198,10 +204,13 @@ class _ExplorePageState extends State<ExplorePage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         const spacing = 16.0;
-        final itemHeight = (constraints.maxHeight - spacing) / 2;
+        const topInset = 8.0;
+        const bottomInset = 90.0;
+        final itemHeight =
+            (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
         return GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
+          padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: spacing,
@@ -218,7 +227,7 @@ class _ExplorePageState extends State<ExplorePage> {
   Widget _buildGridAuto(Color textTheme) {
     return GridView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 16,
@@ -542,10 +551,16 @@ class _CategoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: 0.04),
             spreadRadius: 0,
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            spreadRadius: 0,
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),

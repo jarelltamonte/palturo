@@ -553,7 +553,15 @@ class _SkillsCardState extends State<SkillsCard> {
                       ? null
                       : () => widget.onRemoveAttachment!(_skillIds[i]),
             ),
-            if (i != _skillIds.length - 1) const SizedBox(height: 16),
+            if (i != _skillIds.length - 1)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: textColor.withValues(alpha: 0.12),
+                ),
+              ),
           ],
         ],
       ),

@@ -452,7 +452,7 @@ class _HomePageState extends State<HomePage> {
                 color: textColor.withValues(alpha: 0.7),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text.rich(
               TextSpan(
                 children: [

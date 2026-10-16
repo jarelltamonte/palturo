@@ -225,9 +225,11 @@ class _ChatRoomState extends State<ChatRoom> {
     final hasMessages = _messages.isNotEmpty;
 
     final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
+    final bgColor = Theme.of(context).colorScheme.onPrimary;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      
       appBar: AppBar(
         toolbarHeight: adaptiveHeight + (widget.skillName != null ? 8 : 0),
         backgroundColor: Colors.transparent,
@@ -410,7 +412,7 @@ class _ChatRoomState extends State<ChatRoom> {
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
                     filled: true,
-                    fillColor: AppColors.secondary,
+                    fillColor: bgColor,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 16,
@@ -439,8 +441,8 @@ class _ChatRoomState extends State<ChatRoom> {
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.background,
-                  minimumSize: const Size(58, 58),
-                  maximumSize: const Size(58, 58),
+                  minimumSize: const Size(48, 48),
+                  maximumSize: const Size(58, 48),
                 ),
                 icon: const Icon(
                   Icons.send_rounded,

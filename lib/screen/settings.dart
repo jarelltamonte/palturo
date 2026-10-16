@@ -7,6 +7,10 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/screen/block_list.dart';
 
+final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
+  splashFactory: NoSplash.splashFactory,
+);
+
 class Settings extends StatefulWidget {
   const Settings({super.key});
 
@@ -23,13 +27,25 @@ class _SettingsState extends State<Settings> {
   final TextEditingController _reportController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
 
-  final List<String> _feedbackQuestions = [
-    'How would you rate your experience with PalTuro?',
-    'How easy was PalTuro to use?',
-    'How would you rate the app design?',
-    'How satisfied are you with the features?',
-    'How well did PalTuro’s AI recommendations match your interests and preferences?',
-    'How likely are you to recommend PalTuro?',
+  static const List<String> _agreementLabels = [
+    'Strongly agree',
+    'Agree',
+    'Disagree',
+    'Strongly disagree',
+  ];
+
+  static const List<String> _feedbackStatements = [
+    'Overall, my experience with PalTuro has been good.',
+    'PalTuro is easy to use.',
+    'I like how the app looks.',
+    'I would recommend PalTuro to others.',
+    'PalTuro makes it easier to find learners or mentors for Filipino cultural and practical skills.',
+    'PalTuro helps me find people whose skills are relevant to what I want to learn or teach.',
+    'PalTuro reduces the need to search across multiple online platforms or groups.',
+    'The profiles, skill showcases, and recommendations make it easier to evaluate potential learners or mentors than general online platforms.',
+    'PalTuro provides a more organized way to search for skill-exchange partners than keyword-based searching.',
+    'PalTuro helps me consider relevant factors, such as availability, learning style, language preference, and skill interests, when looking for a learner or mentor.',
+    'I would prefer using PalTuro over general social-media platforms when searching for a learner or mentor for Filipino cultural and practical skills.',
   ];
 
   @override
@@ -54,14 +70,76 @@ class _SettingsState extends State<Settings> {
           builder: (context, setDialogState) {
             final textTheme = Theme.of(context).colorScheme.secondary;
 
-            final bool isCommentStep = currentStep == _feedbackQuestions.length;
+            final bool isCommentStep = currentStep == _feedbackStatements.length;
             final int selectedRating = ratings[currentStep] ?? 0;
+
+            Widget buildOption(int index) {
+              final int value = index + 1;
+              final bool selected = selectedRating == value;
+              final shape = RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color:
+                      selected
+                          ? AppColors.primary
+                          : textTheme.withValues(alpha: 0.2),
+                  width: selected ? 1.5 : 1,
+                ),
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color:
+                      selected
+                          ? AppColors.primary.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                  shape: shape,
+                  child: InkWell(
+                    customBorder: shape,
+                    hoverColor: Colors.transparent,
+                    focusColor: Colors.transparent,
+                    splashFactory: NoSplash.splashFactory,
+                    onTap: () {
+                      setDialogState(() {
+                        ratings[currentStep] = value;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _agreementLabels[index],
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (selected)
+                            const Icon(
+                              Icons.check_circle,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
 
             final Widget ratingContent = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Step ${currentStep + 1} of ${_feedbackQuestions.length + 1}',
+                  'Step ${currentStep + 1} of ${_feedbackStatements.length + 1}',
                   style: AppTextStyles.regularText.copyWith(
                     color: textTheme.withValues(alpha: 0.5),
                     fontSize: 12,
@@ -71,7 +149,8 @@ class _SettingsState extends State<Settings> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value: (currentStep + 1) / (_feedbackQuestions.length + 1),
+                    value:
+                        (currentStep + 1) / (_feedbackStatements.length + 1),
                     minHeight: 4,
                     backgroundColor: textTheme.withValues(alpha: 0.1),
                     valueColor: const AlwaysStoppedAnimation<Color>(
@@ -82,7 +161,7 @@ class _SettingsState extends State<Settings> {
                 const SizedBox(height: 24),
                 if (!isCommentStep) ...[
                   Text(
-                    _feedbackQuestions[currentStep],
+                    _feedbackStatements[currentStep],
                     textAlign: TextAlign.center,
                     style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
@@ -90,42 +169,8 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final int rating = index + 1;
-
-                      return IconButton(
-                        onPressed: () {
-                          setDialogState(() {
-                            ratings[currentStep] = rating;
-                          });
-                        },
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        constraints: const BoxConstraints(
-                          minWidth: 44,
-                          minHeight: 44,
-                        ),
-                        icon: Icon(
-                          rating <= selectedRating
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          size: 34,
-                          color: AppColors.primary,
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    selectedRating == 0
-                        ? 'Tap a star to rate'
-                        : '$selectedRating out of 5',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textTheme.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
-                  ),
+                  for (int i = 0; i < _agreementLabels.length; i++)
+                    buildOption(i),
                 ] else ...[
                   Text(
                     'Anything else you would like to share?',
@@ -199,8 +244,8 @@ class _SettingsState extends State<Settings> {
 
               final Map<String, dynamic> feedbackData = {
                 'ratings': {
-                  for (int i = 0; i < _feedbackQuestions.length; i++)
-                    _feedbackQuestions[i]: ratings[i],
+                  for (int i = 0; i < _feedbackStatements.length; i++)
+                    _feedbackStatements[i]: ratings[i],
                 },
                 'comment': _feedbackController.text.trim(),
               };
@@ -218,7 +263,7 @@ class _SettingsState extends State<Settings> {
               return CupertinoAlertDialog(
                 title: Center(
                   child: Text(
-                    'Submit a Feedback',
+                    'Send Feedback',
                     style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
                       fontSize: 18,
@@ -267,16 +312,20 @@ class _SettingsState extends State<Settings> {
               ),
               title: Center(
                 child: Text(
-                  'Submit a Feedback',
+                  'Send Feedback',
                   style: AppTextStyles.regularText.copyWith(
                     color: textTheme,
                     fontSize: 18,
                   ),
                 ),
               ),
-              content: SizedBox(width: double.maxFinite, child: ratingContent),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(child: ratingContent),
+              ),
               actions: [
                 TextButton(
+                  style: _noSplashButtonStyle,
                   onPressed: () {
                     Navigator.pop(dialogContext);
                   },
@@ -286,6 +335,7 @@ class _SettingsState extends State<Settings> {
                   ),
                 ),
                 TextButton(
+                  style: _noSplashButtonStyle,
                   onPressed:
                       !isCommentStep && selectedRating == 0
                           ? null
@@ -415,6 +465,7 @@ class _SettingsState extends State<Settings> {
           content: SizedBox(width: double.maxFinite, child: textField),
           actions: [
             TextButton(
+              style: _noSplashButtonStyle,
               onPressed: () {
                 _reportController.clear();
                 Navigator.pop(dialogContext);
@@ -425,6 +476,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             TextButton(
+              style: _noSplashButtonStyle,
               onPressed: submitReport,
               child: Text(
                 'Submit',
@@ -535,6 +587,7 @@ class _SettingsState extends State<Settings> {
           content: SizedBox(width: double.maxFinite, child: message),
           actions: [
             TextButton(
+              style: _noSplashButtonStyle,
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancel',
@@ -542,6 +595,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             TextButton(
+              style: _noSplashButtonStyle,
               onPressed: () {
                 Navigator.pop(dialogContext);
                 _handleLogout();
@@ -606,108 +660,127 @@ class _SettingsState extends State<Settings> {
                 ),
               ),
             ),
-            body: ListView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 24.0,
-              ),
-              children: [
-                SwitchListTile.adaptive(
-                  title: Text(
-                    'Notifications',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  activeTrackColor: AppColors.primary,
-                  activeThumbColor: AppColors.white,
-                  value: _notificationsEnabled,
-                  onChanged: (bool value) {
-                    setState(() {
-                      _notificationsEnabled = value;
-                    });
-                  },
+            body: Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(splashFactory: NoSplash.splashFactory),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 24.0,
                 ),
-                SwitchListTile.adaptive(
-                  title: Text(
-                    'Sound',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  activeTrackColor: AppColors.primary,
-                  activeThumbColor: AppColors.white,
-                  value: _soundEnabled,
-                  onChanged: (bool value) {
-                    setState(() {
-                      _soundEnabled = value;
-                    });
-                  },
-                ),
-                SwitchListTile.adaptive(
-                  title: Text(
-                    'Vibration',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  activeTrackColor: AppColors.primary,
-                  activeThumbColor: AppColors.white,
-                  value: _vibrationEnabled,
-                  onChanged: (bool value) {
-                    setState(() {
-                      _vibrationEnabled = value;
-                    });
-                  },
-                ),
-                SwitchListTile.adaptive(
-                  title: Text(
-                    'Dark Mode',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  activeTrackColor: AppColors.primary,
-                  activeThumbColor: AppColors.white,
-                  value: isDarkMode,
-                  onChanged: (bool value) {
-                    MyApp.of(context).setThemeMode(value);
-                  },
-                ),
-                Divider(
-                  height: 20,
-                  color: AppColors.black.withValues(alpha: 0.2),
-                ),
-                ListTile(
-                  leading: Icon(Icons.feedback_outlined, color: textTheme),
-                  title: Text(
-                    'Submit a Feedback',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  trailing: Icon(Icons.chevron_right, color: textTheme),
-                  onTap: _showFeedbackDialog,
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.report_problem_outlined,
-                    color: textTheme,
-                  ),
-                  title: Text(
-                    'Report a Problem',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  trailing: Icon(Icons.chevron_right, color: textTheme),
-                  onTap: _showReportDialog,
-                ),
-                ListTile(
-                  leading: Icon(Icons.block, color: textTheme),
-                  title: Text(
-                    'Blocked Users',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                  trailing: Icon(Icons.chevron_right, color: textTheme),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const BlockListPage(),
+                children: [
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Notifications',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
                       ),
-                    );
-                  },
-                ),
-              ],
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: _notificationsEnabled,
+                    onChanged: (bool value) {
+                      setState(() {
+                        _notificationsEnabled = value;
+                      });
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Sound',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: _soundEnabled,
+                    onChanged: (bool value) {
+                      setState(() {
+                        _soundEnabled = value;
+                      });
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Vibration',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: _vibrationEnabled,
+                    onChanged: (bool value) {
+                      setState(() {
+                        _vibrationEnabled = value;
+                      });
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Dark Mode',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: isDarkMode,
+                    onChanged: (bool value) {
+                      MyApp.of(context).setThemeMode(value);
+                    },
+                  ),
+                  Divider(
+                    height: 20,
+                    color: AppColors.black.withValues(alpha: 0.2),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.feedback_outlined, color: textTheme),
+                    title: Text(
+                      'Send Feedback',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: _showFeedbackDialog,
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.report_problem_outlined,
+                      color: textTheme,
+                    ),
+                    title: Text(
+                      'Report a Problem',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: _showReportDialog,
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.block, color: textTheme),
+                    title: Text(
+                      'Blocked Users',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BlockListPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
             bottomNavigationBar: SafeArea(
               child: Padding(
@@ -722,6 +795,7 @@ class _SettingsState extends State<Settings> {
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
+                        splashFactory: NoSplash.splashFactory,
                         onTap: _showLogoutDialog,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -750,6 +824,7 @@ class _SettingsState extends State<Settings> {
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
+                        splashFactory: NoSplash.splashFactory,
                         onTap: _showDeleteAccountDialog,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -989,6 +1064,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
       content: SizedBox(width: double.maxFinite, child: content),
       actions: [
         TextButton(
+          style: _noSplashButtonStyle,
           onPressed: () {
             Navigator.pop(context);
           },
@@ -1000,6 +1076,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
         TextButton(
           onPressed: _canConfirm ? widget.onConfirm : null,
           style: TextButton.styleFrom(
+            splashFactory: NoSplash.splashFactory,
             backgroundColor: Colors.red.withValues(
               alpha: _canConfirm ? 0.12 : 0.06,
             ),

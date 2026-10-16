@@ -99,10 +99,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   String get _roleKey => switch (_roleFilter) {
-        RoleFilter.learner => 'learner',
-        RoleFilter.mentor => 'mentor',
-        RoleFilter.all => _oppositeRoleKey,
-      };
+    RoleFilter.learner => 'learner',
+    RoleFilter.mentor => 'mentor',
+    RoleFilter.all => _oppositeRoleKey,
+  };
 
   String get _oppositeRoleKey {
     final role = _myProfile?.role;
@@ -130,16 +130,14 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connection request sent to ${person.name}'),
-        ),
+        SnackBar(content: Text('Connection request sent to ${person.name}')),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Request failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
     }
 
     _next(right: true);
@@ -155,9 +153,9 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileEditPage(
-          profile: _myProfile ?? _fallbackSelfProfile,
-        ),
+        builder:
+            (context) =>
+                ProfileEditPage(profile: _myProfile ?? _fallbackSelfProfile),
       ),
     );
   }
@@ -224,19 +222,17 @@ class _HomePageState extends State<HomePage> {
       duration: const Duration(milliseconds: 350),
       curve: Curves.easeOutCubic,
       child: child,
-      builder: (context, v, child) => Opacity(
-        opacity: 1 - v * 0.5,
-        child: Transform.translate(
-          offset: Offset(
-            dir * v * size.width * 0.7,
-            v * size.height * 0.35,
+      builder:
+          (context, v, child) => Opacity(
+            opacity: 1 - v * 0.5,
+            child: Transform.translate(
+              offset: Offset(
+                dir * v * size.width * 0.7,
+                v * size.height * 0.35,
+              ),
+              child: Transform.rotate(angle: dir * v * 0.25, child: child),
+            ),
           ),
-          child: Transform.rotate(
-            angle: dir * v * 0.25,
-            child: child,
-          ),
-        ),
-      ),
     );
   }
 
@@ -256,25 +252,22 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You blocked ${person.name}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Block failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
     }
 
     _next();
   }
 
   Future<void> _confirmReport(Person person) async {
-    final reason = await showReportReasonDialog(
-      context,
-      name: person.name,
-    );
+    final reason = await showReportReasonDialog(context, name: person.name);
 
     if (reason == null || !mounted) return;
 
@@ -283,15 +276,15 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Report failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
     }
 
     _next();
@@ -306,6 +299,7 @@ class _HomePageState extends State<HomePage> {
 
     final people = _filteredPeople;
     final hasMore = _currentIndex < people.length;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -318,11 +312,11 @@ class _HomePageState extends State<HomePage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'PalTuro',
-              style: AppTextStyles.headingText.copyWith(
-                color: textTheme,
-              ),
+            Image.asset(
+              isDarkMode
+                  ? 'assets/images/hlogo_white.png'
+                  : 'assets/images/hlogo_black.png',
+                  height: 40,
             ),
             Row(
               children: [
@@ -330,9 +324,10 @@ class _HomePageState extends State<HomePage> {
                   onPressed: _history.isEmpty ? null : _undo,
                   icon: Icon(
                     CupertinoIcons.arrow_uturn_left,
-                    color: _history.isEmpty
-                        ? textTheme.withValues(alpha: 0.3)
-                        : textTheme,
+                    color:
+                        _history.isEmpty
+                            ? textTheme.withValues(alpha: 0.3)
+                            : textTheme,
                     size: 24,
                   ),
                 ),
@@ -341,11 +336,7 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     IconButton(
                       onPressed: _openFilterSheet,
-                      icon: Icon(
-                        Icons.tune,
-                        color: textTheme,
-                        size: 24,
-                      ),
+                      icon: Icon(Icons.tune, color: textTheme, size: 24),
                     ),
                     if (_hasActiveFilter)
                       Positioned(
@@ -369,30 +360,26 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(),
-              )
-            : _error != null
+        child:
+            _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
                 ? _buildErrorState(textTheme)
                 : hasMore
-                    ? _wrapUndo(
-                        _SwipeableCard(
-                          key: ValueKey(people[_currentIndex].id),
-                          onSwiped: (right) => _next(right: right),
-                          child: PersonCardOverlay(
-                            person: people[_currentIndex],
-                            onAdd: () =>
-                                _confirmAdd(people[_currentIndex]),
-                            onSkip: _next,
-                            onBlock: () =>
-                                _confirmBlock(people[_currentIndex]),
-                            onReport: () =>
-                                _confirmReport(people[_currentIndex]),
-                          ),
-                        ),
-                      )
-                    : _buildEmptyState(textTheme),
+                ? _wrapUndo(
+                  _SwipeableCard(
+                    key: ValueKey(people[_currentIndex].id),
+                    onSwiped: (right) => _next(right: right),
+                    child: PersonCardOverlay(
+                      person: people[_currentIndex],
+                      onAdd: () => _confirmAdd(people[_currentIndex]),
+                      onSkip: _next,
+                      onBlock: () => _confirmBlock(people[_currentIndex]),
+                      onReport: () => _confirmReport(people[_currentIndex]),
+                    ),
+                  ),
+                )
+                : _buildEmptyState(textTheme),
       ),
     );
   }
@@ -406,9 +393,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(
               'Couldn’t load recommendations.\nPlease check your connection.',
-              style: AppTextStyles.regularText.copyWith(
-                color: textColor,
-              ),
+              style: AppTextStyles.regularText.copyWith(color: textColor),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -419,10 +404,7 @@ class _HomePageState extends State<HomePage> {
               ),
               child: const Text(
                 'Retry',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.black, fontSize: 16),
               ),
             ),
           ],
@@ -460,9 +442,7 @@ class _HomePageState extends State<HomePage> {
                   TextSpan(
                     text: 'settings',
                     recognizer: _settingsTap,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
                 style: AppTextStyles.regularText.copyWith(
@@ -516,9 +496,9 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
   void _onTick() {
     setState(() {
-      _dx = _from +
-          (_to - _from) *
-              Curves.easeOutCubic.transform(_controller.value);
+      _dx =
+          _from +
+          (_to - _from) * Curves.easeOutCubic.transform(_controller.value);
     });
   }
 
@@ -573,8 +553,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
         final angle = (_dx / (_width * 0.7)) * _maxAngle;
         final dy = _dx.abs() * driftRatio;
-        final fade =
-            (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
+        final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
 
         final goingRight = _dx > 0;
         final tint = goingRight ? AppColors.primary : Colors.red;
@@ -594,12 +573,11 @@ class _SwipeableCardState extends State<_SwipeableCard>
                       color: tint.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    alignment: goingRight
-                        ? Alignment.centerLeft
-                        : Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                    ),
+                    alignment:
+                        goingRight
+                            ? Alignment.centerLeft
+                            : Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Icon(
                       goingRight ? Icons.check : Icons.close,
                       color: tint,
@@ -611,10 +589,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
                 opacity: 1 - fade,
                 child: Transform.translate(
                   offset: Offset(_dx, dy),
-                  child: Transform.rotate(
-                    angle: angle,
-                    child: widget.child,
-                  ),
+                  child: Transform.rotate(angle: angle, child: widget.child),
                 ),
               ),
             ],

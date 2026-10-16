@@ -6,6 +6,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/screen/history_list.dart';
 
 final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
   splashFactory: NoSplash.splashFactory,
@@ -768,6 +769,24 @@ class _SettingsState extends State<Settings> {
                     ),
                     trailing: Icon(Icons.chevron_right, color: textTheme),
                     onTap: _showReportDialog,
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.history, color: textTheme),
+                    title: Text(
+                      'History',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HistoryListPage(),
+                        ),
+                      );
+                    },
                   ),
                   ListTile(
                     leading: Icon(Icons.block, color: textTheme),

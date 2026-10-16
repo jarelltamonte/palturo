@@ -306,56 +306,78 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
+        titleSpacing: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Image.asset(
-              isDarkMode
-                  ? 'assets/images/hlogo_white.png'
-                  : 'assets/images/hlogo_black.png',
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Transform.translate(
+                offset: const Offset(-10, 0),
+                child: Image.asset(
+                  isDarkMode
+                      ? 'assets/images/hlogo_white.png'
+                      : 'assets/images/hlogo_black.png',
                   height: 40,
-            ),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: _history.isEmpty ? null : _undo,
-                  icon: Icon(
-                    CupertinoIcons.arrow_uturn_left,
-                    color:
-                        _history.isEmpty
-                            ? textTheme.withValues(alpha: 0.3)
-                            : textTheme,
-                    size: 24,
-                  ),
                 ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      onPressed: _openFilterSheet,
-                      icon: Icon(Icons.tune, color: textTheme, size: 24),
-                    ),
-                    if (_hasActiveFilter)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
+              ),
+              Row(
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _history.isEmpty ? null : _undo,
+                    child: SizedBox(
+                      width: 40,
+                      height: 44,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Icon(
+                          CupertinoIcons.arrow_uturn_left,
+                          color:
+                              _history.isEmpty
+                                  ? textTheme.withValues(alpha: 0.3)
+                                  : textTheme,
+                          size: 24,
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                    ),
+                  ),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _openFilterSheet,
+                    child: SizedBox(
+                      width: 40,
+                      height: 44,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Icon(Icons.tune, color: textTheme, size: 24),
+                          ),
+                          if (_hasActiveFilter)
+                            Positioned(
+                              right: -2,
+                              top: 8,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: Padding(

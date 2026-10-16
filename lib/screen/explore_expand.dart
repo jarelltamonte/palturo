@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -101,25 +100,22 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You blocked ${person.name}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Block failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
     }
 
     _next();
   }
 
   Future<void> _confirmReport(Person person) async {
-    final reason = await showReportReasonDialog(
-      context,
-      name: person.name,
-    );
+    final reason = await showReportReasonDialog(context, name: person.name);
 
     if (reason == null || !mounted) return;
 
@@ -128,15 +124,15 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Report failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
     }
 
     _next();
@@ -181,11 +177,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ),
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Icon(
-        icon,
-        color: color,
-        size: 36,
-      ),
+      child: Icon(icon, color: color, size: 36),
     );
   }
 
@@ -212,11 +204,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
               behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.pop(context),
               child: Padding(
-                padding: const EdgeInsets.only(
-                  right: 12,
-                  top: 8,
-                  bottom: 8,
-                ),
+                padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
                 child: Icon(
                   Icons.arrow_back_ios_new,
                   color: textTheme,
@@ -235,14 +223,23 @@ class _ExploreExpandState extends State<ExploreExpand> {
                 ),
               ),
             ),
-            IconButton(
-              onPressed: _history.isEmpty ? null : _undo,
-              icon: Icon(
-                CupertinoIcons.arrow_uturn_left,
-                color: _history.isEmpty
-                    ? textTheme.withValues(alpha: 0.3)
-                    : textTheme,
-                size: 24,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _history.isEmpty ? null : _undo,
+              child: SizedBox(
+                width: 40,
+                height: 44,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Icon(
+                    CupertinoIcons.arrow_uturn_left,
+                    color:
+                        _history.isEmpty
+                            ? textTheme.withValues(alpha: 0.3)
+                            : textTheme,
+                    size: 24,
+                  ),
+                ),
               ),
             ),
           ],
@@ -252,40 +249,35 @@ class _ExploreExpandState extends State<ExploreExpand> {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(),
-                )
-              : _error != null
+          child:
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
                   ? _buildErrorState(textTheme)
                   : hasMore
-                      ? Dismissible(
-                          key: ValueKey(_people[_currentIndex].id),
-                          direction: DismissDirection.horizontal,
-                          background: _swipeBackground(
-                            alignment: Alignment.centerLeft,
-                            color: AppColors.primary,
-                            icon: Icons.check,
-                          ),
-                          secondaryBackground: _swipeBackground(
-                            alignment: Alignment.centerRight,
-                            color: Colors.red,
-                            icon: Icons.close,
-                          ),
-                          onDismissed: (_) => _next(),
-                          child: PersonCardOverlay(
-                            person: _people[_currentIndex],
-                            onAdd: null,
-                            onSkip: _next,
-                            onBlock: () => _confirmBlock(
-                              _people[_currentIndex],
-                            ),
-                            onReport: () => _confirmReport(
-                              _people[_currentIndex],
-                            ),
-                          ),
-                        )
-                      : _buildEmptyState(textTheme),
+                  ? Dismissible(
+                    key: ValueKey(_people[_currentIndex].id),
+                    direction: DismissDirection.horizontal,
+                    background: _swipeBackground(
+                      alignment: Alignment.centerLeft,
+                      color: AppColors.primary,
+                      icon: Icons.check,
+                    ),
+                    secondaryBackground: _swipeBackground(
+                      alignment: Alignment.centerRight,
+                      color: Colors.red,
+                      icon: Icons.close,
+                    ),
+                    onDismissed: (_) => _next(),
+                    child: PersonCardOverlay(
+                      person: _people[_currentIndex],
+                      onAdd: null,
+                      onSkip: _next,
+                      onBlock: () => _confirmBlock(_people[_currentIndex]),
+                      onReport: () => _confirmReport(_people[_currentIndex]),
+                    ),
+                  )
+                  : _buildEmptyState(textTheme),
         ),
       ),
     );
@@ -298,23 +290,16 @@ class _ExploreExpandState extends State<ExploreExpand> {
         children: [
           Text(
             'Couldn’t load users for ${widget.nodeLabel}.\nPlease check your connection.',
-            style: AppTextStyles.regularText.copyWith(
-              color: textTheme2,
-            ),
+            style: AppTextStyles.regularText.copyWith(color: textTheme2),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadPeople,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             child: const Text(
               'Retry',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.black, fontSize: 16),
             ),
           ),
         ],

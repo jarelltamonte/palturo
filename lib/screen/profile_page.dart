@@ -63,7 +63,9 @@ class _ProfilePageState extends State<ProfilePage> {
       final convos = await MatchApi.getConversations();
       final accepted = convos.where((c) => c.status == 'accepted').length;
       if (mounted) setState(() => _friendCount = accepted);
-    } catch (_) {/* keep null → renders plain label */}
+    } catch (_) {
+      /* keep null → renders plain label */
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -183,14 +185,22 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: IconButton(
-              icon: Icon(Icons.settings, color: textTheme),
-              onPressed: () {
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const Settings()),
                 );
               },
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Icon(Icons.settings, color: textTheme),
+                ),
+              ),
             ),
           ),
         ],
@@ -262,7 +272,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                               _friendCount == null
+                                              _friendCount == null
                                                   ? ''
                                                   : '$_friendCount',
                                               style: AppTextStyles.regularText

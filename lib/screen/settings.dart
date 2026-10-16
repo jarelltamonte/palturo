@@ -70,7 +70,8 @@ class _SettingsState extends State<Settings> {
           builder: (context, setDialogState) {
             final textTheme = Theme.of(context).colorScheme.secondary;
 
-            final bool isCommentStep = currentStep == _feedbackStatements.length;
+            final bool isCommentStep =
+                currentStep == _feedbackStatements.length;
             final int selectedRating = ratings[currentStep] ?? 0;
 
             Widget buildOption(int index) {
@@ -149,8 +150,7 @@ class _SettingsState extends State<Settings> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value:
-                        (currentStep + 1) / (_feedbackStatements.length + 1),
+                    value: (currentStep + 1) / (_feedbackStatements.length + 1),
                     minHeight: 4,
                     backgroundColor: textTheme.withValues(alpha: 0.1),
                     valueColor: const AlwaysStoppedAnimation<Color>(
@@ -648,9 +648,17 @@ class _SettingsState extends State<Settings> {
               scrolledUnderElevation: 0,
               elevation: 0,
               automaticallyImplyLeading: false,
-              leading: IconButton(
-                icon: Icon(Icons.close, color: textTheme),
-                onPressed: _isLoggingOut ? null : () => Navigator.pop(context),
+              leadingWidth: 60,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _isLoggingOut ? null : () => Navigator.pop(context),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Icon(Icons.close, color: textTheme, size: 24),
+                  ),
+                ),
               ),
               title: Text(
                 'Settings',

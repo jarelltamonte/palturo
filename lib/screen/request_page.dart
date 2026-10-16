@@ -168,9 +168,9 @@ class _RequestPageState extends State<RequestPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load requests: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load requests: $e')));
     }
   }
 
@@ -193,14 +193,16 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   List<ConnectionRequest> get _filteredAndSortedRequests {
-    var filtered = _requests.where((r) {
-      final matchesDate = _matchesDateFilter(r.requestedAt);
-      final matchesRole = _roleFilter == RoleFilter.all ||
-          (_roleFilter == RoleFilter.learner &&
-              r.role == PersonRole.learner) ||
-          (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
-      return matchesDate && matchesRole;
-    }).toList();
+    var filtered =
+        _requests.where((r) {
+          final matchesDate = _matchesDateFilter(r.requestedAt);
+          final matchesRole =
+              _roleFilter == RoleFilter.all ||
+              (_roleFilter == RoleFilter.learner &&
+                  r.role == PersonRole.learner) ||
+              (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
+          return matchesDate && matchesRole;
+        }).toList();
 
     switch (_sortFilter) {
       case SortFilter.newest:
@@ -231,9 +233,9 @@ class _RequestPageState extends State<RequestPage> {
       await MatchApi.blockUser(request.requesterId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Block failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
       return;
     }
     if (!mounted) return;
@@ -248,14 +250,14 @@ class _RequestPageState extends State<RequestPage> {
     try {
       await MatchApi.reportUser(request.requesterId, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Report failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
     }
   }
 
@@ -274,9 +276,9 @@ class _RequestPageState extends State<RequestPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to respond: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
     }
     _removeRequest(request.id);
   }
@@ -285,19 +287,20 @@ class _RequestPageState extends State<RequestPage> {
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.7),
-      builder: (_) => RequestDetailDialog(
-        person: request.toPerson(),
-        onAccept: () {
-          Navigator.pop(context);
-          _respond(request, true);
-        },
-        onDecline: () {
-          Navigator.pop(context);
-          _respond(request, false);
-        },
-        onBlock: () => _blockRequester(request),
-        onReport: (reason) => _reportRequester(request, reason),
-      ),
+      builder:
+          (_) => RequestDetailDialog(
+            person: request.toPerson(),
+            onAccept: () {
+              Navigator.pop(context);
+              _respond(request, true);
+            },
+            onDecline: () {
+              Navigator.pop(context);
+              _respond(request, false);
+            },
+            onBlock: () => _blockRequester(request),
+            onReport: (reason) => _reportRequester(request, reason),
+          ),
     );
   }
 
@@ -374,37 +377,48 @@ class _RequestPageState extends State<RequestPage> {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            Text(
-              'Requests',
-              style: AppTextStyles.headingText.copyWith(color: textTheme),
-            ),
-            const Spacer(),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  onPressed: _openFilterSheet,
-                  icon: Icon(Icons.tune, color: textTheme, size: 22),
-                ),
-                if (_hasActiveFilter)
-                  Positioned(
-                    right: 10,
-                    top: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _filterDotColor,
-                        shape: BoxShape.circle,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Text(
+                'Requests',
+                style: AppTextStyles.headingText.copyWith(color: textTheme),
+              ),
+              const Spacer(),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openFilterSheet,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Icon(Icons.tune, color: textTheme, size: 24),
                       ),
-                    ),
+                      if (_hasActiveFilter)
+                        Positioned(
+                          right: -2,
+                          top: 9,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _filterDotColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       body:

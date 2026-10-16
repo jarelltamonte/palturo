@@ -96,10 +96,11 @@ class _ExplorePageState extends State<ExplorePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ExploreExpand(
-          nodePath: (root['path'] ?? '') as String,
-          nodeLabel: (root['name'] ?? '') as String,
-        ),
+        builder:
+            (context) => ExploreExpand(
+              nodePath: (root['path'] ?? '') as String,
+              nodeLabel: (root['name'] ?? '') as String,
+            ),
       ),
     );
   }
@@ -118,30 +119,33 @@ class _ExplorePageState extends State<ExplorePage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Explore',
-              style: AppTextStyles.headingText.copyWith(color: textTheme),
-            ),
-            IconButton(
-              icon: Icon(
-                CupertinoIcons.question_circle,
-                color: textTheme,
-                size: 24,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Explore',
+                style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () {
-                showAdaptiveDialog(
-                  context: context,
-                  builder: (context) => const _ExploreInfoDialog(),
-                );
-              },
-            ),
-          ],
+              IconButton(
+                icon: Icon(
+                  CupertinoIcons.question_circle,
+                  color: textTheme,
+                  size: 24,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  showAdaptiveDialog(
+                    context: context,
+                    builder: (context) => const _ExploreInfoDialog(),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
       body: Padding(

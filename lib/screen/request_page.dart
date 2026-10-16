@@ -423,7 +423,7 @@ class _RequestPageState extends State<RequestPage> {
                         'They want to connect with you. Like back to start exchanging skills right away!',
                         style: AppTextStyles.regularText.copyWith(
                           color: textTheme.withValues(alpha: 0.7),
-                          fontSize: 16,
+                          fontSize: 14,
                         ),
                       ),
                     );

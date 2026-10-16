@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/request_card.dart';
@@ -148,6 +149,7 @@ class _RequestPageState extends State<RequestPage> {
       _sortFilter != SortFilter.newest;
 
   late List<ConnectionRequest> _requests = const [];
+  bool _loading = true;
 
   @override
   void initState() {
@@ -161,9 +163,11 @@ class _RequestPageState extends State<RequestPage> {
       if (!mounted) return;
       setState(() {
         _requests = incoming.map((r) => r.toConnectionRequest()).toList();
+        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
+      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load requests: $e')),
       );
@@ -325,6 +329,34 @@ class _RequestPageState extends State<RequestPage> {
     );
   }
 
+  Widget _buildEmptyState(Color textTheme) {
+    final filteredOut = _requests.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 0, 32, 110),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Lottie.asset(
+              'assets/lottie/empty.json',
+              width: 220,
+              height: 220,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              filteredOut ? 'No requests found' : 'No requests yet',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
@@ -375,43 +407,48 @@ class _RequestPageState extends State<RequestPage> {
           ],
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        itemCount: requests.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                'They want to connect with you. Like back to start exchanging skills right away!',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.7),
-                  fontSize: 16,
-                ),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : requests.isEmpty
+              ? _buildEmptyState(textTheme)
+              : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                itemCount: requests.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        'They want to connect with you. Like back to start exchanging skills right away!',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme.withValues(alpha: 0.7),
+                          fontSize: 16,
+                        ),
+                      ),
+                    );
+                  }
+                  final request = requests[index - 1];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: GestureDetector(
+                      onTap: () => _openDetail(request),
+                      child: RequestCard(
+                        skillName: request.skillName,
+                        requesterName: request.requesterName,
+                        schedule: request.schedule,
+                        language: request.language,
+                        learningStyle: request.learningStyle,
+                        timeAgo: timeAgo(request.requestedAt),
+                        iconAsset: request.iconAsset,
+                        seekingLabel: request.seekingLabel,
+                        onAccept: () => _respond(request, true),
+                        onDecline: () => _respond(request, false),
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          }
-          final request = requests[index - 1];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: GestureDetector(
-              onTap: () => _openDetail(request),
-              child: RequestCard(
-                skillName: request.skillName,
-                requesterName: request.requesterName,
-                schedule: request.schedule,
-                language: request.language,
-                learningStyle: request.learningStyle,
-                timeAgo: timeAgo(request.requestedAt),
-                iconAsset: request.iconAsset,
-                seekingLabel: request.seekingLabel,
-                onAccept: () => _respond(request, true),
-                onDecline: () => _respond(request, false),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

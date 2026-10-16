@@ -26,7 +26,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Person> _people = const [];
   bool _loading = true;
-  bool _randomMode = false;
   String? _error;
   ProfileData? _myProfile;
 
@@ -82,7 +81,6 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _people = deck;
         _loading = false;
-        _randomMode = false;
         _currentIndex = 0;
         _history.clear();
         _historyRight.clear();
@@ -91,36 +89,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e, st) {
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
 
-      if (!mounted) return;
-
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _loadRandomDeck() async {
-    setState(() {
-      _loading = _people.isEmpty;
-      _error = null;
-    });
-
-    try {
-      final randoms = await MatchApi.getRandomDeck(limit: 20);
-
-      if (!mounted) return;
-
-      setState(() {
-        _people = randoms;
-        _randomMode = true;
-        _loading = false;
-        _currentIndex = 0;
-        _history.clear();
-        _historyRight.clear();
-        _undoActive = false;
-      });
-    } catch (e) {
       if (!mounted) return;
 
       setState(() {
@@ -478,49 +446,19 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              _randomMode
-                  ? 'You have seen everything for now.'
-                  : 'You have seen all the top results.\nExplore more of the community!',
+              'You have seen all the top results',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _randomMode
-                  ? () => _loadDeck(force: true)
-                  : _loadRandomDeck,
-              icon: Icon(
-                _randomMode
-                    ? CupertinoIcons.arrow_counterclockwise
-                    : CupertinoIcons.shuffle,
-                size: 18,
-              ),
-              label: Text(
-                _randomMode
-                    ? 'Back to recommendations'
-                    : 'Explore more people',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
             Text.rich(
               TextSpan(
                 children: [
                   const TextSpan(text: 'Update your '),
                   TextSpan(
-                    text: 'Settings',
+                    text: 'settings',
                     recognizer: _settingsTap,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,

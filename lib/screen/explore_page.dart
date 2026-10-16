@@ -24,7 +24,6 @@ class _ExplorePageState extends State<ExplorePage> {
   // (e.g. read from shared_preferences in initState before loading).
   ExploreRole _role = ExploreRole.learner;
 
-  // Guards against out-of-order responses when the user toggles quickly.
   int _requestId = 0;
 
   static const Map<String, IconData> _rootIcons = {
@@ -39,8 +38,28 @@ class _ExplorePageState extends State<ExplorePage> {
     'visual_arts_design': Icons.brush_outlined,
   };
 
+  static const Map<String, String> _descriptionRules = {
+    'cook': 'Recipes, flavors, and kitchen traditions',
+    'craft': 'Weaving, carving, and handmade heritage',
+    'perform': 'Music, dance, and stage traditions',
+    'martial': 'Combat arts and discipline',
+    'language': 'Languages, scripts, and storytelling',
+    'household': 'Everyday skills for the home',
+    'agricult': 'Farming, fishing, and local trades',
+    'modern': "Useful skills for today's world",
+    'visual': 'Drawing, painting, and design',
+  };
+
   static const String _fallbackDescription =
       'Skills shared by the PalTuro community';
+
+  String _descriptionFor(Map<String, dynamic> node) {
+    final key = '${node['path'] ?? ''} ${node['name'] ?? ''}'.toLowerCase();
+    for (final rule in _descriptionRules.entries) {
+      if (key.contains(rule.key)) return rule.value;
+    }
+    return _fallbackDescription;
+  }
 
   @override
   void initState() {
@@ -61,7 +80,6 @@ class _ExplorePageState extends State<ExplorePage> {
     }
   }
 
-  /// Live data: 9 taxonomy roots from `skill_nodes` (DEV-20).
   Future<void> _loadTaxonomy() async {
     final requestId = ++_requestId;
     setState(() {
@@ -171,7 +189,6 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildCaption(Color textTheme) {
-    // Fixed height so the grid doesn't jump when the caption changes.
     return SizedBox(
       height: 18,
       child: AnimatedSwitcher(
@@ -191,14 +208,11 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildContent(Color textTheme) {
-    // Keep the previous grid visible while switching, so there's no spinner flash.
     if (_loading && _roots.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) return _buildErrorState(textTheme);
     if (_roots.isEmpty) return _buildEmptyState(textTheme);
-    // Only stretch to fill the screen when there are exactly 4 cards;
-    // 1-3 cards (common in Mentor mode) would look oversized.
     return _roots.length == 4
         ? _buildGrid2x2(textTheme)
         : _buildGridAuto(textTheme);
@@ -236,7 +250,7 @@ class _ExplorePageState extends State<ExplorePage> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        mainAxisExtent: 150,
+        mainAxisExtent: 190,
       ),
       itemCount: _roots.length,
       itemBuilder: (context, index) => _buildCard(index),
@@ -248,7 +262,7 @@ class _ExplorePageState extends State<ExplorePage> {
     final path = (node['path'] ?? '') as String;
     return _CategoryCard(
       label: (node['name'] ?? '') as String,
-      description: _fallbackDescription,
+      description: _descriptionFor(node),
       icon: _rootIcons[path] ?? Icons.category_outlined,
       onTap: () => _openCategory(node),
     );

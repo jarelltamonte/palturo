@@ -428,7 +428,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide(
-                        color: primaryColor,
+                        color: AppColors.primary,
                         width: 1.5,
                       ),
                     ),

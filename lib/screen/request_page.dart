@@ -6,6 +6,7 @@ import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
 import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/match_api.dart';
 
 class ConnectionRequest {
@@ -103,6 +104,41 @@ class _RequestPageState extends State<RequestPage> {
   DateFilter _dateFilter = DateFilter.all;
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
+
+  static const List<FilterSection> _filterSections = [
+    FilterSection(
+      key: 'date',
+      title: 'Date',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Today', 'today'),
+        FilterOption('This Week', 'thisWeek'),
+        FilterOption('This Month', 'thisMonth'),
+        FilterOption('This Year', 'thisYear'),
+      ],
+    ),
+    FilterSection(
+      key: 'role',
+      title: 'Role',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Learner', 'learner'),
+        FilterOption('Mentor', 'mentor'),
+      ],
+    ),
+    FilterSection(key: 'skills', title: 'Skills'),
+    FilterSection(
+      key: 'sort',
+      title: 'Filter',
+      defaultValue: 'newest',
+      options: [
+        FilterOption('Newest', 'newest'),
+        FilterOption('Oldest', 'oldest'),
+        FilterOption('Ascending (A-Z)', 'ascending'),
+        FilterOption('Descending (Z-A)', 'descending'),
+      ],
+    ),
+  ];
 
   Color get _filterDotColor => AppColors.primary;
 
@@ -262,276 +298,30 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   void _openFilterSheet() {
-    DateFilter draftDate = _dateFilter;
-    RoleFilter draftRole = _roleFilter;
-    SortFilter draftSort = _sortFilter;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        final textColor = Theme.of(context).colorScheme.secondary;
-        final primaryColor = Theme.of(context).colorScheme.primary;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => setModalState(() {
-                            draftDate = DateFilter.all;
-                            draftRole = RoleFilter.all;
-                            draftSort = SortFilter.newest;
-                          }),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _sheetSectionLabel('Date', textColor),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _filterChip(
-                                  'All',
-                                  draftDate == DateFilter.all,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.all),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Today',
-                                  draftDate == DateFilter.today,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.today),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'This Week',
-                                  draftDate == DateFilter.thisWeek,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.thisWeek),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'This Month',
-                                  draftDate == DateFilter.thisMonth,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.thisMonth),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'This Year',
-                                  draftDate == DateFilter.thisYear,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.thisYear),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            _sheetSectionLabel('Role', textColor),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _filterChip(
-                                  'All',
-                                  draftRole == RoleFilter.all,
-                                  () => setModalState(
-                                      () => draftRole = RoleFilter.all),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Learner',
-                                  draftRole == RoleFilter.learner,
-                                  () => setModalState(
-                                      () => draftRole = RoleFilter.learner),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Mentor',
-                                  draftRole == RoleFilter.mentor,
-                                  () => setModalState(
-                                      () => draftRole = RoleFilter.mentor),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            _sheetSectionLabel('Skills', textColor),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Coming soon',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textColor.withValues(alpha: 0.4),
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _sheetSectionLabel('Filter', textColor),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _filterChip(
-                                  'Newest',
-                                  draftSort == SortFilter.newest,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.newest),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Oldest',
-                                  draftSort == SortFilter.oldest,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.oldest),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Ascending (A-Z)',
-                                  draftSort == SortFilter.ascending,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.ascending),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Descending (Z-A)',
-                                  draftSort == SortFilter.descending,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.descending),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _dateFilter = draftDate;
-                            _roleFilter = draftRole;
-                            _sortFilter = draftSort;
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
+    FilterBottomSheet.show(
+      context,
+      sections: _filterSections,
+      selected: {
+        'date': _dateFilter.name,
+        'role': _roleFilter.name,
+        'sort': _sortFilter.name,
       },
-    );
-  }
-
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor,
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.secondary
-                : textColor.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: isSelected ? AppColors.black : textColor,
-            fontSize: 13,
-          ),
-        ),
-      ),
+      onApply: (result) {
+        setState(() {
+          _dateFilter = DateFilter.values.firstWhere(
+            (d) => d.name == result['date'],
+            orElse: () => DateFilter.all,
+          );
+          _roleFilter = RoleFilter.values.firstWhere(
+            (r) => r.name == result['role'],
+            orElse: () => RoleFilter.all,
+          );
+          _sortFilter = SortFilter.values.firstWhere(
+            (s) => s.name == result['sort'],
+            orElse: () => SortFilter.newest,
+          );
+        });
+      },
     );
   }
 

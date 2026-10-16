@@ -12,6 +12,7 @@ import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
 
 const kBioMaxLength = 100;
@@ -527,7 +528,26 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   const SizedBox(height: 24),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _BioField(controller: _bioController),
+                    child: Text(
+                      'Bio',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: textTheme,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TopLabeledField(
+                      label: 'Introduce yourself',
+                      controller: _bioController,
+                      maxLines: null,
+                      maxLength: kBioMaxLength,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.done,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Padding(
@@ -688,61 +708,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BioField extends StatelessWidget {
-  final TextEditingController controller;
-
-  const _BioField({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-
-    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(20),
-      borderSide: BorderSide(color: color, width: width),
-    );
-
-    return TextField(
-      controller: controller,
-      minLines: 2,
-      maxLines: 3,
-      maxLength: kBioMaxLength,
-      keyboardType: TextInputType.multiline,
-      textInputAction: TextInputAction.done,
-      textCapitalization: TextCapitalization.sentences,
-      cursorColor: textColor,
-      style: TextStyle(color: textColor, fontSize: 16),
-      buildCounter: (
-        context, {
-        required int currentLength,
-        required bool isFocused,
-        required int? maxLength,
-      }) {
-        return Text(
-          '$currentLength/$maxLength',
-          style: TextStyle(
-            fontSize: 12,
-            color: textColor.withValues(alpha: 0.5),
-          ),
-        );
-      },
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: AppColors.secondary,
-        hintText: 'Write a short bio about yourself',
-        hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 14,
-        ),
-        border: border(Colors.transparent, 0),
-        enabledBorder: border(Colors.transparent, 0),
-        focusedBorder: border(textColor, 1.5),
       ),
     );
   }

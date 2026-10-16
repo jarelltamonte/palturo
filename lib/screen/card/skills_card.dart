@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/widgets/top_labeled_field.dart';
 
 const kOtherId = 'other';
 const kOtherPrefix = 'other:';
 const kCustomSkillMaxLength = 30;
 const kSkillNoteMaxLength = 150;
 const kMaxSuggestions = 5;
+const kSkillFieldHeight = 56.0;
 
 const kSkillCategories = <({String id, String label, IconData icon})>[
   (id: 'arts_design', label: 'Arts and Design', icon: Icons.palette_outlined),
@@ -47,6 +49,42 @@ const _kSmallWords = <String>{
   'the',
   'in',
 };
+
+const _kKeywordCategories = <String, String>{
+  'cook': 'everyday_skills',
+  'bake': 'everyday_skills',
+  'repair': 'everyday_skills',
+  'martial': 'everyday_skills',
+  'sew': 'arts_design',
+  'weav': 'arts_design',
+  'embroid': 'arts_design',
+  'paint': 'arts_design',
+  'draw': 'arts_design',
+  'craft': 'arts_design',
+  'pottery': 'arts_design',
+  'carv': 'arts_design',
+  'dance': 'language_culture',
+  'sing': 'language_culture',
+  'music': 'language_culture',
+  'drum': 'language_culture',
+  'script': 'language_culture',
+  'language': 'language_culture',
+  'tagalog': 'language_culture',
+  'farm': 'agriculture_livelihood',
+  'plant': 'agriculture_livelihood',
+  'garden': 'agriculture_livelihood',
+  'harvest': 'agriculture_livelihood',
+  'fish': 'agriculture_livelihood',
+  'livestock': 'agriculture_livelihood',
+};
+
+String guessSkillCategory(String text) {
+  final lower = text.toLowerCase();
+  for (final entry in _kKeywordCategories.entries) {
+    if (lower.contains(entry.key)) return entry.value;
+  }
+  return 'everyday_skills';
+}
 
 ({String id, String label, IconData icon})? categoryById(String? id) {
   if (id == null || id.isEmpty) return null;
@@ -157,41 +195,7 @@ abstract class SkillSuggestionService {
 class LocalSkillSuggestionService implements SkillSuggestionService {
   const LocalSkillSuggestionService();
 
-  static const _keywordCategories = <String, String>{
-    'cook': 'everyday_skills',
-    'bake': 'everyday_skills',
-    'repair': 'everyday_skills',
-    'martial': 'everyday_skills',
-    'sew': 'arts_design',
-    'weav': 'arts_design',
-    'embroid': 'arts_design',
-    'paint': 'arts_design',
-    'draw': 'arts_design',
-    'craft': 'arts_design',
-    'pottery': 'arts_design',
-    'carv': 'arts_design',
-    'dance': 'language_culture',
-    'sing': 'language_culture',
-    'music': 'language_culture',
-    'drum': 'language_culture',
-    'script': 'language_culture',
-    'language': 'language_culture',
-    'tagalog': 'language_culture',
-    'farm': 'agriculture_livelihood',
-    'plant': 'agriculture_livelihood',
-    'garden': 'agriculture_livelihood',
-    'harvest': 'agriculture_livelihood',
-    'fish': 'agriculture_livelihood',
-    'livestock': 'agriculture_livelihood',
-  };
-
-  String _guessCategory(String text) {
-    final lower = text.toLowerCase();
-    for (final entry in _keywordCategories.entries) {
-      if (lower.contains(entry.key)) return entry.value;
-    }
-    return 'everyday_skills';
-  }
+  String _guessCategory(String text) => guessSkillCategory(text);
 
   @override
   Future<List<SkillSuggestion>> suggest(
@@ -338,6 +342,7 @@ class _SkillsCardState extends State<SkillsCard> {
   late List<String> _notes;
   late List<int> _rowUids;
   int _nextUid = 0;
+  int? _activeUid;
 
   String? _resolveAttachmentPath(String skillId) {
     if (widget.attachments == null || widget.attachments!.isEmpty) return null;
@@ -385,6 +390,7 @@ class _SkillsCardState extends State<SkillsCard> {
             .toList();
     _notes = _skillIds.map(_resolveNote).toList();
     _rowUids = List.generate(_skillIds.length, (_) => _nextUid++);
+    _activeUid = null;
   }
 
   void _emit() {
@@ -412,22 +418,30 @@ class _SkillsCardState extends State<SkillsCard> {
     }
   }
 
+  void _activate(int uid) {
+    if (_activeUid == uid) return;
+    setState(() => _activeUid = uid);
+  }
+
   void _addSkill() {
     if (_skillIds.length >= widget.maxSkills) return;
     if (_skillIds.contains('')) return;
     setState(() {
       _skillIds.add('');
       _notes.add('');
+      _activeUid = _nextUid;
       _rowUids.add(_nextUid++);
     });
   }
 
   void _removeSkill(int index) {
     final old = _skillIds[index];
+    final uid = _rowUids[index];
     setState(() {
       _skillIds.removeAt(index);
       _notes.removeAt(index);
       _rowUids.removeAt(index);
+      if (_activeUid == uid) _activeUid = null;
     });
     if (old.isNotEmpty) widget.onNoteChanged?.call(old, '');
     _emit();
@@ -517,6 +531,7 @@ class _SkillsCardState extends State<SkillsCard> {
               selectedId: _skillIds[i],
               alreadyUsedIds: _skillIds,
               isEditing: widget.isEditing,
+              isActive: _activeUid == _rowUids[i],
               accentColor: accentColor,
               options: widget.options,
               labelSuffix: widget.labelSuffix,
@@ -525,6 +540,7 @@ class _SkillsCardState extends State<SkillsCard> {
               suggestionService: widget.suggestionService,
               showAttachFile: widget.showAttachFile,
               attachmentPath: _resolveAttachmentPath(_skillIds[i]),
+              onActivate: () => _activate(_rowUids[i]),
               onChanged: (newId) => _updateSkill(i, newId),
               onNoteChanged: (note) => _updateNote(i, note),
               onRemove: () => _removeSkill(i),
@@ -549,6 +565,7 @@ class _SkillRow extends StatefulWidget {
   final String selectedId;
   final List<String> alreadyUsedIds;
   final bool isEditing;
+  final bool isActive;
   final Color accentColor;
   final List<OnboardingOption> options;
   final String labelSuffix;
@@ -557,6 +574,7 @@ class _SkillRow extends StatefulWidget {
   final SkillSuggestionService suggestionService;
   final bool showAttachFile;
   final String? attachmentPath;
+  final VoidCallback onActivate;
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onNoteChanged;
   final VoidCallback onRemove;
@@ -568,6 +586,7 @@ class _SkillRow extends StatefulWidget {
     required this.selectedId,
     required this.alreadyUsedIds,
     required this.isEditing,
+    required this.isActive,
     required this.accentColor,
     required this.options,
     required this.labelSuffix,
@@ -576,6 +595,7 @@ class _SkillRow extends StatefulWidget {
     required this.suggestionService,
     required this.showAttachFile,
     this.attachmentPath,
+    required this.onActivate,
     required this.onChanged,
     required this.onNoteChanged,
     required this.onRemove,
@@ -591,12 +611,16 @@ class _SkillRowState extends State<_SkillRow> {
   final _searchController = TextEditingController();
   final _noteController = TextEditingController();
   final _focusNode = FocusNode();
+  final _overlayController = OverlayPortalController();
+  final _layerLink = LayerLink();
 
   Timer? _debounce;
   int _requestId = 0;
   bool _loading = false;
   List<SkillSuggestion> _suggestions = const [];
   String? _pickedCategoryId;
+  String _lastNote = '';
+  double _fieldWidth = 0;
 
   bool get _isLearn => widget.labelSuffix.toLowerCase() == 'learn';
 
@@ -604,34 +628,65 @@ class _SkillRowState extends State<_SkillRow> {
   void initState() {
     super.initState();
     _noteController.text = widget.initialNote;
+    _lastNote = widget.initialNote;
+    _noteController.addListener(_onNoteControllerChanged);
     _focusNode.addListener(_onFocusChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _overlayController.show();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SkillRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      _debounce?.cancel();
+      _requestId++;
+      _suggestions = const [];
+      _loading = false;
+    }
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _focusNode.removeListener(_onFocusChanged);
+    _noteController.removeListener(_onNoteControllerChanged);
     _focusNode.dispose();
     _searchController.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
+  void _onNoteControllerChanged() {
+    final text = _noteController.text;
+    if (text == _lastNote) return;
+    _lastNote = text;
+    widget.onNoteChanged(text);
+  }
+
   void _onFocusChanged() {
-    if (_focusNode.hasFocus &&
-        _suggestions.isEmpty &&
-        _searchController.text.isEmpty) {
-      _search('');
+    if (!_focusNode.hasFocus) return;
+    widget.onActivate();
+    if (_suggestions.isEmpty) {
+      _search(_searchController.text);
     }
   }
 
   void _onQueryChanged(String query) {
+    setState(() {});
     _debounce?.cancel();
     if (query.trim().isEmpty) {
       _search('');
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 250), () => _search(query));
+  }
+
+  void _clearQuery() {
+    _searchController.clear();
+    _focusNode.requestFocus();
+    _onQueryChanged('');
   }
 
   Future<void> _search(String query) async {
@@ -688,7 +743,15 @@ class _SkillRowState extends State<_SkillRow> {
     if (custom != null && custom.categoryId.isNotEmpty) {
       return custom.categoryId;
     }
-    return kSkillToCategorySlug[id] ?? _pickedCategoryId;
+    final mapped = kSkillToCategorySlug[id];
+    if (mapped != null) return mapped;
+    if (_pickedCategoryId != null) return _pickedCategoryId;
+    for (final o in widget.options) {
+      if (o.id == id || o.label == id) {
+        return kSkillToCategorySlug[o.id] ?? guessSkillCategory(o.label);
+      }
+    }
+    return guessSkillCategory(_labelFor(id));
   }
 
   String _getDisplayName(String path) {
@@ -710,48 +773,73 @@ class _SkillRowState extends State<_SkillRow> {
         borderSide: BorderSide(color: color, width: width),
       );
 
-  Widget _buildSearchField(Color textColor, Color dim) {
-    return TextField(
-      controller: _searchController,
-      focusNode: _focusNode,
-      autofocus: widget.isEditing,
-      enabled: widget.isEditing,
-      maxLength: kCustomSkillMaxLength,
-      textInputAction: TextInputAction.search,
-      onChanged: _onQueryChanged,
-      cursorColor: textColor,
-      style: TextStyle(
-        color: textColor,
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
+  Widget _buildSuffix(Color dim) {
+    final hasText = _searchController.text.isNotEmpty;
+    if (!_loading && !hasText) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          if (hasText)
+            InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _clearQuery,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(Icons.close, size: 18, color: dim),
+              ),
+            ),
+        ],
       ),
-      decoration: InputDecoration(
-        hintText: 'Search a skill to ${widget.labelSuffix.toLowerCase()}',
-        hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
-        counterText: '',
-        prefixIcon: Icon(Icons.search, size: 20, color: dim),
-        suffixIcon:
-            _loading
-                ? const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                )
-                : null,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
+    );
+  }
+
+  Widget _buildSearchField(Color textColor, Color dim) {
+    return SizedBox(
+      height: kSkillFieldHeight,
+      child: TextField(
+        controller: _searchController,
+        focusNode: _focusNode,
+        autofocus: widget.isEditing,
+        enabled: widget.isEditing,
+        expands: true,
+        minLines: null,
+        maxLines: null,
+        textAlignVertical: TextAlignVertical.center,
+        maxLength: kCustomSkillMaxLength,
+        textInputAction: TextInputAction.search,
+        onChanged: _onQueryChanged,
+        cursorColor: textColor,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
         ),
-        border: _border(dim, 1.5, 28),
-        enabledBorder: _border(dim, 1.5, 28),
-        disabledBorder: _border(dim, 1.5, 28),
-        focusedBorder: _border(AppColors.primary, 1.5, 28),
+        decoration: InputDecoration(
+          hintText: 'Search a skill to ${widget.labelSuffix.toLowerCase()}',
+          hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+          counterText: '',
+          prefixIcon: Icon(Icons.search, size: 20, color: dim),
+          suffixIcon: _buildSuffix(dim),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+          border: _border(dim, 1.5, 28),
+          enabledBorder: _border(dim, 1.5, 28),
+          disabledBorder: _border(dim, 1.5, 28),
+          focusedBorder: _border(AppColors.primary, 1.5, 28),
+        ),
       ),
     );
   }
@@ -765,7 +853,8 @@ class _SkillRowState extends State<_SkillRow> {
         ),
         onTap: widget.isEditing ? _changeSelection : null,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          height: kSkillFieldHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: dim, width: 1.5),
@@ -789,66 +878,81 @@ class _SkillRowState extends State<_SkillRow> {
     );
   }
 
-  Widget _buildSuggestions(Color textColor) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Material(
-        color: AppColors.secondary,
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            for (final s in _suggestions)
-              InkWell(
-                onTap: () => _select(s),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        s.isCustom
-                            ? Icons.add_circle_outline
-                            : (categoryById(s.categoryId)?.icon ??
-                                Icons.label_outline),
-                        size: 20,
-                        color: s.isCustom ? AppColors.primary : textColor,
+  Widget _buildSuggestionsOverlay(Color textColor) {
+    final surface = Theme.of(context).colorScheme.surface;
+    final ordered = _suggestions.reversed.toList();
+    return CompositedTransformFollower(
+      link: _layerLink,
+      showWhenUnlinked: false,
+      targetAnchor: Alignment.topLeft,
+      followerAnchor: Alignment.bottomLeft,
+      offset: const Offset(0, -8),
+      child: Align(
+        alignment: Alignment.bottomLeft,
+        child: SizedBox(
+          width: _fieldWidth,
+          child: Material(
+            color: surface,
+            elevation: 6,
+            shadowColor: Colors.black.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final s in ordered)
+                  InkWell(
+                    onTap: () => _select(s),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              s.isCustom ? 'Add "${s.label}"' : s.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            if (categoryById(s.categoryId) != null)
-                              Text(
-                                categoryById(s.categoryId)!.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: textColor.withValues(alpha: 0.6),
-                                  fontSize: 12,
+                      child: Row(
+                        children: [
+                          Icon(
+                            s.isCustom
+                                ? Icons.add_circle_outline
+                                : (categoryById(s.categoryId)?.icon ??
+                                    Icons.label_outline),
+                            size: 20,
+                            color: s.isCustom ? AppColors.primary : textColor,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.isCustom ? 'Add "${s.label}"' : s.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
-                              ),
-                          ],
-                        ),
+                                if (categoryById(s.categoryId) != null)
+                                  Text(
+                                    categoryById(s.categoryId)!.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: textColor.withValues(alpha: 0.6),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -883,43 +987,39 @@ class _SkillRowState extends State<_SkillRow> {
   }
 
   Widget _buildNoteField(Color textColor) {
+    final prompt =
+        _isLearn
+            ? 'Tell us more about what you want to learn'
+            : 'Tell us more about what you can teach';
+
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: TextField(
-        controller: _noteController,
-        enabled: widget.isEditing,
-        minLines: 2,
-        maxLines: 3,
-        maxLength: kSkillNoteMaxLength,
-        textCapitalization: TextCapitalization.sentences,
-        onChanged: widget.onNoteChanged,
-        cursorColor: textColor,
-        style: TextStyle(color: textColor, fontSize: 14),
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: AppColors.secondary,
-          hintText:
-              _isLearn
-                  ? 'Add a note (e.g. complete beginner, want to cook for my family)'
-                  : 'Add a note (e.g. 5 years of experience, can teach in Filipino)',
-          hintMaxLines: 2,
-          hintStyle: TextStyle(
-            color: textColor.withValues(alpha: 0.5),
-            fontSize: 14,
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Text(
+              prompt,
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
+            ),
           ),
-          counterStyle: TextStyle(
-            color: textColor.withValues(alpha: 0.5),
-            fontSize: 12,
+          IgnorePointer(
+            ignoring: !widget.isEditing,
+            child: TopLabeledField(
+              label: 'Note',
+              controller: _noteController,
+              maxLines: 3,
+              maxLength: kSkillNoteMaxLength,
+              textCapitalization: TextCapitalization.sentences,
+            ),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 14,
-          ),
-          border: _border(Colors.transparent, 0, 20),
-          enabledBorder: _border(Colors.transparent, 0, 20),
-          disabledBorder: _border(Colors.transparent, 0, 20),
-          focusedBorder: _border(AppColors.primary, 1.5, 20),
-        ),
+        ],
       ),
     );
   }
@@ -1034,13 +1134,21 @@ class _SkillRowState extends State<_SkillRow> {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final dim = widget.isEditing ? textColor : textColor.withValues(alpha: 0.5);
+    final dim =
+        widget.isEditing
+            ? textColor.withValues(alpha: 0.7)
+            : textColor.withValues(alpha: 0.5);
     final hasSelection = widget.selectedId.isNotEmpty;
     final category =
         hasSelection ? categoryById(_categoryIdFor(widget.selectedId)) : null;
     final showNote =
         hasSelection &&
         (widget.isEditing || _noteController.text.trim().isNotEmpty);
+    final showSuggestions =
+        !hasSelection &&
+        widget.isEditing &&
+        widget.isActive &&
+        _suggestions.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1061,10 +1169,25 @@ class _SkillRowState extends State<_SkillRow> {
         Row(
           children: [
             Expanded(
-              child:
-                  hasSelection
-                      ? _buildSelectedPill(dim)
-                      : _buildSearchField(textColor, dim),
+              child: OverlayPortal(
+                controller: _overlayController,
+                overlayChildBuilder:
+                    (_) =>
+                        showSuggestions
+                            ? _buildSuggestionsOverlay(textColor)
+                            : const SizedBox.shrink(),
+                child: CompositedTransformTarget(
+                  link: _layerLink,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _fieldWidth = constraints.maxWidth;
+                      return hasSelection
+                          ? _buildSelectedPill(dim)
+                          : _buildSearchField(textColor, dim);
+                    },
+                  ),
+                ),
+              ),
             ),
             if (widget.isEditing) ...[
               const SizedBox(width: 12),
@@ -1085,15 +1208,6 @@ class _SkillRowState extends State<_SkillRow> {
               ),
             ],
           ],
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          alignment: Alignment.topCenter,
-          child:
-              !hasSelection && widget.isEditing && _suggestions.isNotEmpty
-                  ? _buildSuggestions(textColor)
-                  : const SizedBox(width: double.infinity),
         ),
         if (category != null) _buildCategoryTag(category, textColor, dim),
         if (showNote) _buildNoteField(textColor),

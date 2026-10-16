@@ -9,6 +9,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
@@ -37,6 +38,19 @@ class _HomePageState extends State<HomePage> {
   late final TapGestureRecognizer _settingsTap =
       TapGestureRecognizer()..onTap = _openSettings;
 
+  static const List<FilterSection> _filterSections = [
+    FilterSection(
+      key: 'role',
+      title: 'Role',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Learner', 'learner'),
+        FilterOption('Mentor', 'mentor'),
+      ],
+    ),
+    FilterSection(key: 'skills', title: 'Skills'),
+  ];
+
   RoleFilter _roleFilter = RoleFilter.all;
   int _currentIndex = 0;
   final List<int> _history = [];
@@ -48,23 +62,23 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Instant preload: served from the deck cache when present (no spinner on
-    // tab re-entry), refreshed silently when stale. Only a cold cache shows a
-    // spinner.
     _loadDeck();
   }
 
-  /// Loads the live recommendation deck (get-matches + public profiles).
   Future<void> _loadDeck({bool force = false}) async {
     final cached = MatchApi.hasCachedDeck(_roleKey);
+
     setState(() {
       _loading = !cached && _people.isEmpty;
       _error = null;
     });
+
     try {
       final deck = await _fetchDeck(force: force);
       debugPrint('[People] deck loaded: ${deck.length} people');
+
       if (!mounted) return;
+
       setState(() {
         _people = deck;
         _loading = false;
@@ -76,7 +90,9 @@ class _HomePageState extends State<HomePage> {
       });
     } catch (e, st) {
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
+
       if (!mounted) return;
+
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -84,15 +100,17 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Random discovery beyond the ranked deck (FR-13).
   Future<void> _loadRandomDeck() async {
     setState(() {
       _loading = _people.isEmpty;
       _error = null;
     });
+
     try {
       final randoms = await MatchApi.getRandomDeck(limit: 20);
+
       if (!mounted) return;
+
       setState(() {
         _people = randoms;
         _randomMode = true;
@@ -104,6 +122,7 @@ class _HomePageState extends State<HomePage> {
       });
     } catch (e) {
       if (!mounted) return;
+
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -124,7 +143,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<List<Person>> _fetchDeck({bool force = false}) async {
     final me = await ProfileService().getCurrentUserProfile();
-    if (mounted) setState(() => _myProfile = me);
+
+    if (mounted) {
+      setState(() => _myProfile = me);
+    }
+
     return MatchApi.getMatchDeck(
       asRoleDb: _roleKey,
       force: force,
@@ -132,20 +155,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Live "Add": sends a connection request from the feed (FR-9).
   Future<void> _confirmAdd(Person person) async {
     try {
       await MatchApi.sendConnectionRequest(person.id);
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection request sent to ${person.name}')),
+        SnackBar(
+          content: Text('Connection request sent to ${person.name}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Request failed: $e')),
       );
     }
+
     _next(right: true);
   }
 
@@ -159,16 +187,42 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            ProfileEditPage(profile: _myProfile ?? _fallbackSelfProfile),
+        builder: (context) => ProfileEditPage(
+          profile: _myProfile ?? _fallbackSelfProfile,
+        ),
       ),
     );
   }
 
   bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
 
-  /// Role selection happens at retrieval time (as_role) — deck is prefiltered.
   List<Person> get _filteredPeople => _people;
+
+  void _openFilterSheet() {
+    FilterBottomSheet.show(
+      context,
+      sections: _filterSections,
+      selected: {'role': _roleFilter.name},
+      onApply: (result) {
+        final newRole = RoleFilter.values.firstWhere(
+          (r) => r.name == result['role'],
+          orElse: () => RoleFilter.all,
+        );
+
+        if (newRole != _roleFilter) {
+          setState(() {
+            _roleFilter = newRole;
+            _currentIndex = 0;
+            _history.clear();
+            _historyRight.clear();
+            _undoActive = false;
+          });
+
+          _loadDeck();
+        }
+      },
+    );
+  }
 
   void _next({bool right = false}) {
     setState(() {
@@ -181,6 +235,7 @@ class _HomePageState extends State<HomePage> {
 
   void _undo() {
     if (_history.isEmpty) return;
+
     setState(() {
       _currentIndex = _history.removeLast();
       _undoRight = _historyRight.removeLast();
@@ -191,8 +246,10 @@ class _HomePageState extends State<HomePage> {
 
   Widget _wrapUndo(Widget child) {
     if (!_undoActive) return child;
+
     final size = MediaQuery.of(context).size;
     final dir = _undoRight ? 1.0 : -1.0;
+
     return TweenAnimationBuilder<double>(
       key: ValueKey('undo$_undoToken'),
       tween: Tween(begin: 1.0, end: 0.0),
@@ -202,8 +259,14 @@ class _HomePageState extends State<HomePage> {
       builder: (context, v, child) => Opacity(
         opacity: 1 - v * 0.5,
         child: Transform.translate(
-          offset: Offset(dir * v * size.width * 0.7, v * size.height * 0.35),
-          child: Transform.rotate(angle: dir * v * 0.25, child: child),
+          offset: Offset(
+            dir * v * size.width * 0.7,
+            v * size.height * 0.35,
+          ),
+          child: Transform.rotate(
+            angle: dir * v * 0.25,
+            child: child,
+          ),
         ),
       ),
     );
@@ -217,212 +280,59 @@ class _HomePageState extends State<HomePage> {
           '${person.name} won’t be able to find or message you. You can unblock them anytime in Settings.',
       confirmLabel: 'Block',
     );
+
     if (!confirmed || !mounted) return;
 
     try {
       await MatchApi.blockUser(person.id);
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('You blocked ${person.name}')),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Block failed: $e')),
       );
     }
+
     _next();
   }
 
   Future<void> _confirmReport(Person person) async {
-    final reason = await showReportReasonDialog(context, name: person.name);
+    final reason = await showReportReasonDialog(
+      context,
+      name: person.name,
+    );
+
     if (reason == null || !mounted) return;
 
     try {
       await MatchApi.reportUser(person.id, reason);
+
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks for your report.')),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Report failed: $e')),
+      );
     }
+
     _next();
-  }
-
-  void _openFilterSheet() {
-    RoleFilter draftRole = _roleFilter;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        final textColor = Theme.of(context).colorScheme.secondary;
-        final primaryColor = AppColors.primary;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed:
-                              () => setModalState(
-                                () => draftRole = RoleFilter.all,
-                              ),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _sheetSectionLabel('Role', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRole == RoleFilter.all,
-                          () => setModalState(() => draftRole = RoleFilter.all),
-                          primaryColor,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Learner',
-                          draftRole == RoleFilter.learner,
-                          () => setModalState(
-                            () => draftRole = RoleFilter.learner,
-                          ),
-                          primaryColor,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Mentor',
-                          draftRole == RoleFilter.mentor,
-                          () => setModalState(
-                            () => draftRole = RoleFilter.mentor,
-                          ),
-                          primaryColor,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Skills', textColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coming soon',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.4),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          if (draftRole != _roleFilter) {
-                            _roleFilter = draftRole;
-                            _loadDeck();
-                          }
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor,
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: isSelected ? Colors.black : textColor,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
@@ -442,7 +352,9 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(
               'PalTuro',
-              style: AppTextStyles.headingText.copyWith(color: textTheme),
+              style: AppTextStyles.headingText.copyWith(
+                color: textTheme,
+              ),
             ),
             Row(
               children: [
@@ -450,10 +362,9 @@ class _HomePageState extends State<HomePage> {
                   onPressed: _history.isEmpty ? null : _undo,
                   icon: Icon(
                     CupertinoIcons.arrow_uturn_left,
-                    color:
-                        _history.isEmpty
-                            ? textTheme.withValues(alpha: 0.3)
-                            : textTheme,
+                    color: _history.isEmpty
+                        ? textTheme.withValues(alpha: 0.3)
+                        : textTheme,
                     size: 24,
                   ),
                 ),
@@ -462,7 +373,11 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     IconButton(
                       onPressed: _openFilterSheet,
-                      icon: Icon(Icons.tune, color: textTheme, size: 24),
+                      icon: Icon(
+                        Icons.tune,
+                        color: textTheme,
+                        size: 24,
+                      ),
                     ),
                     if (_hasActiveFilter)
                       Positioned(
@@ -487,7 +402,9 @@ class _HomePageState extends State<HomePage> {
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
             : _error != null
                 ? _buildErrorState(textTheme)
                 : hasMore
@@ -497,9 +414,11 @@ class _HomePageState extends State<HomePage> {
                           onSwiped: (right) => _next(right: right),
                           child: PersonCardOverlay(
                             person: people[_currentIndex],
-                            onAdd: () => _confirmAdd(people[_currentIndex]),
+                            onAdd: () =>
+                                _confirmAdd(people[_currentIndex]),
                             onSkip: _next,
-                            onBlock: () => _confirmBlock(people[_currentIndex]),
+                            onBlock: () =>
+                                _confirmBlock(people[_currentIndex]),
                             onReport: () =>
                                 _confirmReport(people[_currentIndex]),
                           ),
@@ -519,7 +438,9 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(
               'Couldn’t load recommendations.\nPlease check your connection.',
-              style: AppTextStyles.regularText.copyWith(color: textColor),
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -530,7 +451,10 @@ class _HomePageState extends State<HomePage> {
               ),
               child: const Text(
                 'Retry',
-                style: TextStyle(color: Colors.black, fontSize: 16),
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                ),
               ),
             ),
           ],
@@ -574,7 +498,9 @@ class _HomePageState extends State<HomePage> {
                 size: 18,
               ),
               label: Text(
-                _randomMode ? 'Back to recommendations' : 'Explore more people',
+                _randomMode
+                    ? 'Back to recommendations'
+                    : 'Explore more people',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -591,12 +517,14 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 10),
             Text.rich(
               TextSpan(
-                recognizer: _settingsTap,
                 children: [
                   const TextSpan(text: 'Update your '),
                   TextSpan(
                     text: 'Settings',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    recognizer: _settingsTap,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
                 style: AppTextStyles.regularText.copyWith(
@@ -650,15 +578,16 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
   void _onTick() {
     setState(() {
-      _dx =
-          _from +
-          (_to - _from) * Curves.easeOutCubic.transform(_controller.value);
+      _dx = _from +
+          (_to - _from) *
+              Curves.easeOutCubic.transform(_controller.value);
     });
   }
 
   void _animateTo(double target, {VoidCallback? onDone}) {
     _from = _dx;
     _to = target;
+
     _controller.forward(from: 0).whenComplete(() {
       if (mounted) onDone?.call();
     });
@@ -676,6 +605,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
   void _onDragEnd(DragEndDetails d) {
     if (_exiting) return;
+
     final velocity = d.velocity.pixelsPerSecond.dx;
     final flung = velocity.abs() > 800 && velocity.sign == _dx.sign;
     final passed = _dx.abs() > _width * 0.35 || flung;
@@ -687,6 +617,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
     final right = _dx > 0;
     _exiting = true;
+
     _animateTo(
       (right ? 1 : -1) * _width * _exitFactor,
       onDone: () => widget.onSwiped(right),
@@ -701,9 +632,12 @@ class _SwipeableCardState extends State<_SwipeableCard>
     return LayoutBuilder(
       builder: (context, constraints) {
         _width = constraints.maxWidth;
+
         final angle = (_dx / (_width * 0.7)) * _maxAngle;
         final dy = _dx.abs() * driftRatio;
-        final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
+        final fade =
+            (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
+
         final goingRight = _dx > 0;
         final tint = goingRight ? AppColors.primary : Colors.red;
 
@@ -722,11 +656,12 @@ class _SwipeableCardState extends State<_SwipeableCard>
                       color: tint.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    alignment:
-                        goingRight
-                            ? Alignment.centerLeft
-                            : Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    alignment: goingRight
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                    ),
                     child: Icon(
                       goingRight ? Icons.check : Icons.close,
                       color: tint,
@@ -738,7 +673,10 @@ class _SwipeableCardState extends State<_SwipeableCard>
                 opacity: 1 - fade,
                 child: Transform.translate(
                   offset: Offset(_dx, dy),
-                  child: Transform.rotate(angle: angle, child: widget.child),
+                  child: Transform.rotate(
+                    angle: angle,
+                    child: widget.child,
+                  ),
                 ),
               ),
             ],

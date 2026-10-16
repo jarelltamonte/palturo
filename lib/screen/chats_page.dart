@@ -12,10 +12,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/services/match_api.dart';
-
-enum ChatRoleFilter { all, learner, mentor }
-
-enum ChatReadFilter { all, unread, read }
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 
 class ChatsPage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
@@ -32,8 +29,30 @@ class _ChatsPageState extends State<ChatsPage> {
 
   bool _isSearching = false;
   String _query = '';
-  ChatRoleFilter _roleFilter = ChatRoleFilter.all;
-  ChatReadFilter _readFilter = ChatReadFilter.all;
+
+  Map<String, String> _filters = {'role': 'all', 'status': 'all'};
+
+  static const List<FilterSection> _filterSections = [
+    FilterSection(
+      key: 'role',
+      title: 'Role',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Learner', 'learner'),
+        FilterOption('Mentor', 'mentor'),
+      ],
+    ),
+    FilterSection(
+      key: 'status',
+      title: 'Status',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Unread', 'unread'),
+        FilterOption('Read', 'read'),
+      ],
+    ),
+    FilterSection(key: 'skills', title: 'Skills'),
+  ];
 
   static const int _maxMatchCards = 8;
 
@@ -50,7 +69,6 @@ class _ChatsPageState extends State<ChatsPage> {
     _loadChats();
   }
 
-  /// Live data: accepted conversations rendered as matches/messages.
   Future<void> _loadChats() async {
     setState(() {
       _loadingChats = true;
@@ -96,9 +114,7 @@ class _ChatsPageState extends State<ChatsPage> {
 
   String _formatChatTime(DateTime t) {
     final now = DateTime.now();
-    if (t.year == now.year &&
-        t.month == now.month &&
-        t.day == now.day) {
+    if (t.year == now.year && t.month == now.month && t.day == now.day) {
       final hh = t.hour.toString().padLeft(2, '0');
       final mm = t.minute.toString().padLeft(2, '0');
       return '$hh:$mm';
@@ -127,27 +143,27 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   bool get _hasActiveFilter =>
-      _roleFilter != ChatRoleFilter.all || _readFilter != ChatReadFilter.all;
+      _filters['role'] != 'all' || _filters['status'] != 'all';
 
   bool _matchesRole(MatchedUser chat) {
-    switch (_roleFilter) {
-      case ChatRoleFilter.all:
-        return true;
-      case ChatRoleFilter.learner:
+    switch (_filters['role']) {
+      case 'learner':
         return chat.role == PersonRole.learner;
-      case ChatRoleFilter.mentor:
+      case 'mentor':
         return chat.role == PersonRole.mentor;
+      default:
+        return true;
     }
   }
 
   bool _matchesRead(MatchedUser chat) {
-    switch (_readFilter) {
-      case ChatReadFilter.all:
-        return true;
-      case ChatReadFilter.unread:
+    switch (_filters['status']) {
+      case 'unread':
         return chat.hasUnread;
-      case ChatReadFilter.read:
+      case 'read':
         return !chat.hasUnread;
+      default:
+        return true;
     }
   }
 
@@ -221,209 +237,12 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor.withValues(alpha: 0.6),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool selected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? primaryColor : textColor.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: selected ? Colors.black : textColor,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _openFilterSheet() {
-    final bgColor = Theme.of(context).colorScheme.surface;
-    final textColor = Theme.of(context).colorScheme.secondary;
-    ChatRoleFilter draftRole = _roleFilter;
-    ChatReadFilter draftRead = _readFilter;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: bgColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed:
-                              () => setModalState(() {
-                                draftRole = ChatRoleFilter.all;
-                                draftRead = ChatReadFilter.all;
-                              }),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _sheetSectionLabel('Role', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRole == ChatRoleFilter.all,
-                          () => setModalState(
-                            () => draftRole = ChatRoleFilter.all,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Learner',
-                          draftRole == ChatRoleFilter.learner,
-                          () => setModalState(
-                            () => draftRole = ChatRoleFilter.learner,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Mentor',
-                          draftRole == ChatRoleFilter.mentor,
-                          () => setModalState(
-                            () => draftRole = ChatRoleFilter.mentor,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Status', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRead == ChatReadFilter.all,
-                          () => setModalState(
-                            () => draftRead = ChatReadFilter.all,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Unread',
-                          draftRead == ChatReadFilter.unread,
-                          () => setModalState(
-                            () => draftRead = ChatReadFilter.unread,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Read',
-                          draftRead == ChatReadFilter.read,
-                          () => setModalState(
-                            () => draftRead = ChatReadFilter.read,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Skills', textColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coming soon',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.4),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _roleFilter = draftRole;
-                            _readFilter = draftRead;
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+    FilterBottomSheet.show(
+      context,
+      sections: _filterSections,
+      selected: _filters,
+      onApply: (result) => setState(() => _filters = result),
     );
   }
 

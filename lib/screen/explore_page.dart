@@ -6,6 +6,8 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/services/match_api.dart';
 
+enum ExploreRole { learner, mentor }
+
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
 
@@ -17,6 +19,13 @@ class _ExplorePageState extends State<ExplorePage> {
   List<Map<String, dynamic>> _roots = const [];
   bool _loading = true;
   String? _error;
+
+  // TODO: default to the user's primary role / last saved choice
+  // (e.g. read from shared_preferences in initState before loading).
+  ExploreRole _role = ExploreRole.learner;
+
+  // Guards against out-of-order responses when the user toggles quickly.
+  int _requestId = 0;
 
   static const Map<String, IconData> _rootIcons = {
     'cooking_culinary': Icons.restaurant_outlined,
@@ -39,8 +48,22 @@ class _ExplorePageState extends State<ExplorePage> {
     _loadTaxonomy();
   }
 
+  /// TODO(Jev): role-aware filtering.
+  /// Learner: return all roots.
+  /// Mentor: return only roots related to the user's mentor skills.
+  /// This can either be done server-side (pass the role to the API) or here.
+  List<Map<String, dynamic>> _filterByRole(List<Map<String, dynamic>> roots) {
+    switch (_role) {
+      case ExploreRole.learner:
+        return roots;
+      case ExploreRole.mentor:
+        return roots; // placeholder until Jev's logic is ready
+    }
+  }
+
   /// Live data: 9 taxonomy roots from `skill_nodes` (DEV-20).
   Future<void> _loadTaxonomy() async {
+    final requestId = ++_requestId;
     setState(() {
       _loading = true;
       _error = null;
@@ -49,18 +72,24 @@ class _ExplorePageState extends State<ExplorePage> {
       final nodes = await MatchApi.taxonomyVisible();
       final roots =
           nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
       setState(() {
-        _roots = roots;
+        _roots = _filterByRole(roots);
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _requestId) return;
       setState(() {
         _error = e.toString();
         _loading = false;
       });
     }
+  }
+
+  void _onRoleChanged(ExploreRole role) {
+    if (role == _role) return;
+    setState(() => _role = role);
+    _loadTaxonomy();
   }
 
   void _openCategory(Map<String, dynamic> root) {
@@ -117,16 +146,54 @@ class _ExplorePageState extends State<ExplorePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? _buildErrorState(textTheme)
-                : (_roots.length <= 4
-                    ? _buildGrid2x2(textTheme)
-                    : _buildGridAuto(textTheme)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            const SizedBox(height: 8),
+            _buildCaption(textTheme),
+            const SizedBox(height: 8),
+            Expanded(child: _buildContent(textTheme)),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _buildCaption(Color textTheme) {
+    // Fixed height so the grid doesn't jump when the caption changes.
+    return SizedBox(
+      height: 18,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: Text(
+          _role == ExploreRole.mentor
+              ? 'Showing only categories that match your mentor skills.'
+              : 'Showing all categories.',
+          key: ValueKey(_role),
+          style: TextStyle(
+            fontSize: 12,
+            color: textTheme.withValues(alpha: 0.7),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(Color textTheme) {
+    // Keep the previous grid visible while switching, so there's no spinner flash.
+    if (_loading && _roots.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) return _buildErrorState(textTheme);
+    if (_roots.isEmpty) return _buildEmptyState(textTheme);
+    // Only stretch to fill the screen when there are exactly 4 cards;
+    // 1-3 cards (common in Mentor mode) would look oversized.
+    return _roots.length == 4
+        ? _buildGrid2x2(textTheme)
+        : _buildGridAuto(textTheme);
+  }
+
   Widget _buildGrid2x2(Color textTheme) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -174,13 +241,28 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
+  Widget _buildEmptyState(Color textTheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Text(
+          _role == ExploreRole.mentor
+              ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
+              : 'No categories available right now.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(color: textTheme),
+        ),
+      ),
+    );
+  }
+
   Widget _buildErrorState(Color textTheme) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Couldnâ€™t load categories.\nPlease check your connection.',
+            'Couldn\'t load categories.\nPlease check your connection.',
             style: AppTextStyles.regularText.copyWith(color: textTheme),
             textAlign: TextAlign.center,
           ),
@@ -199,7 +281,77 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 }
 
-class _ExploreInfoDialog extends StatefulWidget {  const _ExploreInfoDialog();
+class _RoleToggle extends StatelessWidget {
+  const _RoleToggle({required this.value, required this.onChanged});
+
+  final ExploreRole value;
+  final ValueChanged<ExploreRole> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    final isMentor = value == ExploreRole.mentor;
+
+    Widget segment(String label, ExploreRole role) {
+      final selected = value == role;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onChanged(role),
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: AppTextStyles.regularText.copyWith(
+                fontSize: 14,
+                color:
+                    selected ? Colors.black : textColor.withValues(alpha: 0.7),
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              child: Text(label),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: textColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment: isMentor ? Alignment.centerRight : Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              heightFactor: 1,
+              child: Container(
+                margin: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              segment('Learner', ExploreRole.learner),
+              segment('Mentor', ExploreRole.mentor),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExploreInfoDialog extends StatefulWidget {
+  const _ExploreInfoDialog();
 
   @override
   State<_ExploreInfoDialog> createState() => _ExploreInfoDialogState();
@@ -209,7 +361,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
   static const _titles = ['Explore', 'Heads up'];
 
   static const _messages = [
-    'Browse categories to discover skills and knowledge shared by other users. Pick a category, then swipe through people who are teaching or learning in it.',
+    'Browse categories to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a category and swipe through people who are teaching or learning in it.',
     'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Explore is for discovering something new, so keep an open mind.',
   ];
 

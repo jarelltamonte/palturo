@@ -1020,7 +1020,7 @@ class _SkillRowState extends State<_SkillRow> {
           IgnorePointer(
             ignoring: !widget.isEditing,
             child: TopLabeledField(
-              label: 'Note',
+              label: 'Add note',
               controller: _noteController,
               maxLines: 3,
               maxLength: kSkillNoteMaxLength,

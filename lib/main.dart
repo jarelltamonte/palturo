@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
+import 'package:palturo/authentication/auth_gate.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
@@ -80,6 +81,35 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   final _appLinks = AppLinks();
 
   Uri? _latestDeepLink;
+  WidgetBuilder? _pendingAuthScreen;
+  int _authScreenRetry = 0;
+
+  /// Replaces the whole stack with a fresh AuthGate root, then pushes the
+  /// deep-link screen above it. This guarantees that `popUntil(isFirst)`
+  /// always reveals the auth gate - even during the splash/onboarding phase,
+  /// where the first route is not AuthGate yet - and disposes the landing
+  /// timer so it cannot replace the deep-link screen.
+  void _openAuthScreen(WidgetBuilder builder) {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) {
+      if (!mounted || _authScreenRetry >= 10) return;
+      _authScreenRetry++;
+      _pendingAuthScreen = builder;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final pending = _pendingAuthScreen;
+        _pendingAuthScreen = null;
+        if (pending != null) _openAuthScreen(pending);
+      });
+      return;
+    }
+    _authScreenRetry = 0;
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
+    );
+    navigator.push(MaterialPageRoute(builder: builder));
+  }
 
   @override
   void initState() {
@@ -110,10 +140,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
 
         if (event == AuthChangeEvent.passwordRecovery) {
           _latestDeepLink = null;
-          navigatorKey.currentState?.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const ForgotPasswordType()),
-            (route) => false,
-          );
+          _openAuthScreen((_) => const ForgotPasswordType());
           return;
         }
 
@@ -134,15 +161,8 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
 
             _latestDeepLink = null;
 
-            navigatorKey.currentState?.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder:
-                    (context) => ScratchWidget(
-                      email: user.email,
-                      isConfirmedInitial: true,
-                    ),
-              ),
-              (route) => false,
+            _openAuthScreen(
+              (_) => ScratchWidget(email: user.email, isConfirmedInitial: true),
             );
           }
         }
@@ -162,22 +182,12 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
               _latestDeepLink!.path == '/callback';
 
           if (isResetCallback) {
-            navigatorKey.currentState?.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => const ForgotPasswordExpired(),
-              ),
-              (route) => false,
-            );
+            _openAuthScreen((_) => const ForgotPasswordExpired());
             return;
           }
 
           if (isSignupCallback) {
-            navigatorKey.currentState?.pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => const EmailConfirmationExpired(),
-              ),
-              (route) => false,
-            );
+            _openAuthScreen((_) => const EmailConfirmationExpired());
           }
         }
       },

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'forgot_password_1.dart';
-import 'login.dart';
 
 class ForgotPasswordExpired extends StatelessWidget {
   const ForgotPasswordExpired({super.key});
@@ -58,7 +57,7 @@ class ForgotPasswordExpired extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (context) => const ForgotPassword(),
                     ),
-                    (route) => false,
+                    (route) => route.isFirst,
                   );
                 },
                 style: ElevatedButton.styleFrom(
@@ -75,11 +74,7 @@ class ForgotPasswordExpired extends StatelessWidget {
               const SizedBox(height: 12),
               TextButton(
                 onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
-                  );
+                  Navigator.popUntil(context, (route) => route.isFirst);
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: textTheme,

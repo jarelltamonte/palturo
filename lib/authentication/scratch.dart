@@ -4,7 +4,6 @@ import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import 'login.dart';
 
 class ScratchWidget extends StatefulWidget {
   final String? email;
@@ -20,6 +19,7 @@ class _ScratchWidgetState extends State<ScratchWidget> {
   late final StreamSubscription<AuthState> _authSubscription;
   late bool _emailConfirmed;
   bool _isChecking = false;
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -113,6 +113,21 @@ class _ScratchWidgetState extends State<ScratchWidget> {
     );
   }
 
+  Future<void> _signOutAndReturnToRoot() async {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+    final navigator = Navigator.of(context);
+    try {
+      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {
+      // The local session may already be cleared; navigation must still happen.
+    }
+    if (!mounted) return;
+    // Return to the AuthGate root instead of replacing the whole stack:
+    // AuthGate owns all post-login routing.
+    navigator.popUntil((route) => route.isFirst);
+  }
+
   @override
   void dispose() {
     _authSubscription.cancel();
@@ -170,19 +185,7 @@ class _ScratchWidgetState extends State<ScratchWidget> {
             children: [
               if (_emailConfirmed)
                 ElevatedButton(
-                  onPressed: () async {
-                    final navigator = Navigator.of(context);
-                    await Supabase.instance.client.auth.signOut(
-                      scope: SignOutScope.local,
-                    );
-                    if (!mounted) return;
-                    navigator.pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
-                      ),
-                      (route) => false,
-                    );
-                  },
+                  onPressed: _isNavigating ? null : _signOutAndReturnToRoot,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 20),
@@ -217,15 +220,7 @@ class _ScratchWidgetState extends State<ScratchWidget> {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
-                      ),
-                      (route) => false,
-                    );
-                  },
+                  onPressed: _isNavigating ? null : _signOutAndReturnToRoot,
                   style: TextButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.secondary,
                     textStyle: AppTextStyles.regularText,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:palturo/authentication/auth_gate.dart';
 
@@ -18,18 +19,29 @@ class IntroScreen extends StatefulWidget {
 }
 
 class _IntroScreenState extends State<IntroScreen> {
+  Timer? _timer;
+
   @override
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AuthGate()),
-        );
-      }
+    _timer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      // Never replace a route that was pushed above the splash (deep links,
+      // recovery screens). Only advance when this route is still on top.
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isCurrent) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const AuthGate()),
+      );
     });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override

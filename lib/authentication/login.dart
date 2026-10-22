@@ -33,6 +33,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoggingIn = false;
 
   Future<void> _login() async {
+    if (_isLoggingIn) return;
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -40,6 +42,8 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       await _authService.login(email, password);
+      // On success the AuthGate swaps this page out; keep the button disabled
+      // until then so a second sign-in cannot be queued.
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoggingIn = false);
@@ -135,9 +139,7 @@ class _LoginPageState extends State<LoginPage> {
           builder: (context, constraints) {
             return SingleChildScrollView(
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight,
-                ),
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     16,
@@ -191,9 +193,12 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            _login();
-                          },
+                          onPressed:
+                              _isLoggingIn
+                                  ? null
+                                  : () {
+                                    _login();
+                                  },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             padding: const EdgeInsets.symmetric(vertical: 16),

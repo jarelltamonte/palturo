@@ -5,7 +5,6 @@ import 'package:lottie/lottie.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_text_styles.dart';
 import 'forgot_password_3.dart';
-import 'login.dart';
 
 class ForgotPasswordWait extends StatefulWidget {
   final String email;
@@ -50,11 +49,8 @@ class _ForgotPasswordWaitState extends State<ForgotPasswordWait> {
   }
 
   void _returnToLogin() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
-    );
+    // Preserve the AuthGate root so the next login is routed correctly.
+    Navigator.popUntil(context, (route) => route.isFirst);
   }
 
   @override

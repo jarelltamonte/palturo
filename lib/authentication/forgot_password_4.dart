@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_colors.dart';
-import 'login.dart';
 
 class ForgotPasswordComplete extends StatefulWidget {
   const ForgotPasswordComplete({super.key});
@@ -58,13 +57,8 @@ class _ForgotPasswordCompleteState extends State<ForgotPasswordComplete> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
-                      ),
-                      (route) => false,
-                    );
+                    // AuthService.updatePassword already signed out locally.
+                    Navigator.popUntil(context, (route) => route.isFirst);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,

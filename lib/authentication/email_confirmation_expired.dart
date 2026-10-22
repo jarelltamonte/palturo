@@ -1,27 +1,53 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import 'login.dart';
 import 'register.dart';
 
-class EmailConfirmationExpired extends StatelessWidget {
+class EmailConfirmationExpired extends StatefulWidget {
   const EmailConfirmationExpired({super.key});
 
-  void _navigateToRegister(BuildContext context) {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const RegisterPage()),
-      (route) => false,
-    );
+  @override
+  State<EmailConfirmationExpired> createState() =>
+      _EmailConfirmationExpiredState();
+}
+
+class _EmailConfirmationExpiredState extends State<EmailConfirmationExpired> {
+  bool _isNavigating = false;
+
+  late final TapGestureRecognizer _registerTap =
+      TapGestureRecognizer()
+        ..onTap = () => _signOutAndNavigate(toRegister: true);
+
+  @override
+  void dispose() {
+    _registerTap.dispose();
+    super.dispose();
   }
 
-  void _navigateToLogin(BuildContext context) {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
-    );
+  Future<void> _signOutAndNavigate({required bool toRegister}) async {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+
+    final navigator = Navigator.of(context);
+    try {
+      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {
+      // The local session may already be cleared; navigation must still happen.
+    }
+
+    if (!mounted) return;
+
+    if (toRegister) {
+      // Keep the AuthGate root alive so post-signup routing still works.
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const RegisterPage()),
+        (route) => route.isFirst,
+      );
+    } else {
+      navigator.popUntil((route) => route.isFirst);
+    }
   }
 
   @override
@@ -67,9 +93,7 @@ class EmailConfirmationExpired extends StatelessWidget {
                           color: AppColors.primary,
                           decoration: TextDecoration.underline,
                         ),
-                        recognizer:
-                            TapGestureRecognizer()
-                              ..onTap = () => _navigateToRegister(context),
+                        recognizer: _registerTap,
                       ),
                       const TextSpan(text: ' to request a new link.'),
                     ],
@@ -88,7 +112,10 @@ class EmailConfirmationExpired extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ElevatedButton(
-                onPressed: () => _navigateToLogin(context),
+                onPressed:
+                    _isNavigating
+                        ? null
+                        : () => _signOutAndNavigate(toRegister: false),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 20),
@@ -102,7 +129,10 @@ class EmailConfirmationExpired extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () => _navigateToRegister(context),
+                onPressed:
+                    _isNavigating
+                        ? null
+                        : () => _signOutAndNavigate(toRegister: true),
                 style: TextButton.styleFrom(
                   foregroundColor: textTheme.withValues(alpha: 0.8),
                   textStyle: AppTextStyles.regularText,

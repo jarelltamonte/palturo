@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
     show kLearningOptions, kTeachingOptions;
@@ -35,7 +36,10 @@ class _ProfilePageState extends State<ProfilePage> {
   final ProfileService _profileService = ProfileService();
   ProfileData? _profile;
   bool _isLoading = true;
+  static const String _loadError =
+      'Couldn’t load your profile.\nPlease check your connection.';
   int? _friendCount;
+  bool _openingEditor = false;
 
   static const _roleOptions = [
     RoleOption(
@@ -68,45 +72,53 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _loadProfile() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadProfile({bool showSpinner = true}) async {
+    if (!mounted) return;
+
+    if (showSpinner) {
+      setState(() => _isLoading = true);
+    }
+
     final data = await _profileService.getCurrentUserProfile();
-    if (mounted) {
+
+    if (!mounted) return;
+
+    if (data != null) {
       setState(() {
-        _profile =
-            data ??
-            ProfileData(
-              firstName: 'Juan',
-              lastName: 'De La Cruz',
-              schedule: 'Mon/Sat/Sun',
-              bio:
-                  'Mahilig akong magluto at matuto ng lumang gawang-kamay. Tara, magpalitan tayo ng kaalaman!',
-              languages: const ['English', 'Tagalog'],
-              interests: const ['Discussion', 'Visual Demons...'],
-              role: OnboardingRole.both,
-              learningSkillIds: const [
-                'cooking_pinakbet',
-                'weaving_inabel',
-                'parol_making',
-              ],
-              teachingSkillIds: const [],
-            );
+        _profile = data;
         _isLoading = false;
       });
+      return;
+    }
+
+    // A failed refresh must not discard a profile that is already on screen.
+    setState(() => _isLoading = false);
+    if (_profile != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t refresh your profile. Please try again.'),
+        ),
+      );
     }
   }
 
   Future<void> _openEdit() async {
-    if (_profile == null) return;
+    final profile = _profile;
+    if (profile == null || _openingEditor) return;
 
-    final updated = await Navigator.push<ProfileData>(
-      context,
-      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: _profile!)),
-    );
+    _openingEditor = true;
+    try {
+      final updated = await Navigator.push<ProfileData>(
+        context,
+        MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
+      );
 
-    if (updated != null && mounted) {
-      setState(() => _profile = updated);
-      await _loadProfile();
+      if (!mounted) return;
+      if (updated != null) {
+        setState(() => _profile = updated);
+      }
+    } finally {
+      _openingEditor = false;
     }
   }
 
@@ -160,6 +172,41 @@ class _ProfilePageState extends State<ProfilePage> {
     showPersonProfileDialog(context, _profileToPerson());
   }
 
+  Widget _buildErrorState(Color textTheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.person_off_outlined,
+              size: 48,
+              color: textTheme.withValues(alpha: 0.4),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _loadError,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadProfile(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
@@ -209,8 +256,10 @@ class _ProfilePageState extends State<ProfilePage> {
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
+              : _profile == null
+              ? _buildErrorState(textTheme)
               : RefreshIndicator(
-                onRefresh: _loadProfile,
+                onRefresh: () => _loadProfile(showSpinner: false),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(

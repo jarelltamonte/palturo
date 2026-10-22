@@ -29,11 +29,6 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
 
-  final ProfileData _fallbackSelfProfile = ProfileData(
-    name: 'You',
-    schedule: 'Select your availability',
-  );
-
   late final TapGestureRecognizer _settingsTap =
       TapGestureRecognizer()..onTap = _openSettings;
 
@@ -57,6 +52,7 @@ class _HomePageState extends State<HomePage> {
   bool _undoActive = false;
   bool _undoRight = false;
   int _undoToken = 0;
+  bool _openingEditor = false;
 
   @override
   void initState() {
@@ -112,7 +108,7 @@ class _HomePageState extends State<HomePage> {
   Future<List<Person>> _fetchDeck({bool force = false}) async {
     final me = await ProfileService().getCurrentUserProfile();
 
-    if (mounted) {
+    if (mounted && me != null) {
       setState(() => _myProfile = me);
     }
 
@@ -149,15 +145,43 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void _openSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) =>
-                ProfileEditPage(profile: _myProfile ?? _fallbackSelfProfile),
-      ),
-    );
+  Future<void> _openSettings() async {
+    if (_openingEditor) return;
+    _openingEditor = true;
+
+    try {
+      var profile = _myProfile;
+
+      // Never open the editor with a placeholder: the editor writes every
+      // field it shows, so a failed load must not become a save of fake data.
+      if (profile == null) {
+        final fetched = await ProfileService().getCurrentUserProfile();
+        if (!mounted) return;
+        if (fetched == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Couldn’t load your profile. Please try again.'),
+            ),
+          );
+          return;
+        }
+        profile = fetched;
+        setState(() => _myProfile = fetched);
+      }
+
+      final seed = profile;
+      final updated = await Navigator.push<ProfileData>(
+        context,
+        MaterialPageRoute(builder: (context) => ProfileEditPage(profile: seed)),
+      );
+
+      if (!mounted) return;
+      if (updated != null) {
+        setState(() => _myProfile = updated);
+      }
+    } finally {
+      _openingEditor = false;
+    }
   }
 
   bool get _hasActiveFilter => _roleFilter != RoleFilter.all;

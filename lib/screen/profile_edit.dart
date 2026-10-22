@@ -29,6 +29,7 @@ class ProfileEditPage extends StatefulWidget {
 class _ProfileEditPageState extends State<ProfileEditPage> {
   final ProfileService _profileService = ProfileService();
   bool _isSaving = false;
+  bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
 
@@ -58,6 +59,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void initState() {
     super.initState();
+    assert(
+      widget.profile.id.isNotEmpty,
+      'ProfileEditPage requires a profile loaded from the server',
+    );
     _bioController = TextEditingController(text: widget.profile.bio);
     _availability = _parseAvailability(widget.profile);
     _languages = List.from(widget.profile.languages);
@@ -101,9 +106,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   Map<String, String> _parseAvailability(dynamic source) {
     List<String> days;
     if (source is ProfileData) {
-      days = source.availableDays.isNotEmpty
-          ? source.availableDays
-          : parseAvailableDays(source.schedule);
+      days =
+          source.availableDays.isNotEmpty
+              ? source.availableDays
+              : parseAvailableDays(source.schedule);
     } else {
       days = parseAvailableDays(source);
     }
@@ -375,7 +381,59 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  Future<void> _showProfileUnavailableDialog() async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Profile Not Loaded',
+              style: AppTextStyles.boldText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
+            ),
+            content: Text(
+              'We could not load your profile, so nothing was saved. '
+              'Go back and try again.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
   Future<void> _save() async {
+    if (widget.profile.id.isEmpty) {
+      if (_showingProfileError) return;
+      _showingProfileError = true;
+      try {
+        await _showProfileUnavailableDialog();
+      } finally {
+        _showingProfileError = false;
+      }
+      return;
+    }
+
     final allSelectedSkills = [..._learningSkillIds, ..._teachingSkillIds];
     for (final skill in allSelectedSkills) {
       final lower = skill.trim().toLowerCase();

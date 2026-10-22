@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/services/chat_state_service.dart';
 
 import 'home_page.dart';
 import 'explore_page.dart';
@@ -108,35 +109,43 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   }
 
   Widget _buildNavBar() {
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.only(right: 16, left: 16, bottom: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(20),
-            blurRadius: 15,
-            offset: const Offset(0, -4),
+    return ListenableBuilder(
+      listenable: ChatStateService.instance,
+      builder: (context, _) {
+        return Container(
+          height: 60,
+          margin: const EdgeInsets.only(right: 16, left: 16, bottom: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(20),
+                blurRadius: 15,
+                offset: const Offset(0, -4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(_navigationIcons.length, (index) {
-          final isSelected = _selectedIndex == index;
-          final activeColor = AppColors.primary;
-          final inactiveColor = Colors.grey;
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_navigationIcons.length, (index) {
+              final isSelected = _selectedIndex == index;
+              final activeColor = AppColors.primary;
+              final inactiveColor = Colors.grey;
+              final isChat = index == 2;
+              final showBadge = isChat && !isSelected && ChatStateService.instance.totalUnreadCount > 0;
 
-          return _NavItem(
-            icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
-            label: _navigationLabels[index],
-            color: isSelected ? activeColor : inactiveColor,
-            onTap: () => _onItemTapped(index),
-          );
-        }),
-      ),
+              return _NavItem(
+                icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
+                label: _navigationLabels[index],
+                color: isSelected ? activeColor : inactiveColor,
+                onTap: () => _onItemTapped(index),
+                showBadge: showBadge,
+              );
+            }),
+          ),
+        );
+      },
     );
   }
 }
@@ -214,12 +223,14 @@ class _NavItem extends StatefulWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool showBadge;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.showBadge = false,
   });
 
   @override
@@ -267,12 +278,30 @@ class _NavItemState extends State<_NavItem>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedBuilder(
-              animation: _jiggle,
-              builder: (context, child) {
-                return Transform.rotate(angle: _jiggle.value, child: child);
-              },
-              child: Icon(widget.icon, color: widget.color, size: 24),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedBuilder(
+                  animation: _jiggle,
+                  builder: (context, child) {
+                    return Transform.rotate(angle: _jiggle.value, child: child);
+                  },
+                  child: Icon(widget.icon, color: widget.color, size: 24),
+                ),
+                if (widget.showBadge)
+                  Positioned(
+                    top: -2,
+                    right: -4,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(

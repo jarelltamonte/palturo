@@ -55,6 +55,7 @@ class ConversationLite {
   final DateTime? lastAt;
   final int unread;
   final String? otherAvatar;
+  final String? otherSkill;
   const ConversationLite({
     required this.connectionId,
     required this.status,
@@ -65,7 +66,34 @@ class ConversationLite {
     this.lastAt,
     required this.unread,
     this.otherAvatar,
+    this.otherSkill,
   });
+
+  ConversationLite copyWith({
+    String? connectionId,
+    String? status,
+    String? otherUserId,
+    String? otherName,
+    String? otherRole,
+    String? lastMessage,
+    DateTime? lastAt,
+    int? unread,
+    String? otherAvatar,
+    String? otherSkill,
+  }) {
+    return ConversationLite(
+      connectionId: connectionId ?? this.connectionId,
+      status: status ?? this.status,
+      otherUserId: otherUserId ?? this.otherUserId,
+      otherName: otherName ?? this.otherName,
+      otherRole: otherRole ?? this.otherRole,
+      lastMessage: lastMessage ?? this.lastMessage,
+      lastAt: lastAt ?? this.lastAt,
+      unread: unread ?? this.unread,
+      otherAvatar: otherAvatar ?? this.otherAvatar,
+      otherSkill: otherSkill ?? this.otherSkill,
+    );
+  }
 
   Person toPerson() => Person(
         id: otherUserId,
@@ -73,7 +101,7 @@ class ConversationLite {
         schedule: '',
         language: '',
         learningStyle: '',
-        skillName: '',
+        skillName: otherSkill ?? '',
         role: otherRole == 'learner' ? PersonRole.learner : PersonRole.mentor,
         photoUrls: [otherAvatar],
       );
@@ -331,6 +359,7 @@ class MatchApi {
               lastAt: DateTime.tryParse(r['last_at']?.toString() ?? ''),
               unread: (r['unread'] as num?)?.toInt() ?? 0,
               otherAvatar: r['other_avatar'] as String?,
+              otherSkill: (r['other_skill'] ?? r['skill_name'] ?? r['skill']) as String?,
             ))
         .toList();
   }
@@ -357,6 +386,38 @@ class MatchApi {
       'p_connection': connectionId,
       'p_body': body,
     });
+  }
+
+  /// Marks unread messages in this connection as read.
+  static Future<void> markMessagesRead(String connectionId) async {
+    try {
+      await _Client.c.rpc('mark_messages_read', params: {
+        'p_connection': connectionId,
+      });
+    } catch (_) {
+      try {
+        final myId = _Client.c.auth.currentUser?.id;
+        if (myId != null) {
+          final nowIso = DateTime.now().toUtc().toIso8601String();
+          await _Client.c
+              .from('connections')
+              .update({'requester_read_at': nowIso})
+              .eq('id', connectionId)
+              .eq('requester_id', myId);
+          await _Client.c
+              .from('connections')
+              .update({'recipient_read_at': nowIso})
+              .eq('id', connectionId)
+              .eq('recipient_id', myId);
+          await _Client.c
+              .from('messages')
+              .update({'is_read': true})
+              .eq('connection_id', connectionId)
+              .neq('sender_id', myId)
+              .eq('is_read', false);
+        }
+      } catch (_) {}
+    }
   }
 
   /// Requests page: incoming pending connections (+ requester details).

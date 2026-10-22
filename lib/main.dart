@@ -6,6 +6,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/authentication/scratch.dart';
@@ -39,6 +40,7 @@ void main() async {
   );
 
   PreferencesService.instance.init();
+  ChatStateService.instance.init();
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );

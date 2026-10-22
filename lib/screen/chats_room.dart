@@ -8,6 +8,8 @@ import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/chat_time_formatter.dart';
 
 class ChatRoom extends StatefulWidget {
   final String? connectionId;
@@ -38,10 +40,14 @@ class _ChatRoomState extends State<ChatRoom> {
   List<Map<String, dynamic>> _messages = [];
   bool _loadingMessages = false;
   StreamSubscription? _messageStream;
+  final Set<int> _expandedTimestamps = {};
 
   @override
   void initState() {
     super.initState();
+    if (widget.connectionId != null) {
+      ChatStateService.instance.enterRoom(widget.connectionId!);
+    }
     _messageController.addListener(() {
       setState(() {});
     });
@@ -51,6 +57,9 @@ class _ChatRoomState extends State<ChatRoom> {
 
   @override
   void dispose() {
+    if (widget.connectionId != null) {
+      ChatStateService.instance.leaveRoom(widget.connectionId!);
+    }
     _messageStream?.cancel();
     _scrollController.dispose();
     _messageController.dispose();
@@ -215,7 +224,6 @@ class _ChatRoomState extends State<ChatRoom> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
 
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
@@ -274,7 +282,7 @@ class _ChatRoomState extends State<ChatRoom> {
                                 color: textTheme,
                               ),
                             ),
-                            if (widget.skillName != null) ...[
+                            if (widget.skillName != null && widget.skillName!.trim().isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Align(
                                 alignment: Alignment.centerLeft,
@@ -352,106 +360,114 @@ class _ChatRoomState extends State<ChatRoom> {
           ],
         ),
       ),
-      body: !hasMessages && !showProfileInAppBar
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      body: Column(
+        children: [
+          Expanded(
+            child: !hasMessages && !showProfileInAppBar
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: _showProfile,
+                          child: CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.grey,
+                            backgroundImage: widget.avatarImage,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.name,
+                          style: AppTextStyles.boldText.copyWith(
+                            color: textTheme,
+                            fontSize: 18,
+                          ),
+                        ),
+                        if (widget.skillName != null && widget.skillName!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'You matched on',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme.withValues(alpha: 0.6),
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SkillTag(
+                            skillName: widget.skillName!,
+                            role: widget.role,
+                          ),
+                        ],
+                      ],
+                    ),
+                  )
+                : _loadingMessages
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildMessageList(textTheme),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  GestureDetector(
-                    onTap: _showProfile,
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.grey,
-                      backgroundImage: widget.avatarImage,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.name,
-                    style: AppTextStyles.boldText.copyWith(
-                      color: textTheme,
-                      fontSize: 18,
-                    ),
-                  ),
-                  if (widget.skillName != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'You matched on',
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      onTap: _scrollToBottom,
+                      minLines: 1,
+                      maxLines: 3,
+                      textInputAction: TextInputAction.newline,
                       style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.6),
-                        fontSize: 13,
+                        fontSize: 16,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        filled: true,
+                        fillColor: bgColor,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    SkillTag(
-                      skillName: widget.skillName!,
-                      role: widget.role,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _sendMessage,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.background,
+                      minimumSize: const Size(48, 48),
+                      maximumSize: const Size(58, 48),
                     ),
-                  ],
+                    icon: const Icon(
+                      Icons.send_rounded,
+                      size: 21,
+                    ),
+                  ),
                 ],
               ),
-            )
-          : _loadingMessages
-              ? const Center(child: CircularProgressIndicator())
-              : _buildMessageList(textTheme),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  minLines: 1,
-                  maxLines: 3,
-                  textInputAction: TextInputAction.newline,
-                  style: AppTextStyles.regularText.copyWith(
-                    fontSize: 16,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    filled: true,
-                    fillColor: bgColor,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide(
-                        color: AppColors.primary,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _sendMessage,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.background,
-                  minimumSize: const Size(48, 48),
-                  maximumSize: const Size(58, 48),
-                ),
-                icon: const Icon(
-                  Icons.send_rounded,
-                  size: 21,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -465,27 +481,74 @@ class _ChatRoomState extends State<ChatRoom> {
       itemBuilder: (context, i) {
         final msg = _messages[i];
         final mine = msg['sender_id'] == myId;
-        return Align(
-          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-            ),
-            decoration: BoxDecoration(
-              color: mine
-                  ? AppColors.primary.withValues(alpha: 0.9)
-                  : Colors.grey.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              (msg['body'] ?? '').toString(),
-              style: AppTextStyles.regularText.copyWith(
-                color: mine ? Colors.black : textTheme,
+        final currTime = DateTime.tryParse(msg['created_at']?.toString() ?? '');
+        DateTime? prevTime;
+        if (i > 0) {
+          prevTime = DateTime.tryParse(_messages[i - 1]['created_at']?.toString() ?? '');
+        }
+
+        final showHeader = currTime != null && ChatTimeFormatter.shouldShowMessengerHeader(prevTime, currTime);
+        final isSelected = _expandedTimestamps.contains(i);
+
+        return Column(
+          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            if (showHeader)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    ChatTimeFormatter.formatMessengerHeader(currTime),
+                    style: AppTextStyles.regularText.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: textTheme.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (_expandedTimestamps.contains(i)) {
+                    _expandedTimestamps.remove(i);
+                  } else {
+                    _expandedTimestamps.add(i);
+                  }
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.75,
+                ),
+                decoration: BoxDecoration(
+                  color: mine
+                      ? AppColors.primary.withValues(alpha: 0.9)
+                      : Colors.grey.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  (msg['body'] ?? '').toString(),
+                  style: AppTextStyles.regularText.copyWith(
+                    color: mine ? Colors.black : textTheme,
+                  ),
+                ),
               ),
             ),
-          ),
+            if (isSelected && currTime != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 4, left: 4, right: 4),
+                child: Text(
+                  ChatTimeFormatter.formatTimeOnly(currTime),
+                  style: AppTextStyles.regularText.copyWith(
+                    fontSize: 11,
+                    color: textTheme.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

@@ -11,8 +11,9 @@ import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/home_page.dart';
-import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/chat_time_formatter.dart';
 
 class ChatsPage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
@@ -56,9 +57,29 @@ class _ChatsPageState extends State<ChatsPage> {
 
   static const int _maxMatchCards = 8;
 
-  List<MatchedUser> _chats = const [];
-  bool _loadingChats = true;
-  String? _chatsError;
+  List<MatchedUser> get _chats => ChatStateService.instance.conversations
+      .map((c) => MatchedUser(
+            id: '${c.connectionId}|${c.otherUserId}',
+            name: c.otherName,
+            role: c.otherRole == 'learner'
+                ? PersonRole.learner
+                : PersonRole.mentor,
+            skillName: c.otherSkill ?? '',
+            category: SkillCategory.everydayPractical,
+            schedule: '',
+            language: '',
+            learningStyle: '',
+            lastMessage: c.lastMessage,
+            lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
+            hasUnread: c.unread > 0,
+            avatarUrl: c.otherAvatar,
+            connectionId: c.connectionId,
+            otherUserId: c.otherUserId,
+          ))
+      .toList();
+
+  bool get _loadingChats => ChatStateService.instance.loading;
+  String? get _chatsError => ChatStateService.instance.error;
 
   late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
     ..onTap = _startSwiping;
@@ -66,64 +87,21 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   void initState() {
     super.initState();
+    ChatStateService.instance.addListener(_onChatStateChanged);
     _loadChats();
   }
 
-  Future<void> _loadChats() async {
-    setState(() {
-      _loadingChats = true;
-      _chatsError = null;
-    });
-    try {
-      final convos = await MatchApi.getConversations();
-      final mapped = convos
-          .where((c) => c.status == 'accepted')
-          .map((c) => MatchedUser(
-                id: '${c.connectionId}|${c.otherUserId}',
-                name: c.otherName,
-                role: c.otherRole == 'learner'
-                    ? PersonRole.learner
-                    : PersonRole.mentor,
-                skillName: '',
-                category: SkillCategory.everydayPractical,
-                schedule: '',
-                language: '',
-                learningStyle: '',
-                lastMessage: c.lastMessage,
-                lastMessageTime:
-                    c.lastAt == null ? null : _formatChatTime(c.lastAt!),
-                hasUnread: c.unread > 0,
-                avatarUrl: c.otherAvatar,
-                connectionId: c.connectionId,
-                otherUserId: c.otherUserId,
-              ))
-          .toList();
-      if (!mounted) return;
-      setState(() {
-        _chats = mapped;
-        _loadingChats = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _chatsError = e.toString();
-        _loadingChats = false;
-      });
-    }
+  void _onChatStateChanged() {
+    if (mounted) setState(() {});
   }
 
-  String _formatChatTime(DateTime t) {
-    final now = DateTime.now();
-    if (t.year == now.year && t.month == now.month && t.day == now.day) {
-      final hh = t.hour.toString().padLeft(2, '0');
-      final mm = t.minute.toString().padLeft(2, '0');
-      return '$hh:$mm';
-    }
-    return '${t.month}/${t.day}';
+  Future<void> _loadChats() async {
+    await ChatStateService.instance.loadConversations();
   }
 
   @override
   void dispose() {
+    ChatStateService.instance.removeListener(_onChatStateChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -211,8 +189,11 @@ class _ChatsPageState extends State<ChatsPage> {
     PersonRole? role,
     Person? person,
     String? connectionId,
-  }) {
-    Navigator.push(
+  }) async {
+    if (connectionId != null) {
+      ChatStateService.instance.enterRoom(connectionId);
+    }
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -226,6 +207,9 @@ class _ChatsPageState extends State<ChatsPage> {
             ),
       ),
     );
+    if (connectionId != null) {
+      ChatStateService.instance.leaveRoom(connectionId);
+    }
   }
 
   void _openMatches(BuildContext context) {
@@ -793,7 +777,7 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (skillName != null) ...[
+                      if (skillName != null && skillName!.trim().isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Flexible(
                           child: SkillTag(skillName: skillName!, role: role),
@@ -841,6 +825,7 @@ class SkillTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (skillName.trim().isEmpty) return const SizedBox.shrink();
     final textTheme = Theme.of(context).colorScheme.secondary;
     final iconAsset =
         role == PersonRole.mentor

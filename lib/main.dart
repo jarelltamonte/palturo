@@ -13,9 +13,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/authentication/scratch.dart';
 import 'package:palturo/root_gate.dart';
 import 'package:palturo/authentication/forgot_password_3.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+// Compile-time configuration. Pass these with
+//   flutter run --dart-define-from-file=.env
+// or with individual --dart-define flags. They are never bundled as assets.
+const String kSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const String kSupabasePublishableKey = String.fromEnvironment(
+  'SUPABASE_PUBLISHABLE_KEY',
+);
 
 Future<void> playSplashSound() async {
   final player = AudioPlayer();
@@ -31,13 +38,18 @@ void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  if (kSupabaseUrl.isEmpty || kSupabasePublishableKey.isEmpty) {
+    FlutterNativeSplash.remove();
+    runApp(const MissingConfigurationApp());
+    return;
+  }
+
   playSplashSound();
 
-  await dotenv.load(fileName: ".env");
-
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    publishableKey: dotenv.env['SUPABASE_PUBLISHABLE_KEY'] ?? '',
+    url: kSupabaseUrl,
+    publishableKey: kSupabasePublishableKey,
   );
 
   PreferencesService.instance.init();
@@ -47,6 +59,56 @@ void main() async {
   );
 
   runApp(MyApp(isOnboardingDone: isOnboardingDone ?? false));
+}
+
+/// Shown when Supabase configuration was not supplied at build time.
+/// Keeping this as a tiny standalone app avoids touching Supabase before it is
+/// initialized and turns a silent black screen into an actionable message.
+class MissingConfigurationApp extends StatelessWidget {
+  const MissingConfigurationApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.settings_suggest_outlined, size: 56),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'PalTuro is not configured',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY, then rebuild.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  const SelectableText(
+                    'flutter run --dart-define-from-file=.env',
+                    style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'See .env.example for the expected values.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 mixin MyAppThemeController on State<MyApp> {

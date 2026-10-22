@@ -22,7 +22,6 @@ dependencies:
 
   supabase_flutter: ^2.17.2
   app_links: ^7.2.1
-  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -70,7 +69,6 @@ flutter:
     - assets/lottie/
     - assets/fonts/
     - assets/sounds/
-    - .env
 
   fonts:
     - family: Comfortaa

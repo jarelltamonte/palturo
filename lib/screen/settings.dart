@@ -24,6 +24,7 @@ class _SettingsState extends State<Settings> {
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _isLoggingOut = false;
+  bool _isDeleting = false;
 
   final TextEditingController _reportController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
@@ -614,6 +615,29 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  Future<void> _handleDeleteAccount() async {
+    if (_isDeleting) return;
+    setState(() => _isDeleting = true);
+
+    try {
+      await AuthService().deleteAccount();
+
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).popUntil((route) => route.isFirst);
+      // Keep the busy overlay until this route is disposed, so it cannot
+      // flash away during the exit animation.
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
   void _showDeleteAccountDialog() {
     showAdaptiveDialog(
       context: context,
@@ -621,9 +645,7 @@ class _SettingsState extends State<Settings> {
         return _DeleteAccountDialog(
           onConfirm: () {
             Navigator.pop(dialogContext);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Your account has been deleted.')),
-            );
+            _handleDeleteAccount();
           },
         );
       },
@@ -639,7 +661,7 @@ class _SettingsState extends State<Settings> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
-      canPop: !_isLoggingOut,
+      canPop: !_isLoggingOut && !_isDeleting,
       child: Stack(
         children: [
           Scaffold(
@@ -654,7 +676,10 @@ class _SettingsState extends State<Settings> {
                 padding: const EdgeInsets.only(left: 16),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: _isLoggingOut ? null : () => Navigator.pop(context),
+                  onTap:
+                      (_isLoggingOut || _isDeleting)
+                          ? null
+                          : () => Navigator.pop(context),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Icon(Icons.close, color: textTheme, size: 24),
@@ -895,7 +920,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
           ),
-          if (_isLoggingOut)
+          if (_isLoggingOut || _isDeleting)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.5),
@@ -929,7 +954,9 @@ class _SettingsState extends State<Settings> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Logging out...',
+                          _isDeleting
+                              ? 'Deleting account...'
+                              : 'Logging out...',
                           style: AppTextStyles.boldText.copyWith(
                             color: textTheme,
                             fontSize: 15,

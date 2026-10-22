@@ -2,3 +2,6 @@ project_id = "palturo"
 
 [functions.classify-skill]
 verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

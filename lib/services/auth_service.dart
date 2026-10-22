@@ -246,6 +246,39 @@ class AuthService {
     await _supabase.auth.signOut();
   }
 
+  /// Permanently deletes the signed-in user's profile, media and auth account
+  /// via the `delete-account` Edge Function, then clears the local session.
+  Future<void> deleteAccount() async {
+    try {
+      await _supabase.functions.invoke('delete-account', body: const {});
+    } on FunctionException catch (e) {
+      if (e.status == 0) {
+        throw Exception(
+          'Unable to delete your account. Please check your connection and try again.',
+        );
+      }
+      final details = e.details;
+      final message = details is Map && details['error'] is String
+          ? details['error'] as String
+          : details is String && details.isNotEmpty
+          ? details
+          : 'Unable to delete your account. Please try again.';
+      throw Exception(message);
+    } catch (_) {
+      throw Exception(
+        'Unable to delete your account. Please check your connection and try again.',
+      );
+    }
+
+    // The account is gone at this point; clear local credentials so the UI
+    // returns to login even if the network call cannot reach the server.
+    try {
+      await _supabase.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {
+      // signOut clears local credentials before the request, so ignore.
+    }
+  }
+
   // Current user
   User? getCurrentUser() {
     return _supabase.auth.currentUser;

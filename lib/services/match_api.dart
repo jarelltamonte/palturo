@@ -240,9 +240,29 @@ class MatchApi {
   static final Map<String, List<Person>> _deckCache = {};
   static final Map<String, DateTime> _deckFetchedAt = {};
   static const Duration _deckTtl = Duration(minutes: 10);
+  static String? _deckCacheUserId;
+
+  /// Cache key is scoped to the signed-in user. If the session changes (sign
+  /// out / account switch) the previous user's deck is discarded immediately.
+  static String _deckKey(String asRoleDb) {
+    final userId = _Client.c.auth.currentUser?.id ?? 'anonymous';
+    if (_deckCacheUserId != userId) {
+      _deckCache.clear();
+      _deckFetchedAt.clear();
+      _deckCacheUserId = userId;
+    }
+    return '$userId|$asRoleDb';
+  }
+
+  /// Drops all cached decks. Call on sign-out.
+  static void clearCaches() {
+    _deckCache.clear();
+    _deckFetchedAt.clear();
+    _deckCacheUserId = null;
+  }
 
   static bool hasCachedDeck(String asRoleDb) =>
-      _deckCache.containsKey(asRoleDb);
+      _deckCache.containsKey(_deckKey(asRoleDb));
 
   /// Cached deck instantly (no spinner); triggers a background refresh when
   /// stale. force bypasses both.
@@ -252,8 +272,9 @@ class MatchApi {
     bool force = false,
     int enrichLimit = 10,
   }) async {
-    final cached = _deckCache[asRoleDb];
-    final fetchedAt = _deckFetchedAt[asRoleDb];
+    final key = _deckKey(asRoleDb);
+    final cached = _deckCache[key];
+    final fetchedAt = _deckFetchedAt[key];
     final fresh = cached != null &&
         fetchedAt != null &&
         DateTime.now().difference(fetchedAt) < _deckTtl;
@@ -269,6 +290,7 @@ class MatchApi {
 
   static Future<List<Person>> fetchAndCacheDeck(
       String asRoleDb, int enrichLimit) async {
+    final key = _deckKey(asRoleDb);
     final matches = await getMatches(asRole: asRoleDb);
     final targetMatches = matches.take(enrichLimit).toList();
     final out = <Person>[];
@@ -291,8 +313,11 @@ class MatchApi {
         compatibility: compat,
       ));
     }
-    _deckCache[asRoleDb] = out;
-    _deckFetchedAt[asRoleDb] = DateTime.now();
+    // Guard against a user switch during the fetch.
+    if (key == _deckKey(asRoleDb)) {
+      _deckCache[key] = out;
+      _deckFetchedAt[key] = DateTime.now();
+    }
     return out;
   }
 

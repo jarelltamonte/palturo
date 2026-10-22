@@ -216,6 +216,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Resets state on logout and unsubscribes from Realtime.
   void reset() {
+    MatchApi.clearCaches();
     if (_realtimeChannel != null) {
       Supabase.instance.client.removeChannel(_realtimeChannel!);
       _realtimeChannel = null;

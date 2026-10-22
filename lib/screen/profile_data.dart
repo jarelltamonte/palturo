@@ -1,10 +1,12 @@
 import 'package:palturo/onboarding/onboarding_models.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
 
 class ProfileData {
   final String id;
   final String firstName;
   final String lastName;
   final String schedule;
+  final List<String> availableDays;
   final String? avatarUrl;
   final List<String?> photos;
   final String bio;
@@ -27,6 +29,7 @@ class ProfileData {
     String? firstName,
     String? lastName,
     required this.schedule,
+    this.availableDays = const [],
     this.avatarUrl,
     this.photos = const [null, null, null],
     this.bio = '',
@@ -58,6 +61,7 @@ class ProfileData {
     String? firstName,
     String? lastName,
     String? schedule,
+    List<String>? availableDays,
     String? avatarUrl,
     List<String?>? photos,
     String? bio,
@@ -78,6 +82,7 @@ class ProfileData {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       schedule: schedule ?? this.schedule,
+      availableDays: availableDays ?? this.availableDays,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       photos: photos ?? this.photos,
       bio: bio ?? this.bio,
@@ -105,14 +110,8 @@ class ProfileData {
     final roleStr = map['role'] as String?;
     if (roleStr != null) parsedRole = OnboardingRoleDb.fromDb(roleStr);
 
-    String formattedSchedule = '';
-    if (map['availability'] is Map && (map['availability'] as Map).isNotEmpty) {
-      final avail = map['availability'] as Map;
-      formattedSchedule = avail.entries
-          .where((e) => e.value != null && e.value.toString().trim().isNotEmpty)
-          .map((e) => '${e.key}: ${e.value}')
-          .join('/');
-    }
+    final parsedDays = parseAvailableDays(map['availability']);
+    final formattedSchedule = formatScheduleDays(parsedDays);
 
     final rawPhotos = map['photos'] as List<dynamic>?;
     List<String?> parsedPhotos = [null, null, null];
@@ -142,6 +141,7 @@ class ProfileData {
               : fallbackFirst,
       lastName: (map['last_name'] as String?) ?? fallbackLast,
       schedule: formattedSchedule,
+      availableDays: parsedDays,
       avatarUrl: map['avatar_url'] as String?,
       photos: parsedPhotos,
       bio: (map['bio'] as String?) ?? '',

@@ -1,11 +1,12 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:math';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
-import '../onboarding/onboarding_models.dart' show OnboardingRoleDb;
+import '../onboarding/onboarding_models.dart' show OnboardingRole, OnboardingRoleDb;
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
+import '../screen/utils/schedule_format.dart';
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -71,16 +72,16 @@ class ProfileService {
 
   Future<void> saveOnboardingPreferences(
     OnboardingController controller,
-  ) async {    final user = _supabase.auth.currentUser;
+  ) async {
+    final user = _supabase.auth.currentUser;
     if (user == null) {
       throw Exception('User is not authenticated. Cannot save preferences.');
     }
 
-    final cleanedAvailability = Map<String, String>.fromEntries(
-      controller.availability.entries.where(
-        (entry) =>
-            entry.value != 'Tap to set time' && entry.value.trim().isNotEmpty,
-      ),
+    final availableDays = parseAvailableDays(
+      controller.availabilityDays.isNotEmpty
+          ? controller.availabilityDays
+          : controller.availability.keys,
     );
 
     final resolvedLearning =
@@ -116,7 +117,7 @@ class ProfileService {
             'teaching_skills': resolvedTeaching,
             'learning_styles': controller.learningStyles.toList(),
             'languages': controller.languages.toList(),
-            'availability': cleanedAvailability,
+            'availability': availableDays,
             'skill_categories': calculatedCategories,
             'has_completed_onboarding': true,
             'is_profile_completed': isComplete,
@@ -348,35 +349,29 @@ class ProfileService {
       } catch (_) {}
     }
 
-    final scheduleParts =
-        updatedProfile.schedule
-            .split('/')
-            .map((s) => s.trim())
-            .where(
-              (s) => s.isNotEmpty && s != 'Not set' && s != 'No schedule set',
-            )
-            .toList();
-
-    final Map<String, String> availabilityMap = {};
-    for (final part in scheduleParts) {
-      if (part.contains(':')) {
-        final colonIdx = part.indexOf(':');
-        final day = part.substring(0, colonIdx).trim();
-        final time = part.substring(colonIdx + 1).trim();
-        if (day.isNotEmpty && time.isNotEmpty && time != 'Tap to set time') {
-          availabilityMap[day] = time;
-        }
-      } else {
-        availabilityMap[part] = 'Available';
-      }
-    }
+    final availableDays = parseAvailableDays(
+      updatedProfile.availableDays.isNotEmpty
+          ? updatedProfile.availableDays
+          : updatedProfile.schedule,
+    );
 
     final primaryAvatar =
         uploadedPhotoUrls.isNotEmpty ? uploadedPhotoUrls[0] : null;
+
+    final bool hasSkillsForRole;
+    if (updatedProfile.role == OnboardingRole.teach) {
+      hasSkillsForRole = resolvedTeaching.isNotEmpty;
+    } else if (updatedProfile.role == OnboardingRole.both) {
+      hasSkillsForRole =
+          resolvedLearning.isNotEmpty || resolvedTeaching.isNotEmpty;
+    } else {
+      hasSkillsForRole = resolvedLearning.isNotEmpty;
+    }
+
     final isCompleted =
         primaryAvatar != null &&
         primaryAvatar.isNotEmpty &&
-        resolvedLearning.isNotEmpty;
+        hasSkillsForRole;
 
     await _supabase
         .from('profiles')
@@ -393,7 +388,7 @@ class ProfileService {
           'skill_categories': allCategorySlugs.toList(),
           'learning_styles': updatedProfile.interests,
           'languages': updatedProfile.languages,
-          'availability': availabilityMap,
+          'availability': availableDays,
           'is_profile_completed': isCompleted,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })

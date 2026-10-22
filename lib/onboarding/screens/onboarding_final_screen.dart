@@ -39,18 +39,7 @@ class OnboardingFinalScreen extends StatelessWidget {
   });
 
   void _setAvailableDays(Set<String> days) {
-    final existing = controller.availability.keys.toList();
-
-    for (final day in existing) {
-      if (!days.contains(day)) {
-        controller.removeAvailability(day);
-      }
-    }
-    for (final day in days) {
-      if (!controller.availability.containsKey(day)) {
-        controller.setAvailability(day, '');
-      }
-    }
+    controller.setAvailabilityDays(days);
   }
 
   @override
@@ -59,7 +48,7 @@ class OnboardingFinalScreen extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final selectedDays =
-            kDayOptions.where(controller.availability.containsKey).toList();
+            kDayOptions.where(controller.availabilityDays.contains).toList();
 
         final isValid =
             controller.learningStyles.isNotEmpty &&

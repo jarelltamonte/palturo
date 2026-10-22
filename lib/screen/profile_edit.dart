@@ -59,7 +59,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   void initState() {
     super.initState();
     _bioController = TextEditingController(text: widget.profile.bio);
-    _availability = _parseAvailability(widget.profile.schedule);
+    _availability = _parseAvailability(widget.profile);
     _languages = List.from(widget.profile.languages);
     _learningStyles = List.from(widget.profile.interests);
     _role = widget.profile.role;
@@ -98,45 +98,26 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     });
   }
 
-  Map<String, String> _parseAvailability(String raw) {
-    final Map<String, String> map = {};
-    if (raw.trim().isEmpty ||
-        raw == 'No schedule set' ||
-        raw == 'No schedules set') {
-      return map;
+  Map<String, String> _parseAvailability(dynamic source) {
+    List<String> days;
+    if (source is ProfileData) {
+      days = source.availableDays.isNotEmpty
+          ? source.availableDays
+          : parseAvailableDays(source.schedule);
+    } else {
+      days = parseAvailableDays(source);
     }
-    final segments = raw.split('/');
-    for (final seg in segments) {
-      final trimmed = seg.trim();
-      if (trimmed.isEmpty) continue;
-      if (trimmed.contains(':')) {
-        final colonIdx = trimmed.indexOf(':');
-        final day = trimmed.substring(0, colonIdx).trim();
-        map[day] = '';
-      } else {
-        map[trimmed] = '';
-      }
-    }
-    return map;
-  }
-
-  String _formatAvailabilityString(Map<String, String> map) {
-    if (map.isEmpty) return '';
-    final days = map.keys.toList();
-    days.sort((a, b) {
-      final ia = kDayOptions.indexOf(a);
-      final ib = kDayOptions.indexOf(b);
-      return (ia == -1 ? 999 : ia).compareTo(ib == -1 ? 999 : ib);
-    });
-    return days.join('/');
+    return {for (final d in days) d: 'Available'};
   }
 
   bool _hasUnsavedChanges() {
-    final initialAvail = _parseAvailability(widget.profile.schedule);
+    final initialAvail = _parseAvailability(widget.profile);
 
     if (_bioController.text.trim() != widget.profile.bio.trim()) return true;
     if (_role != widget.profile.role) return true;
-    if (!mapEquals(_availability, initialAvail)) return true;
+    if (!setEquals(_availability.keys.toSet(), initialAvail.keys.toSet())) {
+      return true;
+    }
     if (!listEquals(_languages, widget.profile.languages)) return true;
     if (!listEquals(_learningStyles, widget.profile.interests)) return true;
     if (!listEquals(_learningSkillIds, widget.profile.learningSkillIds)) {
@@ -227,7 +208,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                               onChanged: (checked) {
                                 setModalState(() {
                                   if (checked == true) {
-                                    tempAvail[day] = '';
+                                    tempAvail[day] = 'Available';
                                   } else {
                                     tempAvail.remove(day);
                                   }
@@ -413,11 +394,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
-    final scheduleFormatted = _formatAvailabilityString(_availability);
+    final selectedDays = parseAvailableDays(_availability.keys);
+    final scheduleFormatted = formatScheduleDays(selectedDays);
 
     final updated = widget.profile.copyWith(
       bio: _bioController.text.trim(),
       schedule: scheduleFormatted,
+      availableDays: selectedDays,
       languages: _languages,
       interests: _learningStyles,
       role: _role,

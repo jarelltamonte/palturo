@@ -57,8 +57,10 @@ class OnboardingController extends ChangeNotifier {
   void toggleAvailabilityDay(String day) {
     if (availabilityDays.contains(day)) {
       availabilityDays.remove(day);
+      availability.remove(day);
     } else {
       availabilityDays.add(day);
+      availability[day] = 'Available';
     }
     notifyListeners();
   }
@@ -67,11 +69,14 @@ class OnboardingController extends ChangeNotifier {
     availabilityDays
       ..clear()
       ..addAll(values);
+    availability
+      ..clear()
+      ..addEntries(values.map((d) => MapEntry(d, 'Available')));
     notifyListeners();
   }
 
   void setAvailability(String day, String timeRange) {
-    availability[day] = timeRange;
+    availability[day] = timeRange.isEmpty ? 'Available' : timeRange;
     availabilityDays.add(day);
     notifyListeners();
   }

@@ -141,10 +141,11 @@ class _ProfilePageState extends State<ProfilePage> {
       skillName = '';
     }
 
+    final formattedSched = formatSchedule(profile.schedule);
     return Person(
       id: profile.id.isNotEmpty ? profile.id : 'me',
       name: profile.name,
-      schedule: formatSchedule(profile.schedule),
+      schedule: formattedSched.isNotEmpty ? formattedSched : 'No schedule set',
       language: profile.languages.join(', '),
       learningStyle: profile.interests.join(', '),
       skillName: skillName,
@@ -420,7 +421,9 @@ class _ProfileSummaryCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
-                              formatSchedule(profile.schedule),
+                              formatSchedule(profile.schedule).isNotEmpty
+                                  ? formatSchedule(profile.schedule)
+                                  : 'No schedule set',
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: textColor, fontSize: 14),
                             ),

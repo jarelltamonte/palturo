@@ -291,11 +291,9 @@ class _RequestPageState extends State<RequestPage> {
           (_) => RequestDetailDialog(
             person: request.toPerson(),
             onAccept: () {
-              Navigator.pop(context);
               _respond(request, true);
             },
             onDecline: () {
-              Navigator.pop(context);
               _respond(request, false);
             },
             onBlock: () => _blockRequester(request),

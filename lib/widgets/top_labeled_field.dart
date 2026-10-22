@@ -13,6 +13,10 @@ class TopLabeledField extends StatefulWidget {
   final TextCapitalization textCapitalization;
   final int? maxLines;
   final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+  final Iterable<String>? autofillHints;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
 
   const TopLabeledField({
     super.key,
@@ -25,6 +29,10 @@ class TopLabeledField extends StatefulWidget {
     this.textCapitalization = TextCapitalization.none,
     this.maxLines = 1,
     this.maxLength,
+    this.inputFormatters,
+    this.autofillHints,
+    this.focusNode,
+    this.onChanged,
   });
 
   @override
@@ -34,7 +42,8 @@ class TopLabeledField extends StatefulWidget {
 class _TopLabeledFieldState extends State<TopLabeledField> {
   late final TextEditingController _controller;
   late final bool _ownsController;
-  final FocusNode _focusNode = FocusNode();
+  late final FocusNode _focusNode;
+  late final bool _ownsFocusNode;
 
   static const double _height = 58;
   static const Duration _duration = Duration(milliseconds: 180);
@@ -47,6 +56,8 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
     super.initState();
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? TextEditingController();
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ?? FocusNode();
     _focusNode.addListener(_handleChange);
     _controller.addListener(_handleChange);
   }
@@ -59,7 +70,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   void dispose() {
     _focusNode.removeListener(_handleChange);
     _controller.removeListener(_handleChange);
-    _focusNode.dispose();
+    if (_ownsFocusNode) _focusNode.dispose();
     if (_ownsController) _controller.dispose();
     super.dispose();
   }
@@ -101,6 +112,9 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     keyboardType: widget.keyboardType,
                     textInputAction: widget.textInputAction,
                     textCapitalization: widget.textCapitalization,
+                    inputFormatters: widget.inputFormatters,
+                    autofillHints: widget.autofillHints,
+                    onChanged: widget.onChanged,
                     minLines: 1,
                     maxLines: widget.obscureText ? 1 : widget.maxLines,
                     maxLength: widget.maxLength,

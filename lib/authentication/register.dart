@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/legal_dialogs.dart';
 import '../services/auth_service.dart';
+import '../utils/validators.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -22,13 +24,70 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  final _firstNameFocusNode = FocusNode();
+  final _lastNameFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _confirmPasswordFocusNode = FocusNode();
+
   final AuthService _authService = AuthService();
 
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
 
+  bool _firstNameTouched = false;
+  bool _lastNameTouched = false;
+  bool _emailHasLostFocus = false;
+  bool _passwordTouched = false;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _firstNameFocusNode.addListener(() {
+      if (!_firstNameFocusNode.hasFocus && _firstNameController.text.isNotEmpty) {
+        setState(() => _firstNameTouched = true);
+      }
+    });
+
+    _lastNameFocusNode.addListener(() {
+      if (!_lastNameFocusNode.hasFocus && _lastNameController.text.isNotEmpty) {
+        setState(() => _lastNameTouched = true);
+      }
+    });
+
+    _emailFocusNode.addListener(() {
+      if (!_emailFocusNode.hasFocus && _emailController.text.isNotEmpty) {
+        setState(() => _emailHasLostFocus = true);
+      }
+    });
+
+    _passwordFocusNode.addListener(() {
+      if (_passwordFocusNode.hasFocus && !_passwordTouched) {
+        setState(() => _passwordTouched = true);
+      }
+    });
+
+    _firstNameController.addListener(_onFieldChanged);
+    _lastNameController.addListener(_onFieldChanged);
+    _emailController.addListener(_onFieldChanged);
+    _passwordController.addListener(_onFieldChanged);
+    _confirmPasswordController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _firstNameFocusNode.dispose();
+    _lastNameFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
+
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -37,32 +96,162 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
+  String? get _firstNameError {
+    if (!_firstNameTouched && _firstNameController.text.isEmpty) return null;
+    return Validators.validateName(_firstNameController.text, 'First name');
+  }
+
+  String? get _lastNameError {
+    if (!_lastNameTouched && _lastNameController.text.isEmpty) return null;
+    return Validators.validateName(_lastNameController.text, 'Last name');
+  }
+
+  String? get _emailError {
+    if (!_emailHasLostFocus) return null;
+    return Validators.validateEmail(_emailController.text);
+  }
+
+  PasswordValidationResult get _passwordResult =>
+      Validators.checkPassword(_passwordController.text);
+
+  String? get _confirmPasswordError {
+    if (_confirmPasswordController.text.isEmpty) return null;
+    return Validators.validateConfirmPassword(
+      _passwordController.text,
+      _confirmPasswordController.text,
+    );
+  }
+
   Future<void> _register() async {
+    if (_isSubmitting) return;
+
+    // Check if any field is empty - restore "All fields are required" pop up
+    if (_firstNameController.text.trim().isEmpty ||
+        _lastNameController.text.trim().isEmpty ||
+        _emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty ||
+        _confirmPasswordController.text.isEmpty) {
+      setState(() {
+        _firstNameTouched = true;
+        _lastNameTouched = true;
+        _emailHasLostFocus = true;
+        _passwordTouched = true;
+      });
+      await _showSignUpFailedDialog('All fields are required');
+      return;
+    }
+
+    // Validate email format
+    final emailError = Validators.validateEmail(_emailController.text);
+    if (emailError != null) {
+      setState(() {
+        _emailHasLostFocus = true;
+      });
+      await _showSignUpFailedDialog(emailError);
+      return;
+    }
+
+    // Validate name fields
+    final firstNameError =
+        Validators.validateName(_firstNameController.text, 'First name');
+    if (firstNameError != null) {
+      setState(() {
+        _firstNameTouched = true;
+      });
+      await _showSignUpFailedDialog(firstNameError);
+      return;
+    }
+
+    final lastNameError =
+        Validators.validateName(_lastNameController.text, 'Last name');
+    if (lastNameError != null) {
+      setState(() {
+        _lastNameTouched = true;
+      });
+      await _showSignUpFailedDialog(lastNameError);
+      return;
+    }
+
+    // Validate password policy
+    final passwordResult =
+        Validators.checkPassword(_passwordController.text);
+    if (!passwordResult.isValid) {
+      setState(() {
+        _passwordTouched = true;
+      });
+      final errorMsg = passwordResult.unmetRequirements.isNotEmpty
+          ? passwordResult.unmetRequirements.first
+          : 'Password does not meet security requirements.';
+      await _showSignUpFailedDialog(errorMsg);
+      return;
+    }
+
+    // Validate confirm password
+    final confirmError = Validators.validateConfirmPassword(
+      _passwordController.text,
+      _confirmPasswordController.text,
+    );
+    if (confirmError != null) {
+      await _showSignUpFailedDialog(confirmError);
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
     try {
-      await _authService.register(
-        _firstNameController.text.trim(),
-        _lastNameController.text.trim(),
-        _emailController.text.trim(),
+      final result = await _authService.register(
+        _firstNameController.text,
+        _lastNameController.text,
+        _emailController.text,
         _passwordController.text,
         _confirmPasswordController.text,
       );
 
+      // Clear sensitive password inputs
+      _passwordController.clear();
+      _confirmPasswordController.clear();
+
+      // Reset loading state IMMEDIATELY before showing dialog so button spinner stops
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+
       if (!mounted) return;
 
-      await _showAccountCreatedDialog();
+      if (result.isSuccess) {
+        await _showAccountCreatedDialog(
+          message: result.requiresConfirmation
+              ? 'Successfully created account. Please check your email to confirm before logging in.'
+              : 'Successfully created account. You may now log in.',
+        );
 
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        await _showSignUpFailedDialog(
+          result.message ?? 'Unable to create your account. Please try again.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
       if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e) {
-      if (!mounted) return;
-
       await _showSignUpFailedDialog(
-        e.toString().replaceFirst('Exception: ', ''),
+        'Unable to create your account. Please check your connection and try again.',
       );
     }
   }
 
-  Future<void> _showAccountCreatedDialog() async {
+  Future<void> _showAccountCreatedDialog({
+    String message = 'Successfully created account. You may now log in.',
+  }) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
     await showDialog<void>(
@@ -94,7 +283,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ],
             ),
             content: Text(
-              'Successfully created account. You may now log in.',
+              message,
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme.withValues(alpha: 0.8),
@@ -192,8 +381,13 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final errorColor = Theme.of(context).colorScheme.error;
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+        Theme.of(context).platform == TargetPlatform.iOS ? 44.0 : 56.0;
+
+    final showPasswordChecklist =
+        (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
+            !_passwordResult.isValid;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -221,7 +415,6 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
-
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -250,16 +443,84 @@ class _RegisterPageState extends State<RegisterPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: TopLabeledField(
-                              label: 'First name',
-                              controller: _firstNameController,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TopLabeledField(
+                                  label: 'First name',
+                                  controller: _firstNameController,
+                                  focusNode: _firstNameFocusNode,
+                                  keyboardType: TextInputType.name,
+                                  textCapitalization:
+                                      TextCapitalization.words,
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.givenName,
+                                  ],
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(
+                                      Validators.maxNameLength,
+                                    ),
+                                  ],
+                                ),
+                                if (_firstNameError != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 4,
+                                      left: 4,
+                                    ),
+                                    child: Text(
+                                      _firstNameError!,
+                                      style:
+                                          AppTextStyles.regularText.copyWith(
+                                        color: errorColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: TopLabeledField(
-                              label: 'Last name',
-                              controller: _lastNameController,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TopLabeledField(
+                                  label: 'Last name',
+                                  controller: _lastNameController,
+                                  focusNode: _lastNameFocusNode,
+                                  keyboardType: TextInputType.name,
+                                  textCapitalization:
+                                      TextCapitalization.words,
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [
+                                    AutofillHints.familyName,
+                                  ],
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(
+                                      Validators.maxNameLength,
+                                    ),
+                                  ],
+                                ),
+                                if (_lastNameError != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 4,
+                                      left: 4,
+                                    ),
+                                    child: Text(
+                                      _lastNameError!,
+                                      style:
+                                          AppTextStyles.regularText.copyWith(
+                                        color: errorColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ],
@@ -268,12 +529,42 @@ class _RegisterPageState extends State<RegisterPage> {
                       TopLabeledField(
                         label: 'Email',
                         controller: _emailController,
+                        focusNode: _emailFocusNode,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.email],
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(
+                            Validators.maxEmailLength,
+                          ),
+                          Validators.emailDenyWhitespaceFormatter,
+                        ],
                       ),
+                      if (_emailError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 4),
+                          child: Text(
+                            _emailError!,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: errorColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
                       TopLabeledField(
                         label: 'Password',
                         controller: _passwordController,
+                        focusNode: _passwordFocusNode,
                         obscureText: _isPasswordObscured,
+                        keyboardType: TextInputType.visiblePassword,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.newPassword],
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(
+                            Validators.maxPasswordLength,
+                          ),
+                        ],
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isPasswordObscured
@@ -288,11 +579,53 @@ class _RegisterPageState extends State<RegisterPage> {
                           },
                         ),
                       ),
+                      if (showPasswordChecklist)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _passwordResult.unmetRequirements
+                                .map((req) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      size: 5,
+                                      color: errorColor,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        req,
+                                        style:
+                                            AppTextStyles.regularText.copyWith(
+                                          color: errorColor,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       const SizedBox(height: 10),
                       TopLabeledField(
                         label: 'Confirm password',
                         controller: _confirmPasswordController,
+                        focusNode: _confirmPasswordFocusNode,
                         obscureText: _isConfirmPasswordObscured,
+                        keyboardType: TextInputType.visiblePassword,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.newPassword],
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(
+                            Validators.maxPasswordLength,
+                          ),
+                        ],
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isConfirmPasswordObscured
@@ -308,6 +641,17 @@ class _RegisterPageState extends State<RegisterPage> {
                           },
                         ),
                       ),
+                      if (_confirmPasswordError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 4),
+                          child: Text(
+                            _confirmPasswordError!,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: errorColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 64),
@@ -385,7 +729,7 @@ class _RegisterPageState extends State<RegisterPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _register,
+                  onPressed: _isSubmitting ? () {} : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -395,7 +739,18 @@ class _RegisterPageState extends State<RegisterPage> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: const Text('Sign Up'),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.textSecondary,
+                            ),
+                          ),
+                        )
+                      : const Text('Sign Up'),
                 ),
               ),
             ],

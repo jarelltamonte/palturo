@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/services/match_api.dart';
 
@@ -224,6 +225,18 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _loading = false;
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      scheduler.addPostFrameCallback((_) {
+        super.notifyListeners();
+      });
+    } else {
+      super.notifyListeners();
+    }
   }
 
   @override

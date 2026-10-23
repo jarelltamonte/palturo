@@ -32,16 +32,16 @@ class MatchLite {
       role == 'learner' ? PersonRole.learner : PersonRole.mentor;
 
   Person toPerson(String? avatarUrl, {String bio = ''}) => Person(
-        id: userId,
-        name: displayName,
-        schedule: '',
-        language: '',
-        learningStyle: '',
-        skillName: '',
-        role: personRole,
-        bio: bio,
-        photoUrls: [avatarUrl],
-      );
+    id: userId,
+    name: displayName,
+    schedule: '',
+    language: '',
+    learningStyle: '',
+    skillName: '',
+    role: personRole,
+    bio: bio,
+    photoUrls: [avatarUrl],
+  );
 }
 
 /// Conversation row from get_conversations RPC (Chats/Matches).
@@ -96,15 +96,15 @@ class ConversationLite {
   }
 
   Person toPerson() => Person(
-        id: otherUserId,
-        name: otherName,
-        schedule: '',
-        language: '',
-        learningStyle: '',
-        skillName: otherSkill ?? '',
-        role: otherRole == 'learner' ? PersonRole.learner : PersonRole.mentor,
-        photoUrls: [otherAvatar],
-      );
+    id: otherUserId,
+    name: otherName,
+    schedule: '',
+    language: '',
+    learningStyle: '',
+    skillName: otherSkill ?? '',
+    role: otherRole == 'learner' ? PersonRole.learner : PersonRole.mentor,
+    photoUrls: [otherAvatar],
+  );
 }
 
 /// Incoming connection request from get_incoming_requests RPC (Requests page).
@@ -181,7 +181,9 @@ class MatchApi {
     if (raw is Map) {
       data = Map<String, dynamic>.from(raw);
     } else if (raw is String && raw.isNotEmpty) {
-      debugPrint('[MatchApi] res.data was String: ${raw.substring(0, raw.length.clamp(0, 200))}');
+      debugPrint(
+        '[MatchApi] res.data was String: ${raw.substring(0, raw.length.clamp(0, 200))}',
+      );
       data = (jsonDecode(raw) as Map).cast<String, dynamic>();
     } else {
       debugPrint('[MatchApi] res.data unexpected type: ${raw.runtimeType}');
@@ -191,21 +193,24 @@ class MatchApi {
     debugPrint('[MatchApi] get-matches parsed: ${results.length} results');
     return results
         .whereType<Map>()
-        .map((r) => MatchLite(
-              userId: r['user_id'] as String,
-              rank: (r['rank'] as num?)?.toInt() ?? 0,
-              displayName: _displayName(r['display_name']),
-              role: (r['role'] ?? 'both') as String,
-              compatibility: (r['compatibility'] as num?)?.toDouble() ?? 0.0,
-              pipeline: (r['pipeline'] ?? 'full') as String,
-            ))
+        .map(
+          (r) => MatchLite(
+            userId: r['user_id'] as String,
+            rank: (r['rank'] as num?)?.toInt() ?? 0,
+            displayName: _displayName(r['display_name']),
+            role: (r['role'] ?? 'both') as String,
+            compatibility: (r['compatibility'] as num?)?.toDouble() ?? 0.0,
+            pipeline: (r['pipeline'] ?? 'full') as String,
+          ),
+        )
         .toList();
   }
 
   /// Public profile detail to enrich a deck card / dialog.
   static Future<Map<String, dynamic>?> getPublicProfile(String userId) async {
-    final res = await _Client.c
-        .rpc('get_public_profile', params: {'p_user': userId}) as Map?;
+    final res =
+        await _Client.c.rpc('get_public_profile', params: {'p_user': userId})
+            as Map?;
     if (res == null) return null;
     return Map<String, dynamic>.from(res);
   }
@@ -223,21 +228,24 @@ class MatchApi {
       final t = teaching.first as Map;
       // leaf name only (short-form template) — full chain lives in the profile dialog
       final raw = ((t['path'] ?? '') as String);
-      skill = raw.isEmpty
-          ? ((t['skill'] ?? '') as String)
-          : raw.split('.').last.replaceAll('_', ' ').trim();
+      skill =
+          raw.isEmpty
+              ? ((t['skill'] ?? '') as String)
+              : raw.split('.').last.replaceAll('_', ' ').trim();
     } else if (learning.isNotEmpty) {
       final l = learning.first as Map;
       final raw = ((l['path'] ?? '') as String);
-      skill = raw.isEmpty
-          ? ((l['skill'] ?? '') as String)
-          : raw.split('.').last.replaceAll('_', ' ').trim();
+      skill =
+          raw.isEmpty
+              ? ((l['skill'] ?? '') as String)
+              : raw.split('.').last.replaceAll('_', ' ').trim();
     }
-    final showcases = ((p['p_showcases'] as List?) ?? [])
-        .whereType<Map>()
-        .map((m) => m['media'] as String?)
-        .whereType<String>()
-        .toList();
+    final showcases =
+        ((p['p_showcases'] as List?) ?? [])
+            .whereType<Map>()
+            .map((m) => m['media'] as String?)
+            .whereType<String>()
+            .toList();
     return Person(
       id: userId,
       name: name,
@@ -245,9 +253,7 @@ class MatchApi {
       language: (p['p_languages'] ?? '') as String,
       learningStyle: (p['p_styles'] ?? '') as String,
       skillName: skill,
-      role: (p['p_role'] == 'learner')
-          ? PersonRole.learner
-          : PersonRole.mentor,
+      role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
       photoUrls: [(p['p_avatar'] as String?)],
       showcaseUrls: showcases.isNotEmpty ? showcases : const [null],
@@ -293,21 +299,28 @@ class MatchApi {
     final key = _deckKey(asRoleDb);
     final cached = _deckCache[key];
     final fetchedAt = _deckFetchedAt[key];
-    final fresh = cached != null &&
+    final fresh =
+        cached != null &&
         fetchedAt != null &&
         DateTime.now().difference(fetchedAt) < _deckTtl;
     if (cached != null && fresh && !force) return cached;
     if (cached != null && !force) {
       // stale-while-revalidate: serve the cached copy, refresh silently
-      getMatchDeck(asRoleDb: asRoleDb, force: true, enrichLimit: enrichLimit)
-          .then((_) {}, onError: (_) {});
+      getMatchDeck(
+        asRoleDb: asRoleDb,
+        force: true,
+        enrichLimit: enrichLimit,
+      ).then((_) {}, onError: (_) {});
       return cached;
     }
     return fetchAndCacheDeck(asRoleDb, enrichLimit, force: force);
   }
 
   static Future<List<Person>> fetchAndCacheDeck(
-      String asRoleDb, int enrichLimit, {bool force = false}) async {
+    String asRoleDb,
+    int enrichLimit, {
+    bool force = false,
+  }) async {
     final key = _deckKey(asRoleDb);
     final matches = await getMatches(asRole: asRoleDb, useCache: !force);
     final targetMatches = matches.take(enrichLimit).toList();
@@ -317,19 +330,21 @@ class MatchApi {
       if (person == null) continue;
       // carry the compatibility score onto the card (spec §6.3 indicator)
       final compat = m.compatibility;
-      out.add(Person(
-        id: person.id,
-        name: person.name,
-        schedule: person.schedule,
-        language: person.language,
-        learningStyle: person.learningStyle,
-        skillName: person.skillName,
-        role: person.role,
-        bio: person.bio,
-        photoUrls: person.photoUrls,
-        showcaseUrls: person.showcaseUrls,
-        compatibility: compat,
-      ));
+      out.add(
+        Person(
+          id: person.id,
+          name: person.name,
+          schedule: person.schedule,
+          language: person.language,
+          learningStyle: person.learningStyle,
+          skillName: person.skillName,
+          role: person.role,
+          bio: person.bio,
+          photoUrls: person.photoUrls,
+          showcaseUrls: person.showcaseUrls,
+          compatibility: compat,
+        ),
+      );
     }
     // Guard against a user switch during the fetch.
     if (key == _deckKey(asRoleDb)) {
@@ -350,21 +365,26 @@ class MatchApi {
   }) async {
     final sampleSize =
         role == null ? limit : (limit * 10).clamp(0, 200).toInt();
-    final res = await _Client.c.rpc('browse_random_users',
-        params: {'p_limit': sampleSize}) as List;
+    final res =
+        await _Client.c.rpc(
+              'browse_random_users',
+              params: {'p_limit': sampleSize},
+            )
+            as List;
 
     final seen = <String>{};
-    final ids = res
-        .whereType<Map>()
-        .where((r) {
-          if (role == null) return true;
-          final rawRole = r['role'] as String?;
-          return rawRole == null || rawRole == role || rawRole == 'both';
-        })
-        .map((r) => r['user_id'] as String)
-        .where(seen.add)
-        .take(limit)
-        .toList();
+    final ids =
+        res
+            .whereType<Map>()
+            .where((r) {
+              if (role == null) return true;
+              final rawRole = r['role'] as String?;
+              return rawRole == null || rawRole == role || rawRole == 'both';
+            })
+            .map((r) => r['user_id'] as String)
+            .where(seen.add)
+            .take(limit)
+            .toList();
 
     // Enrich concurrently; one missing/deleted profile must not discard the
     // rest of the batch.
@@ -386,53 +406,26 @@ class MatchApi {
     return out;
   }
 
-  /// Recommended deck: get-matches + public-profile enrichment, capped.
-  static Future<List<Person>> getMatchDeckLegacy({
-    required String asRoleDb,
-    String? learnerOrMentorFilter,
-    int enrichLimit = 10,
-  }) async {
-    final matches = await getMatches(asRole: asRoleDb);
-    debugPrint('[MatchApi] deck candidates: ${matches.length} for asRole=$asRoleDb');
-    // non-self, ranked, filtered by UI role filter (both passes all)
-    final targetMatches = matches
-        .where((m) =>
-            learnerOrMentorFilter == null ||
-            m.role == learnerOrMentorFilter ||
-            m.role == 'both')
-        .take(enrichLimit)
-        .toList();
-    final out = <Person>[];
-    for (final m in targetMatches) {
-      final person = await getPersonFromPublicProfile(m.userId);
-      if (person != null) {
-        out.add(person);
-        debugPrint('[MatchApi] enriched ${person.name} (compat=${m.compatibility})');
-      } else {
-        debugPrint('[MatchApi] enrich failed for ${m.userId}');
-      }
-    }
-    debugPrint('[MatchApi] deck enriched: ${out.length} people');
-    return out;
-  }
-
   /// Conversations for Chats/Matches/Requests surfaces.
   static Future<List<ConversationLite>> getConversations() async {
     final res = await _Client.c.rpc('get_conversations') as List;
     return res
         .whereType<Map>()
-        .map((r) => ConversationLite(
-              connectionId: r['connection_id'] as String,
-              status: (r['status'] ?? 'pending') as String,
-              otherUserId: (r['other_user_id'] ?? '') as String,
-              otherName: _displayName(r['other_name']),
-              otherRole: (r['other_role'] ?? 'both') as String,
-              lastMessage: r['last_message'] as String?,
-              lastAt: DateTime.tryParse(r['last_at']?.toString() ?? ''),
-              unread: (r['unread'] as num?)?.toInt() ?? 0,
-              otherAvatar: r['other_avatar'] as String?,
-              otherSkill: (r['other_skill'] ?? r['skill_name'] ?? r['skill']) as String?,
-            ))
+        .map(
+          (r) => ConversationLite(
+            connectionId: r['connection_id'] as String,
+            status: (r['status'] ?? 'pending') as String,
+            otherUserId: (r['other_user_id'] ?? '') as String,
+            otherName: _displayName(r['other_name']),
+            otherRole: (r['other_role'] ?? 'both') as String,
+            lastMessage: r['last_message'] as String?,
+            lastAt: DateTime.tryParse(r['last_at']?.toString() ?? ''),
+            unread: (r['unread'] as num?)?.toInt() ?? 0,
+            otherAvatar: r['other_avatar'] as String?,
+            otherSkill:
+                (r['other_skill'] ?? r['skill_name'] ?? r['skill']) as String?,
+          ),
+        )
         .toList();
   }
 
@@ -442,8 +435,12 @@ class MatchApi {
   static Future<List<Map<String, dynamic>>> getMessages(
     String connectionId,
   ) async {
-    final res = await _Client.c
-        .rpc('get_conversation', params: {'p_connection': connectionId}) as List;
+    final res =
+        await _Client.c.rpc(
+              'get_conversation',
+              params: {'p_connection': connectionId},
+            )
+            as List;
     return res.whereType<Map>().map((m) {
       return {
         'id': m['id'],
@@ -455,18 +452,19 @@ class MatchApi {
   }
 
   static Future<void> sendMessage(String connectionId, String body) async {
-    await _Client.c.rpc('send_message', params: {
-      'p_connection': connectionId,
-      'p_body': body,
-    });
+    await _Client.c.rpc(
+      'send_message',
+      params: {'p_connection': connectionId, 'p_body': body},
+    );
   }
 
   /// Marks unread messages in this connection as read.
   static Future<void> markMessagesRead(String connectionId) async {
     try {
-      await _Client.c.rpc('mark_messages_read', params: {
-        'p_connection': connectionId,
-      });
+      await _Client.c.rpc(
+        'mark_messages_read',
+        params: {'p_connection': connectionId},
+      );
     } catch (_) {
       // Best-effort; the next sync recomputes unread from the read timestamps.
     }
@@ -476,37 +474,40 @@ class MatchApi {
   static Future<List<RequestLite>> getIncomingRequests() async {
     final res = await _Client.c.rpc('get_incoming_requests') as List;
     return res.whereType<Map>().map((r) {
-      final skills = ((r['skills'] as List?) ?? [])
-          .whereType<dynamic>()
-          .map((s) => s.toString())
-          .toList();
+      final skills =
+          ((r['skills'] as List?) ?? [])
+              .whereType<dynamic>()
+              .map((s) => s.toString())
+              .toList();
       return RequestLite(
         connectionId: r['connection_id'] as String,
         requesterId: r['requester_id'] as String,
         requesterName: _displayName(r['requester_name']),
         avatarUrl: r['avatar_url'] as String?,
         skills: skills,
-        createdAt: DateTime.tryParse(r['created_at']?.toString() ?? '') ??
+        createdAt:
+            DateTime.tryParse(r['created_at']?.toString() ?? '') ??
             DateTime.now(),
       );
     }).toList();
   }
 
-  static Future<void> respondToRequest(
-      String connectionId, bool accept) async {
-    await _Client.c.rpc('respond_connection_request', params: {
-      'p_connection': connectionId,
-      'p_accept': accept,
-    });
+  static Future<void> respondToRequest(String connectionId, bool accept) async {
+    await _Client.c.rpc(
+      'respond_connection_request',
+      params: {'p_connection': connectionId, 'p_accept': accept},
+    );
   }
 
   /// Deletes an accepted connection. The RPC verifies the caller is one of the
   /// two participants before removing it and its messages/feedback.
   static Future<void> unmatch(String connectionId) async {
-    await _Client.c.rpc('unmatch_connection', params: {
-      'p_connection': connectionId,
-    });
+    await _Client.c.rpc(
+      'unmatch_connection',
+      params: {'p_connection': connectionId},
+    );
   }
+
   static Future<void> sendConnectionRequest(String userId) =>
       _Client.c.rpc('send_connection_request', params: {'p_recipient': userId});
 
@@ -516,11 +517,10 @@ class MatchApi {
   static Future<void> unblockUser(String userId) =>
       _Client.c.rpc('unblock_user', params: {'p_target': userId});
 
-  static Future<void> reportUser(String userId, String reason) =>
-      _Client.c.rpc('report_user', params: {
-        'p_target': userId,
-        'p_reason': reason,
-      });
+  static Future<void> reportUser(String userId, String reason) => _Client.c.rpc(
+    'report_user',
+    params: {'p_target': userId, 'p_reason': reason},
+  );
 
   static Future<List<Map<String, dynamic>>> getBlockList() async {
     final res = await _Client.c.rpc('get_block_list') as List;
@@ -533,10 +533,15 @@ class MatchApi {
   // ---- Explore taxonomy ----
 
   /// Visible taxonomy nodes (id, name, path, depth, is_leaf, usage_count).
-  static Future<List<Map<String, dynamic>>> taxonomyVisible(
-      {String? rootPath}) async {
-    final res = await _Client.c.rpc('taxonomy_visible',
-        params: {'p_root_path': rootPath}) as List;
+  static Future<List<Map<String, dynamic>>> taxonomyVisible({
+    String? rootPath,
+  }) async {
+    final res =
+        await _Client.c.rpc(
+              'taxonomy_visible',
+              params: {'p_root_path': rootPath},
+            )
+            as List;
     return res
         .whereType<Map>()
         .map((r) => Map<String, dynamic>.from(r))
@@ -544,12 +549,16 @@ class MatchApi {
   }
 
   /// Skill users for Explore expand (teach side by default).
-  static Future<List<Person>> browseSkillUsers(String nodePath,
-      {String kind = 'teach'}) async {
-    final res = await _Client.c.rpc('browse_skill_users', params: {
-      'p_node': nodePath,
-      'p_kind': kind,
-    }) as List;
+  static Future<List<Person>> browseSkillUsers(
+    String nodePath, {
+    String kind = 'teach',
+  }) async {
+    final res =
+        await _Client.c.rpc(
+              'browse_skill_users',
+              params: {'p_node': nodePath, 'p_kind': kind},
+            )
+            as List;
     return (res.whereType<Map>()).map((r) {
       return Person(
         id: r['user_id'] as String,
@@ -578,23 +587,13 @@ class MatchApi {
 
   // ---- Skill selection (spec: taxonomy + notes + classify) ----
 
-  static List<Map<String, dynamic>>? _leafCache;
-
-  /// Cached taxonomy leaves (OnboardingOption-friendly: id = node id).
-  static Future<List<Map<String, dynamic>>> taxonomyLeaves(
-      {bool forceRefresh = false}) async {
-    if (_leafCache != null && !forceRefresh) return _leafCache!;
-    final nodes = await taxonomyVisible();
-    _leafCache = nodes
-        .where((n) => (n['is_leaf'] as bool?) == true)
-        .toList();
-    return _leafCache!;
-  }
-
   /// The caller's placements: [{kind, note, id, name, path}].
   static Future<List<Map<String, dynamic>>> mySkills() async {
-    final res = await _Client.c.from('user_skills').select(
-        'kind, note, skill:skill_id(id, name, path)') as List;
+    final res =
+        await _Client.c
+                .from('user_skills')
+                .select('kind, note, skill:skill_id(id, name, path)')
+            as List;
     return res.whereType<Map>().map((m) {
       final skill = (m['skill'] as Map?) ?? {};
       return {

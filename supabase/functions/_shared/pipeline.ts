@@ -19,9 +19,7 @@ export interface PipelineCfg {
   rerankApi: string;
   wSkills: number;
   wContext: number;
-  wBio: number;
   topK: number;
-  calibration: string;
   configRevision: number;
 }
 
@@ -41,9 +39,7 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
     ),
     wSkills: Number(weights.skills ?? 0.7),
     wContext: Number(weights.context ?? 0.3),
-    wBio: Number(weights.bio ?? 0.0),
     topK: num(cfg.candidate_pool_k, 50),
-    calibration: unstr(cfg.calibration, "sigmoid"),
     configRevision: num(cfg.__revision, 0),
   };
 }

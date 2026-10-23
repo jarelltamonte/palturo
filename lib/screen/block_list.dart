@@ -1,31 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
-
-/// In-memory helpers kept for transitional callers; blocks are persisted
-/// through MatchApi.blockUser / unblockUser (DEV-11 resolved).
-class BlockedUsers {
-  BlockedUsers._();
-
-  static final ValueNotifier<List<Person>> notifier =
-      ValueNotifier<List<Person>>([]);
-
-  static bool isBlocked(String id) =>
-      notifier.value.any((person) => person.id == id);
-
-  static void block(Person person) {
-    if (isBlocked(person.id)) return;
-    notifier.value = [...notifier.value, person];
-  }
-
-  static void unblock(String id) {
-    notifier.value = notifier.value.where((p) => p.id != id).toList();
-  }
-}
 
 /// Live blocked list from the `blocks` table (FR-15).
 class BlockListPage extends StatefulWidget {
@@ -73,15 +52,15 @@ class _BlockListPageState extends State<BlockListPage> {
     try {
       await MatchApi.unblockUser(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You unblocked $name')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('You unblocked $name')));
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unblock failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unblock failed: $e')));
     }
   }
 
@@ -111,13 +90,14 @@ class _BlockListPageState extends State<BlockListPage> {
           ),
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
               ? _buildErrorState(textTheme)
               : _blocked.isEmpty
-                  ? _buildEmptyState(textTheme)
-                  : _buildList(textTheme),
+              ? _buildEmptyState(textTheme)
+              : _buildList(textTheme),
     );
   }
 
@@ -125,10 +105,9 @@ class _BlockListPageState extends State<BlockListPage> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: _blocked.length,
-      separatorBuilder: (context, index) => Divider(
-        height: 1,
-        color: textTheme.withValues(alpha: 0.1),
-      ),
+      separatorBuilder:
+          (context, index) =>
+              Divider(height: 1, color: textTheme.withValues(alpha: 0.1)),
       itemBuilder: (context, index) {
         final entry = _blocked[index];
         final person = Person(
@@ -141,10 +120,7 @@ class _BlockListPageState extends State<BlockListPage> {
           role: PersonRole.learner,
           photoUrls: [entry['avatar_url'] as String?],
         );
-        return _BlockedTile(
-          person: person,
-          onUnblock: () => _unblock(entry),
-        );
+        return _BlockedTile(person: person, onUnblock: () => _unblock(entry));
       },
     );
   }
@@ -225,7 +201,9 @@ class _BlockedTile extends StatelessWidget {
             radius: 24,
             backgroundColor: Colors.grey.withValues(alpha: 0.3),
             backgroundImage:
-                person.photoUrls[0] == null ? null : NetworkImage(person.photoUrls[0]!),
+                person.photoUrls[0] == null
+                    ? null
+                    : NetworkImage(person.photoUrls[0]!),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -244,10 +222,7 @@ class _BlockedTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: const Text(
-              'Unblock',
-              style: TextStyle(fontSize: 13),
-            ),
+            child: const Text('Unblock', style: TextStyle(fontSize: 13)),
           ),
         ],
       ),

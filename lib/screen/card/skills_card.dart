@@ -159,12 +159,6 @@ class TitleCaseFormatter extends TextInputFormatter {
   }
 }
 
-bool isSkillIdValid(String id) {
-  final lower = id.trim().toLowerCase();
-  if (lower == 'other' || lower == 'others') return false;
-  return CustomSkill.tryParse(id)?.isValid ?? true;
-}
-
 bool isPendingSkillId(String id) {
   if (id.trim().isEmpty) return true;
   final custom = CustomSkill.tryParse(id);

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -46,7 +46,8 @@ class _ChatRoomState extends State<ChatRoom> {
   bool _loadingMessages = false;
   String? _loadError;
   StreamSubscription? _messageStream;
-  final Set<int> _expandedTimestamps = {};
+  final Set<String> _expandedTimestamps = {};
+  bool _sendingMessage = false;
 
   @override
   void initState() {
@@ -121,10 +122,12 @@ class _ChatRoomState extends State<ChatRoom> {
   List<Map<String, dynamic>> _sortMessages(List<Map<String, dynamic>> rows) {
     final sorted = [...rows];
     sorted.sort((a, b) {
-      final ta = DateTime.tryParse(a['created_at']?.toString() ?? '')
-          ?? DateTime(1900);
-      final tb = DateTime.tryParse(b['created_at']?.toString() ?? '')
-          ?? DateTime(1900);
+      final ta =
+          DateTime.tryParse(a['created_at']?.toString() ?? '') ??
+          DateTime(1900);
+      final tb =
+          DateTime.tryParse(b['created_at']?.toString() ?? '') ??
+          DateTime(1900);
       final byTime = ta.compareTo(tb);
       if (byTime != 0) return byTime;
       // stable tie-breaker for equal timestamps
@@ -143,6 +146,8 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   Future<void> _sendMessage() async {
+    if (_sendingMessage) return;
+
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
     if (widget.connectionId == null) {
@@ -153,15 +158,22 @@ class _ChatRoomState extends State<ChatRoom> {
       );
       return;
     }
-    _messageController.clear();
+
+    setState(() => _sendingMessage = true);
     try {
       await MatchApi.sendMessage(widget.connectionId!, message);
-      // realtime stream refreshes the thread
+      if (!mounted) return;
+      // Keep anything the user typed while the request was in flight.
+      if (_messageController.text.trim() == message) {
+        _messageController.clear();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+    } finally {
+      if (mounted) setState(() => _sendingMessage = false);
     }
   }
 
@@ -206,9 +218,9 @@ class _ChatRoomState extends State<ChatRoom> {
     try {
       await MatchApi.reportUser(target, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -239,10 +251,7 @@ class _ChatRoomState extends State<ChatRoom> {
     }
 
     if (action == 'report') {
-      final reason = await showReportReasonDialog(
-        context,
-        name: widget.name,
-      );
+      final reason = await showReportReasonDialog(context, name: widget.name);
       if (reason == null) return;
       _report(reason);
     } else if (action == 'block') {
@@ -274,7 +283,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      
+
       appBar: AppBar(
         toolbarHeight: adaptiveHeight + (widget.skillName != null ? 8 : 0),
         backgroundColor: Colors.transparent,
@@ -319,7 +328,8 @@ class _ChatRoomState extends State<ChatRoom> {
                                 color: textTheme,
                               ),
                             ),
-                            if (widget.skillName != null && widget.skillName!.trim().isNotEmpty) ...[
+                            if (widget.skillName != null &&
+                                widget.skillName!.trim().isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Align(
                                 alignment: Alignment.centerLeft,
@@ -347,39 +357,43 @@ class _ChatRoomState extends State<ChatRoom> {
               elevation: 6,
               offset: const Offset(0, 40),
               onSelected: _handleMenuAction,
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'report',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flag_outlined,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Report',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
+              itemBuilder:
+                  (context) => [
+                    PopupMenuItem<String>(
+                      value: 'report',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.flag_outlined,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Report',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'block',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Block',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'block',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block, color: Colors.red, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Block',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  ],
               child: Container(
                 padding: const EdgeInsets.all(6),
                 margin: const EdgeInsets.only(right: 8),
@@ -387,11 +401,7 @@ class _ChatRoomState extends State<ChatRoom> {
                   color: Colors.transparent,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.more_horiz,
-                  color: textTheme,
-                  size: 22,
-                ),
+                child: Icon(Icons.more_horiz, color: textTheme, size: 22),
               ),
             ),
           ],
@@ -400,50 +410,52 @@ class _ChatRoomState extends State<ChatRoom> {
       body: Column(
         children: [
           Expanded(
-            child: _loadingMessages
-                ? const Center(child: CircularProgressIndicator())
-                : _loadError != null && _messages.isEmpty
-                ? _buildLoadError(textTheme)
-                : !hasMessages && !showProfileInAppBar
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        GestureDetector(
-                          onTap: _showProfile,
-                          child: CircleAvatar(
-                            radius: 50,
-                            backgroundColor: Colors.grey,
-                            backgroundImage: widget.avatarImage,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          widget.name,
-                          style: AppTextStyles.boldText.copyWith(
-                            color: textTheme,
-                            fontSize: 18,
-                          ),
-                        ),
-                        if (widget.skillName != null && widget.skillName!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            'You matched on',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme.withValues(alpha: 0.6),
-                              fontSize: 13,
+            child:
+                _loadingMessages
+                    ? const Center(child: CircularProgressIndicator())
+                    : _loadError != null && _messages.isEmpty
+                    ? _buildLoadError(textTheme)
+                    : !hasMessages && !showProfileInAppBar
+                    ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: _showProfile,
+                            child: CircleAvatar(
+                              radius: 50,
+                              backgroundColor: Colors.grey,
+                              backgroundImage: widget.avatarImage,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          SkillTag(
-                            skillName: widget.skillName!,
-                            role: widget.role,
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.name,
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textTheme,
+                              fontSize: 18,
+                            ),
                           ),
+                          if (widget.skillName != null &&
+                              widget.skillName!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              'You matched on',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme.withValues(alpha: 0.6),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SkillTag(
+                              skillName: widget.skillName!,
+                              role: widget.role,
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  )
-                : _buildMessageList(textTheme),
+                      ),
+                    )
+                    : _buildMessageList(textTheme),
           ),
           SafeArea(
             top: false,
@@ -459,9 +471,7 @@ class _ChatRoomState extends State<ChatRoom> {
                       minLines: 1,
                       maxLines: 3,
                       textInputAction: TextInputAction.newline,
-                      style: AppTextStyles.regularText.copyWith(
-                        fontSize: 16,
-                      ),
+                      style: AppTextStyles.regularText.copyWith(fontSize: 16),
                       decoration: InputDecoration(
                         hintText: 'Type a message...',
                         filled: true,
@@ -490,17 +500,24 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    onPressed: _sendMessage,
+                    onPressed: _sendingMessage ? null : _sendMessage,
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.background,
                       minimumSize: const Size(48, 48),
                       maximumSize: const Size(58, 48),
                     ),
-                    icon: const Icon(
-                      Icons.send_rounded,
-                      size: 21,
-                    ),
+                    icon:
+                        _sendingMessage
+                            ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.background,
+                              ),
+                            )
+                            : const Icon(Icons.send_rounded, size: 21),
                   ),
                 ],
               ),
@@ -552,14 +569,22 @@ class _ChatRoomState extends State<ChatRoom> {
         final currTime = DateTime.tryParse(msg['created_at']?.toString() ?? '');
         DateTime? prevTime;
         if (i > 0) {
-          prevTime = DateTime.tryParse(_messages[i - 1]['created_at']?.toString() ?? '');
+          prevTime = DateTime.tryParse(
+            _messages[i - 1]['created_at']?.toString() ?? '',
+          );
         }
 
-        final showHeader = currTime != null && ChatTimeFormatter.shouldShowMessengerHeader(prevTime, currTime);
-        final isSelected = _expandedTimestamps.contains(i);
+        final showHeader =
+            currTime != null &&
+            ChatTimeFormatter.shouldShowMessengerHeader(prevTime, currTime);
+        final messageKey =
+            msg['id']?.toString() ??
+            '${msg['created_at']}-${msg['sender_id']}-${msg['body']}';
+        final isSelected = _expandedTimestamps.contains(messageKey);
 
         return Column(
-          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (showHeader)
               Center(
@@ -578,23 +603,27 @@ class _ChatRoomState extends State<ChatRoom> {
             GestureDetector(
               onTap: () {
                 setState(() {
-                  if (_expandedTimestamps.contains(i)) {
-                    _expandedTimestamps.remove(i);
+                  if (_expandedTimestamps.contains(messageKey)) {
+                    _expandedTimestamps.remove(messageKey);
                   } else {
-                    _expandedTimestamps.add(i);
+                    _expandedTimestamps.add(messageKey);
                   }
                 });
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.75,
                 ),
                 decoration: BoxDecoration(
-                  color: mine
-                      ? AppColors.primary.withValues(alpha: 0.9)
-                      : Colors.grey.withValues(alpha: 0.25),
+                  color:
+                      mine
+                          ? AppColors.primary.withValues(alpha: 0.9)
+                          : Colors.grey.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -607,7 +636,12 @@ class _ChatRoomState extends State<ChatRoom> {
             ),
             if (isSelected && currTime != null)
               Padding(
-                padding: const EdgeInsets.only(top: 2, bottom: 4, left: 4, right: 4),
+                padding: const EdgeInsets.only(
+                  top: 2,
+                  bottom: 4,
+                  left: 4,
+                  right: 4,
+                ),
                 child: Text(
                   ChatTimeFormatter.formatTimeOnly(currTime),
                   style: AppTextStyles.regularText.copyWith(

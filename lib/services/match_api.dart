@@ -446,6 +446,7 @@ class MatchApi {
         .rpc('get_conversation', params: {'p_connection': connectionId}) as List;
     return res.whereType<Map>().map((m) {
       return {
+        'id': m['id'],
         'sender_id': m['sender_id'],
         'body': m['body'],
         'created_at': m['created_at'],

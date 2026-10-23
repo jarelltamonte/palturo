@@ -58,32 +58,36 @@ class _ChatsPageState extends State<ChatsPage> {
 
   static const int _maxMatchCards = 8;
 
-  List<MatchedUser> get _chats => ChatStateService.instance.conversations
-      .map((c) => MatchedUser(
-            id: '${c.connectionId}|${c.otherUserId}',
-            name: c.otherName,
-            role: c.otherRole == 'learner'
-                ? PersonRole.learner
-                : PersonRole.mentor,
-            skillName: c.otherSkill ?? '',
-            category: SkillCategory.everydayPractical,
-            schedule: '',
-            language: '',
-            learningStyle: '',
-            lastMessage: c.lastMessage,
-            lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
-            hasUnread: c.unread > 0,
-            avatarUrl: c.otherAvatar,
-            connectionId: c.connectionId,
-            otherUserId: c.otherUserId,
-          ))
-      .toList();
+  List<MatchedUser> get _chats =>
+      ChatStateService.instance.conversations
+          .map(
+            (c) => MatchedUser(
+              id: '${c.connectionId}|${c.otherUserId}',
+              name: c.otherName,
+              role:
+                  c.otherRole == 'learner'
+                      ? PersonRole.learner
+                      : PersonRole.mentor,
+              skillName: c.otherSkill ?? '',
+              category: SkillCategory.everydayPractical,
+              schedule: '',
+              language: '',
+              learningStyle: '',
+              lastMessage: c.lastMessage,
+              lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
+              hasUnread: c.unread > 0,
+              avatarUrl: c.otherAvatar,
+              connectionId: c.connectionId,
+              otherUserId: c.otherUserId,
+            ),
+          )
+          .toList();
 
   bool get _loadingChats => ChatStateService.instance.loading;
   String? get _chatsError => ChatStateService.instance.error;
 
-  late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
-    ..onTap = _startSwiping;
+  late final TapGestureRecognizer _swipeTap =
+      TapGestureRecognizer()..onTap = _startSwiping;
 
   @override
   void initState() {
@@ -158,7 +162,7 @@ class _ChatsPageState extends State<ChatsPage> {
     final q = _query.trim().toLowerCase();
     return _chats.where((c) {
       final matchesQuery = q.isEmpty || c.name.toLowerCase().contains(q);
-      return matchesQuery && _matchesRole(c);
+      return matchesQuery && _matchesRole(c) && _matchesRead(c);
     }).toList();
   }
 
@@ -305,7 +309,9 @@ class _ChatsPageState extends State<ChatsPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No chats found',
+              _hasActiveFilter && _query.trim().isEmpty
+                  ? 'No chats match your filters'
+                  : 'No chats found',
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme.withValues(alpha: 0.6),
               ),
@@ -368,6 +374,9 @@ class _ChatsPageState extends State<ChatsPage> {
     final nothingFound = matches.isEmpty && messages.isEmpty;
     final showShortcut = _query.trim().isEmpty;
     final hasNoChats = _chats.isEmpty;
+    final showMatchesSection =
+        !hasNoChats &&
+        (matches.isNotEmpty || (showShortcut && !_hasActiveFilter));
 
     if (_loadingChats) {
       return Scaffold(
@@ -499,7 +508,7 @@ class _ChatsPageState extends State<ChatsPage> {
         child: CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
-            if (!hasNoChats && (matches.isNotEmpty || showShortcut)) ...[
+            if (showMatchesSection) ...[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16.0),
@@ -786,7 +795,8 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (skillName != null && skillName!.trim().isNotEmpty) ...[
+                      if (skillName != null &&
+                          skillName!.trim().isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Flexible(
                           child: SkillTag(skillName: skillName!, role: role),

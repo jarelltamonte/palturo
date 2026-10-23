@@ -19,7 +19,7 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 
-const BUCKETS = ["profile-media", "avatars", "profile-photos", "skill-showcases"];
+const BUCKETS = ["profile-media", "skill-proofs", "avatars", "profile-photos", "skill-showcases"];
 const PAGE = 100;
 
 /** Recursively lists object keys under a prefix (Storage list is not recursive). */

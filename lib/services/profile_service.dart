@@ -61,39 +61,59 @@ class ProfileService {
     final ext = dot == -1 ? '' : name.substring(dot + 1);
     return RegExp(r'^[A-Za-z0-9]{1,5}$').hasMatch(ext)
         ? ext.toLowerCase()
-        : 'jpg';
+        : '';
   }
 
   static String _uploadNamePrefix(String base) =>
       base.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
 
-  /// Uploads [path] to profile-media and returns its public URL.
-  /// Throws if the picked bytes cannot be read, so the caller can abort the
-  /// save instead of persisting a local/blob path.
-  Future<String> _uploadToProfileMedia(
+  /// Uploads [path] to [bucket] and returns a public URL or object path.
+  Future<String> _uploadToBucket(
+    String bucket,
     String path,
-    String filePrefix,
-  ) async {
+    String filePrefix, {
+    required bool publicUrl,
+  }) async {
     final bytes = await _readUploadBytes(path);
     if (bytes == null) {
       throw Exception(
         'Could not read the selected image. Please re-select it and try again.',
       );
     }
+    if (bytes.length > 5 * 1024 * 1024) {
+      throw Exception('Image is too large. Please choose one under 5 MB.');
+    }
 
     final detected = _extensionFromBytes(bytes);
     final ext = detected.isNotEmpty ? detected : _extensionFor(path);
+    if (!const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext.toLowerCase())) {
+      throw Exception('Unsupported image type. Use JPG, PNG, or WebP.');
+    }
     final fileName = '$filePrefix.$ext';
 
     await _supabase.storage
-        .from('profile-media')
+        .from(bucket)
         .uploadBinary(
           fileName,
           bytes,
           fileOptions: const FileOptions(upsert: true),
         );
-    return _supabase.storage.from('profile-media').getPublicUrl(fileName);
+    return publicUrl
+        ? _supabase.storage.from(bucket).getPublicUrl(fileName)
+        : fileName;
   }
+
+  Future<String> _uploadToProfileMedia(
+    String path,
+    String filePrefix,
+  ) =>
+      _uploadToBucket('profile-media', path, filePrefix, publicUrl: true);
+
+  Future<String> _uploadToSkillProofs(
+    String path,
+    String filePrefix,
+  ) =>
+      _uploadToBucket('skill-proofs', path, filePrefix, publicUrl: false);
 
   String _toTitleCase(String text) {
     final clean = text.replaceAll('_', ' ').trim();
@@ -249,6 +269,29 @@ class ProfileService {
         fallbackLast: metaLast,
       );
 
+      // Private proof objects are stored as paths; sign them for display.
+      final proofImages = <String, String>{};
+      for (final entry in profile.teachingSkillImages.entries) {
+        final value = entry.value;
+        if (value.startsWith('http')) {
+          proofImages[entry.key] = value;
+          continue;
+        }
+        try {
+          final signed = await _supabase.storage
+              .from('skill-proofs')
+              .createSignedUrl(value, 3600);
+          proofImages[entry.key] = signed;
+        } catch (_) {
+          // Keep the path so a later save does not treat an unreadable proof
+          // as removed; the UI may show a broken preview until it can sign.
+          proofImages[entry.key] = value;
+        }
+      }
+      final profileWithProofs = profile.copyWith(
+        teachingSkillImages: proofImages,
+      );
+
       final learningNotes = <String, String>{};
       final teachingNotes = <String, String>{};
       var notesLoaded = false;
@@ -289,7 +332,7 @@ class ProfileService {
         // Notes are optional; the profile still loads without them.
       }
 
-      return profile.copyWith(
+      return profileWithProofs.copyWith(
         learningNotes: learningNotes,
         teachingNotes: teachingNotes,
         notesLoaded: notesLoaded,
@@ -400,6 +443,7 @@ class ProfileService {
             .maybeSingle();
 
     final Set<String> oldStorageUrls = {};
+    final Set<String> existingProofPaths = {};
     if (existingRow != null) {
       if (existingRow['avatar_url'] is String &&
           (existingRow['avatar_url'] as String).isNotEmpty) {
@@ -413,7 +457,10 @@ class ProfileService {
       if (existingRow['teaching_skill_images'] is Map) {
         for (final val
             in (existingRow['teaching_skill_images'] as Map).values) {
-          if (val is String && val.isNotEmpty) oldStorageUrls.add(val);
+          if (val is String && val.isNotEmpty) {
+            oldStorageUrls.add(val);
+            if (!val.startsWith('http')) existingProofPaths.add(val);
+          }
         }
       }
     }
@@ -454,36 +501,69 @@ class ProfileService {
         }
 
         if (!localOrRemotePath.startsWith('http')) {
-          final prefix =
-              '${user.id}/proof_${_uploadNamePrefix(targetSkillName)}_${DateTime.now().millisecondsSinceEpoch}';
-          uploadedSkillImages[targetSkillName] = await _uploadToProfileMedia(
-            localOrRemotePath,
-            prefix,
-          );
+          if (existingProofPaths.contains(localOrRemotePath)) {
+            // Existing private path that could not be signed for display;
+            // preserve it rather than re-uploading or deleting it.
+            uploadedSkillImages[targetSkillName] = localOrRemotePath;
+          } else {
+            final prefix =
+                '${user.id}/proof_${_uploadNamePrefix(targetSkillName)}_${DateTime.now().millisecondsSinceEpoch}';
+            uploadedSkillImages[targetSkillName] = await _uploadToSkillProofs(
+              localOrRemotePath,
+              prefix,
+            );
+          }
         } else {
-          uploadedSkillImages[targetSkillName] = localOrRemotePath;
+          // A signed URL from the private bucket: persist the object path, not
+          // the expiring URL. Legacy public profile-media URLs stay as-is.
+          final proofPath = _extractStoragePath(
+            localOrRemotePath,
+            'skill-proofs',
+          );
+          uploadedSkillImages[targetSkillName] =
+              proofPath ?? localOrRemotePath;
         }
       }
     }
 
-    final Set<String> preservedUrls = {
+    final Set<String> preservedProofPaths = uploadedSkillImages.values
+        .where((value) => !value.startsWith('http'))
+        .toSet();
+    final Set<String> preservedMediaUrls = {
       ...uploadedPhotoUrls.whereType<String>(),
-      ...uploadedSkillImages.values,
+      ...uploadedSkillImages.values.where((value) => value.startsWith('http')),
     };
 
-    final List<String> filesToDelete = [];
+    final List<String> mediaToDelete = [];
+    final List<String> proofToDelete = [];
     for (final oldUrl in oldStorageUrls) {
-      if (!preservedUrls.contains(oldUrl)) {
+      // Private proof paths are stored as bare paths or signed URLs.
+      final proofPath = oldUrl.startsWith('http')
+          ? _extractStoragePath(oldUrl, 'skill-proofs')
+          : (oldUrl.contains('://') ? null : oldUrl);
+      if (proofPath != null) {
+        if (!preservedProofPaths.contains(proofPath)) {
+          proofToDelete.add(proofPath);
+        }
+        continue;
+      }
+
+      if (!preservedMediaUrls.contains(oldUrl)) {
         final relativePath = _extractStoragePath(oldUrl, 'profile-media');
         if (relativePath != null && relativePath.startsWith('${user.id}/')) {
-          filesToDelete.add(relativePath);
+          mediaToDelete.add(relativePath);
         }
       }
     }
 
-    if (filesToDelete.isNotEmpty) {
+    if (mediaToDelete.isNotEmpty) {
       try {
-        await _supabase.storage.from('profile-media').remove(filesToDelete);
+        await _supabase.storage.from('profile-media').remove(mediaToDelete);
+      } catch (_) {}
+    }
+    if (proofToDelete.isNotEmpty) {
+      try {
+        await _supabase.storage.from('skill-proofs').remove(proofToDelete);
       } catch (_) {}
     }
 

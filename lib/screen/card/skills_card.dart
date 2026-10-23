@@ -258,6 +258,8 @@ class SkillsCard extends StatefulWidget {
   final SkillSuggestionService suggestionService;
   final ValueChanged<List<String>>? onChanged;
   final void Function(String skillId, String note)? onNoteChanged;
+  final void Function(String oldId, String newId)? onSkillReplaced;
+  final ValueChanged<String>? onSkillRemoved;
   final ValueChanged<String>? onAttachFile;
   final ValueChanged<String>? onRemoveAttachment;
 
@@ -274,6 +276,8 @@ class SkillsCard extends StatefulWidget {
     this.suggestionService = const LocalSkillSuggestionService(),
     this.onChanged,
     this.onNoteChanged,
+    this.onSkillReplaced,
+    this.onSkillRemoved,
     this.onAttachFile,
     this.onRemoveAttachment,
   });
@@ -313,6 +317,8 @@ class SkillsCard extends StatefulWidget {
         const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
     void Function(String skillId, String note)? onNoteChanged,
+    void Function(String oldId, String newId)? onSkillReplaced,
+    ValueChanged<String>? onSkillRemoved,
     ValueChanged<String>? onAttachFile,
     ValueChanged<String>? onRemoveAttachment,
   }) {
@@ -329,6 +335,8 @@ class SkillsCard extends StatefulWidget {
       suggestionService: suggestionService,
       onChanged: onChanged,
       onNoteChanged: onNoteChanged,
+      onSkillReplaced: onSkillReplaced,
+      onSkillRemoved: onSkillRemoved,
       onAttachFile: onAttachFile,
       onRemoveAttachment: onRemoveAttachment,
     );
@@ -448,7 +456,10 @@ class _SkillsCardState extends State<SkillsCard> {
       _rowUids.removeAt(index);
       if (_activeUid == uid) _activeUid = null;
     });
-    if (old.isNotEmpty) widget.onNoteChanged?.call(old, '');
+    if (old.isNotEmpty) {
+      widget.onSkillRemoved?.call(old);
+      widget.onNoteChanged?.call(old, '');
+    }
     _emit();
   }
 
@@ -548,6 +559,7 @@ class _SkillsCardState extends State<SkillsCard> {
               onActivate: () => _activate(_rowUids[i]),
               onChanged: (newId) => _updateSkill(i, newId),
               onNoteChanged: (note) => _updateNote(i, note),
+              onReplaced: widget.onSkillReplaced,
               onRemove: () => _removeSkill(i),
               onAttachFile:
                   widget.onAttachFile == null
@@ -590,6 +602,7 @@ class _SkillRow extends StatefulWidget {
   final VoidCallback onActivate;
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onNoteChanged;
+  final void Function(String oldId, String newId)? onReplaced;
   final VoidCallback onRemove;
   final VoidCallback? onAttachFile;
   final VoidCallback? onRemoveAttachment;
@@ -611,6 +624,7 @@ class _SkillRow extends StatefulWidget {
     required this.onActivate,
     required this.onChanged,
     required this.onNoteChanged,
+    this.onReplaced,
     required this.onRemove,
     this.onAttachFile,
     this.onRemoveAttachment,
@@ -632,6 +646,7 @@ class _SkillRowState extends State<_SkillRow> {
   bool _loading = false;
   List<SkillSuggestion> _suggestions = const [];
   String? _pickedCategoryId;
+  String? _pendingOldId;
   String _lastNote = '';
   double _fieldWidth = 0;
 
@@ -657,6 +672,16 @@ class _SkillRowState extends State<_SkillRow> {
       _requestId++;
       _suggestions = const [];
       _loading = false;
+    }
+
+    // The cleared row's old skill may have been re-added through another row.
+    // Drop the stale pending link so selecting a new skill here cannot take
+    // that live skill's proof.
+    final pendingOldId = _pendingOldId;
+    if (pendingOldId != null &&
+        widget.selectedId.isEmpty &&
+        widget.alreadyUsedIds.contains(pendingOldId)) {
+      _pendingOldId = null;
     }
   }
 
@@ -729,16 +754,27 @@ class _SkillRowState extends State<_SkillRow> {
     _requestId++;
     _focusNode.unfocus();
     _searchController.clear();
+    final oldId = _pendingOldId ?? widget.selectedId;
+    _pendingOldId = null;
+    final newId = suggestion.isCustom ? suggestion.id : suggestion.label;
     setState(() {
       _pickedCategoryId = suggestion.categoryId;
       _suggestions = const [];
       _loading = false;
     });
-    widget.onChanged(suggestion.id);
+    widget.onReplaced?.call(oldId, newId);
+    widget.onChanged(newId);
   }
 
   void _changeSelection() {
+    final oldId = widget.selectedId;
+    _pendingOldId = oldId;
+    widget.onActivate();
     setState(() => _pickedCategoryId = null);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+    widget.onReplaced?.call(oldId, '');
     widget.onChanged('');
   }
 
@@ -826,7 +862,7 @@ class _SkillRowState extends State<_SkillRow> {
       child: TextField(
         controller: _searchController,
         focusNode: _focusNode,
-        autofocus: widget.isEditing,
+        autofocus: widget.isActive,
         enabled: widget.isEditing,
         expands: true,
         minLines: null,

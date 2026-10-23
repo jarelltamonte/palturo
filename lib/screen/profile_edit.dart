@@ -97,6 +97,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   late Map<String, String> _teachingSkillImages;
+  final Map<String, String> _pendingTeachingImages = {};
 
   Future<void> _pickAttachmentForSkill(String skillId) async {
     final picker = ImagePicker();
@@ -104,9 +105,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       source: ImageSource.gallery,
       imageQuality: 85,
     );
-    if (picked == null) return;
+    if (picked == null || !mounted || !_teachingSkillIds.contains(skillId)) {
+      return;
+    }
 
     setState(() {
+      _pendingTeachingImages.remove(skillId);
       _teachingSkillImages[skillId] = picked.path;
     });
   }
@@ -115,6 +119,43 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     setState(() {
       _teachingSkillImages.remove(skillId);
     });
+  }
+
+  /// A skill row clears to an empty id before the user picks a replacement.
+  /// Keep its proof under a pending key so the replacement can inherit it.
+  void _replaceTeachingImage(String oldId, String newId) {
+    if (oldId.isEmpty && newId.isEmpty) return;
+
+    if (oldId == newId) {
+      final pendingImage = _pendingTeachingImages.remove(oldId);
+      if (pendingImage != null) {
+        _teachingSkillImages[oldId] = pendingImage;
+      }
+      return;
+    }
+
+    if (newId.isEmpty) {
+      final image = _teachingSkillImages.remove(oldId);
+      if (image != null) _pendingTeachingImages[oldId] = image;
+      return;
+    }
+
+    // If the target skill already has a proof waiting, keep it and leave the
+    // old proof pending. Moving the old image here would overwrite the
+    // target's own proof and delete it on save.
+    if (_pendingTeachingImages.containsKey(newId)) return;
+
+    final image =
+        _pendingTeachingImages.remove(oldId) ??
+        _teachingSkillImages.remove(oldId);
+    if (image != null && !_teachingSkillImages.containsKey(newId)) {
+      _teachingSkillImages[newId] = image;
+    }
+  }
+
+  void _removeTeachingImage(String skillId) {
+    _teachingSkillImages.remove(skillId);
+    _pendingTeachingImages.remove(skillId);
   }
 
   Map<String, String> _parseAvailability(dynamic source) {
@@ -594,7 +635,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _PhotoPickerRow(
                       photoPaths: _photos,
-                      onChanged: (updated) => setState(() => _photos = updated),
+                      onChanged: (updated) {
+                        if (!mounted) return;
+                        setState(() => _photos = updated);
+                      },
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -747,16 +791,39 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             },
                             onChanged: (updatedIds) {
                               setState(() {
+                                // A proof can be waiting while a row has no
+                                // selection; restore it if that skill is
+                                // re-added through another row.
+                                for (final entry
+                                    in _pendingTeachingImages.entries
+                                        .toList()) {
+                                  if (updatedIds.contains(entry.key)) {
+                                    if (!_teachingSkillImages.containsKey(
+                                      entry.key,
+                                    )) {
+                                      _teachingSkillImages[entry.key] =
+                                          entry.value;
+                                    }
+                                    _pendingTeachingImages.remove(entry.key);
+                                  }
+                                }
                                 final removed =
                                     _teachingSkillIds
                                         .where((id) => !updatedIds.contains(id))
                                         .toList();
                                 for (final oldId in removed) {
+                                  if (_pendingTeachingImages.containsKey(
+                                    oldId,
+                                  )) {
+                                    continue;
+                                  }
                                   _teachingSkillImages.remove(oldId);
                                 }
                                 _teachingSkillIds = updatedIds;
                               });
                             },
+                            onSkillReplaced: _replaceTeachingImage,
+                            onSkillRemoved: _removeTeachingImage,
                             onAttachFile:
                                 (skillId) => _pickAttachmentForSkill(skillId),
                             onRemoveAttachment:
@@ -921,11 +988,15 @@ class _PhotoPickerRow extends StatelessWidget {
     );
     if (picked == null) return;
     final updated = List<String?>.from(photoPaths);
+    while (updated.length <= index) {
+      updated.add(null);
+    }
     updated[index] = picked.path;
     onChanged(updated);
   }
 
   void _removePhoto(int index) {
+    if (index < 0 || index >= photoPaths.length) return;
     final updated = List<String?>.from(photoPaths);
     updated[index] = null;
     onChanged(updated);

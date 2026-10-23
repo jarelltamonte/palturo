@@ -25,6 +25,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   }
 
   Future<void> _handleSendResetLink() async {
+    if (_isLoading) return;
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       _showErrorDialog('Please enter your email address.');
@@ -68,7 +69,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
             borderRadius: BorderRadius.circular(20),
           ),
           title: const Text(
-            'Account Not Found',
+            "Couldn't Send Link",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: Text(message),

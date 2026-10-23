@@ -1,5 +1,8 @@
 project_id = "palturo"
 
+[auth]
+enable_confirmations = false
+
 [functions.moderate-notes]
 verify_jwt = false
 

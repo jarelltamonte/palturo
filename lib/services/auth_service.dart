@@ -6,6 +6,7 @@ import '../utils/validators.dart';
 enum RegisterStatus {
   success,
   requiresConfirmation,
+  neutral,
   failure,
 }
 
@@ -37,6 +38,12 @@ class AuthRegisterResult {
         response: response,
       );
 
+  factory AuthRegisterResult.neutral() => const AuthRegisterResult._(
+        status: RegisterStatus.neutral,
+        message:
+            'If your account was created, log in to continue. If confirmation is enabled, check your email first.',
+      );
+
   factory AuthRegisterResult.failure(String message) => AuthRegisterResult._(
         status: RegisterStatus.failure,
         message: message,
@@ -44,7 +51,8 @@ class AuthRegisterResult {
 
   bool get isSuccess =>
       status == RegisterStatus.success ||
-      status == RegisterStatus.requiresConfirmation;
+      status == RegisterStatus.requiresConfirmation ||
+      status == RegisterStatus.neutral;
   bool get requiresConfirmation =>
       status == RegisterStatus.requiresConfirmation;
 }
@@ -85,7 +93,8 @@ class AuthService {
 
       return response;
     } on AuthException catch (e) {
-      if (e.code == 'invalid_credentials') {
+      if (e.code == 'invalid_credentials' ||
+          e.code == 'email_not_confirmed') {
         throw Exception('Invalid Email or Password');
       }
       throw Exception('Unable to login. Please try again.');
@@ -153,18 +162,6 @@ class AuthService {
       return AuthRegisterResult.failure(confirmError);
     }
 
-    // Check email in profiles if available without throwing unhandled exceptions
-    try {
-      final alreadyExists = await checkEmailExists(cleanEmail);
-      if (alreadyExists) {
-        return AuthRegisterResult.failure(
-          'An account with this email already exists.',
-        );
-      }
-    } catch (_) {
-      // Allow auth.signUp to be the ultimate source of truth
-    }
-
     _isRegistering = true;
     try {
       final response = await _supabase.auth.signUp(
@@ -180,20 +177,20 @@ class AuthService {
       if (response.user != null &&
           (response.user!.identities == null ||
               response.user!.identities!.isEmpty)) {
-        return AuthRegisterResult.failure(
-          'An account with this email already exists.',
-        );
+        return AuthRegisterResult.neutral();
       }
 
-      if (response.session == null) {
-        return AuthRegisterResult.requiresConfirmation(
-          response,
-          'Registration successful! Please check your email to confirm your account.',
-        );
+      // With autoconfirm enabled (current beta config) signUp returns a
+      // session; keep the existing auto-login flow. When confirmation is
+      // enabled (B3/SMTP), return the neutral check-email result.
+      if (response.session != null) {
+        return AuthRegisterResult.success(response);
       }
-
-      return AuthRegisterResult.success(response);
+      return AuthRegisterResult.neutral();
     } on AuthException catch (e) {
+      if (e.code == 'user_already_exists') {
+        return AuthRegisterResult.neutral();
+      }
       if (e.code == 'over_request_rate_limit' ||
           e.code == 'over_email_send_rate_limit') {
         _rateLimitCooldownUntil =
@@ -226,7 +223,7 @@ class AuthService {
   static String _mapAuthException(AuthException e) {
     switch (e.code) {
       case 'user_already_exists':
-        return 'An account with this email already exists.';
+        return 'Could not create an account. If you already have one, sign in or reset your password.';
       case 'weak_password':
         return 'Password does not meet security requirements.';
       case 'invalid_credentials':
@@ -298,31 +295,12 @@ class AuthService {
     return _supabase.auth.currentUser;
   }
 
-  // Verify Email
-  Future<bool> checkEmailExists(String email) async {
-    try {
-      final cleanEmail = Validators.normalizeEmail(email);
-      final exists = await _supabase.rpc(
-        'email_exists',
-        params: {'p_email': cleanEmail},
-      );
-      return exists == true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   // Send Reset Link
   Future<void> sendPasswordResetLink(String email) async {
     final cleanEmail = Validators.normalizeEmail(email);
 
     if (cleanEmail.isEmpty) {
       throw Exception('Email is required');
-    }
-
-    final exists = await checkEmailExists(cleanEmail);
-    if (!exists) {
-      throw Exception('No account found with this email');
     }
 
     try {
@@ -336,7 +314,7 @@ class AuthService {
           'Too many password reset requests. Please try again later.',
         );
       }
-      throw Exception(e.message);
+      throw Exception('Could not send a reset link. Please try again.');
     } catch (_) {
       throw Exception('Failed to send password reset link. Please try again.');
     }

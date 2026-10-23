@@ -224,9 +224,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (result.isSuccess) {
         await _showAccountCreatedDialog(
-          message: result.requiresConfirmation
-              ? 'Successfully created account. Please check your email to confirm before logging in.'
-              : 'Successfully created account. You may now log in.',
+          message: result.message ??
+              'If your account is ready, please log in to continue.',
         );
 
         if (!mounted) return;
@@ -273,7 +272,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Account Created',
+                  'Next Step',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.boldText.copyWith(
                     color: textTheme,

@@ -2,6 +2,7 @@ project_id = "palturo"
 
 [auth]
 site_url = "palturo://auth/callback"
+jwt_expiry = 1800
 additional_redirect_urls = ["palturo://auth/callback", "palturo://auth/reset-callback"]
 
 [auth.email]

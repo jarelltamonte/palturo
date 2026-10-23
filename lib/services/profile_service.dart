@@ -5,11 +5,27 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
-import '../onboarding/onboarding_models.dart' show OnboardingRole, OnboardingRoleDb;
+import '../onboarding/onboarding_models.dart'
+    show OnboardingRole, OnboardingRoleDb;
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
 import '../screen/utils/schedule_format.dart';
+
+bool isProfileComplete({
+  required String? avatarUrl,
+  required String bio,
+  required List<String> languages,
+  required List<String> learningStyles,
+  required bool hasRoleSkills,
+}) {
+  return avatarUrl != null &&
+      avatarUrl.trim().isNotEmpty &&
+      bio.trim().isNotEmpty &&
+      languages.isNotEmpty &&
+      learningStyles.isNotEmpty &&
+      hasRoleSkills;
+}
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -59,9 +75,7 @@ class ProfileService {
     final name = path.split('?').first;
     final dot = name.lastIndexOf('.');
     final ext = dot == -1 ? '' : name.substring(dot + 1);
-    return RegExp(r'^[A-Za-z0-9]{1,5}$').hasMatch(ext)
-        ? ext.toLowerCase()
-        : '';
+    return RegExp(r'^[A-Za-z0-9]{1,5}$').hasMatch(ext) ? ext.toLowerCase() : '';
   }
 
   static String _uploadNamePrefix(String base) =>
@@ -103,16 +117,10 @@ class ProfileService {
         : fileName;
   }
 
-  Future<String> _uploadToProfileMedia(
-    String path,
-    String filePrefix,
-  ) =>
+  Future<String> _uploadToProfileMedia(String path, String filePrefix) =>
       _uploadToBucket('profile-media', path, filePrefix, publicUrl: true);
 
-  Future<String> _uploadToSkillProofs(
-    String path,
-    String filePrefix,
-  ) =>
+  Future<String> _uploadToSkillProofs(String path, String filePrefix) =>
       _uploadToBucket('skill-proofs', path, filePrefix, publicUrl: false);
 
   String _toTitleCase(String text) {
@@ -210,7 +218,34 @@ class ProfileService {
       ...resolvedTeaching,
     ].any((s) => s.toLowerCase() == 'others');
 
-    final isComplete = !hasUnresolvedOthers;
+    Map<String, dynamic>? existingProfile;
+    try {
+      existingProfile =
+          await _supabase
+              .from('profiles')
+              .select('avatar_url, bio')
+              .eq('id', user.id)
+              .maybeSingle();
+    } catch (_) {
+      // Completion is best-effort; a read failure must not block onboarding.
+    }
+
+    final hasRoleSkills = switch (controller.role) {
+      OnboardingRole.teach => resolvedTeaching.isNotEmpty,
+      OnboardingRole.both =>
+        resolvedLearning.isNotEmpty || resolvedTeaching.isNotEmpty,
+      _ => resolvedLearning.isNotEmpty,
+    };
+
+    final isComplete =
+        !hasUnresolvedOthers &&
+        isProfileComplete(
+          avatarUrl: existingProfile?['avatar_url'] as String?,
+          bio: (existingProfile?['bio'] ?? '') as String,
+          languages: controller.languages.toList(),
+          learningStyles: controller.learningStyles.toList(),
+          hasRoleSkills: hasRoleSkills,
+        );
 
     await _saveUserSkills(
       resolvedLearning.map((name) => {'name': name}).toList(),
@@ -520,15 +555,15 @@ class ProfileService {
             localOrRemotePath,
             'skill-proofs',
           );
-          uploadedSkillImages[targetSkillName] =
-              proofPath ?? localOrRemotePath;
+          uploadedSkillImages[targetSkillName] = proofPath ?? localOrRemotePath;
         }
       }
     }
 
-    final Set<String> preservedProofPaths = uploadedSkillImages.values
-        .where((value) => !value.startsWith('http'))
-        .toSet();
+    final Set<String> preservedProofPaths =
+        uploadedSkillImages.values
+            .where((value) => !value.startsWith('http'))
+            .toSet();
     final Set<String> preservedMediaUrls = {
       ...uploadedPhotoUrls.whereType<String>(),
       ...uploadedSkillImages.values.where((value) => value.startsWith('http')),
@@ -538,9 +573,10 @@ class ProfileService {
     final List<String> proofToDelete = [];
     for (final oldUrl in oldStorageUrls) {
       // Private proof paths are stored as bare paths or signed URLs.
-      final proofPath = oldUrl.startsWith('http')
-          ? _extractStoragePath(oldUrl, 'skill-proofs')
-          : (oldUrl.contains('://') ? null : oldUrl);
+      final proofPath =
+          oldUrl.startsWith('http')
+              ? _extractStoragePath(oldUrl, 'skill-proofs')
+              : (oldUrl.contains('://') ? null : oldUrl);
       if (proofPath != null) {
         if (!preservedProofPaths.contains(proofPath)) {
           proofToDelete.add(proofPath);
@@ -586,10 +622,13 @@ class ProfileService {
       hasSkillsForRole = resolvedLearning.isNotEmpty;
     }
 
-    final isCompleted =
-        primaryAvatar != null &&
-        primaryAvatar.isNotEmpty &&
-        hasSkillsForRole;
+    final isCompleted = isProfileComplete(
+      avatarUrl: primaryAvatar,
+      bio: updatedProfile.bio,
+      languages: updatedProfile.languages,
+      learningStyles: updatedProfile.interests,
+      hasRoleSkills: hasSkillsForRole,
+    );
 
     // The RPC owns the skill arrays. Run it first so the arrays and
     // user_skills stay consistent even if the later profile update fails;

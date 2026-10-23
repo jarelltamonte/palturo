@@ -48,8 +48,16 @@ Set the same random secret in both places:
 
 ```sh
 supabase secrets set MODERATION_WORKER_SECRET=<random-64-hex>
-# then insert the same value into public.integration_secrets
-# under name = 'MODERATION_WORKER_SECRET'
+```
+
+and create the Vault entry used by `pg_cron`:
+
+```sql
+select vault.create_secret(
+  '<the same value>',
+  'moderation_worker_secret',
+  'pg_cron worker auth'
+);
 ```
 
 The `20261023000700_note_worker_cron.sql` migration schedules the worker every

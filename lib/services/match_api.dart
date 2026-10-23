@@ -438,28 +438,7 @@ class MatchApi {
         'p_connection': connectionId,
       });
     } catch (_) {
-      try {
-        final myId = _Client.c.auth.currentUser?.id;
-        if (myId != null) {
-          final nowIso = DateTime.now().toUtc().toIso8601String();
-          await _Client.c
-              .from('connections')
-              .update({'requester_read_at': nowIso})
-              .eq('id', connectionId)
-              .eq('requester_id', myId);
-          await _Client.c
-              .from('connections')
-              .update({'recipient_read_at': nowIso})
-              .eq('id', connectionId)
-              .eq('recipient_id', myId);
-          await _Client.c
-              .from('messages')
-              .update({'is_read': true})
-              .eq('connection_id', connectionId)
-              .neq('sender_id', myId)
-              .eq('is_read', false);
-        }
-      } catch (_) {}
+      // Best-effort; the next sync recomputes unread from the read timestamps.
     }
   }
 

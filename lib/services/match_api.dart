@@ -473,6 +473,13 @@ class MatchApi {
     });
   }
 
+  /// Deletes an accepted connection. The RPC verifies the caller is one of the
+  /// two participants before removing it and its messages/feedback.
+  static Future<void> unmatch(String connectionId) async {
+    await _Client.c.rpc('unmatch_connection', params: {
+      'p_connection': connectionId,
+    });
+  }
   static Future<void> sendConnectionRequest(String userId) =>
       _Client.c.rpc('send_connection_request', params: {'p_recipient': userId});
 

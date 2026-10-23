@@ -11,6 +11,7 @@ import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -199,7 +200,34 @@ class _MatchesState extends State<Matches> {
     }
   }
 
-  void _unmatchPal(MatchedUser pal) {
+  Future<void> _unmatchPal(MatchedUser pal) async {
+    if (!mounted) return;
+
+    final connectionId = pal.connectionId;
+    if (connectionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This match isn’t available.')),
+      );
+      return;
+    }
+
+    try {
+      await MatchApi.unmatch(connectionId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unmatch failed: $e')),
+      );
+      return;
+    }
+
+    // Keep the Chats tab in sync with the deleted connection.
+    try {
+      await ChatStateService.instance.loadConversations(showSpinner: false);
+    } catch (_) {
+      // The unmatch itself succeeded; the list will refresh on resume.
+    }
+
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
     ScaffoldMessenger.of(context).showSnackBar(

@@ -90,6 +90,31 @@ String timeAgo(DateTime dateTime) {
 
 enum DateFilter { all, today, thisWeek, thisMonth, thisYear }
 
+bool matchesRequestDate(DateTime date, DateFilter filter, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  switch (filter) {
+    case DateFilter.all:
+      return true;
+    case DateFilter.today:
+      return date.year == current.year &&
+          date.month == current.month &&
+          date.day == current.day;
+    case DateFilter.thisWeek:
+      final startOfWeek = DateTime(
+        current.year,
+        current.month,
+        current.day - (current.weekday - 1),
+      );
+      return !date.isBefore(startOfWeek) && !date.isAfter(current);
+    case DateFilter.thisMonth:
+      return date.year == current.year &&
+          date.month == current.month &&
+          !date.isAfter(current);
+    case DateFilter.thisYear:
+      return date.year == current.year && !date.isAfter(current);
+  }
+}
+
 enum RoleFilter { all, learner, mentor }
 
 enum SortFilter { newest, oldest, ascending, descending }
@@ -150,6 +175,8 @@ class _RequestPageState extends State<RequestPage> {
 
   late List<ConnectionRequest> _requests = const [];
   bool _loading = true;
+  String? _loadError;
+  bool _responding = false;
 
   @override
   void initState() {
@@ -158,38 +185,29 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   Future<void> _loadRequests() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final incoming = await MatchApi.getIncomingRequests();
       if (!mounted) return;
       setState(() {
         _requests = incoming.map((r) => r.toConnectionRequest()).toList();
         _loading = false;
+        _loadError = null;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to load requests: $e')));
+      setState(() {
+        _loading = false;
+        _loadError = 'Couldn’t load requests.\nPlease check your connection.';
+      });
     }
   }
 
   bool _matchesDateFilter(DateTime date) {
-    final now = DateTime.now();
-    switch (_dateFilter) {
-      case DateFilter.all:
-        return true;
-      case DateFilter.today:
-        return date.year == now.year &&
-            date.month == now.month &&
-            date.day == now.day;
-      case DateFilter.thisWeek:
-        return now.difference(date).inDays <= 7;
-      case DateFilter.thisMonth:
-        return date.year == now.year && date.month == now.month;
-      case DateFilter.thisYear:
-        return date.year == now.year;
-    }
+    return matchesRequestDate(date, _dateFilter);
   }
 
   List<ConnectionRequest> get _filteredAndSortedRequests {
@@ -261,10 +279,14 @@ class _RequestPageState extends State<RequestPage> {
     }
   }
 
-  void _respond(ConnectionRequest request, bool accept) async {
+  Future<void> _respond(ConnectionRequest request, bool accept) async {
+    if (_responding) return;
+    _responding = true;
+
     try {
       await MatchApi.respondToRequest(request.id, accept);
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -274,13 +296,15 @@ class _RequestPageState extends State<RequestPage> {
           ),
         ),
       );
+      _removeRequest(request.id);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
+    } finally {
+      _responding = false;
     }
-    _removeRequest(request.id);
   }
 
   void _openDetail(ConnectionRequest request) {
@@ -327,6 +351,35 @@ class _RequestPageState extends State<RequestPage> {
           );
         });
       },
+    );
+  }
+
+  Widget _buildLoadError(Color textTheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _loadError!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadRequests,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -422,6 +475,8 @@ class _RequestPageState extends State<RequestPage> {
       body:
           _loading
               ? const Center(child: CircularProgressIndicator())
+              : _loadError != null
+              ? _buildLoadError(textTheme)
               : requests.isEmpty
               ? _buildEmptyState(textTheme)
               : ListView.builder(

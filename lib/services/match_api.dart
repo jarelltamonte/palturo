@@ -550,7 +550,6 @@ class MatchApi {
       'p_kind': kind,
     }) as List;
     return (res.whereType<Map>()).map((r) {
-      final role = (r['role'] ?? 'both') as String;
       return Person(
         id: r['user_id'] as String,
         name: _displayName(r['name']),
@@ -558,7 +557,9 @@ class MatchApi {
         language: '',
         learningStyle: '',
         skillName: '',
-        role: role == 'learner' ? PersonRole.learner : PersonRole.mentor,
+        // The card is shown in a teaching or learning deck, so reflect the
+        // placement being browsed rather than the profile's global role.
+        role: kind == 'learn' ? PersonRole.learner : PersonRole.mentor,
         bio: (r['note'] ?? '') as String,
         photoUrls: [r['avatar_url'] as String?],
       );

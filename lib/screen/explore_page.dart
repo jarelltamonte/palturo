@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -67,17 +67,28 @@ class _ExplorePageState extends State<ExplorePage> {
     _loadTaxonomy();
   }
 
-  /// TODO(Jev): role-aware filtering.
   /// Learner: return all roots.
   /// Mentor: return only roots related to the user's mentor skills.
-  /// This can either be done server-side (pass the role to the API) or here.
-  List<Map<String, dynamic>> _filterByRole(List<Map<String, dynamic>> roots) {
-    switch (_role) {
-      case ExploreRole.learner:
-        return roots;
-      case ExploreRole.mentor:
-        return roots; // placeholder until Jev's logic is ready
-    }
+  Future<List<Map<String, dynamic>>> _filterByRole(
+    List<Map<String, dynamic>> roots,
+  ) async {
+    if (_role == ExploreRole.learner) return roots;
+
+    final skills = await MatchApi.mySkills();
+    final mentorPaths =
+        skills
+            .where((skill) => skill['kind'] == 'teach')
+            .map((skill) => (skill['path'] ?? '') as String)
+            .where((path) => path.isNotEmpty)
+            .toList();
+
+    return roots.where((root) {
+      final rootPath = (root['path'] ?? '') as String;
+      if (rootPath.isEmpty) return false;
+      return mentorPaths.any(
+        (path) => path == rootPath || path.startsWith('$rootPath.'),
+      );
+    }).toList();
   }
 
   Future<void> _loadTaxonomy() async {
@@ -90,9 +101,10 @@ class _ExplorePageState extends State<ExplorePage> {
       final nodes = await MatchApi.taxonomyVisible();
       final roots =
           nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
+      final filtered = await _filterByRole(roots);
       if (!mounted || requestId != _requestId) return;
       setState(() {
-        _roots = _filterByRole(roots);
+        _roots = filtered;
         _loading = false;
       });
     } catch (e) {
@@ -118,6 +130,7 @@ class _ExplorePageState extends State<ExplorePage> {
             (context) => ExploreExpand(
               nodePath: (root['path'] ?? '') as String,
               nodeLabel: (root['name'] ?? '') as String,
+              kind: _role == ExploreRole.learner ? 'teach' : 'learn',
             ),
       ),
     );
@@ -208,7 +221,7 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildContent(Color textTheme) {
-    if (_loading && _roots.isEmpty) {
+    if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) return _buildErrorState(textTheme);

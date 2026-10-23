@@ -12,10 +12,15 @@ class ExploreExpand extends StatefulWidget {
   final String nodePath;
   final String nodeLabel;
 
+  /// `teach` shows people teaching this skill (Learner mode); `learn` shows
+  /// people who want to learn it (Mentor mode).
+  final String kind;
+
   const ExploreExpand({
     super.key,
     required this.nodePath,
     required this.nodeLabel,
+    required this.kind,
   });
 
   @override
@@ -48,7 +53,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
     try {
       final users = await MatchApi.browseSkillUsers(
         widget.nodePath,
-        kind: 'teach',
+        kind: widget.kind,
       );
 
       final seen = <String>{};
@@ -94,6 +99,30 @@ class _ExploreExpandState extends State<ExploreExpand> {
     setState(() {
       _currentIndex = _history.removeLast();
     });
+  }
+
+  Future<void> _confirmAdd(Person person) async {
+    if (_actionInFlight) return;
+    _actionInFlight = true;
+
+    try {
+      await MatchApi.sendConnectionRequest(person.id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connection request sent to ${person.name}')),
+      );
+      _advanceFrom(person);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
+    } finally {
+      _actionInFlight = false;
+    }
   }
 
   Future<void> _confirmBlock(Person person) async {
@@ -218,7 +247,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       onDismissed: (_) => _advanceFrom(person),
       child: PersonCardOverlay(
         person: person,
-        onAdd: null,
+        onAdd: () => _confirmAdd(person),
         onSkip: () => _advanceFrom(person),
         onBlock: () => _confirmBlock(person),
         onReport: () => _confirmReport(person),

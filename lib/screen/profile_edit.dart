@@ -903,8 +903,11 @@ class _PhotoSlot extends StatelessWidget {
 
     ImageProvider? imageProvider;
     if (hasImage) {
+      // Web: picked files arrive as blob: URLs. File() throws
+      // "Unsupported operation: _Namespace" there, so never build a
+      // FileImage on web; NetworkImage can load blob: and http(s) URLs.
       imageProvider =
-          isNetwork
+          isNetwork || kIsWeb
               ? NetworkImage(path!) as ImageProvider
               : FileImage(File(path!));
     }

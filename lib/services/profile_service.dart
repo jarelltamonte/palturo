@@ -1,5 +1,8 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_models.dart' show OnboardingRole, OnboardingRoleDb;
@@ -10,6 +13,87 @@ import '../screen/utils/schedule_format.dart';
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
+
+  /// Reads picked-image bytes without `File(path)`, which throws
+  /// "Unsupported operation: _Namespace" on web.
+  static Future<Uint8List?> _readUploadBytes(String path) async {
+    if (path.startsWith('http')) return null;
+    try {
+      if (kIsWeb) {
+        return await XFile(path).readAsBytes();
+      }
+      final file = File(path);
+      if (!await file.exists()) return null;
+      return await file.readAsBytes();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Blob URLs have no usable extension. Prefer the bytes (authoritative on
+  /// both platforms), then the source path, then jpg.
+  static String _extensionFromBytes(Uint8List bytes) {
+    bool startsWith(List<int> signature) {
+      if (bytes.length < signature.length) return false;
+      for (var i = 0; i < signature.length; i++) {
+        if (bytes[i] != signature[i]) return false;
+      }
+      return true;
+    }
+
+    if (startsWith(const [0x89, 0x50, 0x4E, 0x47])) return 'png';
+    if (startsWith(const [0xFF, 0xD8, 0xFF])) return 'jpg';
+    if (startsWith(const [0x47, 0x49, 0x46, 0x38])) return 'gif';
+    if (bytes.length >= 12 &&
+        startsWith(const [0x52, 0x49, 0x46, 0x46]) &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      return 'webp';
+    }
+    return '';
+  }
+
+  static String _extensionFor(String path) {
+    final name = path.split('?').first;
+    final dot = name.lastIndexOf('.');
+    final ext = dot == -1 ? '' : name.substring(dot + 1);
+    return RegExp(r'^[A-Za-z0-9]{1,5}$').hasMatch(ext)
+        ? ext.toLowerCase()
+        : 'jpg';
+  }
+
+  static String _uploadNamePrefix(String base) =>
+      base.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+
+  /// Uploads [path] to profile-media and returns its public URL.
+  /// Throws if the picked bytes cannot be read, so the caller can abort the
+  /// save instead of persisting a local/blob path.
+  Future<String> _uploadToProfileMedia(
+    String path,
+    String filePrefix,
+  ) async {
+    final bytes = await _readUploadBytes(path);
+    if (bytes == null) {
+      throw Exception(
+        'Could not read the selected image. Please re-select it and try again.',
+      );
+    }
+
+    final detected = _extensionFromBytes(bytes);
+    final ext = detected.isNotEmpty ? detected : _extensionFor(path);
+    final fileName = '$filePrefix.$ext';
+
+    await _supabase.storage
+        .from('profile-media')
+        .uploadBinary(
+          fileName,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    return _supabase.storage.from('profile-media').getPublicUrl(fileName);
+  }
 
   String _toTitleCase(String text) {
     final clean = text.replaceAll('_', ' ').trim();
@@ -258,23 +342,9 @@ class ProfileService {
       for (int i = 0; i < newPhotoLocalPaths.length; i++) {
         final path = newPhotoLocalPaths[i];
         if (path != null && !path.startsWith('http')) {
-          final file = File(path);
-          if (await file.exists()) {
-            final ext = path.split('.').last;
-            final fileName =
-                '${user.id}/photo_${i}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-            await _supabase.storage
-                .from('profile-media')
-                .upload(
-                  fileName,
-                  file,
-                  fileOptions: const FileOptions(upsert: true),
-                );
-            final publicUrl = _supabase.storage
-                .from('profile-media')
-                .getPublicUrl(fileName);
-            uploadedPhotoUrls[i] = publicUrl;
-          }
+          final prefix =
+              '${user.id}/photo_${i}_${DateTime.now().millisecondsSinceEpoch}';
+          uploadedPhotoUrls[i] = await _uploadToProfileMedia(path, prefix);
         } else {
           uploadedPhotoUrls[i] = path;
         }
@@ -303,25 +373,12 @@ class ProfileService {
         }
 
         if (!localOrRemotePath.startsWith('http')) {
-          final file = File(localOrRemotePath);
-          if (await file.exists()) {
-            final ext = localOrRemotePath.split('.').last;
-            final fileName =
-                '${user.id}/proof_${targetSkillName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-
-            await _supabase.storage
-                .from('profile-media')
-                .upload(
-                  fileName,
-                  file,
-                  fileOptions: const FileOptions(upsert: true),
-                );
-
-            final publicUrl = _supabase.storage
-                .from('profile-media')
-                .getPublicUrl(fileName);
-            uploadedSkillImages[targetSkillName] = publicUrl;
-          }
+          final prefix =
+              '${user.id}/proof_${_uploadNamePrefix(targetSkillName)}_${DateTime.now().millisecondsSinceEpoch}';
+          uploadedSkillImages[targetSkillName] = await _uploadToProfileMedia(
+            localOrRemotePath,
+            prefix,
+          );
         } else {
           uploadedSkillImages[targetSkillName] = localOrRemotePath;
         }

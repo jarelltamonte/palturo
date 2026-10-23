@@ -222,7 +222,13 @@ class ProfileService {
       final response =
           await _supabase
               .from('profiles')
-              .select()
+              .select(
+                'id, first_name, last_name, display_name, bio, avatar_url, '
+                'photos, role, learning_skills, teaching_skills, '
+                'learning_styles, languages, availability, skill_categories, '
+                'teaching_skill_images, timezone, is_profile_completed, '
+                'has_completed_onboarding, created_at, updated_at',
+              )
               .eq('id', user.id)
               .maybeSingle();
 

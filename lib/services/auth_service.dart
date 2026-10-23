@@ -288,13 +288,11 @@ class AuthService {
   Future<bool> checkEmailExists(String email) async {
     try {
       final cleanEmail = Validators.normalizeEmail(email);
-
-      final data = await _supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', cleanEmail)
-          .maybeSingle();
-      return data != null;
+      final exists = await _supabase.rpc(
+        'email_exists',
+        params: {'p_email': cleanEmail},
+      );
+      return exists == true;
     } catch (_) {
       return false;
     }

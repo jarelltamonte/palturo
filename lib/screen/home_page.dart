@@ -431,6 +431,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildErrorState(Color textColor) {
+    final raw = (_error ?? '')
+        .replaceFirst(RegExp(r'^Exception:\s*'), '')
+        .trim();
+    final message = raw.contains('Too many deck requests')
+        ? raw
+        : 'Couldn’t load recommendations.\nPlease check your connection.';
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -438,7 +444,7 @@ class _HomePageState extends State<HomePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Couldn’t load recommendations.\nPlease check your connection.',
+              message,
               style: AppTextStyles.regularText.copyWith(color: textColor),
               textAlign: TextAlign.center,
             ),

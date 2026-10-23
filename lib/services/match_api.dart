@@ -162,10 +162,18 @@ class MatchApi {
     required String asRole,
     bool useCache = true,
   }) async {
-    final res = await _Client.c.functions.invoke(
-      'get-matches',
-      body: {'as_role': asRole, 'refresh': useCache},
-    );
+    late final FunctionResponse res;
+    try {
+      res = await _Client.c.functions.invoke(
+        'get-matches',
+        body: {'as_role': asRole, 'refresh': useCache},
+      );
+    } on FunctionException catch (e) {
+      if (e.status == 429) {
+        throw Exception('Too many deck requests. Please try again later.');
+      }
+      rethrow;
+    }
     // supabase_flutter may hand res.data back as a decoded Map or a raw JSON
     // string depending on platform — handle both before reading keys.
     final dynamic raw = res.data;

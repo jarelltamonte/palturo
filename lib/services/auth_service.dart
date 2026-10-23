@@ -257,6 +257,16 @@ class AuthService {
           'Unable to delete your account. Please check your connection and try again.',
         );
       }
+      if (e.status == 429) {
+        throw Exception(
+          'Too many attempts. Please wait a few minutes and try again.',
+        );
+      }
+      if (e.status == 503) {
+        throw Exception(
+          'Account deletion is temporarily unavailable. Please try again.',
+        );
+      }
       final details = e.details;
       final message = details is Map && details['error'] is String
           ? details['error'] as String

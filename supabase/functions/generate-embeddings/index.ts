@@ -40,6 +40,23 @@ Deno.serve(async (req) => {
     const user = authData?.user;
     if (!user) return json({ error: "Unauthorized" }, 401);
 
+    const { data: rateOk, error: rateErr } = await admin.rpc(
+      "consume_rate_limit",
+      {
+        p_subject: user.id,
+        p_action: "generate_embeddings",
+        p_limit: 20,
+        p_window_seconds: 3600,
+      },
+    );
+    if (rateErr) {
+      console.error(`[generate-embeddings] rate limiter: ${rateErr.message}`);
+      return json({ error: "rate_limit_unavailable" }, 503);
+    }
+    if (rateOk !== true) {
+      return json({ error: "rate_limited", retry_after_seconds: 3600 }, 429);
+    }
+
     const cfg = await getConfig(admin);
     const key = await nimKey(admin);
     if (!key) return json({ error: "NIM_API_KEY not configured" }, 503);

@@ -23,6 +23,32 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 
+const CACHE_COLUMNS =
+  "candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode";
+
+async function cacheResults(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  rows: Array<Record<string, unknown>>,
+) {
+  const ids = rows.map((r) => r.candidate_id as string).concat(userId);
+  const { data: pRows } = await admin.rpc("profile_match_view", { p_users: ids });
+  const profiles = (pRows ?? []) as Array<{ user_id: string; name: string; role: string }>;
+  const nameOf = new Map(profiles.map((p) => [p.user_id, p]));
+  return rows.map((r) => {
+    const p = nameOf.get(r.candidate_id as string);
+    return {
+      user_id: r.candidate_id,
+      rank: Number(r.rank),
+      display_name: p?.name ?? "",
+      role: p?.role ?? "both",
+      compatibility: Number(r.calibrated_score ?? 0),
+      pipeline: String(r.pipeline_mode ?? "full"),
+      cached: true,
+    };
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -71,28 +97,13 @@ Deno.serve(async (req) => {
       if (fresh === true) {
         const { data: cached } = await admin
           .from("match_cache")
-          .select("candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode")
+          .select(CACHE_COLUMNS)
           .eq("user_id", user.id)
           .eq("as_role", targetRole)
           .order("rank");
         const rows = (cached ?? []) as Array<Record<string, unknown>>;
         if (rows.length > 0) {
-          const ids = rows.map((r) => r.candidate_id as string).concat(user.id);
-          const { data: pRows } = await admin.rpc("profile_match_view", { p_users: ids });
-          const profiles = (pRows ?? []) as Array<{ user_id: string; name: string; role: string }>;
-          const nameOf = new Map(profiles.map((p) => [p.user_id, p]));
-          const results = rows.map((r) => {
-            const p = nameOf.get(r.candidate_id as string);
-            return {
-              user_id: r.candidate_id,
-              rank: Number(r.rank),
-              display_name: p?.name ?? "",
-              role: p?.role ?? "both",
-              compatibility: Number(r.calibrated_score ?? 0),
-              pipeline: String(r.pipeline_mode ?? "full"),
-              cached: true,
-            };
-          });
+          const results = await cacheResults(admin, user.id, rows);
           return json({
             status: "ok",
             mode: "cached",
@@ -106,6 +117,43 @@ Deno.serve(async (req) => {
     }
 
     // ---------- 1. self-heal the caller's embeddings ----------
+    const { data: rateOk, error: rateErr } = await admin.rpc(
+      "consume_rate_limit",
+      {
+        p_subject: user.id,
+        p_action: "get_matches",
+        p_limit: 60,
+        p_window_seconds: 3600,
+      },
+    );
+    if (rateErr) {
+      console.error(`[get-matches] rate limiter: ${rateErr.message}`);
+      return json({ error: "rate_limit_unavailable" }, 503);
+    }
+    if (rateOk !== true) {
+      // A stale ranking is still useful; prefer it over a hard deck outage.
+      const { data: stale } = await admin
+        .from("match_cache")
+        .select(CACHE_COLUMNS)
+        .eq("user_id", user.id)
+        .eq("as_role", targetRole)
+        .order("rank");
+      const staleRows = (stale ?? []) as Array<Record<string, unknown>>;
+      if (staleRows.length > 0) {
+        const results = await cacheResults(admin, user.id, staleRows);
+        return json({
+          status: "ok",
+          mode: "cached_stale",
+          rate_limited: true,
+          config_version: cfg.configRevision,
+          ms: Date.now() - started,
+          results,
+        });
+      }
+      const retry = 3600 - (Math.floor(Date.now() / 1000) % 3600);
+      return json({ error: "rate_limited", retry_after_seconds: retry }, 429);
+    }
+
     // Candidate embeddings are refreshed when profiles are saved (the client
     // calls generate-embeddings). Embedding every profile here turned each
     // uncached deck load into a 500-user NIM batch.

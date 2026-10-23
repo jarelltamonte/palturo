@@ -104,6 +104,23 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, serviceKey);
 
+    const { data: rateOk, error: rateErr } = await admin.rpc(
+      "consume_rate_limit",
+      {
+        p_subject: user.id,
+        p_action: "delete_account",
+        p_limit: 5,
+        p_window_seconds: 3600,
+      },
+    );
+    if (rateErr) {
+      console.error(`[delete-account] rate limiter: ${rateErr.message}`);
+      return json({ error: "rate_limit_unavailable" }, 503);
+    }
+    if (rateOk !== true) {
+      return json({ error: "rate_limited", retry_after_seconds: 3600 }, 429);
+    }
+
     // 1. Storage first. If this fails we abort before touching the database,
     //    so a failure never leaves a half-deleted account.
     await deleteUserMedia(admin, user.id);

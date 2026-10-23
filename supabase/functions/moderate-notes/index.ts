@@ -39,6 +39,23 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const { data: rateOk, error: rateErr } = await admin.rpc(
+    "consume_rate_limit",
+    {
+      p_subject: "00000000-0000-0000-0000-000000000000",
+      p_action: "moderate_notes_worker",
+      p_limit: 120,
+      p_window_seconds: 3600,
+    },
+  );
+  if (rateErr) {
+    console.error(`[moderate-notes] rate limiter: ${rateErr.message}`);
+    return json({ error: "rate_limit_unavailable" }, 503);
+  }
+  if (rateOk !== true) {
+    return json({ error: "rate_limited", retry_after_seconds: 3600 }, 429);
+  }
+
   let cfg: Record<string, unknown> = {};
   const { data: configRows } = await admin
     .from("pipeline_config")

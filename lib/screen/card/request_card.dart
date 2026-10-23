@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
 
 class RequestCard extends StatelessWidget {
   final String skillName;
@@ -138,7 +139,7 @@ class RequestCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              schedule,
+                              formatSchedule(schedule),
                               style: AppTextStyles.regularText.copyWith(
                                 color: textTheme,
                                 fontSize: 12,

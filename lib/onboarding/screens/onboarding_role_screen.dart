@@ -7,18 +7,28 @@ import '../widgets/role_card_group.dart';
 class OnboardingRoleScreen extends StatelessWidget {
   final OnboardingController controller;
   final VoidCallback onContinue;
+  final VoidCallback? onBack;
   final VoidCallback? onSkip;
 
   const OnboardingRoleScreen({
     super.key,
     required this.controller,
     required this.onContinue,
+    this.onBack,
     this.onSkip,
   });
 
   static const _options = [
-    RoleOption(OnboardingRole.learn, 'assets/icons/rlearner.svg', 'I want to\nlearn'),
-    RoleOption(OnboardingRole.teach, 'assets/icons/rmentor.svg', 'I want to\nteach'),
+    RoleOption(
+      OnboardingRole.learn,
+      'assets/icons/rlearner.svg',
+      'I want to\nlearn',
+    ),
+    RoleOption(
+      OnboardingRole.teach,
+      'assets/icons/rmentor.svg',
+      'I want to\nteach',
+    ),
     RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
   ];
 
@@ -32,6 +42,7 @@ class OnboardingRoleScreen extends StatelessWidget {
           subtitle: 'Select one that applies',
           progress: 0.2,
           showBackButton: true,
+          onBack: onBack,
           onPrimaryPressed: controller.role == null ? null : onContinue,
           onSkip: onSkip,
           child: RoleCardGroup(

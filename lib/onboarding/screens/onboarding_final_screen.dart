@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
 import '../onboarding_controller.dart';
 import '../widgets/onboarding_scaffold.dart';
 import '../widgets/onboarding_select_field.dart';
@@ -37,18 +38,27 @@ class OnboardingFinalScreen extends StatelessWidget {
     this.onSkip,
   });
 
+  void _setAvailableDays(Set<String> days) {
+    controller.setAvailabilityDays(days);
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final isValid = controller.learningStyles.isNotEmpty &&
-            controller.availabilityDays.isNotEmpty &&
-            controller.languages.isNotEmpty;
+        final selectedDays =
+            kDayOptions.where(controller.availabilityDays.contains).toList();
+
+        final isValid =
+            controller.learningStyles.isNotEmpty &&
+            controller.languages.isNotEmpty &&
+            selectedDays.isNotEmpty;
 
         return OnboardingScaffold(
           title: 'One last thing',
-          subtitle: 'Help us personalize your matches by adding one final detail.',
+          subtitle:
+              'Help us personalize your matches by adding one final detail.',
           progress: 0.9,
           showBackButton: true,
           onBack: onBack,
@@ -73,14 +83,14 @@ class OnboardingFinalScreen extends StatelessWidget {
                 OnboardingSelectField(
                   label: 'Availability',
                   labelIcon: Icons.calendar_today_rounded,
-                  hint: 'Select your availability',
-                  displayValue: controller.availabilityDays.join(', '),
+                  hint: 'Select the days you\'re available',
+                  displayValue: formatScheduleDays(selectedDays),
                   options: kDayOptions,
-                  selected: controller.availabilityDays,
+                  selected: selectedDays.toSet(),
                   multiSelect: true,
-                  onChanged: controller.setAvailabilityDays,
+                  onChanged: _setAvailableDays,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 OnboardingSelectField(
                   label: 'Language Preference',
                   labelIcon: Icons.translate,

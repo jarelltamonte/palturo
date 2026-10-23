@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'onboarding_models.dart';
 
-/// Single source of truth for the whole onboarding flow.
-/// Passed down to every step so no screen needs its own local state.
 class OnboardingController extends ChangeNotifier {
   OnboardingRole? role;
 
@@ -10,9 +8,8 @@ class OnboardingController extends ChangeNotifier {
   final Set<String> teachingInterests = {};
 
   final Set<String> learningStyles = {};
-
   final Set<String> availabilityDays = {};
-
+  final Map<String, String> availability = {};
   final Set<String> languages = {};
 
   bool get wantsLearning =>
@@ -60,8 +57,10 @@ class OnboardingController extends ChangeNotifier {
   void toggleAvailabilityDay(String day) {
     if (availabilityDays.contains(day)) {
       availabilityDays.remove(day);
+      availability.remove(day);
     } else {
       availabilityDays.add(day);
+      availability[day] = 'Available';
     }
     notifyListeners();
   }
@@ -70,6 +69,21 @@ class OnboardingController extends ChangeNotifier {
     availabilityDays
       ..clear()
       ..addAll(values);
+    availability
+      ..clear()
+      ..addEntries(values.map((d) => MapEntry(d, 'Available')));
+    notifyListeners();
+  }
+
+  void setAvailability(String day, String timeRange) {
+    availability[day] = timeRange.isEmpty ? 'Available' : timeRange;
+    availabilityDays.add(day);
+    notifyListeners();
+  }
+
+  void removeAvailability(String day) {
+    availability.remove(day);
+    availabilityDays.remove(day);
     notifyListeners();
   }
 

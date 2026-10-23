@@ -4,7 +4,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/explore_expand.dart';
-import 'package:palturo/screen/users_dump.dart';
+import 'package:palturo/services/match_api.dart';
+
+enum ExploreRole { learner, mentor }
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -14,39 +16,122 @@ class ExplorePage extends StatefulWidget {
 }
 
 class _ExplorePageState extends State<ExplorePage> {
-  final List<String> _categoryLabels = [
-    'Arts and Design',
-    'Language and Cultural Knowledge',
-    'Everyday Practical Skills',
-    'Agriculture and Livelihood',
-  ];
+  List<Map<String, dynamic>> _roots = const [];
+  bool _loading = true;
+  String? _error;
 
-  final List<String> _categoryDescription = [
-    'Weaving, embroidery, and handmade crafts',
-    'Dialects, stories, and living heritage',
-    'Cooking, repairs, and daily know-how',
-    'Farming, fishing, and local trades',
-  ];
+  // TODO: default to the user's primary role / last saved choice
+  // (e.g. read from shared_preferences in initState before loading).
+  ExploreRole _role = ExploreRole.learner;
 
-  final List<IconData> _categoryIcons = [
-    Icons.palette_outlined,
-    Icons.translate,
-    Icons.handyman_outlined,
-    Icons.agriculture_outlined,
-  ];
+  int _requestId = 0;
 
-  final List<SkillCategory> _categories = [
-    SkillCategory.artsDesign,
-    SkillCategory.languageCulture,
-    SkillCategory.everydayPractical,
-    SkillCategory.agricultureLivelihood,
-  ];
+  static const Map<String, IconData> _rootIcons = {
+    'cooking_culinary': Icons.restaurant_outlined,
+    'traditional_crafts': Icons.palette_outlined,
+    'performing_arts': Icons.music_note_outlined,
+    'martial_arts': Icons.sports_martial_arts,
+    'language_writing': Icons.translate,
+    'household_skills': Icons.home_repair_service_outlined,
+    'agriculture_livelihood': Icons.agriculture_outlined,
+    'modern_practical_skills': Icons.handyman_outlined,
+    'visual_arts_design': Icons.brush_outlined,
+  };
 
-  void _openCategory(SkillCategory category) {
+  static const Map<String, String> _descriptionRules = {
+    'cook': 'Recipes, flavors, and kitchen traditions',
+    'craft': 'Weaving, carving, and handmade heritage',
+    'perform': 'Music, dance, and stage traditions',
+    'martial': 'Combat arts and discipline',
+    'language': 'Languages, scripts, and storytelling',
+    'household': 'Everyday skills for the home',
+    'agricult': 'Farming, fishing, and local trades',
+    'modern': "Useful skills for today's world",
+    'visual': 'Drawing, painting, and design',
+  };
+
+  static const String _fallbackDescription =
+      'Skills shared by the PalTuro community';
+
+  String _descriptionFor(Map<String, dynamic> node) {
+    final key = '${node['path'] ?? ''} ${node['name'] ?? ''}'.toLowerCase();
+    for (final rule in _descriptionRules.entries) {
+      if (key.contains(rule.key)) return rule.value;
+    }
+    return _fallbackDescription;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTaxonomy();
+  }
+
+  /// Learner: return all roots.
+  /// Mentor: return only roots related to the user's mentor skills.
+  Future<List<Map<String, dynamic>>> _filterByRole(
+    List<Map<String, dynamic>> roots,
+  ) async {
+    if (_role == ExploreRole.learner) return roots;
+
+    final skills = await MatchApi.mySkills();
+    final mentorPaths =
+        skills
+            .where((skill) => skill['kind'] == 'teach')
+            .map((skill) => (skill['path'] ?? '') as String)
+            .where((path) => path.isNotEmpty)
+            .toList();
+
+    return roots.where((root) {
+      final rootPath = (root['path'] ?? '') as String;
+      if (rootPath.isEmpty) return false;
+      return mentorPaths.any(
+        (path) => path == rootPath || path.startsWith('$rootPath.'),
+      );
+    }).toList();
+  }
+
+  Future<void> _loadTaxonomy() async {
+    final requestId = ++_requestId;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final nodes = await MatchApi.taxonomyVisible();
+      final roots =
+          nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
+      final filtered = await _filterByRole(roots);
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _roots = filtered;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _onRoleChanged(ExploreRole role) {
+    if (role == _role) return;
+    setState(() => _role = role);
+    _loadTaxonomy();
+  }
+
+  void _openCategory(Map<String, dynamic> root) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ExploreExpand(category: category),
+        builder:
+            (context) => ExploreExpand(
+              nodePath: (root['path'] ?? '') as String,
+              nodeLabel: (root['name'] ?? '') as String,
+              kind: _role == ExploreRole.learner ? 'teach' : 'learn',
+            ),
       ),
     );
   }
@@ -65,62 +150,241 @@ class _ExplorePageState extends State<ExplorePage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Explore',
-              style: AppTextStyles.headingText.copyWith(
-                color: textTheme,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Explore',
+                style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
-            ),
-            IconButton(
-              icon: Icon(
-                CupertinoIcons.question_circle,
-                color: textTheme,
-                size: 24,
+              IconButton(
+                icon: Icon(
+                  CupertinoIcons.question_circle,
+                  color: textTheme,
+                  size: 24,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  showAdaptiveDialog(
+                    context: context,
+                    builder: (context) => const _ExploreInfoDialog(),
+                  );
+                },
               ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () {
-                showAdaptiveDialog(
-                  context: context,
-                  builder: (context) => const _ExploreInfoDialog(),
-                );
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            const spacing = 16.0;
-            final itemHeight = (constraints.maxHeight - spacing) / 2;
-
-            return GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: spacing,
-                mainAxisSpacing: spacing,
-                mainAxisExtent: itemHeight,
-              ),
-              itemCount: _categoryLabels.length,
-              itemBuilder: (context, index) {
-                return _CategoryCard(
-                  label: _categoryLabels[index],
-                  description: _categoryDescription[index],
-                  icon: _categoryIcons[index],
-                  onTap: () => _openCategory(_categories[index]),
-                );
-              },
-            );
-          },
+        padding: const EdgeInsets.only(top: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildCaption(textTheme),
+            ),
+            const SizedBox(height: 8),
+            Expanded(child: _buildContent(textTheme)),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCaption(Color textTheme) {
+    return SizedBox(
+      height: 18,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: Text(
+          _role == ExploreRole.mentor
+              ? 'Showing only categories that match your mentor skills.'
+              : 'Showing all categories.',
+          key: ValueKey(_role),
+          style: TextStyle(
+            fontSize: 12,
+            color: textTheme.withValues(alpha: 0.7),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(Color textTheme) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) return _buildErrorState(textTheme);
+    if (_roots.isEmpty) return _buildEmptyState(textTheme);
+    return _roots.length == 4
+        ? _buildGrid2x2(textTheme)
+        : _buildGridAuto(textTheme);
+  }
+
+  Widget _buildGrid2x2(Color textTheme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 16.0;
+        const topInset = 8.0;
+        const bottomInset = 90.0;
+        final itemHeight =
+            (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            mainAxisExtent: itemHeight,
+          ),
+          itemCount: _roots.length,
+          itemBuilder: (context, index) => _buildCard(index),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridAuto(Color textTheme) {
+    return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        mainAxisExtent: 190,
+      ),
+      itemCount: _roots.length,
+      itemBuilder: (context, index) => _buildCard(index),
+    );
+  }
+
+  Widget _buildCard(int index) {
+    final node = _roots[index];
+    final path = (node['path'] ?? '') as String;
+    return _CategoryCard(
+      label: (node['name'] ?? '') as String,
+      description: _descriptionFor(node),
+      icon: _rootIcons[path] ?? Icons.category_outlined,
+      onTap: () => _openCategory(node),
+    );
+  }
+
+  Widget _buildEmptyState(Color textTheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Text(
+          _role == ExploreRole.mentor
+              ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
+              : 'No categories available right now.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(color: textTheme),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Color textTheme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Couldn\'t load categories.\nPlease check your connection.',
+            style: AppTextStyles.regularText.copyWith(color: textTheme),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadTaxonomy,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text(
+              'Retry',
+              style: TextStyle(color: Colors.black, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleToggle extends StatelessWidget {
+  const _RoleToggle({required this.value, required this.onChanged});
+
+  final ExploreRole value;
+  final ValueChanged<ExploreRole> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    final isMentor = value == ExploreRole.mentor;
+
+    Widget segment(String label, ExploreRole role) {
+      final selected = value == role;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onChanged(role),
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: AppTextStyles.regularText.copyWith(
+                fontSize: 14,
+                color:
+                    selected ? Colors.black : textColor.withValues(alpha: 0.7),
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              child: Text(label),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: textColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment: isMentor ? Alignment.centerRight : Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              heightFactor: 1,
+              child: Container(
+                margin: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              segment('Learner', ExploreRole.learner),
+              segment('Mentor', ExploreRole.mentor),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -134,20 +398,14 @@ class _ExploreInfoDialog extends StatefulWidget {
 }
 
 class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
-  static const _titles = [
-    'Explore',
-    'Heads up',
-  ];
+  static const _titles = ['Explore', 'Heads up'];
 
   static const _messages = [
-    'Browse categories to discover skills and knowledge shared by other users. Pick a category, then swipe through people who are teaching or learning in it.',
+    'Browse categories to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a category and swipe through people who are teaching or learning in it.',
     'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Explore is for discovering something new, so keep an open mind.',
   ];
 
-  static const _icons = [
-    CupertinoIcons.compass,
-    CupertinoIcons.lightbulb,
-  ];
+  static const _icons = [CupertinoIcons.compass, CupertinoIcons.lightbulb];
 
   int _page = 0;
 
@@ -211,9 +469,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: TweenAnimationBuilder<double>(
-            tween: Tween(
-              end: (_page + 1) / _titles.length,
-            ),
+            tween: Tween(end: (_page + 1) / _titles.length),
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
             builder: (context, value, _) {
@@ -253,10 +509,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         title: title,
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Material(
-            color: Colors.transparent,
-            child: content,
-          ),
+          child: Material(color: Colors.transparent, child: content),
         ),
         actions: [
           if (_page > 0)
@@ -264,9 +517,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
               onPressed: _back,
               child: Text(
                 'Back',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                ),
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
           CupertinoDialogAction(
@@ -284,32 +535,23 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
 
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: title,
-      content: SizedBox(
-        width: double.maxFinite,
-        child: content,
-      ),
+      content: SizedBox(width: double.maxFinite, child: content),
       actions: [
         if (_page > 0)
           TextButton(
             onPressed: _back,
             child: Text(
               'Back',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
           ),
         TextButton(
           onPressed: _next,
           child: Text(
             _isLastPage ? 'Okay' : 'Next',
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.primary,
-            ),
+            style: AppTextStyles.regularText.copyWith(color: AppColors.primary),
           ),
         ),
       ],
@@ -333,21 +575,28 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
+    final cardColor = Theme.of(context).colorScheme.surface;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: 0.04),
             spreadRadius: 0,
             blurRadius: 16,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            spreadRadius: 0,
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
         ],
       ),
       child: Material(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(24),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -361,34 +610,36 @@ class _CategoryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    icon,
-                    size: 28,
-                    color: AppColors.background,
-                  ),
+                  child: Icon(icon, size: 22, color: AppColors.background),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
                 Text(
                   label,
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.headingText.copyWith(
                     color: textColor,
-                    fontSize: 16,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  description,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.7),
-                    fontSize: 13,
+                const SizedBox(height: 4),
+                Flexible(
+                  child: Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: textColor.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
@@ -399,4 +650,3 @@ class _CategoryCard extends StatelessWidget {
     );
   }
 }
-

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -8,6 +9,14 @@ class TopLabeledField extends StatefulWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final int? maxLines;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+  final Iterable<String>? autofillHints;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
 
   const TopLabeledField({
     super.key,
@@ -16,6 +25,14 @@ class TopLabeledField extends StatefulWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.keyboardType,
+    this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.maxLines = 1,
+    this.maxLength,
+    this.inputFormatters,
+    this.autofillHints,
+    this.focusNode,
+    this.onChanged,
   });
 
   @override
@@ -25,7 +42,8 @@ class TopLabeledField extends StatefulWidget {
 class _TopLabeledFieldState extends State<TopLabeledField> {
   late final TextEditingController _controller;
   late final bool _ownsController;
-  final FocusNode _focusNode = FocusNode();
+  late final FocusNode _focusNode;
+  late final bool _ownsFocusNode;
 
   static const double _height = 58;
   static const Duration _duration = Duration(milliseconds: 180);
@@ -38,6 +56,8 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
     super.initState();
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? TextEditingController();
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ?? FocusNode();
     _focusNode.addListener(_handleChange);
     _controller.addListener(_handleChange);
   }
@@ -50,7 +70,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   void dispose() {
     _focusNode.removeListener(_handleChange);
     _controller.removeListener(_handleChange);
-    _focusNode.dispose();
+    if (_ownsFocusNode) _focusNode.dispose();
     if (_ownsController) _controller.dispose();
     super.dispose();
   }
@@ -59,49 +79,26 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   Widget build(BuildContext context) {
     final double suffixWidth = widget.suffixIcon != null ? 48 : 16;
     final bool floating = _isFloating;
+    final bgColor = Theme.of(context).colorScheme.onPrimary;
+    final textColor = Theme.of(context).colorScheme.secondary;
 
-    return GestureDetector(
+    final field = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => FocusScope.of(context).requestFocus(_focusNode),
       child: Container(
-        height: _height,
+        constraints: const BoxConstraints(minHeight: _height),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onPrimary,
+          color: bgColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _focusNode.hasFocus ? AppColors.primary : Theme.of(context).colorScheme.secondary,
+            color: _focusNode.hasFocus ? AppColors.primary : textColor.withValues(alpha: 0.7),
             width: _focusNode.hasFocus ? 1.5 : 1,
           ),
         ),
         child: Stack(
           children: [
-            AnimatedPositioned(
-              duration: _duration,
-              curve: _curve,
-              left: 16,
-              right: suffixWidth,
-              top: floating ? 8 : 0,
-              height: floating ? 16 : _height,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AnimatedDefaultTextStyle(
-                  duration: _duration,
-                  curve: _curve,
-                  style: AppTextStyles.regularText.copyWith(
-                    color: Theme.of(context).colorScheme.secondary.withAlpha((0.6 * 255).round()),
-                    fontSize: floating ? 12 : 16,
-                    fontWeight: floating ? FontWeight.w500 : FontWeight.normal,
-                  ),
-                  child: Text(widget.label),
-                ),
-              ),
-            ),
-
-            Positioned(
-              left: 16,
-              right: suffixWidth,
-              bottom: 8,
-              height: 22,
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, 28, suffixWidth, 8),
               child: AnimatedOpacity(
                 duration: _duration,
                 curve: _curve,
@@ -113,7 +110,26 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     focusNode: _focusNode,
                     obscureText: widget.obscureText,
                     keyboardType: widget.keyboardType,
-                    style: AppTextStyles.regularText.copyWith(color: Theme.of(context).colorScheme.secondary, fontSize: 16),
+                    textInputAction: widget.textInputAction,
+                    textCapitalization: widget.textCapitalization,
+                    inputFormatters: widget.inputFormatters,
+                    autofillHints: widget.autofillHints,
+                    onChanged: widget.onChanged,
+                    minLines: 1,
+                    maxLines: widget.obscureText ? 1 : widget.maxLines,
+                    maxLength: widget.maxLength,
+                    maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                    cursorColor: textColor,
+                    buildCounter: (
+                      context, {
+                      required int currentLength,
+                      required bool isFocused,
+                      required int? maxLength,
+                    }) => null,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textColor,
+                      fontSize: 16,
+                    ),
                     decoration: const InputDecoration(
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
@@ -125,17 +141,60 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                 ),
               ),
             ),
-
+            AnimatedPositioned(
+              duration: _duration,
+              curve: _curve,
+              left: 16,
+              right: suffixWidth,
+              top: floating ? 8 : 0,
+              height: floating ? 16 : _height,
+              child: IgnorePointer(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedDefaultTextStyle(
+                    duration: _duration,
+                    curve: _curve,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textColor.withAlpha((0.6 * 255).round()),
+                      fontSize: floating ? 12 : 16,
+                      fontWeight:
+                          floating ? FontWeight.w500 : FontWeight.normal,
+                    ),
+                    child: Text(widget.label),
+                  ),
+                ),
+              ),
+            ),
             if (widget.suffixIcon != null)
               Positioned(
                 right: 4,
                 top: 0,
-                bottom: 0,
+                height: _height,
                 child: Center(child: widget.suffixIcon!),
               ),
           ],
         ),
       ),
+    );
+
+    if (widget.maxLength == null) return field;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field,
+        Padding(
+          padding: const EdgeInsets.only(top: 6, right: 4),
+          child: Text(
+            '${_controller.text.length}/${widget.maxLength}',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 12,
+              color: textColor.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

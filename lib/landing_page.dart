@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'authentication/login.dart';
+import 'package:palturo/authentication/auth_gate.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -18,18 +19,29 @@ class IntroScreen extends StatefulWidget {
 }
 
 class _IntroScreenState extends State<IntroScreen> {
+  Timer? _timer;
+
   @override
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
-      }
+    _timer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      // Never replace a route that was pushed above the splash (deep links,
+      // recovery screens). Only advance when this route is still on top.
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isCurrent) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const AuthGate()),
+      );
     });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -40,9 +52,9 @@ class _IntroScreenState extends State<IntroScreen> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
         child: Image.asset(
-          isDarkMode 
-                ? 'assets/images/vlogo_white.png'   
-                : 'assets/images/vlogo_black.png',
+          isDarkMode
+              ? 'assets/images/vlogo_white.png'
+              : 'assets/images/vlogo_black.png',
           width: 320,
         ),
       ),

@@ -1,15 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
 import 'package:palturo/screen/users_dump.dart';
-import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/match_api.dart';
 
 class ConnectionRequest {
   final String id;
+  final String requesterId;
   final String skillName;
   final String requesterName;
   final String schedule;
@@ -24,6 +27,7 @@ class ConnectionRequest {
 
   const ConnectionRequest({
     required this.id,
+    this.requesterId = '',
     required this.skillName,
     required this.requesterName,
     required this.schedule,
@@ -61,7 +65,7 @@ class ConnectionRequest {
 
   Person toPerson() {
     return Person(
-      id: id,
+      id: requesterId.isNotEmpty ? requesterId : id,
       name: requesterName,
       schedule: schedule,
       language: language,
@@ -86,6 +90,31 @@ String timeAgo(DateTime dateTime) {
 
 enum DateFilter { all, today, thisWeek, thisMonth, thisYear }
 
+bool matchesRequestDate(DateTime date, DateFilter filter, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  switch (filter) {
+    case DateFilter.all:
+      return true;
+    case DateFilter.today:
+      return date.year == current.year &&
+          date.month == current.month &&
+          date.day == current.day;
+    case DateFilter.thisWeek:
+      final startOfWeek = DateTime(
+        current.year,
+        current.month,
+        current.day - (current.weekday - 1),
+      );
+      return !date.isBefore(startOfWeek) && !date.isAfter(current);
+    case DateFilter.thisMonth:
+      return date.year == current.year &&
+          date.month == current.month &&
+          !date.isAfter(current);
+    case DateFilter.thisYear:
+      return date.year == current.year && !date.isAfter(current);
+  }
+}
+
 enum RoleFilter { all, learner, mentor }
 
 enum SortFilter { newest, oldest, ascending, descending }
@@ -102,6 +131,41 @@ class _RequestPageState extends State<RequestPage> {
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
 
+  static const List<FilterSection> _filterSections = [
+    FilterSection(
+      key: 'date',
+      title: 'Date',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Today', 'today'),
+        FilterOption('This Week', 'thisWeek'),
+        FilterOption('This Month', 'thisMonth'),
+        FilterOption('This Year', 'thisYear'),
+      ],
+    ),
+    FilterSection(
+      key: 'role',
+      title: 'Role',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Learner', 'learner'),
+        FilterOption('Mentor', 'mentor'),
+      ],
+    ),
+    FilterSection(key: 'skills', title: 'Skills'),
+    FilterSection(
+      key: 'sort',
+      title: 'Filter',
+      defaultValue: 'newest',
+      options: [
+        FilterOption('Newest', 'newest'),
+        FilterOption('Oldest', 'oldest'),
+        FilterOption('Ascending (A-Z)', 'ascending'),
+        FilterOption('Descending (Z-A)', 'descending'),
+      ],
+    ),
+  ];
+
   Color get _filterDotColor => AppColors.primary;
 
   bool get _hasActiveFilter =>
@@ -109,74 +173,54 @@ class _RequestPageState extends State<RequestPage> {
       _roleFilter != RoleFilter.all ||
       _sortFilter != SortFilter.newest;
 
-  late final List<ConnectionRequest> _requests = [
-    ConnectionRequest(
-      id: '1',
-      skillName: 'Parol Making',
-      requesterName: 'RJ',
-      schedule: 'Mon/Wed/Sat',
-      language: 'English',
-      learningStyle: 'Discussion',
-      bio: 'Gusto kong matutong gumawa ng parol para sa pamilya ko.',
-      requestedAt: DateTime.now().subtract(const Duration(minutes: 2)),
-      role: PersonRole.learner,
-      photoUrls: const [null, null],
-    ),
-    ConnectionRequest(
-      id: '2',
-      skillName: 'Weaving Inabel',
-      requesterName: 'Maria',
-      schedule: 'Tue/Thu',
-      language: 'Tagalog',
-      learningStyle: 'Hands-on Practice',
-      bio: 'Lumaki ako sa tabi ng habihan ni Lola. Tuturuan kita nang dahan-dahan.',
-      requestedAt: DateTime.now().subtract(const Duration(days: 1)),
-      role: PersonRole.mentor,
-      photoUrls: const [null],
-    ),
-    ..._dumpRequests(),
-  ];
+  late List<ConnectionRequest> _requests = const [];
+  bool _loading = true;
+  String? _loadError;
+  bool _responding = false;
 
-  static List<ConnectionRequest> _dumpRequests() {
-    final candidates =
-        dumpUsers.where((u) => u.lastMessage == null).take(8).toList();
-    final now = DateTime.now();
-    return [
-      for (var i = 0; i < candidates.length; i++)
-        ConnectionRequest.fromMatchedUser(
-          candidates[i],
-          requestedAt: now.subtract(Duration(hours: 3 + i * 9)),
-        ),
-    ];
+  @override
+  void initState() {
+    super.initState();
+    _loadRequests();
   }
 
-  bool _matchesDateFilter(DateTime date) {
-    final now = DateTime.now();
-    switch (_dateFilter) {
-      case DateFilter.all:
-        return true;
-      case DateFilter.today:
-        return date.year == now.year &&
-            date.month == now.month &&
-            date.day == now.day;
-      case DateFilter.thisWeek:
-        return now.difference(date).inDays <= 7;
-      case DateFilter.thisMonth:
-        return date.year == now.year && date.month == now.month;
-      case DateFilter.thisYear:
-        return date.year == now.year;
+  Future<void> _loadRequests() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final incoming = await MatchApi.getIncomingRequests();
+      if (!mounted) return;
+      setState(() {
+        _requests = incoming.map((r) => r.toConnectionRequest()).toList();
+        _loading = false;
+        _loadError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = 'Couldn’t load requests.\nPlease check your connection.';
+      });
     }
   }
 
+  bool _matchesDateFilter(DateTime date) {
+    return matchesRequestDate(date, _dateFilter);
+  }
+
   List<ConnectionRequest> get _filteredAndSortedRequests {
-    var filtered = _requests.where((r) {
-      final matchesDate = _matchesDateFilter(r.requestedAt);
-      final matchesRole = _roleFilter == RoleFilter.all ||
-          (_roleFilter == RoleFilter.learner &&
-              r.role == PersonRole.learner) ||
-          (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
-      return matchesDate && matchesRole;
-    }).toList();
+    var filtered =
+        _requests.where((r) {
+          final matchesDate = _matchesDateFilter(r.requestedAt);
+          final matchesRole =
+              _roleFilter == RoleFilter.all ||
+              (_roleFilter == RoleFilter.learner &&
+                  r.role == PersonRole.learner) ||
+              (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
+          return matchesDate && matchesRole;
+        }).toList();
 
     switch (_sortFilter) {
       case SortFilter.newest:
@@ -201,306 +245,167 @@ class _RequestPageState extends State<RequestPage> {
     });
   }
 
-  void _blockRequester(ConnectionRequest request) {
+  void _blockRequester(ConnectionRequest request) async {
     if (!mounted) return;
-    BlockedUsers.block(request.toPerson());
+    try {
+      await MatchApi.blockUser(request.requesterId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+      return;
+    }
+    if (!mounted) return;
     _removeRequest(request.id);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('You blocked ${request.requesterName}')),
     );
   }
 
-  void _reportRequester(ConnectionRequest request, String reason) {
+  void _reportRequester(ConnectionRequest request, String reason) async {
     if (!mounted) return;
-    debugPrint('Reported ${request.id}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
+    try {
+      await MatchApi.reportUser(request.requesterId, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+    }
+  }
+
+  Future<void> _respond(ConnectionRequest request, bool accept) async {
+    if (_responding) return;
+    _responding = true;
+
+    try {
+      await MatchApi.respondToRequest(request.id, accept);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            accept
+                ? 'Connected with ${request.requesterName}!'
+                : 'Request from ${request.requesterName} declined.',
+          ),
+        ),
+      );
+      _removeRequest(request.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
+    } finally {
+      _responding = false;
+    }
   }
 
   void _openDetail(ConnectionRequest request) {
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.7),
-      builder: (_) => RequestDetailDialog(
-        person: request.toPerson(),
-        onAccept: () => _removeRequest(request.id),
-        onDecline: () => _removeRequest(request.id),
-        onBlock: () => _blockRequester(request),
-        onReport: (reason) => _reportRequester(request, reason),
-      ),
+      builder:
+          (_) => RequestDetailDialog(
+            person: request.toPerson(),
+            onAccept: () {
+              _respond(request, true);
+            },
+            onDecline: () {
+              _respond(request, false);
+            },
+            onBlock: () => _blockRequester(request),
+            onReport: (reason) => _reportRequester(request, reason),
+          ),
     );
   }
 
   void _openFilterSheet() {
-    DateFilter draftDate = _dateFilter;
-    RoleFilter draftRole = _roleFilter;
-    SortFilter draftSort = _sortFilter;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        final textColor = Theme.of(context).colorScheme.secondary;
-        final primaryColor = Theme.of(context).colorScheme.primary;
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => setModalState(() {
-                            draftDate = DateFilter.all;
-                            draftRole = RoleFilter.all;
-                            draftSort = SortFilter.newest;
-                          }),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _sheetSectionLabel('Date', textColor),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _filterChip(
-                                  'All',
-                                  draftDate == DateFilter.all,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.all),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Today',
-                                  draftDate == DateFilter.today,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.today),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'This Week',
-                                  draftDate == DateFilter.thisWeek,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.thisWeek),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'This Month',
-                                  draftDate == DateFilter.thisMonth,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.thisMonth),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'This Year',
-                                  draftDate == DateFilter.thisYear,
-                                  () => setModalState(
-                                      () => draftDate = DateFilter.thisYear),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            _sheetSectionLabel('Role', textColor),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _filterChip(
-                                  'All',
-                                  draftRole == RoleFilter.all,
-                                  () => setModalState(
-                                      () => draftRole = RoleFilter.all),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Learner',
-                                  draftRole == RoleFilter.learner,
-                                  () => setModalState(
-                                      () => draftRole = RoleFilter.learner),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Mentor',
-                                  draftRole == RoleFilter.mentor,
-                                  () => setModalState(
-                                      () => draftRole = RoleFilter.mentor),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            _sheetSectionLabel('Skills', textColor),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Coming soon',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textColor.withValues(alpha: 0.4),
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            _sheetSectionLabel('Filter', textColor),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _filterChip(
-                                  'Newest',
-                                  draftSort == SortFilter.newest,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.newest),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Oldest',
-                                  draftSort == SortFilter.oldest,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.oldest),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Ascending (A-Z)',
-                                  draftSort == SortFilter.ascending,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.ascending),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                                _filterChip(
-                                  'Descending (Z-A)',
-                                  draftSort == SortFilter.descending,
-                                  () => setModalState(
-                                      () => draftSort = SortFilter.descending),
-                                  primaryColor,
-                                  textColor,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _dateFilter = draftDate;
-                            _roleFilter = draftRole;
-                            _sortFilter = draftSort;
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
+    FilterBottomSheet.show(
+      context,
+      sections: _filterSections,
+      selected: {
+        'date': _dateFilter.name,
+        'role': _roleFilter.name,
+        'sort': _sortFilter.name,
+      },
+      onApply: (result) {
+        setState(() {
+          _dateFilter = DateFilter.values.firstWhere(
+            (d) => d.name == result['date'],
+            orElse: () => DateFilter.all,
+          );
+          _roleFilter = RoleFilter.values.firstWhere(
+            (r) => r.name == result['role'],
+            orElse: () => RoleFilter.all,
+          );
+          _sortFilter = SortFilter.values.firstWhere(
+            (s) => s.name == result['sort'],
+            orElse: () => SortFilter.newest,
+          );
+        });
       },
     );
   }
 
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor,
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
+  Widget _buildLoadError(Color textTheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _loadError!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadRequests,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _filterChip(
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.secondary
-                : textColor.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: isSelected ? AppColors.black : textColor,
-            fontSize: 13,
-          ),
+  Widget _buildEmptyState(Color textTheme) {
+    final filteredOut = _requests.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 0, 32, 110),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Lottie.asset(
+              'assets/lottie/empty.json',
+              width: 220,
+              height: 220,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              filteredOut ? 'No requests found' : 'No requests yet',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -523,76 +428,94 @@ class _RequestPageState extends State<RequestPage> {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            Text(
-              'Requests',
-              style: AppTextStyles.headingText.copyWith(color: textTheme),
-            ),
-            const Spacer(),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  onPressed: _openFilterSheet,
-                  icon: Icon(Icons.tune, color: textTheme, size: 22),
-                ),
-                if (_hasActiveFilter)
-                  Positioned(
-                    right: 10,
-                    top: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _filterDotColor,
-                        shape: BoxShape.circle,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Text(
+                'Requests',
+                style: AppTextStyles.headingText.copyWith(color: textTheme),
+              ),
+              const Spacer(),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _openFilterSheet,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Icon(Icons.tune, color: textTheme, size: 24),
                       ),
-                    ),
+                      if (_hasActiveFilter)
+                        Positioned(
+                          right: -2,
+                          top: 9,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _filterDotColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        itemCount: requests.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                'They want to connect with you. Like back to start exchanging skills right away!',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.7),
-                  fontSize: 16,
-                ),
+      body:
+          _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _loadError != null
+              ? _buildLoadError(textTheme)
+              : requests.isEmpty
+              ? _buildEmptyState(textTheme)
+              : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                itemCount: requests.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        'They want to connect with you. Like back to start exchanging skills right away!',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme.withValues(alpha: 0.7),
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  }
+                  final request = requests[index - 1];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: GestureDetector(
+                      onTap: () => _openDetail(request),
+                      child: RequestCard(
+                        skillName: request.skillName,
+                        requesterName: request.requesterName,
+                        schedule: request.schedule,
+                        language: request.language,
+                        learningStyle: request.learningStyle,
+                        timeAgo: timeAgo(request.requestedAt),
+                        iconAsset: request.iconAsset,
+                        seekingLabel: request.seekingLabel,
+                        onAccept: () => _respond(request, true),
+                        onDecline: () => _respond(request, false),
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          }
-          final request = requests[index - 1];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: GestureDetector(
-              onTap: () => _openDetail(request),
-              child: RequestCard(
-                skillName: request.skillName,
-                requesterName: request.requesterName,
-                schedule: request.schedule,
-                language: request.language,
-                learningStyle: request.learningStyle,
-                timeAgo: timeAgo(request.requestedAt),
-                iconAsset: request.iconAsset,
-                seekingLabel: request.seekingLabel,
-                onAccept: () => _removeRequest(request.id),
-                onDecline: () => _removeRequest(request.id),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

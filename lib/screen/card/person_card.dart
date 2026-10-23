@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
+import 'package:palturo/screen/utils/schedule_format.dart';
 
 enum PersonRole { learner, mentor }
 
@@ -17,6 +19,13 @@ class Person {
   final String bio;
   final List<String?> photoUrls;
 
+  /// FR-5 short-form showcase media (image/video thumbnails) — shown first on
+  /// the card per spec §6.3 recommendation card.
+  final List<String?> showcaseUrls;
+
+  /// Reciprocal compatibility (0..1) from the pipeline — spec §6.3 indicator.
+  final double? compatibility;
+
   const Person({
     required this.id,
     required this.name,
@@ -27,7 +36,12 @@ class Person {
     required this.role,
     this.bio = '',
     this.photoUrls = const [null],
+    this.showcaseUrls = const [null],
+    this.compatibility,
   });
+
+  /// Card page media: showcase content first, profile photos after.
+  List<String?> get cardMedia => [...showcaseUrls, ...photoUrls];
 }
 
 class PersonCardOverlay extends StatefulWidget {
@@ -71,11 +85,21 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       _photoIndex = 0;
       _bioExpanded = false;
     }
+
+    // Showcase pages can change for the same person (e.g. after an edit).
+    // Keep the index inside the current media list instead of showing a
+    // blank page with no selected dot.
+    final total = widget.person.cardMedia.length;
+    if (total == 0) {
+      _photoIndex = 0;
+    } else if (_photoIndex >= total) {
+      _photoIndex = total - 1;
+    }
   }
 
   void _nextPhoto() {
-    final total = widget.person.photoUrls.length;
-    if (_photoIndex < total - 1) {
+    final total = widget.person.cardMedia.length;
+    if (total > 0 && _photoIndex < total - 1) {
       setState(() => _photoIndex++);
     }
   }
@@ -92,10 +116,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       fontSize: 13,
       height: 1.35,
       shadows: [
-        Shadow(
-          color: Colors.black.withValues(alpha: 0.6),
-          blurRadius: 6,
-        ),
+        Shadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 6),
       ],
     );
 
@@ -110,11 +131,18 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         final overflows = painter.didExceedMaxLines;
         painter.dispose();
 
+        // Expanded bios used to grow without a bound and could overflow the
+        // card on short screens or large text scales. Cap the expanded area
+        // and let long text scroll instead.
+        final maxExpandedHeight = (MediaQuery.sizeOf(context).height * 0.16)
+            .clamp(72.0, 140.0);
+
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: overflows
-              ? () => setState(() => _bioExpanded = !_bioExpanded)
-              : null,
+          onTap:
+              overflows
+                  ? () => setState(() => _bioExpanded = !_bioExpanded)
+                  : null,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -129,14 +157,23 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
                   alignment: Alignment.topLeft,
-                  child: Text(
-                    bio,
-                    maxLines: _bioExpanded ? null : 2,
-                    overflow: _bioExpanded
-                        ? TextOverflow.visible
-                        : TextOverflow.ellipsis,
-                    style: style,
-                  ),
+                  child:
+                      _bioExpanded
+                          ? ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: maxExpandedHeight,
+                            ),
+                            child: SingleChildScrollView(
+                              physics: const ClampingScrollPhysics(),
+                              child: Text(bio, style: style),
+                            ),
+                          )
+                          : Text(
+                            bio,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: style,
+                          ),
                 ),
               ),
             ],
@@ -148,7 +185,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final photoUrls = widget.person.photoUrls;
+    final photoUrls = widget.person.cardMedia;
     final currentPhoto =
         photoUrls.isNotEmpty && _photoIndex < photoUrls.length
             ? photoUrls[_photoIndex]
@@ -163,6 +200,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ? 'Wants to learn'
             : 'Wants to teach';
     final bio = widget.person.bio.trim();
+    final scheduleText = formatSchedule(widget.person.schedule);
 
     return Container(
       width: double.infinity,
@@ -182,73 +220,102 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         fit: StackFit.expand,
         children: [
           currentPhoto != null
-              ? Image.network(currentPhoto, fit: BoxFit.cover)
+              ? Image.network(
+                currentPhoto,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(color: Colors.grey[400]),
+              )
               : Container(color: Colors.grey[400]),
           Row(
             children: [
               Expanded(
                 child: GestureDetector(
+                  key: const ValueKey('card-previous'),
                   behavior: HitTestBehavior.translucent,
                   onTap: _previousPhoto,
                 ),
               ),
               Expanded(
                 child: GestureDetector(
+                  key: const ValueKey('card-next'),
                   behavior: HitTestBehavior.translucent,
                   onTap: _nextPhoto,
                 ),
               ),
             ],
           ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.85),
-                ],
-                stops: const [0.35, 1.0],
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.85),
+                  ],
+                  stops: const [0.35, 1.0],
+                ),
               ),
             ),
           ),
           if (widget.showMenu)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: PopupMenuButton<String>(
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              color: Theme.of(context).colorScheme.surface,
-              elevation: 6,
-              offset: const Offset(0, 40),
-              onSelected: (value) {
-                if (value == 'unmatch') {
-                  widget.onUnmatch?.call();
-                } else if (value == 'report') {
-                  widget.onReport?.call();
-                } else if (value == 'block') {
-                  widget.onBlock?.call();
-                }
-              },
-              itemBuilder:
-                  (context) => [
-                    if (widget.onUnmatch != null)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                color: Theme.of(context).colorScheme.surface,
+                elevation: 6,
+                offset: const Offset(0, 40),
+                onSelected: (value) {
+                  if (value == 'unmatch') {
+                    widget.onUnmatch?.call();
+                  } else if (value == 'report') {
+                    widget.onReport?.call();
+                  } else if (value == 'block') {
+                    widget.onBlock?.call();
+                  }
+                },
+                itemBuilder:
+                    (context) => [
+                      if (widget.onUnmatch != null)
+                        PopupMenuItem<String>(
+                          value: 'unmatch',
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.remove_circle_outline,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Unmatch',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       PopupMenuItem<String>(
-                        value: 'unmatch',
+                        value: 'report',
                         child: Row(
                           children: [
                             const Icon(
-                              Icons.remove_circle_outline,
+                              Icons.flag_outlined,
                               color: Colors.red,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Unmatch',
+                              'Report',
                               style: AppTextStyles.regularText.copyWith(
                                 color: Theme.of(context).colorScheme.secondary,
                               ),
@@ -256,55 +323,40 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           ],
                         ),
                       ),
-                    PopupMenuItem<String>(
-                      value: 'report',
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.flag_outlined,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Report',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
+                      PopupMenuItem<String>(
+                        value: 'block',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.block,
+                              color: Colors.red,
+                              size: 20,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'block',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.block, color: Colors.red, size: 20),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Block',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
+                            const SizedBox(width: 12),
+                            Text(
+                              'Block',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: Theme.of(context).colorScheme.secondary,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.more_horiz,
-                  color: Colors.white,
-                  size: 22,
+                    ],
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.more_horiz,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
-          ),
           Positioned(
             left: 20,
             right: 20,
@@ -315,30 +367,36 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '$roleLabel ',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ],
+                    Flexible(
+                      child: Text(
+                        '$roleLabel ',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    Text(
-                      widget.person.skillName,
-                      style: AppTextStyles.boldText.copyWith(
-                        color: AppColors.primary,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ],
+                    Flexible(
+                      child: Text(
+                        toTitleCase(widget.person.skillName),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.boldText.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -372,25 +430,27 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ),
-                    const Icon(
-                      Icons.calendar_today_outlined,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      widget.person.schedule,
-                      style: AppTextStyles.regularText.copyWith(
+                    if (scheduleText.isNotEmpty) ...[
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 16,
                         color: Colors.white,
-                        fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            blurRadius: 6,
-                          ),
-                        ],
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Text(
+                        scheduleText,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: Colors.white,
+                          fontSize: 14,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -422,7 +482,6 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       ],
                     ),
                     Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
                           Icons.psychology,
@@ -430,17 +489,23 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           color: Colors.white70,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          widget.person.learningStyle,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 6,
-                              ),
-                            ],
+                        Expanded(
+                          child: Text(
+                            widget.person.learningStyle.isNotEmpty
+                                ? widget.person.learningStyle
+                                : 'No learning styles set',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -463,6 +528,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               children: [
                 for (int i = 0; i < photoUrls.length; i++) ...[
                   GestureDetector(
+                    key: ValueKey('card-dot-$i'),
                     onTap: () => setState(() => _photoIndex = i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -484,52 +550,52 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ),
           ),
           if (widget.showActions)
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: 20,
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: widget.onSkip,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.textPrimary),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 20,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: widget.onSkip,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.textPrimary),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      widget.skipLabel,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
+                      child: Text(
+                        widget.skipLabel,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: widget.onAdd,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: widget.onAdd,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      widget.addLabel,
-                      style: TextStyle(color: AppColors.black, fontSize: 16),
+                      child: Text(
+                        widget.addLabel,
+                        style: TextStyle(color: AppColors.black, fontSize: 16),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -565,44 +631,47 @@ void showPersonProfileDialog(
                 person: person,
                 showActions: false,
                 showMenu: hasMenu,
-                onUnmatch: onUnmatch == null
-                    ? null
-                    : () async {
-                        final confirmed = await showConfirmDialog(
-                          dialogContext,
-                          title: 'Unmatch',
-                          message:
-                              'Unmatch ${person.name}? You’ll lose this match and your chat history.',
-                          confirmLabel: 'Unmatch',
-                        );
-                        if (!confirmed || !dialogContext.mounted) return;
-                        Navigator.pop(dialogContext);
-                        onUnmatch();
-                      },
-                onReport: onReport == null
-                    ? null
-                    : () async {
-                        final reason = await showReportReasonDialog(
-                          dialogContext,
-                          name: person.name,
-                        );
-                        if (reason == null || !dialogContext.mounted) return;
-                        onReport(reason);
-                      },
-                onBlock: onBlock == null
-                    ? null
-                    : () async {
-                        final confirmed = await showConfirmDialog(
-                          dialogContext,
-                          title: 'Block',
-                          message:
-                              '${person.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
-                          confirmLabel: 'Block',
-                        );
-                        if (!confirmed || !dialogContext.mounted) return;
-                        Navigator.pop(dialogContext);
-                        onBlock();
-                      },
+                onUnmatch:
+                    onUnmatch == null
+                        ? null
+                        : () async {
+                          final confirmed = await showConfirmDialog(
+                            dialogContext,
+                            title: 'Unmatch',
+                            message:
+                                'Unmatch ${person.name}? You’ll lose this match and your chat history.',
+                            confirmLabel: 'Unmatch',
+                          );
+                          if (!confirmed || !dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          onUnmatch();
+                        },
+                onReport:
+                    onReport == null
+                        ? null
+                        : () async {
+                          final reason = await showReportReasonDialog(
+                            dialogContext,
+                            name: person.name,
+                          );
+                          if (reason == null || !dialogContext.mounted) return;
+                          onReport(reason);
+                        },
+                onBlock:
+                    onBlock == null
+                        ? null
+                        : () async {
+                          final confirmed = await showConfirmDialog(
+                            dialogContext,
+                            title: 'Block',
+                            message:
+                                '${person.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+                            confirmLabel: 'Block',
+                          );
+                          if (!confirmed || !dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          onBlock();
+                        },
               ),
               Positioned(
                 top: 16,

@@ -5,59 +5,129 @@ import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
-import 'package:palturo/screen/users_dump.dart';
-import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/action_dialogs.dart';
-
-enum ExploreRoleFilter { all, learner, mentor }
+import 'package:palturo/services/match_api.dart';
 
 class ExploreExpand extends StatefulWidget {
-  final SkillCategory category;
+  final String nodePath;
+  final String nodeLabel;
 
-  const ExploreExpand({super.key, required this.category});
+  /// `teach` shows people teaching this skill (Learner mode); `learn` shows
+  /// people who want to learn it (Mentor mode).
+  final String kind;
+
+  const ExploreExpand({
+    super.key,
+    required this.nodePath,
+    required this.nodeLabel,
+    required this.kind,
+  });
 
   @override
   State<ExploreExpand> createState() => _ExploreExpandState();
 }
 
 class _ExploreExpandState extends State<ExploreExpand> {
-  late final List<Person> _people = dumpUsers
-      .where((u) => u.category == widget.category)
-      .map((u) => u.toPerson())
-      .toList();
+  List<Person> _people = const [];
+  bool _loading = true;
+  String? _error;
 
-  ExploreRoleFilter _roleFilter = ExploreRoleFilter.all;
   int _currentIndex = 0;
   final List<int> _history = [];
+  bool _actionInFlight = false;
 
-  bool get _hasActiveFilter => _roleFilter != ExploreRoleFilter.all;
+  @override
+  void initState() {
+    super.initState();
+    _loadPeople();
+  }
 
-  List<Person> get _filteredPeople {
-    switch (_roleFilter) {
-      case ExploreRoleFilter.all:
-        return _people;
-      case ExploreRoleFilter.learner:
-        return _people.where((p) => p.role == PersonRole.learner).toList();
-      case ExploreRoleFilter.mentor:
-        return _people.where((p) => p.role == PersonRole.mentor).toList();
+  Future<void> _loadPeople() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _currentIndex = 0;
+      _history.clear();
+    });
+
+    try {
+      final users = await MatchApi.browseSkillUsers(
+        widget.nodePath,
+        kind: widget.kind,
+      );
+
+      final seen = <String>{};
+      final unique = users.where((u) => seen.add(u.id)).toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _people = unique;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
   void _next() {
+    if (_currentIndex >= _people.length) return;
+
     setState(() {
       _history.add(_currentIndex);
       _currentIndex++;
     });
   }
 
+  /// Advance only if [person] is still the visible card. This makes a late
+  /// swipe/dismiss callback and a button callback idempotent for one card.
+  void _advanceFrom(Person person) {
+    if (!mounted) return;
+    if (_currentIndex < 0 || _currentIndex >= _people.length) return;
+    if (_people[_currentIndex].id != person.id) return;
+    _next();
+  }
+
   void _undo() {
     if (_history.isEmpty) return;
+
     setState(() {
       _currentIndex = _history.removeLast();
     });
   }
 
+  Future<void> _confirmAdd(Person person) async {
+    if (_actionInFlight) return;
+    _actionInFlight = true;
+
+    try {
+      await MatchApi.sendConnectionRequest(person.id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connection request sent to ${person.name}')),
+      );
+      _advanceFrom(person);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
+    } finally {
+      _actionInFlight = false;
+    }
+  }
+
   Future<void> _confirmBlock(Person person) async {
+    if (_actionInFlight) return;
+
     final confirmed = await showConfirmDialog(
       context,
       title: 'Block',
@@ -65,176 +135,56 @@ class _ExploreExpandState extends State<ExploreExpand> {
           '${person.name} won’t be able to find or message you. You can unblock them anytime in Settings.',
       confirmLabel: 'Block',
     );
+
     if (!confirmed || !mounted) return;
 
-    BlockedUsers.block(person);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${person.name}')),
-    );
-    _next();
+    _actionInFlight = true;
+    try {
+      await MatchApi.blockUser(person.id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
+      _advanceFrom(person);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+    } finally {
+      _actionInFlight = false;
+    }
   }
 
   Future<void> _confirmReport(Person person) async {
+    if (_actionInFlight) return;
+
     final reason = await showReportReasonDialog(context, name: person.name);
+
     if (reason == null || !mounted) return;
 
-    debugPrint('Reported ${person.id}: $reason');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for your report.')),
-    );
-    _next();
-  }
+    _actionInFlight = true;
+    try {
+      await MatchApi.reportUser(person.id, reason);
 
-  void _openFilterSheet() {
-    ExploreRoleFilter draftRole = _roleFilter;
+      if (!mounted) return;
 
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        final textColor = Theme.of(context).colorScheme.secondary;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      _advanceFrom(person);
+    } catch (e) {
+      if (!mounted) return;
 
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => setModalState(
-                            () => draftRole = ExploreRoleFilter.all,
-                          ),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Role',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRole == ExploreRoleFilter.all,
-                          () => setModalState(
-                            () => draftRole = ExploreRoleFilter.all,
-                          ),
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Learner',
-                          draftRole == ExploreRoleFilter.learner,
-                          () => setModalState(
-                            () => draftRole = ExploreRoleFilter.learner,
-                          ),
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Mentor',
-                          draftRole == ExploreRoleFilter.mentor,
-                          () => setModalState(
-                            () => draftRole = ExploreRoleFilter.mentor,
-                          ),
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _roleFilter = draftRole;
-                            _currentIndex = 0;
-                            _history.clear();
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool isSelected,
-    VoidCallback onTap,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color:
-                isSelected ? AppColors.primary : textColor.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: isSelected ? Colors.black : textColor,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+    } finally {
+      _actionInFlight = false;
+    }
   }
 
   Widget _buildEmptyState(Color textColor) {
@@ -280,14 +230,38 @@ class _ExploreExpandState extends State<ExploreExpand> {
     );
   }
 
+  Widget _buildDeckCard(Person person) {
+    return Dismissible(
+      key: ValueKey(person.id),
+      direction: DismissDirection.horizontal,
+      background: _swipeBackground(
+        alignment: Alignment.centerLeft,
+        color: AppColors.primary,
+        icon: Icons.check,
+      ),
+      secondaryBackground: _swipeBackground(
+        alignment: Alignment.centerRight,
+        color: Colors.red,
+        icon: Icons.close,
+      ),
+      onDismissed: (_) => _advanceFrom(person),
+      child: PersonCardOverlay(
+        person: person,
+        onAdd: () => _confirmAdd(person),
+        onSkip: () => _advanceFrom(person),
+        onBlock: () => _confirmBlock(person),
+        onReport: () => _confirmReport(person),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
-    final people = _filteredPeople;
-    final hasMore = _currentIndex < people.length;
+    final hasMore = _currentIndex < _people.length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -314,7 +288,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
             ),
             Expanded(
               child: Text(
-                widget.category.label,
+                widget.nodeLabel,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.headingText.copyWith(
@@ -323,37 +297,24 @@ class _ExploreExpandState extends State<ExploreExpand> {
                 ),
               ),
             ),
-            IconButton(
-              onPressed: _history.isEmpty ? null : _undo,
-              icon: Icon(
-                CupertinoIcons.arrow_uturn_left,
-                color: _history.isEmpty
-                    ? textTheme.withValues(alpha: 0.3)
-                    : textTheme,
-                size: 24,
-              ),
-            ),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                  onPressed: _openFilterSheet,
-                  icon: Icon(Icons.tune, color: textTheme, size: 24),
-                ),
-                if (_hasActiveFilter)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _history.isEmpty ? null : _undo,
+              child: SizedBox(
+                width: 40,
+                height: 44,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Icon(
+                    CupertinoIcons.arrow_uturn_left,
+                    color:
+                        _history.isEmpty
+                            ? textTheme.withValues(alpha: 0.3)
+                            : textTheme,
+                    size: 24,
                   ),
-              ],
+                ),
+              ),
             ),
           ],
         ),
@@ -362,31 +323,39 @@ class _ExploreExpandState extends State<ExploreExpand> {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-          child: hasMore
-              ? Dismissible(
-                  key: ValueKey(people[_currentIndex].id),
-                  direction: DismissDirection.horizontal,
-                  background: _swipeBackground(
-                    alignment: Alignment.centerLeft,
-                    color: AppColors.primary,
-                    icon: Icons.check,
-                  ),
-                  secondaryBackground: _swipeBackground(
-                    alignment: Alignment.centerRight,
-                    color: Colors.red,
-                    icon: Icons.close,
-                  ),
-                  onDismissed: (_) => _next(),
-                  child: PersonCardOverlay(
-                    person: people[_currentIndex],
-                    onAdd: _next,
-                    onSkip: _next,
-                    onBlock: () => _confirmBlock(people[_currentIndex]),
-                    onReport: () => _confirmReport(people[_currentIndex]),
-                  ),
-                )
-              : _buildEmptyState(textTheme),
+          child:
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? _buildErrorState(textTheme)
+                  : hasMore
+                  ? _buildDeckCard(_people[_currentIndex])
+                  : _buildEmptyState(textTheme),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Color textTheme2) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Couldn’t load users for ${widget.nodeLabel}.\nPlease check your connection.',
+            style: AppTextStyles.regularText.copyWith(color: textTheme2),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadPeople,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text(
+              'Retry',
+              style: TextStyle(color: Colors.black, fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }

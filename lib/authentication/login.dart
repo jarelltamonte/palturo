@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:palturo/onboarding/onboarding_flow.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
-import 'package:palturo/screen/navigation_bar.dart';
+import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,7 +16,113 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  final AuthService _authService = AuthService();
+
   bool _isObscured = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  bool _isLoggingIn = false;
+
+  Future<void> _login() async {
+    if (_isLoggingIn) return;
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    setState(() => _isLoggingIn = true);
+
+    try {
+      await _authService.login(email, password);
+      // On success the AuthGate swaps this page out; keep the button disabled
+      // until then so a second sign-in cannot be queued.
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoggingIn = false);
+      await _showLoginFailedDialog(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  Future<void> _showLoginFailedDialog(String message) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    return showAdaptiveDialog(
+      context: context,
+      builder: (dialogContext) {
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+
+        final title = Center(
+          child: Text(
+            'Login Failed',
+            style: AppTextStyles.regularText.copyWith(
+              color: textTheme,
+              fontSize: 18,
+            ),
+          ),
+        );
+
+        final body = Text(
+          message,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme,
+            fontSize: 14,
+          ),
+        );
+
+        if (isIOS) {
+          return CupertinoAlertDialog(
+            title: title,
+            content: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Material(color: Colors.transparent, child: body),
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: title,
+          content: SizedBox(width: double.maxFinite, child: body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'OK',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +131,9 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      // Web: do not relayout the whole page when the browser keyboard/insets
+      // fire on field focus — scroll instead (fixes the resize jump).
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -31,7 +141,12 @@ class _LoginPageState extends State<LoginPage> {
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    MediaQuery.of(context).viewInsets.bottom,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -49,11 +164,15 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 56),
 
-                      const TopLabeledField(label: 'Email'),
+                      TopLabeledField(
+                        label: 'Email',
+                        controller: _emailController,
+                      ),
                       const SizedBox(height: 10),
 
                       TopLabeledField(
                         label: 'Password',
+                        controller: _passwordController,
                         obscureText: _isObscured,
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -74,25 +193,12 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => OnboardingFlow(
-                                      onFinished: () {
-                                        Navigator.pushAndRemoveUntil(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => const NavigationBarWidget(),
-                                          ),
-                                          (route) => false,
-                                        );
-                                      },
-                                    ),
-                              ),
-                            );
-                          },
+                          onPressed:
+                              _isLoggingIn
+                                  ? null
+                                  : () {
+                                    _login();
+                                  },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -102,7 +208,17 @@ class _LoginPageState extends State<LoginPage> {
                               borderRadius: BorderRadius.circular(24),
                             ),
                           ),
-                          child: const Text('Log In'),
+                          child:
+                              _isLoggingIn
+                                  ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  )
+                                  : const Text('Log In'),
                         ),
                       ),
                       const SizedBox(height: 10),

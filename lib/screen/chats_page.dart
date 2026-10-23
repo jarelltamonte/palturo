@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
@@ -11,10 +12,9 @@ import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/home_page.dart';
-
-enum ChatRoleFilter { all, learner, mentor }
-
-enum ChatReadFilter { all, unread, read }
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/chat_time_formatter.dart';
 
 class ChatsPage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
@@ -31,18 +31,90 @@ class _ChatsPageState extends State<ChatsPage> {
 
   bool _isSearching = false;
   String _query = '';
-  ChatRoleFilter _roleFilter = ChatRoleFilter.all;
-  ChatReadFilter _readFilter = ChatReadFilter.all;
+
+  Map<String, String> _filters = {'role': 'all', 'status': 'all'};
+
+  static const List<FilterSection> _filterSections = [
+    FilterSection(
+      key: 'role',
+      title: 'Role',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Learner', 'learner'),
+        FilterOption('Mentor', 'mentor'),
+      ],
+    ),
+    FilterSection(
+      key: 'status',
+      title: 'Status',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Unread', 'unread'),
+        FilterOption('Read', 'read'),
+      ],
+    ),
+    FilterSection(key: 'skills', title: 'Skills'),
+  ];
 
   static const int _maxMatchCards = 8;
 
-  final List<MatchedUser> _chats = dumpUsers;
+  List<MatchedUser> get _chats =>
+      ChatStateService.instance.conversations
+          .map(
+            (c) => MatchedUser(
+              id: '${c.connectionId}|${c.otherUserId}',
+              name: c.otherName,
+              role:
+                  c.otherRole == 'learner'
+                      ? PersonRole.learner
+                      : PersonRole.mentor,
+              skillName: c.otherSkill ?? '',
+              category: SkillCategory.everydayPractical,
+              schedule: '',
+              language: '',
+              learningStyle: '',
+              lastMessage: c.lastMessage,
+              lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
+              hasUnread: c.unread > 0,
+              avatarUrl: c.otherAvatar,
+              connectionId: c.connectionId,
+              otherUserId: c.otherUserId,
+            ),
+          )
+          .toList();
 
-  late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
-    ..onTap = _startSwiping;
+  bool get _loadingChats => ChatStateService.instance.loading;
+  String? get _chatsError => ChatStateService.instance.error;
+
+  late final TapGestureRecognizer _swipeTap =
+      TapGestureRecognizer()..onTap = _startSwiping;
+
+  @override
+  void initState() {
+    super.initState();
+    ChatStateService.instance.addListener(_onChatStateChanged);
+    _loadChats();
+  }
+
+  void _onChatStateChanged() {
+    if (!mounted) return;
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      scheduler.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadChats() async {
+    await ChatStateService.instance.loadConversations();
+  }
 
   @override
   void dispose() {
+    ChatStateService.instance.removeListener(_onChatStateChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -62,27 +134,27 @@ class _ChatsPageState extends State<ChatsPage> {
   }
 
   bool get _hasActiveFilter =>
-      _roleFilter != ChatRoleFilter.all || _readFilter != ChatReadFilter.all;
+      _filters['role'] != 'all' || _filters['status'] != 'all';
 
   bool _matchesRole(MatchedUser chat) {
-    switch (_roleFilter) {
-      case ChatRoleFilter.all:
-        return true;
-      case ChatRoleFilter.learner:
+    switch (_filters['role']) {
+      case 'learner':
         return chat.role == PersonRole.learner;
-      case ChatRoleFilter.mentor:
+      case 'mentor':
         return chat.role == PersonRole.mentor;
+      default:
+        return true;
     }
   }
 
   bool _matchesRead(MatchedUser chat) {
-    switch (_readFilter) {
-      case ChatReadFilter.all:
-        return true;
-      case ChatReadFilter.unread:
+    switch (_filters['status']) {
+      case 'unread':
         return chat.hasUnread;
-      case ChatReadFilter.read:
+      case 'read':
         return !chat.hasUnread;
+      default:
+        return true;
     }
   }
 
@@ -90,7 +162,7 @@ class _ChatsPageState extends State<ChatsPage> {
     final q = _query.trim().toLowerCase();
     return _chats.where((c) {
       final matchesQuery = q.isEmpty || c.name.toLowerCase().contains(q);
-      return matchesQuery && _matchesRole(c);
+      return matchesQuery && _matchesRole(c) && _matchesRead(c);
     }).toList();
   }
 
@@ -129,8 +201,12 @@ class _ChatsPageState extends State<ChatsPage> {
     String? skillName,
     PersonRole? role,
     Person? person,
-  }) {
-    Navigator.push(
+    String? connectionId,
+  }) async {
+    if (connectionId != null) {
+      ChatStateService.instance.enterRoom(connectionId);
+    }
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -140,9 +216,13 @@ class _ChatsPageState extends State<ChatsPage> {
               skillName: skillName,
               role: role,
               person: person,
+              connectionId: connectionId,
             ),
       ),
     );
+    if (connectionId != null) {
+      ChatStateService.instance.leaveRoom(connectionId);
+    }
   }
 
   void _openMatches(BuildContext context) {
@@ -154,209 +234,12 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor.withValues(alpha: 0.6),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool selected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? primaryColor : textColor.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: selected ? Colors.black : textColor,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _openFilterSheet() {
-    final bgColor = Theme.of(context).colorScheme.surface;
-    final textColor = Theme.of(context).colorScheme.secondary;
-    ChatRoleFilter draftRole = _roleFilter;
-    ChatReadFilter draftRead = _readFilter;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: bgColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed:
-                              () => setModalState(() {
-                                draftRole = ChatRoleFilter.all;
-                                draftRead = ChatReadFilter.all;
-                              }),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _sheetSectionLabel('Role', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRole == ChatRoleFilter.all,
-                          () => setModalState(
-                            () => draftRole = ChatRoleFilter.all,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Learner',
-                          draftRole == ChatRoleFilter.learner,
-                          () => setModalState(
-                            () => draftRole = ChatRoleFilter.learner,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Mentor',
-                          draftRole == ChatRoleFilter.mentor,
-                          () => setModalState(
-                            () => draftRole = ChatRoleFilter.mentor,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Status', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRead == ChatReadFilter.all,
-                          () => setModalState(
-                            () => draftRead = ChatReadFilter.all,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Unread',
-                          draftRead == ChatReadFilter.unread,
-                          () => setModalState(
-                            () => draftRead = ChatReadFilter.unread,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Read',
-                          draftRead == ChatReadFilter.read,
-                          () => setModalState(
-                            () => draftRead = ChatReadFilter.read,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Skills', textColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coming soon',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.4),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _roleFilter = draftRole;
-                            _readFilter = draftRead;
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+    FilterBottomSheet.show(
+      context,
+      sections: _filterSections,
+      selected: _filters,
+      onApply: (result) => setState(() => _filters = result),
     );
   }
 
@@ -426,7 +309,9 @@ class _ChatsPageState extends State<ChatsPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No chats found',
+              _hasActiveFilter && _query.trim().isEmpty
+                  ? 'No chats match your filters'
+                  : 'No chats found',
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme.withValues(alpha: 0.6),
               ),
@@ -489,6 +374,55 @@ class _ChatsPageState extends State<ChatsPage> {
     final nothingFound = matches.isEmpty && messages.isEmpty;
     final showShortcut = _query.trim().isEmpty;
     final hasNoChats = _chats.isEmpty;
+    final showMatchesSection =
+        !hasNoChats &&
+        (matches.isNotEmpty || (showShortcut && !_hasActiveFilter));
+
+    if (_loadingChats) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_chatsError != null) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        appBar: AppBar(
+          toolbarHeight: adaptiveHeight,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          titleSpacing: 16,
+          title: Text(
+            'Chats',
+            style: AppTextStyles.headingText.copyWith(color: textTheme),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Couldn’t load your chats.\nPlease check your connection.',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadChats,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Colors.black, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -574,7 +508,7 @@ class _ChatsPageState extends State<ChatsPage> {
         child: CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
-            if (!hasNoChats && (matches.isNotEmpty || showShortcut)) ...[
+            if (showMatchesSection) ...[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16.0),
@@ -613,6 +547,7 @@ class _ChatsPageState extends State<ChatsPage> {
                               skillName: chat.skillName,
                               role: chat.role,
                               person: chat.toPerson(),
+                              connectionId: chat.connectionId,
                             ),
                       );
                     },
@@ -652,6 +587,7 @@ class _ChatsPageState extends State<ChatsPage> {
                           skillName: chat.skillName,
                           role: chat.role,
                           person: chat.toPerson(),
+                          connectionId: chat.connectionId,
                         ),
                   );
                 },
@@ -859,7 +795,8 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (skillName != null) ...[
+                      if (skillName != null &&
+                          skillName!.trim().isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Flexible(
                           child: SkillTag(skillName: skillName!, role: role),
@@ -907,6 +844,7 @@ class SkillTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (skillName.trim().isEmpty) return const SizedBox.shrink();
     final textTheme = Theme.of(context).colorScheme.secondary;
     final iconAsset =
         role == PersonRole.mentor

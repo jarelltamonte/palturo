@@ -1,10 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/services/auth_service.dart';
+import 'package:palturo/services/preferences_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:palturo/screen/block_list.dart';
+
+final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
+  splashFactory: NoSplash.splashFactory,
+);
 
 class Settings extends StatefulWidget {
   const Settings({super.key});
@@ -17,22 +25,105 @@ class _SettingsState extends State<Settings> {
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
-  bool _darkModeEnabled = false;
+  bool _isLoggingOut = false;
+  bool _isDeleting = false;
+  bool _userChangedSettings = false;
+  String _version = '…';
 
-  final TextEditingController _reportController =
-      TextEditingController();
+  static const _notificationsKey = 'notifications_enabled';
+  static const _soundKey = 'sound_enabled';
+  static const _vibrationKey = 'vibration_enabled';
+  static const _feedbackKey = 'feedback_entries';
+  static const _reportKey = 'problem_reports';
 
-  final TextEditingController _feedbackController =
-      TextEditingController();
+  final TextEditingController _reportController = TextEditingController();
+  final TextEditingController _feedbackController = TextEditingController();
 
-  final List<String> _feedbackQuestions = [
-    'How would you rate your experience with PalTuro?',
-    'How easy was PalTuro to use?',
-    'How would you rate the app design?',
-    'How satisfied are you with the features?',
-    'How well did PalTuro’s AI recommendations match your interests and preferences?',
-    'How likely are you to recommend PalTuro?',
+  static const List<String> _agreementLabels = [
+    'Strongly agree',
+    'Agree',
+    'Disagree',
+    'Strongly disagree',
   ];
+
+  static const List<String> _feedbackStatements = [
+    'Overall, my experience with PalTuro has been good.',
+    'PalTuro is easy to use.',
+    'I like how the app looks.',
+    'I would recommend PalTuro to others.',
+    'PalTuro makes it easier to find learners or mentors for Filipino cultural and practical skills.',
+    'PalTuro helps me find people whose skills are relevant to what I want to learn or teach.',
+    'PalTuro reduces the need to search across multiple online platforms or groups.',
+    'The profiles, skill showcases, and recommendations make it easier to evaluate potential learners or mentors than general online platforms.',
+    'PalTuro provides a more organized way to search for skill-exchange partners than keyword-based searching.',
+    'PalTuro helps me consider relevant factors, such as availability, learning style, language preference, and skill interests, when looking for a learner or mentor.',
+    'I would prefer using PalTuro over general social-media platforms when searching for a learner or mentor for Filipino cultural and practical skills.',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      final build = info.buildNumber.trim();
+      setState(() {
+        _version = build.isEmpty ? info.version : '${info.version}+$build';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _version = 'unknown');
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = PreferencesService.instance;
+    final notifications = await prefs.getBool(_notificationsKey);
+    final sound = await prefs.getBool(_soundKey);
+    final vibration = await prefs.getBool(_vibrationKey);
+    if (!mounted || _userChangedSettings) return;
+    setState(() {
+      _notificationsEnabled = notifications ?? true;
+      _soundEnabled = sound ?? true;
+      _vibrationEnabled = vibration ?? true;
+    });
+  }
+
+  void _setToggle(String key, bool value, VoidCallback apply) {
+    _userChangedSettings = true;
+    setState(apply);
+    PreferencesService.instance.setBool(key, value);
+  }
+
+  Future<void> _appendLocalEntry(String key, Map<String, dynamic> entry) async {
+    final prefs = PreferencesService.instance;
+    final raw = await prefs.getString(key);
+    final entries = <Map<String, dynamic>>[];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map) {
+              entries.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+      } catch (_) {
+        entries.clear();
+      }
+    }
+    entries.add(entry);
+    if (entries.length > 50) {
+      entries.removeRange(0, entries.length - 50);
+    }
+    await prefs.setString(key, jsonEncode(entries));
+  }
 
   @override
   void dispose() {
@@ -50,25 +141,83 @@ class _SettingsState extends State<Settings> {
     showAdaptiveDialog(
       context: context,
       builder: (dialogContext) {
-        final isIOS =
-            defaultTargetPlatform == TargetPlatform.iOS;
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final textTheme =
-                Theme.of(context).colorScheme.secondary;
+            final textTheme = Theme.of(context).colorScheme.secondary;
 
             final bool isCommentStep =
-                currentStep == _feedbackQuestions.length;
+                currentStep == _feedbackStatements.length;
+            final int selectedRating = ratings[currentStep] ?? 0;
 
-            final int selectedRating =
-                ratings[currentStep] ?? 0;
+            Widget buildOption(int index) {
+              final int value = index + 1;
+              final bool selected = selectedRating == value;
+              final shape = RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color:
+                      selected
+                          ? AppColors.primary
+                          : textTheme.withValues(alpha: 0.2),
+                  width: selected ? 1.5 : 1,
+                ),
+              );
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color:
+                      selected
+                          ? AppColors.primary.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                  shape: shape,
+                  child: InkWell(
+                    customBorder: shape,
+                    hoverColor: Colors.transparent,
+                    focusColor: Colors.transparent,
+                    splashFactory: NoSplash.splashFactory,
+                    onTap: () {
+                      setDialogState(() {
+                        ratings[currentStep] = value;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _agreementLabels[index],
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (selected)
+                            const Icon(
+                              Icons.check_circle,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
 
             final Widget ratingContent = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Step ${currentStep + 1} of ${_feedbackQuestions.length + 1}',
+                  'Step ${currentStep + 1} of ${_feedbackStatements.length + 1}',
                   style: AppTextStyles.regularText.copyWith(
                     color: textTheme.withValues(alpha: 0.5),
                     fontSize: 12,
@@ -78,12 +227,10 @@ class _SettingsState extends State<Settings> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
-                    value: (currentStep + 1) / (_feedbackQuestions.length + 1),
+                    value: (currentStep + 1) / (_feedbackStatements.length + 1),
                     minHeight: 4,
-                    backgroundColor:
-                        textTheme.withValues(alpha: 0.1),
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(
+                    backgroundColor: textTheme.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
                       AppColors.primary,
                     ),
                   ),
@@ -91,66 +238,21 @@ class _SettingsState extends State<Settings> {
                 const SizedBox(height: 24),
                 if (!isCommentStep) ...[
                   Text(
-                    _feedbackQuestions[currentStep],
+                    _feedbackStatements[currentStep],
                     textAlign: TextAlign.center,
-                    style:
-                        AppTextStyles.regularText.copyWith(
+                    style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      5,
-                      (index) {
-                        final int rating = index + 1;
-
-                        return IconButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              ratings[currentStep] = rating;
-                            });
-                          },
-                          padding:
-                              const EdgeInsets.symmetric(
-                            horizontal: 4,
-                          ),
-                          constraints:
-                              const BoxConstraints(
-                            minWidth: 44,
-                            minHeight: 44,
-                          ),
-                          icon: Icon(
-                            rating <= selectedRating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 34,
-                            color: AppColors.primary,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    selectedRating == 0
-                        ? 'Tap a star to rate'
-                        : '$selectedRating out of 5',
-                    style:
-                        AppTextStyles.regularText.copyWith(
-                      color:
-                          textTheme.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
-                  ),
+                  for (int i = 0; i < _agreementLabels.length; i++)
+                    buildOption(i),
                 ] else ...[
                   Text(
                     'Anything else you would like to share?',
                     textAlign: TextAlign.center,
-                    style:
-                        AppTextStyles.regularText.copyWith(
+                    style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
                       fontSize: 14,
                     ),
@@ -159,10 +261,8 @@ class _SettingsState extends State<Settings> {
                   Text(
                     'Tell us about your experience or how we can improve.',
                     textAlign: TextAlign.center,
-                    style:
-                        AppTextStyles.regularText.copyWith(
-                      color:
-                          textTheme.withValues(alpha: 0.5),
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme.withValues(alpha: 0.5),
                       fontSize: 12,
                     ),
                   ),
@@ -173,48 +273,33 @@ class _SettingsState extends State<Settings> {
                     maxLines: 6,
                     keyboardType: TextInputType.multiline,
                     textInputAction: TextInputAction.newline,
-                    style:
-                        AppTextStyles.regularText.copyWith(
+                    style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
                       fontSize: 14,
                     ),
                     decoration: InputDecoration(
-                      hintText:
-                          'Write your feedback here...',
-                      hintStyle:
-                          AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(
-                          alpha: 0.45,
-                        ),
+                      hintText: 'Write your feedback here...',
+                      hintStyle: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.45),
                         fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Theme.of(context)
-                          .colorScheme
-                          .surface,
-                      contentPadding:
-                          const EdgeInsets.all(14),
+                      fillColor: Theme.of(context).colorScheme.surface,
+                      contentPadding: const EdgeInsets.all(14),
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: textTheme.withValues(
-                            alpha: 0.2,
-                          ),
+                          color: textTheme.withValues(alpha: 0.2),
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: textTheme.withValues(
-                            alpha: 0.2,
-                          ),
+                          color: textTheme.withValues(alpha: 0.2),
                         ),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(12),
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
                         borderSide: BorderSide(
                           color: AppColors.primary,
                           width: 1.5,
@@ -226,7 +311,7 @@ class _SettingsState extends State<Settings> {
               ],
             );
 
-            void nextOrSubmit() {
+            Future<void> nextOrSubmit() async {
               if (!isCommentStep) {
                 setDialogState(() {
                   currentStep++;
@@ -236,41 +321,38 @@ class _SettingsState extends State<Settings> {
 
               final Map<String, dynamic> feedbackData = {
                 'ratings': {
-                  for (int i = 0;
-                      i < _feedbackQuestions.length;
-                      i++)
-                    _feedbackQuestions[i]: ratings[i],
+                  for (int i = 0; i < _feedbackStatements.length; i++)
+                    _feedbackStatements[i]: ratings[i],
                 },
-                'comment':
-                    _feedbackController.text.trim(),
+                'comment': _feedbackController.text.trim(),
+                'submitted_at': DateTime.now().toIso8601String(),
               };
 
-              debugPrint(
-                'Feedback submitted: $feedbackData',
-              );
+              try {
+                await _appendLocalEntry(_feedbackKey, feedbackData);
+              } catch (_) {
+                // Keep the dialog usable if local storage is unavailable.
+              }
 
-              Navigator.pop(dialogContext);
+              if (!mounted) return;
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
 
-              ScaffoldMessenger.of(this.context)
-                  .showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Thank you for your feedback!',
-                  ),
-                ),
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                const SnackBar(content: Text('Thank you for your feedback!')),
               );
             }
 
             if (isIOS) {
               return CupertinoAlertDialog(
-                title: Center(child: Text(
-                  'Submit a Feedback',
-                  style:
-                      AppTextStyles.regularText.copyWith(
-                    color: textTheme,
-                    fontSize: 18,
+                title: Center(
+                  child: Text(
+                    'Send Feedback',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
                   ),
-                )),
+                ),
                 content: Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: Material(
@@ -285,22 +367,19 @@ class _SettingsState extends State<Settings> {
                     },
                     child: Text(
                       'Cancel',
-                      style:
-                          AppTextStyles.regularText.copyWith(
+                      style: AppTextStyles.regularText.copyWith(
                         color: textTheme,
                       ),
                     ),
                   ),
                   CupertinoDialogAction(
                     onPressed:
-                        !isCommentStep &&
-                                selectedRating == 0
+                        !isCommentStep && selectedRating == 0
                             ? null
                             : nextOrSubmit,
                     child: Text(
                       isCommentStep ? 'Submit' : 'Next',
-                      style:
-                          AppTextStyles.regularText.copyWith(
+                      style: AppTextStyles.regularText.copyWith(
                         color: AppColors.primary,
                       ),
                     ),
@@ -310,46 +389,43 @@ class _SettingsState extends State<Settings> {
             }
 
             return AlertDialog(
-              backgroundColor:
-                  Theme.of(context).colorScheme.surface,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              title: Center(child: Text(
-                'Submit a Feedback',
-                style:
-                    AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                  fontSize: 18,
+              title: Center(
+                child: Text(
+                  'Send Feedback',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme,
+                    fontSize: 18,
+                  ),
                 ),
-              )),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
-                child: ratingContent,
+                child: SingleChildScrollView(child: ratingContent),
               ),
               actions: [
                 TextButton(
+                  style: _noSplashButtonStyle,
                   onPressed: () {
                     Navigator.pop(dialogContext);
                   },
                   child: Text(
                     'Cancel',
-                    style:
-                        AppTextStyles.regularText.copyWith(
-                      color: textTheme,
-                    ),
+                    style: AppTextStyles.regularText.copyWith(color: textTheme),
                   ),
                 ),
                 TextButton(
+                  style: _noSplashButtonStyle,
                   onPressed:
-                      !isCommentStep &&
-                              selectedRating == 0
+                      !isCommentStep && selectedRating == 0
                           ? null
                           : nextOrSubmit,
                   child: Text(
                     isCommentStep ? 'Submit' : 'Next',
-                    style:
-                        AppTextStyles.regularText.copyWith(
+                    style: AppTextStyles.regularText.copyWith(
                       color: AppColors.primary,
                     ),
                   ),
@@ -363,14 +439,12 @@ class _SettingsState extends State<Settings> {
   }
 
   void _showReportDialog() {
-    final textTheme =
-        Theme.of(context).colorScheme.secondary;
+    final textTheme = Theme.of(context).colorScheme.secondary;
 
     showAdaptiveDialog(
       context: context,
       builder: (dialogContext) {
-        final isIOS =
-            defaultTargetPlatform == TargetPlatform.iOS;
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
         final textField = TextField(
           controller: _reportController,
@@ -384,75 +458,64 @@ class _SettingsState extends State<Settings> {
           ),
           decoration: InputDecoration(
             hintText: 'Tell us what went wrong...',
-            hintStyle:
-                AppTextStyles.regularText.copyWith(
+            hintStyle: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.45),
               fontSize: 14,
             ),
             filled: true,
-            fillColor:
-                Theme.of(context).colorScheme.surface,
+            fillColor: Theme.of(context).colorScheme.surface,
             contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color:
-                    textTheme.withValues(alpha: 0.2),
-              ),
+              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color:
-                    textTheme.withValues(alpha: 0.2),
-              ),
+              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: AppColors.primary,
-                width: 1.5,
-              ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
           ),
         );
 
-        void submitReport() {
+        Future<void> submitReport() async {
           final report = _reportController.text.trim();
+          if (report.isEmpty) return;
 
-          if (report.isEmpty) {
-            return;
+          try {
+            await _appendLocalEntry(_reportKey, {
+              'text': report,
+              'submitted_at': DateTime.now().toIso8601String(),
+            });
+          } catch (_) {
+            // Keep the dialog usable if local storage is unavailable.
           }
 
+          if (!mounted) return;
           _reportController.clear();
-          Navigator.pop(dialogContext);
+          if (dialogContext.mounted) Navigator.pop(dialogContext);
 
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Thank you for your report.',
-              ),
-            ),
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Thank you for your report.')),
           );
         }
 
         if (isIOS) {
           return CupertinoAlertDialog(
-            title: Center(child: Text(
-              'Report a Problem',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-                fontSize: 18,
+            title: Center(
+              child: Text(
+                'Report a Problem',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                  fontSize: 18,
+                ),
               ),
-            )),
+            ),
             content: Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Material(
-                color: Colors.transparent,
-                child: textField,
-              ),
+              child: Material(color: Colors.transparent, child: textField),
             ),
             actions: [
               CupertinoDialogAction(
@@ -462,18 +525,14 @@ class _SettingsState extends State<Settings> {
                 },
                 child: Text(
                   'Cancel',
-                  style:
-                      AppTextStyles.regularText.copyWith(
-                    color: textTheme,
-                  ),
+                  style: AppTextStyles.regularText.copyWith(color: textTheme),
                 ),
               ),
               CupertinoDialogAction(
                 onPressed: submitReport,
                 child: Text(
                   'Submit',
-                  style:
-                      AppTextStyles.regularText.copyWith(
+                  style: AppTextStyles.regularText.copyWith(
                     color: AppColors.primary,
                   ),
                 ),
@@ -483,42 +542,38 @@ class _SettingsState extends State<Settings> {
         }
 
         return AlertDialog(
-          backgroundColor:
-              Theme.of(context).colorScheme.surface,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: Center(child: Text(
-            'Report a Problem',
-            style: AppTextStyles.regularText.copyWith(
-              color: textTheme,
-              fontSize: 18,
+          title: Center(
+            child: Text(
+              'Report a Problem',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
             ),
-          )),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: textField,
           ),
+          content: SizedBox(width: double.maxFinite, child: textField),
           actions: [
             TextButton(
+              style: _noSplashButtonStyle,
               onPressed: () {
                 _reportController.clear();
                 Navigator.pop(dialogContext);
               },
               child: Text(
                 'Cancel',
-                style:
-                    AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                ),
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
             TextButton(
+              style: _noSplashButtonStyle,
               onPressed: submitReport,
               child: Text(
                 'Submit',
-                style:
-                    AppTextStyles.regularText.copyWith(
+                style: AppTextStyles.regularText.copyWith(
                   color: AppColors.primary,
                 ),
               ),
@@ -529,15 +584,35 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  Future<void> _handleLogout() async {
+    setState(() => _isLoggingOut = true);
+
+    try {
+      await AuthService().logout();
+
+      if (mounted) {
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoggingOut = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to log out: $e')));
+      }
+    }
+  }
+
   void _showLogoutDialog() {
-    final textTheme =
-        Theme.of(context).colorScheme.secondary;
+    final textTheme = Theme.of(context).colorScheme.secondary;
 
     showAdaptiveDialog(
       context: context,
       builder: (dialogContext) {
-        final isIOS =
-            defaultTargetPlatform == TargetPlatform.iOS;
+        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
         final message = Text(
           'Are you sure you want to log out of PalTuro?',
@@ -548,55 +623,38 @@ class _SettingsState extends State<Settings> {
           ),
         );
 
-        void confirmLogout() {
-          Navigator.pop(dialogContext);
-
-          debugPrint('User logged out');
-
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text('You have been logged out.'),
-            ),
-          );
-        }
-
         if (isIOS) {
           return CupertinoAlertDialog(
-            title: Center(child: Text(
-              'Logout',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-                fontSize: 18,
+            title: Center(
+              child: Text(
+                'Log Out',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                  fontSize: 18,
+                ),
               ),
-            )),
+            ),
             content: Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Material(
-                color: Colors.transparent,
-                child: message,
-              ),
+              child: Material(color: Colors.transparent, child: message),
             ),
             actions: [
               CupertinoDialogAction(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                },
+                onPressed: () => Navigator.pop(dialogContext),
                 child: Text(
                   'Cancel',
-                  style:
-                      AppTextStyles.regularText.copyWith(
-                    color: textTheme,
-                  ),
+                  style: AppTextStyles.regularText.copyWith(color: textTheme),
                 ),
               ),
               CupertinoDialogAction(
-                onPressed: confirmLogout,
+                isDestructiveAction: true,
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _handleLogout();
+                },
                 child: Text(
-                  'Logout',
-                  style:
-                      AppTextStyles.regularText.copyWith(
+                  'Log Out',
+                  style: AppTextStyles.regularText.copyWith(
                     color: AppColors.primary,
                   ),
                 ),
@@ -606,41 +664,38 @@ class _SettingsState extends State<Settings> {
         }
 
         return AlertDialog(
-          backgroundColor:
-              Theme.of(context).colorScheme.surface,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: Center(child: Text(
-            'Logout',
-            style: AppTextStyles.regularText.copyWith(
-              color: textTheme,
-              fontSize: 18,
+          title: Center(
+            child: Text(
+              'Log Out',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
             ),
-          )),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: message,
           ),
+          content: SizedBox(width: double.maxFinite, child: message),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              style: _noSplashButtonStyle,
+              onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancel',
-                style:
-                    AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                ),
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
             TextButton(
-              onPressed: confirmLogout,
+              style: _noSplashButtonStyle,
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _handleLogout();
+              },
               child: Text(
-                'Logout',
-                style:
-                    AppTextStyles.regularText.copyWith(
+                'Log Out',
+                style: AppTextStyles.regularText.copyWith(
                   color: AppColors.primary,
                 ),
               ),
@@ -651,6 +706,29 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  Future<void> _handleDeleteAccount() async {
+    if (_isDeleting) return;
+    setState(() => _isDeleting = true);
+
+    try {
+      await AuthService().deleteAccount();
+
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).popUntil((route) => route.isFirst);
+      // Keep the busy overlay until this route is disposed, so it cannot
+      // flash away during the exit animation.
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isDeleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
   void _showDeleteAccountDialog() {
     showAdaptiveDialog(
       context: context,
@@ -658,17 +736,7 @@ class _SettingsState extends State<Settings> {
         return _DeleteAccountDialog(
           onConfirm: () {
             Navigator.pop(dialogContext);
-
-            debugPrint('Account deleted');
-
-            ScaffoldMessenger.of(context)
-                .showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Your account has been deleted.',
-                ),
-              ),
-            );
+            _handleDeleteAccount();
           },
         );
       },
@@ -677,223 +745,296 @@ class _SettingsState extends State<Settings> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme =
-        Theme.of(context).colorScheme.secondary;
-
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS
-            ? 44.0
-            : 56.0;
+        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    final isDarkMode =
-        Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: Icon(
-            Icons.close,
-            color: textTheme,
-          ),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: Text(
-          'Settings',
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 16,
-          ),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 24,
-        ),
+    return PopScope(
+      canPop: !_isLoggingOut && !_isDeleting,
+      child: Stack(
         children: [
-          SwitchListTile.adaptive(
-            title: Text(
-              'Notifications',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
+          Scaffold(
+            appBar: AppBar(
+              toolbarHeight: adaptiveHeight,
+              backgroundColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              leadingWidth: 60,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap:
+                      (_isLoggingOut || _isDeleting)
+                          ? null
+                          : () => Navigator.pop(context),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Icon(Icons.close, color: textTheme, size: 24),
+                  ),
+                ),
+              ),
+              title: Text(
+                'Settings',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme,
+                  fontSize: 16,
+                ),
               ),
             ),
-            activeTrackColor: AppColors.primary,
-            activeThumbColor: AppColors.white,
-            value: _notificationsEnabled,
-            onChanged: (value) {
-              setState(() {
-                _notificationsEnabled = value;
-              });
-            },
-          ),
-          SwitchListTile.adaptive(
-            title: Text(
-              'Sound',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
-            ),
-            activeTrackColor: AppColors.primary,
-            activeThumbColor: AppColors.white,
-            value: _soundEnabled,
-            onChanged: (value) {
-              setState(() {
-                _soundEnabled = value;
-              });
-            },
-          ),
-          SwitchListTile.adaptive(
-            title: Text(
-              'Vibration',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
-            ),
-            activeTrackColor: AppColors.primary,
-            activeThumbColor: AppColors.white,
-            value: _vibrationEnabled,
-            onChanged: (value) {
-              setState(() {
-                _vibrationEnabled = value;
-              });
-            },
-          ),
-          SwitchListTile.adaptive(
-            title: Text(
-              'Dark Mode',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
-            ),
-            activeTrackColor: AppColors.primary,
-            activeThumbColor: AppColors.white,
-            value: _darkModeEnabled,
-            onChanged: (value) {
-              setState(() {
-                _darkModeEnabled = value;
-              });
-
-              MyApp.of(context).setThemeMode(value);
-            },
-          ),
-          Divider(
-            height: 20,
-            color: AppColors.black.withValues(alpha: 0.2),
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.feedback_outlined,
-              color: textTheme,
-            ),
-            title: Text(
-              'Submit a Feedback',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
-            ),
-            trailing: Icon(
-              Icons.chevron_right,
-              color: textTheme,
-            ),
-            onTap: _showFeedbackDialog,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.report_problem_outlined,
-              color: textTheme,
-            ),
-            title: Text(
-              'Report a Problem',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
-            ),
-            trailing: Icon(
-              Icons.chevron_right,
-              color: textTheme,
-            ),
-            onTap: _showReportDialog,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.block,
-              color: textTheme,
-            ),
-            title: Text(
-              'Blocked Users',
-              style:
-                  AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
-            ),
-            trailing: Icon(
-              Icons.chevron_right,
-              color: textTheme,
-            ),
-            onTap: () {
-              Navigator.push(
+            body: Theme(
+              data: Theme.of(
                 context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const BlockListPage(),
+              ).copyWith(splashFactory: NoSplash.splashFactory),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 24.0,
                 ),
-              );
-            },
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(
-                    alpha: 0.1,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(24),
-                ),
-                child: InkWell(
-                  borderRadius:
-                      BorderRadius.circular(12),
-                  onTap: _showLogoutDialog,
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      vertical: 16,
+                children: [
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Notifications',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.logout_rounded,
-                          color: textTheme,
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: _notificationsEnabled,
+                    onChanged: (bool value) {
+                      _setToggle(
+                        _notificationsKey,
+                        value,
+                        () => _notificationsEnabled = value,
+                      );
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Sound',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: _soundEnabled,
+                    onChanged: (bool value) {
+                      _setToggle(_soundKey, value, () => _soundEnabled = value);
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Vibration',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: _vibrationEnabled,
+                    onChanged: (bool value) {
+                      _setToggle(
+                        _vibrationKey,
+                        value,
+                        () => _vibrationEnabled = value,
+                      );
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    title: Text(
+                      'Dark Mode',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    activeTrackColor: AppColors.primary,
+                    activeThumbColor: AppColors.white,
+                    value: isDarkMode,
+                    onChanged: (bool value) {
+                      MyApp.of(context).setThemeMode(value);
+                    },
+                  ),
+                  Divider(
+                    height: 20,
+                    color: AppColors.black.withValues(alpha: 0.2),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.feedback_outlined, color: textTheme),
+                    title: Text(
+                      'Send Feedback',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: _showFeedbackDialog,
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.report_problem_outlined,
+                      color: textTheme,
+                    ),
+                    title: Text(
+                      'Report a Problem',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: _showReportDialog,
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.block, color: textTheme),
+                    title: Text(
+                      'Blocked Users',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BlockListPage(),
                         ),
-                        const SizedBox(width: 8),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            bottomNavigationBar: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        splashFactory: NoSplash.splashFactory,
+                        onTap: _showLogoutDialog,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.logout_rounded, color: textTheme),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Logout',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        splashFactory: NoSplash.splashFactory,
+                        onTap: _showDeleteAccountDialog,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.delete_forever,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Delete Account',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Colors.red,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Image.asset(
+                      isDarkMode
+                          ? 'assets/images/vlogo_white.png'
+                          : 'assets/images/vlogo_black.png',
+                      height: 60,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Version $_version',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (_isLoggingOut || _isDeleting)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.5),
+                alignment: Alignment.center,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 24,
+                    ),
+                    decoration: BoxDecoration(
+                      color: surfaceColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
+                          strokeWidth: 3.5,
+                        ),
+                        const SizedBox(height: 16),
                         Text(
-                          'Logout',
-                          style: AppTextStyles.regularText
-                              .copyWith(
+                          _isDeleting
+                              ? 'Deleting account...'
+                              : 'Logging out...',
+                          style: AppTextStyles.boldText.copyWith(
                             color: textTheme,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
                         ),
                       ],
@@ -901,64 +1042,8 @@ class _SettingsState extends State<Settings> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color:
-                      Colors.red.withValues(alpha: 0.1),
-                  borderRadius:
-                      BorderRadius.circular(24),
-                ),
-                child: InkWell(
-                  borderRadius:
-                      BorderRadius.circular(12),
-                  onTap: _showDeleteAccountDialog,
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.delete_forever,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Delete Account',
-                          style: AppTextStyles.regularText
-                              .copyWith(
-                            color: Colors.red,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Image.asset(
-                isDarkMode
-                    ? 'assets/images/vlogo_white.png'
-                    : 'assets/images/vlogo_black.png',
-                height: 60,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Version 1.0.0',
-                style:
-                    AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.5),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -970,19 +1055,15 @@ class _DeleteAccountDialog extends StatefulWidget {
   const _DeleteAccountDialog({required this.onConfirm});
 
   @override
-  State<_DeleteAccountDialog> createState() =>
-      _DeleteAccountDialogState();
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
 }
 
-class _DeleteAccountDialogState
-    extends State<_DeleteAccountDialog> {
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   static const String _keyword = 'DELETE';
 
-  final TextEditingController _controller =
-      TextEditingController();
+  final TextEditingController _controller = TextEditingController();
 
-  bool get _canConfirm =>
-      _controller.text.trim().toUpperCase() == _keyword;
+  bool get _canConfirm => _controller.text.trim().toUpperCase() == _keyword;
 
   @override
   void initState() {
@@ -1000,10 +1081,8 @@ class _DeleteAccountDialogState
 
   @override
   Widget build(BuildContext context) {
-    final textTheme =
-        Theme.of(context).colorScheme.secondary;
-    final isIOS =
-        defaultTargetPlatform == TargetPlatform.iOS;
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
     final content = Column(
       mainAxisSize: MainAxisSize.min,
@@ -1036,33 +1115,24 @@ class _DeleteAccountDialogState
           ),
           decoration: InputDecoration(
             hintText: _keyword,
-            hintStyle:
-                AppTextStyles.regularText.copyWith(
+            hintStyle: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.45),
               fontSize: 14,
             ),
             filled: true,
-            fillColor:
-                Theme.of(context).colorScheme.surface,
+            fillColor: Theme.of(context).colorScheme.surface,
             contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: textTheme.withValues(alpha: 0.2),
-              ),
+              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: textTheme.withValues(alpha: 0.2),
-              ),
+              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Colors.red,
-                width: 1.5,
-              ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderSide: BorderSide(color: Colors.red, width: 1.5),
             ),
           ),
         ),
@@ -1071,19 +1141,18 @@ class _DeleteAccountDialogState
 
     if (isIOS) {
       return CupertinoAlertDialog(
-        title: Center(child: Text(
-          'Delete Account',
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 18,
+        title: Center(
+          child: Text(
+            'Delete Account',
+            style: AppTextStyles.regularText.copyWith(
+              color: textTheme,
+              fontSize: 18,
+            ),
           ),
-        )),
+        ),
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Material(
-            color: Colors.transparent,
-            child: content,
-          ),
+          child: Material(color: Colors.transparent, child: content),
         ),
         actions: [
           CupertinoDialogAction(
@@ -1092,9 +1161,7 @@ class _DeleteAccountDialogState
             },
             child: Text(
               'Cancel',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-              ),
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
           ),
           CupertinoDialogAction(
@@ -1103,9 +1170,7 @@ class _DeleteAccountDialogState
             child: Text(
               'I agree',
               style: AppTextStyles.regularText.copyWith(
-                color: Colors.red.withValues(
-                  alpha: _canConfirm ? 1 : 0.4,
-                ),
+                color: Colors.red.withValues(alpha: _canConfirm ? 1 : 0.4),
               ),
             ),
           ),
@@ -1114,47 +1179,39 @@ class _DeleteAccountDialogState
     }
 
     return AlertDialog(
-      backgroundColor:
-          Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      title: Center(child: Text(
-        'Delete Account',
-        style: AppTextStyles.regularText.copyWith(
-          color: textTheme,
-          fontSize: 18,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Center(
+        child: Text(
+          'Delete Account',
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme,
+            fontSize: 18,
+          ),
         ),
-      )),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: content,
       ),
+      content: SizedBox(width: double.maxFinite, child: content),
       actions: [
         TextButton(
+          style: _noSplashButtonStyle,
           onPressed: () {
             Navigator.pop(context);
           },
           child: Text(
             'Cancel',
-            style: AppTextStyles.regularText.copyWith(
-              color: textTheme,
-            ),
+            style: AppTextStyles.regularText.copyWith(color: textTheme),
           ),
         ),
         TextButton(
           onPressed: _canConfirm ? widget.onConfirm : null,
           style: TextButton.styleFrom(
+            splashFactory: NoSplash.splashFactory,
             backgroundColor: Colors.red.withValues(
               alpha: _canConfirm ? 0.12 : 0.06,
             ),
             foregroundColor: Colors.red,
-            disabledForegroundColor:
-                Colors.red.withValues(alpha: 0.4),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 10,
-            ),
+            disabledForegroundColor: Colors.red.withValues(alpha: 0.4),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -1162,9 +1219,7 @@ class _DeleteAccountDialogState
           child: Text(
             'I agree',
             style: AppTextStyles.regularText.copyWith(
-              color: Colors.red.withValues(
-                alpha: _canConfirm ? 1 : 0.4,
-              ),
+              color: Colors.red.withValues(alpha: _canConfirm ? 1 : 0.4),
             ),
           ),
         ),

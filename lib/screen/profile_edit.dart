@@ -1,14 +1,18 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
-import 'package:palturo/onboarding/widgets/onboarding_select_field.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show kLearningStyleOptions, kDayOptions, kLanguageOptions;
+import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
 
 const kBioMaxLength = 100;
@@ -16,29 +20,33 @@ const kBioMaxLength = 100;
 class ProfileEditPage extends StatefulWidget {
   final ProfileData profile;
 
-  const ProfileEditPage({
-    super.key,
-    required this.profile,
-  });
+  const ProfileEditPage({super.key, required this.profile});
 
   @override
   State<ProfileEditPage> createState() => _ProfileEditPageState();
 }
 
 class _ProfileEditPageState extends State<ProfileEditPage> {
-  late String _schedulePlaceholder;
-  late String _languagesPlaceholder;
-  late String _learningStylesPlaceholder;
+  final ProfileService _profileService = ProfileService();
+  bool _isSaving = false;
+  bool _showingProfileError = false;
+
   late final TextEditingController _bioController;
 
-  List<String> _schedule = [];
-  List<String> _languages = [];
-  List<String> _learningStyles = [];
+  late Map<String, String> _availability;
+  late List<String> _languages;
+  late List<String> _learningStyles;
   List<String?> _photos = [null, null, null];
 
   OnboardingRole? _role;
   late List<String> _learningSkillIds;
   late List<String> _teachingSkillIds;
+  late Map<String, String> _learningNotes;
+  late Map<String, String> _teachingNotes;
+  late Map<String, String> _initialLearningNotes;
+  late Map<String, String> _initialTeachingNotes;
+  final Set<String> _changedLearningNotes = {};
+  final Set<String> _changedTeachingNotes = {};
 
   static const _roleOptions = [
     RoleOption(
@@ -51,34 +59,35 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       'assets/icons/rmentor.svg',
       'I want to\nteach',
     ),
-    RoleOption(
-      OnboardingRole.both,
-      'assets/icons/rboth.svg',
-      'I can do\nboth',
-    ),
+    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
   ];
 
   @override
   void initState() {
     super.initState();
-
-    _schedulePlaceholder = widget.profile.schedule.trim().isEmpty
-        ? 'Select your availability'
-        : widget.profile.schedule;
-    _languagesPlaceholder = widget.profile.languages.isEmpty
-        ? 'Select your languages'
-        : widget.profile.languages.join(', ');
-    _learningStylesPlaceholder = widget.profile.interests.isEmpty
-        ? 'Select your learning style'
-        : widget.profile.interests.join(', ');
+    assert(
+      widget.profile.id.isNotEmpty,
+      'ProfileEditPage requires a profile loaded from the server',
+    );
     _bioController = TextEditingController(text: widget.profile.bio);
+    _availability = _parseAvailability(widget.profile);
+    _languages = List.from(widget.profile.languages);
+    _learningStyles = List.from(widget.profile.interests);
     _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);
     _teachingSkillIds = List.from(widget.profile.teachingSkillIds);
-
-    if (widget.profile.avatarUrl != null) {
-      _photos[0] = widget.profile.avatarUrl;
-    }
+    _learningNotes = Map<String, String>.from(widget.profile.learningNotes);
+    _teachingNotes = Map<String, String>.from(widget.profile.teachingNotes);
+    _initialLearningNotes = Map<String, String>.from(
+      widget.profile.learningNotes,
+    );
+    _initialTeachingNotes = Map<String, String>.from(
+      widget.profile.teachingNotes,
+    );
+    _photos = List.from(widget.profile.photos);
+    _teachingSkillImages = Map<String, String>.from(
+      widget.profile.teachingSkillImages,
+    );
   }
 
   @override
@@ -87,95 +96,466 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     super.dispose();
   }
 
-  String _shortenDay(String day) {
-    return day.length >= 3 ? day.substring(0, 3) : day;
+  late Map<String, String> _teachingSkillImages;
+  final Map<String, String> _pendingTeachingImages = {};
+
+  Future<void> _pickAttachmentForSkill(String skillId) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted || !_teachingSkillIds.contains(skillId)) {
+      return;
+    }
+
+    setState(() {
+      _pendingTeachingImages.remove(skillId);
+      _teachingSkillImages[skillId] = picked.path;
+    });
   }
 
-  List<String> _sortDays(Iterable<String> days) {
-    const dayOrder = {
-      'Monday': 0,
-      'Tuesday': 1,
-      'Wednesday': 2,
-      'Thursday': 3,
-      'Friday': 4,
-      'Saturday': 5,
-      'Sunday': 6,
-    };
+  void _removeAttachmentForSkill(String skillId) {
+    setState(() {
+      _teachingSkillImages.remove(skillId);
+    });
+  }
 
-    final sorted = days.toList();
+  /// A skill row clears to an empty id before the user picks a replacement.
+  /// Keep its proof under a pending key so the replacement can inherit it.
+  void _replaceTeachingImage(String oldId, String newId) {
+    if (oldId.isEmpty && newId.isEmpty) return;
 
-    sorted.sort(
-      (a, b) => (dayOrder[a] ?? 999).compareTo(dayOrder[b] ?? 999),
+    if (oldId == newId) {
+      final pendingImage = _pendingTeachingImages.remove(oldId);
+      if (pendingImage != null) {
+        _teachingSkillImages[oldId] = pendingImage;
+      }
+      return;
+    }
+
+    if (newId.isEmpty) {
+      final image = _teachingSkillImages.remove(oldId);
+      if (image != null) _pendingTeachingImages[oldId] = image;
+      return;
+    }
+
+    // If the target skill already has a proof waiting, keep it and leave the
+    // old proof pending. Moving the old image here would overwrite the
+    // target's own proof and delete it on save.
+    if (_pendingTeachingImages.containsKey(newId)) return;
+
+    final image =
+        _pendingTeachingImages.remove(oldId) ??
+        _teachingSkillImages.remove(oldId);
+    if (image != null && !_teachingSkillImages.containsKey(newId)) {
+      _teachingSkillImages[newId] = image;
+    }
+  }
+
+  void _removeTeachingImage(String skillId) {
+    _teachingSkillImages.remove(skillId);
+    _pendingTeachingImages.remove(skillId);
+  }
+
+  Map<String, String> _parseAvailability(dynamic source) {
+    List<String> days;
+    if (source is ProfileData) {
+      days =
+          source.availableDays.isNotEmpty
+              ? source.availableDays
+              : parseAvailableDays(source.schedule);
+    } else {
+      days = parseAvailableDays(source);
+    }
+    return {for (final d in days) d: 'Available'};
+  }
+
+  bool _hasUnsavedChanges() {
+    final initialAvail = _parseAvailability(widget.profile);
+
+    if (_bioController.text.trim() != widget.profile.bio.trim()) return true;
+    if (_role != widget.profile.role) return true;
+    if (!setEquals(_availability.keys.toSet(), initialAvail.keys.toSet())) {
+      return true;
+    }
+    if (!listEquals(_languages, widget.profile.languages)) return true;
+    if (!listEquals(_learningStyles, widget.profile.interests)) return true;
+    if (!listEquals(_learningSkillIds, widget.profile.learningSkillIds)) {
+      return true;
+    }
+    if (!listEquals(_teachingSkillIds, widget.profile.teachingSkillIds)) {
+      return true;
+    }
+    if (!mapEquals(_learningNotes, widget.profile.learningNotes)) return true;
+    if (!mapEquals(_teachingNotes, widget.profile.teachingNotes)) return true;
+
+    final initialPhotos = widget.profile.photos;
+    if (!listEquals(_photos, initialPhotos)) return true;
+
+    final initialProofImages = widget.profile.teachingSkillImages;
+    if (!mapEquals(_teachingSkillImages, initialProofImages)) return true;
+
+    return false;
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges()) return true;
+    return showConfirmDialog(
+      context,
+      title: 'Unsaved Changes',
+      message: 'You have unsaved changes. Wish to go back?',
+      confirmLabel: 'OK',
+      destructive: false,
+    );
+  }
+
+  ButtonStyle get _doneButtonStyle => ElevatedButton.styleFrom(
+    backgroundColor: AppColors.primary,
+    foregroundColor: Colors.black,
+    elevation: 0,
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+  );
+
+  Future<void> _pickSchedule() async {
+    final tempAvail = Map<String, String>.from(_availability);
+    final secondary = Theme.of(context).colorScheme.secondary;
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Availability',
+                      style: AppTextStyles.boldText.copyWith(color: secondary),
+                    ),
+                    const SizedBox(height: 12),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.55,
+                      ),
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final day in kDayOptions)
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: AppColors.primary,
+                              checkColor: Colors.black,
+                              value: tempAvail.containsKey(day),
+                              title: Text(
+                                day,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: secondary,
+                                ),
+                              ),
+                              onChanged: (checked) {
+                                setModalState(() {
+                                  if (checked == true) {
+                                    tempAvail[day] = 'Available';
+                                  } else {
+                                    tempAvail.remove(day);
+                                  }
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: _doneButtonStyle,
+                        onPressed: () => Navigator.pop(context, tempAvail),
+                        child: const Text(
+                          'Apply',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
 
-    return sorted;
+    if (result != null) {
+      setState(() => _availability = result);
+    }
   }
 
-  void _save() {
-    final sortedSchedule = _sortDays(_schedule);
+  Future<void> _pickMultiSelect({
+    required String title,
+    required List<String> options,
+    required List<String> selected,
+    required ValueChanged<List<String>> onSaved,
+  }) async {
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final secondary = Theme.of(context).colorScheme.secondary;
+        var tempSelected = List<String>.from(selected);
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTextStyles.boldText.copyWith(color: secondary),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final option in options)
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: AppColors.primary,
+                              checkColor: Colors.black,
+                              value: tempSelected.contains(option),
+                              title: Text(
+                                option,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: secondary,
+                                ),
+                              ),
+                              onChanged: (checked) {
+                                setModalState(() {
+                                  if (checked == true) {
+                                    tempSelected.add(option);
+                                  } else {
+                                    tempSelected.remove(option);
+                                  }
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: _doneButtonStyle,
+                        onPressed: () => Navigator.pop(context, tempSelected),
+                        child: const Text(
+                          'Apply',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (result != null) onSaved(result);
+  }
+
+  Future<void> _showIncompleteSkillDialog(String message) async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Skill Incomplete',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: textTheme,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              message,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _showProfileUnavailableDialog() async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Profile Not Loaded',
+              style: AppTextStyles.boldText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
+            ),
+            content: Text(
+              'We could not load your profile, so nothing was saved. '
+              'Go back and try again.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (widget.profile.id.isEmpty) {
+      if (_showingProfileError) return;
+      _showingProfileError = true;
+      try {
+        await _showProfileUnavailableDialog();
+      } finally {
+        _showingProfileError = false;
+      }
+      return;
+    }
+
+    // Only persist the skills that are visible for the selected role. A user
+    // who switches Both -> Learn must not keep hidden teaching skills (and
+    // vice versa). A null role keeps both to avoid wiping legacy data.
+    final wantsLearning = _role != OnboardingRole.teach;
+    final wantsTeaching = _role != OnboardingRole.learn;
+
+    final learningSkills = wantsLearning ? _learningSkillIds : <String>[];
+    final teachingSkills = wantsTeaching ? _teachingSkillIds : <String>[];
+    final teachingSkillImages =
+        wantsTeaching ? _teachingSkillImages : <String, String>{};
+
+    final allSelectedSkills = [...learningSkills, ...teachingSkills];
+    for (final skill in allSelectedSkills) {
+      final lower = skill.trim().toLowerCase();
+      if (lower == 'other' || lower == 'others') {
+        await _showIncompleteSkillDialog(
+          'Please name and pick a category for your skill.',
+        );
+        return;
+      }
+      final custom = CustomSkill.tryParse(skill);
+      if (custom != null && !custom.isValid) {
+        await _showIncompleteSkillDialog(
+          'Please enter a skill name and select a category.',
+        );
+        return;
+      }
+    }
+
+    final selectedDays = parseAvailableDays(_availability.keys);
+    final scheduleFormatted = formatScheduleDays(selectedDays);
 
     final updated = widget.profile.copyWith(
-      avatarUrl: _photos[0],
       bio: _bioController.text.trim(),
-      schedule: sortedSchedule.isEmpty
-          ? _schedulePlaceholder
-          : sortedSchedule.join('/'),
-      languages: _languages.isEmpty
-          ? widget.profile.languages
-          : _languages,
-      interests: _learningStyles.isEmpty
-          ? widget.profile.interests
-          : _learningStyles,
+      schedule: scheduleFormatted,
+      availableDays: selectedDays,
+      languages: _languages,
+      interests: _learningStyles,
       role: _role,
-      learningSkillIds: _learningSkillIds,
-      teachingSkillIds: _teachingSkillIds,
+      photos: _photos,
+      learningSkillIds: learningSkills,
+      teachingSkillIds: teachingSkills,
+      learningNotes: _learningNotes,
+      teachingNotes: _teachingNotes,
+      changedLearningNotes: Set<String>.from(_changedLearningNotes),
+      changedTeachingNotes: Set<String>.from(_changedTeachingNotes),
     );
 
-    Navigator.pop(context, updated);
-  }
+    setState(() => _isSaving = true);
 
-  Future<void> _selectAvailability() async {
-    final result = await showMultiSelectPicker(
-      context: context,
-      title: 'Availability',
-      options: kDayOptions,
-      selected: _schedule.toSet(),
-    );
-
-    if (result != null) {
-      setState(() {
-        _schedule = _sortDays(result);
-      });
-    }
-  }
-
-  Future<void> _selectLanguages() async {
-    final result = await showMultiSelectPicker(
-      context: context,
-      title: 'Language Preference',
-      options: kLanguageOptions,
-      selected: _languages.toSet(),
-    );
-
-    if (result != null) {
-      setState(() {
-        _languages = result.toList();
-      });
-    }
-  }
-
-  Future<void> _selectLearningStyles() async {
-    final result = await showMultiSelectPicker(
-      context: context,
-      title: 'Learning Style',
-      options: kLearningStyleOptions,
-      selected: _learningStyles.toSet(),
-    );
-
-    if (result != null) {
-      setState(() {
-        _learningStyles = result.toList();
-      });
+    try {
+      final savedProfile = await _profileService.updateProfile(
+        updated,
+        newPhotoLocalPaths: _photos,
+        teachingSkillImages: teachingSkillImages,
+      );
+      if (mounted) Navigator.pop(context, savedProfile);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -185,214 +565,322 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final textTheme2 = Theme.of(context).colorScheme.surface;
     final lightColor = Theme.of(context).colorScheme.surface;
 
-    return Scaffold(
-      backgroundColor: lightColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(
-          color: textTheme2,
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios,
-            color: textTheme,
-            size: 16,
+    final scheduleDisplay = formatScheduleDays(_availability.keys);
+
+    final hasChanges = _hasUnsavedChanges();
+
+    return PopScope(
+      canPop: !hasChanges,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final canDiscard = await _confirmDiscardChanges();
+        if (canDiscard && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: lightColor,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          iconTheme: IconThemeData(color: textTheme2),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
+            onPressed: () async {
+              if (_hasUnsavedChanges()) {
+                final canDiscard = await _confirmDiscardChanges();
+                if (canDiscard && context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
           ),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: textTheme,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor:
+                      _isSaving ? textTheme.withValues(alpha: 0.5) : textTheme,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-              ),
-              onPressed: _save,
-              child: Text(
-                'Save',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme2,
+                onPressed: _isSaving ? null : _save,
+                child: Text(
+                  'Save',
+                  style: AppTextStyles.regularText.copyWith(color: textTheme2),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+        ),
+        body: Stack(
           children: [
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _PhotoPickerRow(
-                photoPaths: _photos,
-                onChanged: (updated) {
-                  setState(() => _photos = updated);
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _BioField(controller: _bioController),
-            ),
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+            SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _DropdownInfoField(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Availability',
-                    value: _schedule
-                        .map(_shortenDay)
-                        .join('/'),
-                    hint: _schedulePlaceholder,
-                    onTap: _selectAvailability,
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _PhotoPickerRow(
+                      photoPaths: _photos,
+                      onChanged: (updated) {
+                        if (!mounted) return;
+                        setState(() => _photos = updated);
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _DropdownInfoField(
-                    icon: Icons.translate,
-                    label: 'Language',
-                    value: _languages.join(', '),
-                    hint: _languagesPlaceholder,
-                    onTap: _selectLanguages,
-                  ),
-                  const SizedBox(height: 12),
-                  _DropdownInfoField(
-                    icon: Icons.psychology,
-                    label: 'Learning Style',
-                    value: _learningStyles.join(', '),
-                    hint: _learningStylesPlaceholder,
-                    onTap: _selectLearningStyles,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: FractionallySizedBox(
-                      widthFactor: 0.8,
-                      child: Divider(
-                        color: textTheme.withValues(alpha: 0.2),
-                        thickness: 1,
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Bio',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: textTheme,
+                        fontSize: 16,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  RoleCardGroup(
-                    options: _roleOptions,
-                    selected: _role,
-                    isEditing: true,
-                    onSelect: (role) {
-                      setState(() => _role = role);
-                    },
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TopLabeledField(
+                      label: 'Introduce yourself',
+                      controller: _bioController,
+                      maxLines: null,
+                      maxLength: kBioMaxLength,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.done,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  if (_role == OnboardingRole.learn ||
-                      _role == OnboardingRole.both) ...[
-                    SkillsCard.toLearn(
-                      isEditing: true,
-                      initialSkillIds: _learningSkillIds,
-                      onChanged: (updatedIds) {
-                        setState(() => _learningSkillIds = updatedIds);
-                      },
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _DropdownInfoField(
+                          icon: Icons.calendar_today_outlined,
+                          label: 'Availability',
+                          value: scheduleDisplay,
+                          hint: 'Tap to set availability',
+                          onTap: _pickSchedule,
+                        ),
+                        const SizedBox(height: 12),
+                        _DropdownInfoField(
+                          icon: Icons.translate,
+                          label: 'Language',
+                          value: _languages.join(', '),
+                          hint: 'Tap to set languages',
+                          onTap:
+                              () => _pickMultiSelect(
+                                title: 'Language Preference',
+                                options: kLanguageOptions,
+                                selected: _languages,
+                                onSaved:
+                                    (result) =>
+                                        setState(() => _languages = result),
+                              ),
+                        ),
+                        const SizedBox(height: 12),
+                        _DropdownInfoField(
+                          icon: Icons.psychology,
+                          label: 'Learning Style',
+                          value: _learningStyles.join(', '),
+                          hint: 'Tap to set learning styles',
+                          onTap:
+                              () => _pickMultiSelect(
+                                title: 'Learning Style',
+                                options: kLearningStyleOptions,
+                                selected: _learningStyles,
+                                onSaved:
+                                    (result) => setState(
+                                      () => _learningStyles = result,
+                                    ),
+                              ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                  if (_role == OnboardingRole.teach ||
-                      _role == OnboardingRole.both)
-                    SkillsCard.toTeach(
-                      isEditing: true,
-                      initialSkillIds: _teachingSkillIds,
-                      onChanged: (updatedIds) {
-                        setState(() => _teachingSkillIds = updatedIds);
-                      },
-                      onAttachFile: (skillId) {
-                        debugPrint('Attach file for $skillId');
-                      },
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.8,
+                            child: Divider(
+                              color: textTheme.withValues(alpha: 0.2),
+                              thickness: 1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        RoleCardGroup(
+                          options: _roleOptions,
+                          selected: _role,
+                          isEditing: true,
+                          onSelect: (role) => setState(() => _role = role),
+                        ),
+                        const SizedBox(height: 24),
+                        if (_role == OnboardingRole.learn ||
+                            _role == OnboardingRole.both) ...[
+                          SkillsCard.toLearn(
+                            isEditing: true,
+                            initialSkillIds: _learningSkillIds,
+                            notes: _learningNotes,
+                            onChanged:
+                                (updatedIds) => setState(
+                                  () => _learningSkillIds = updatedIds,
+                                ),
+                            onNoteChanged: (id, note) {
+                              setState(() {
+                                if (note.trim().isEmpty) {
+                                  _learningNotes.remove(id);
+                                } else {
+                                  _learningNotes[id] = note;
+                                }
+                                final initial = _initialLearningNotes[id] ?? '';
+                                final current = _learningNotes[id] ?? '';
+                                if (current.trim() == initial.trim()) {
+                                  _changedLearningNotes.remove(id);
+                                } else {
+                                  _changedLearningNotes.add(id);
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        if (_role == OnboardingRole.teach ||
+                            _role == OnboardingRole.both)
+                          SkillsCard.toTeach(
+                            isEditing: true,
+                            initialSkillIds: _teachingSkillIds,
+                            attachments: _teachingSkillImages,
+                            notes: _teachingNotes,
+                            onNoteChanged: (id, note) {
+                              setState(() {
+                                if (note.trim().isEmpty) {
+                                  _teachingNotes.remove(id);
+                                } else {
+                                  _teachingNotes[id] = note;
+                                }
+                                final initial = _initialTeachingNotes[id] ?? '';
+                                final current = _teachingNotes[id] ?? '';
+                                if (current.trim() == initial.trim()) {
+                                  _changedTeachingNotes.remove(id);
+                                } else {
+                                  _changedTeachingNotes.add(id);
+                                }
+                              });
+                            },
+                            onChanged: (updatedIds) {
+                              setState(() {
+                                // A proof can be waiting while a row has no
+                                // selection; restore it if that skill is
+                                // re-added through another row.
+                                for (final entry
+                                    in _pendingTeachingImages.entries
+                                        .toList()) {
+                                  if (updatedIds.contains(entry.key)) {
+                                    if (!_teachingSkillImages.containsKey(
+                                      entry.key,
+                                    )) {
+                                      _teachingSkillImages[entry.key] =
+                                          entry.value;
+                                    }
+                                    _pendingTeachingImages.remove(entry.key);
+                                  }
+                                }
+                                final removed =
+                                    _teachingSkillIds
+                                        .where((id) => !updatedIds.contains(id))
+                                        .toList();
+                                for (final oldId in removed) {
+                                  if (_pendingTeachingImages.containsKey(
+                                    oldId,
+                                  )) {
+                                    continue;
+                                  }
+                                  _teachingSkillImages.remove(oldId);
+                                }
+                                _teachingSkillIds = updatedIds;
+                              });
+                            },
+                            onSkillReplaced: _replaceTeachingImage,
+                            onSkillRemoved: _removeTeachingImage,
+                            onAttachFile:
+                                (skillId) => _pickAttachmentForSkill(skillId),
+                            onRemoveAttachment:
+                                (skillId) => _removeAttachmentForSkill(skillId),
+                          ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            if (_isSaving)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 24,
+                    ),
+                    decoration: BoxDecoration(
+                      color: lightColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary,
+                          ),
+                          strokeWidth: 3.5,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Saving profile...',
+                          style: AppTextStyles.boldText.copyWith(
+                            color: textTheme,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BioField extends StatelessWidget {
-  final TextEditingController controller;
-
-  const _BioField({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-
-    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: color, width: width),
-        );
-
-    return TextField(
-      controller: controller,
-      minLines: 2,
-      maxLines: 3,
-      maxLength: kBioMaxLength,
-      keyboardType: TextInputType.multiline,
-      textInputAction: TextInputAction.done,
-      textCapitalization: TextCapitalization.sentences,
-      cursorColor: textColor,
-      style: TextStyle(color: textColor, fontSize: 16),
-      buildCounter: (
-        context, {
-        required int currentLength,
-        required bool isFocused,
-        required int? maxLength,
-      }) {
-        return Text(
-          '$currentLength/$maxLength',
-          style: TextStyle(
-            fontSize: 12,
-            color: textColor.withValues(alpha: 0.5),
-          ),
-        );
-      },
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: AppColors.secondary,
-        hintText: 'Write a short bio about yourself',
-        hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 14,
-        ),
-        border: border(Colors.transparent, 0),
-        enabledBorder: border(Colors.transparent, 0),
-        focusedBorder: border(textColor, 1.5),
       ),
     );
   }
@@ -422,9 +910,7 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
 
   Future<void> _handleTap() async {
     setState(() => _isOpen = true);
-
     await widget.onTap();
-
     if (mounted) {
       setState(() => _isOpen = false);
     }
@@ -440,11 +926,7 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            widget.icon,
-            size: 18,
-            color: textColor,
-          ),
+          Icon(widget.icon, size: 18, color: textColor),
           const SizedBox(width: 8),
           SizedBox(
             width: 120,
@@ -465,9 +947,10 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
                     showHint ? widget.hint : widget.value,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: showHint
-                          ? textColor.withValues(alpha: 0.4)
-                          : textColor,
+                      color:
+                          showHint
+                              ? textColor.withValues(alpha: 0.4)
+                              : textColor,
                       fontSize: 16,
                     ),
                   ),
@@ -495,27 +978,25 @@ class _PhotoPickerRow extends StatelessWidget {
   final List<String?> photoPaths;
   final ValueChanged<List<String?>> onChanged;
 
-  const _PhotoPickerRow({
-    required this.photoPaths,
-    required this.onChanged,
-  });
+  const _PhotoPickerRow({required this.photoPaths, required this.onChanged});
 
   Future<void> _pickPhoto(int index) async {
     final picker = ImagePicker();
-
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
     );
-
     if (picked == null) return;
-
     final updated = List<String?>.from(photoPaths);
+    while (updated.length <= index) {
+      updated.add(null);
+    }
     updated[index] = picked.path;
     onChanged(updated);
   }
 
   void _removePhoto(int index) {
+    if (index < 0 || index >= photoPaths.length) return;
     final updated = List<String?>.from(photoPaths);
     updated[index] = null;
     onChanged(updated);
@@ -553,7 +1034,19 @@ class _PhotoSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = path != null;
+    final hasImage = path != null && path!.isNotEmpty;
+    final isNetwork = hasImage && path!.startsWith('http');
+
+    ImageProvider? imageProvider;
+    if (hasImage) {
+      // Web: picked files arrive as blob: URLs. File() throws
+      // "Unsupported operation: _Namespace" there, so never build a
+      // FileImage on web; NetworkImage can load blob: and http(s) URLs.
+      imageProvider =
+          isNetwork || kIsWeb
+              ? NetworkImage(path!) as ImageProvider
+              : FileImage(File(path!));
+    }
 
     return GestureDetector(
       onTap: onTap,
@@ -565,26 +1058,21 @@ class _PhotoSlot extends StatelessWidget {
               decoration: BoxDecoration(
                 color: hasImage ? null : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.primary,
-                  width: 3,
-                ),
-                image: hasImage
-                    ? DecorationImage(
-                        image: FileImage(File(path!)),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
+                border: Border.all(color: AppColors.primary, width: 3),
+                image:
+                    imageProvider != null
+                        ? DecorationImage(
+                          image: imageProvider,
+                          fit: BoxFit.cover,
+                        )
+                        : null,
               ),
-              child: hasImage
-                  ? null
-                  : const Center(
-                      child: Icon(
-                        Icons.add,
-                        size: 32,
-                        color: Colors.black54,
+              child:
+                  hasImage
+                      ? null
+                      : const Center(
+                        child: Icon(Icons.add, size: 32, color: Colors.black54),
                       ),
-                    ),
             ),
             if (hasImage)
               Positioned(

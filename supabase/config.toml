@@ -1,0 +1,21 @@
+project_id = "palturo"
+
+[auth]
+site_url = "palturo://auth/callback"
+jwt_expiry = 1800
+additional_redirect_urls = ["palturo://auth/callback", "palturo://auth/reset-callback"]
+
+[auth.email]
+enable_confirmations = true
+
+[functions.moderate-notes]
+verify_jwt = false
+
+[functions.get-matches]
+verify_jwt = true
+
+[functions.generate-embeddings]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

@@ -67,6 +67,7 @@ export async function nimEmbed(
   cfg: PipelineCfg,
   texts: string[],
   inputType: "query" | "passage",
+  timeoutMs = 30000,
 ): Promise<number[][]> {
   const res = await fetch(cfg.embeddingApi, {
     method: "POST",
@@ -77,6 +78,7 @@ export async function nimEmbed(
       input_type: inputType,
       dimensions: cfg.embeddingDim,
     }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     throw new Error(`NIM embed failed (${res.status}): ${await res.text()}`);
@@ -92,6 +94,7 @@ export async function nimRerank(
   cfg: PipelineCfg,
   queryText: string,
   passageTexts: string[],
+  timeoutMs = 30000,
 ): Promise<Array<{ index: number; logit: number }>> {
   const res = await fetch(cfg.rerankApi, {
     method: "POST",
@@ -102,6 +105,7 @@ export async function nimRerank(
       query: { text: queryText },
       passages: passageTexts.map((t) => ({ text: t })),
     }),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     throw new Error(`NIM rerank failed (${res.status}): ${await res.text()}`);
@@ -120,6 +124,7 @@ export async function ensureFreshEmbeddings(
   userIds: string[],
   cfg: PipelineCfg,
   key: string,
+  timeoutMs = 30000,
 ): Promise<{ upserted: number; costEmbeddings: number }> {
   if (userIds.length === 0) return { upserted: 0, costEmbeddings: 0 };
 
@@ -135,10 +140,12 @@ export async function ensureFreshEmbeddings(
   }>;
   if (rows.length === 0) return { upserted: 0, costEmbeddings: 0 };
 
-  // existing stored hashes
-  const { data: existing } = await admin
+  // existing stored hashes (scoped to the users being healed)
+  const { data: existing, error: existingErr } = await admin
     .from("profile_embeddings")
-    .select("user_id,role,field_group,input_type,source_hash");
+    .select("user_id,role,field_group,input_type,source_hash")
+    .in("user_id", userIds);
+  if (existingErr) throw new Error(`embeddings: ${existingErr.message}`);
   const have = new Set(
     (existing ?? []).map((r) => `${r.user_id}|${r.role}|${r.field_group}|${r.input_type}:${r.source_hash}`),
   );
@@ -165,7 +172,13 @@ export async function ensureFreshEmbeddings(
     });
     if (batch.length === 0) continue;
 
-    const vectors = await nimEmbed(key, cfg, batch.map((r) => r.source_text), inputType);
+    const vectors = await nimEmbed(
+      key,
+      cfg,
+      batch.map((r) => r.source_text),
+      inputType,
+      timeoutMs,
+    );
     const payload = batch.map((r, i) => ({
       user_id: r.user_id,
       role: r.role,

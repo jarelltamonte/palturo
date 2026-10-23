@@ -1,6 +1,6 @@
 // PalTuro — get-matches Edge Function
 // Full recommendation pipeline:
-//   1. self-heal stale embeddings ( seekers + all opposite-role users, via NIM embed )
+//   1. self-heal the caller's stale embeddings (via NIM embed)
 //   2. Stage 1 candidate retrieval: weighted multi-vector pgvector cosine (skills + context)
 //   3. Stage 2: batched NIM rerank, BOTH directions
 //   4. reciprocal score sqrt(a*b) on sigmoid-calibrated logits, rank, filter
@@ -9,7 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  Admin, PipelineCfg, ensureFreshEmbeddings, getConfig, nimKey, nimEmbed, nimRerank, sigmoid,
+  Admin, PipelineCfg, ensureFreshEmbeddings, getConfig, nimKey, nimRerank, sigmoid,
 } from "../_shared/pipeline.ts";
 
 const CORS = {
@@ -105,15 +105,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ---------- determine candidate pool ----------
-    const allUsers = await admin.from("profiles").select("id").neq("id", user.id).limit(500);
-    const candidateIds = (allUsers.data ?? []).map((r: any) => r.id) as string[];
-
-    // ---------- 1. self-heal embeddings (me + candidates) ----------
+    // ---------- 1. self-heal the caller's embeddings ----------
+    // Candidate embeddings are refreshed when profiles are saved (the client
+    // calls generate-embeddings). Embedding every profile here turned each
+    // uncached deck load into a 500-user NIM batch.
+    // A slow/unavailable embedding provider must not fail the whole request:
+    // retrieval can still use whatever vectors are already stored.
     let healed = 0;
-    if (payload.refresh !== false) {
-      const res = await ensureFreshEmbeddings(admin, [user.id, ...candidateIds], cfg, key);
-      healed = res.upserted;
+    try {
+      const healedRes = await ensureFreshEmbeddings(
+        admin,
+        [user.id],
+        cfg,
+        key,
+        12000,
+      );
+      healed = healedRes.upserted;
+    } catch (e) {
+      console.error(`[get-matches] embedding self-heal failed: ${(e as Error)?.message ?? e}`);
     }
 
     // ---------- 2. Stage 1: weighted multi-vector retrieval (SQL) ----------
@@ -145,7 +154,7 @@ Deno.serve(async (req) => {
 
     const myDoc = `${me.name}'s ${meRole === "learner" ? "LEARNING REQUEST" : "TEACHING OFFER"}\n${meRole === "learner" ? me.learner_text : me.mentor_text}\n${meRole === "learner" ? me.learner_context : me.mentor_context}`;
 
-    // ---------- 3. NIM rerank: direction A (batched) and B (parallel per candidate) ----------
+    // ---------- 3. NIM rerank: direction A (batched), B (bounded concurrency) ----------
     const docs = candidates.map((c) => {
       const p = byId.get(c.candidate_id)!;
       return `${p.name}'s ${targetRole === "mentor" ? "TEACHING OFFER" : "LEARNING REQUEST"}\n${
@@ -153,28 +162,63 @@ Deno.serve(async (req) => {
       }\n${targetRole === "mentor" ? p.mentor_context : p.learner_context}`;
     });
 
+    const B_LIMIT = 15;
+    const B_CONCURRENCY = 5;
+    const B_TIMEOUT_MS = 12000;
+
     let mode = "full";
     let rerankA: Array<{ index: number; logit: number }>;
-    let rerankB: number[] = [];
+    let rerankB: Array<number | null> = [];
+    let aByIndex = new Map<number, number>();
     try {
       rerankA = await nimRerank(key, cfg, myDoc, docs);
 
-      // direction B: does the candidate also want mtahc with me? (their request vs my offer)
-      const bQueries = candidates.map((c) => {
-        const p = byId.get(c.candidate_id)!;
-        return `${p.name}'s ${targetRole === "mentor" ? "LEARNING REQUEST" : "TEACHING OFFER"}\n${
-          targetRole === "mentor" ? p.learner_text : p.mentor_text
-        }\n${targetRole === "mentor" ? p.learner_context : p.mentor_context}`;
-      });
+      // Direction B: does the candidate also want me? Each candidate has a
+      // different query, so this cannot be a single batch. Bound it to the
+      // strongest A candidates, with limited concurrency and a per-call
+      // timeout, so a deck load cannot spend minutes in NIM.
       const myOfferDoc =
         `${me.name}'s ${targetRole === "mentor" ? "TEACHING OFFER" : "LEARNING REQUEST"}\n${
           targetRole === "mentor" ? me.mentor_text : me.learner_text
         }\n${targetRole === "mentor" ? me.mentor_context : me.learner_context}`;
-      const bResults = await Promise.all(
-        bQueries.map((q) => nimRerank(key, cfg, q, [myOfferDoc]).then((r) => r[0]?.logit ?? null)
-          .catch(() => null)),
+
+      // NIM returns rankings sorted by logit; `index` maps back to the
+      // candidate position. Never index the array positionally.
+      const aMap = new Map<number, number>();
+      for (const r of rerankA) aMap.set(r.index, r.logit);
+      aByIndex = aMap;
+
+      const rankedA = candidates
+        .map((_, i) => ({ i, logit: aByIndex.get(i) ?? -Infinity }))
+        .sort((a, b) => b.logit - a.logit)
+        .slice(0, Math.min(B_LIMIT, candidates.length));
+
+      rerankB = new Array(candidates.length).fill(null);
+      let cursor = 0;
+      const worker = async () => {
+        for (;;) {
+          const job = cursor++;
+          if (job >= rankedA.length) return;
+          const i = rankedA[job].i;
+          const p = byId.get(candidates[i].candidate_id)!;
+          const q = `${p.name}'s ${targetRole === "mentor" ? "LEARNING REQUEST" : "TEACHING OFFER"}\n${
+            targetRole === "mentor" ? p.learner_text : p.mentor_text
+          }\n${targetRole === "mentor" ? p.learner_context : p.mentor_context}`;
+          try {
+            const r = await nimRerank(key, cfg, q, [myOfferDoc], B_TIMEOUT_MS);
+            rerankB[i] = r[0]?.logit ?? null;
+          } catch {
+            rerankB[i] = null;
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from(
+          { length: Math.min(B_CONCURRENCY, rankedA.length) },
+          worker,
+        ),
       );
-      rerankB = bResults as number[];
     } catch (e) {
       // graceful fallback to basic matching (bi-encoder ranking only)
       mode = "basic_bi";
@@ -183,19 +227,21 @@ Deno.serve(async (req) => {
 
     // ---------- 4. reciprocal + calibration ----------
     const scored = candidates.map((c, i) => {
-      const la = mode === "full" ? rerankA[i]?.logit ?? null : null;
+      const la = mode === "full" ? aByIndex.get(i) ?? null : null;
       const lb = mode === "full" ? rerankB[i] ?? null : null;
       const pa = la === null ? null : sigmoid(la);
       const pb = lb === null ? null : sigmoid(lb);
       const biScore = c.bi_score;
       let reciprocal: number;
-      let calibrated: number;
       if (pa !== null && pb !== null) {
         reciprocal = Math.sqrt(pa * pb);
-        calibrated = cfg.calibration === "minmax" ? reciprocal : reciprocal; // sigmoid already calibrated
+      } else if (pa !== null) {
+        // Direction B is bounded (or failed) for this candidate. Use A, which
+        // is on the same 0..1 scale as the reciprocal head; raw cosine is not
+        // comparable and would let the un-reranked tail jump the ranking.
+        reciprocal = pa;
       } else {
         reciprocal = Math.max(biScore, 0);
-        calibrated = reciprocal;
       }
       return {
         candidate_id: c.candidate_id,
@@ -203,7 +249,7 @@ Deno.serve(async (req) => {
         rerank_score_a: pa,
         rerank_score_b: pb,
         reciprocal_score: reciprocal,
-        calibrated_score: calibrated,
+        calibrated_score: reciprocal,
       };
     });
 

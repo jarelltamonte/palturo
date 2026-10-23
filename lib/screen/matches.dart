@@ -299,7 +299,7 @@ class _MatchesState extends State<Matches> {
         context,
         title: 'Unmatch',
         message:
-            'Unmatch ${pal.name}? Youâ€™ll lose this match and your chat history.',
+            'Unmatch ${pal.name}? You’ll lose this match and your chat history.',
         confirmLabel: 'Unmatch',
       );
       if (!confirmed) return;
@@ -313,7 +313,7 @@ class _MatchesState extends State<Matches> {
         context,
         title: 'Block',
         message:
-            '${pal.name} wonâ€™t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+            '${pal.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
         confirmLabel: 'Block',
       );
       if (!confirmed) return;

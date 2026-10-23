@@ -157,7 +157,7 @@ class _BlockListPageState extends State<BlockListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Couldnâ€™t load blocked users.',
+              'Couldn’t load blocked users.',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor.withValues(alpha: 0.7),

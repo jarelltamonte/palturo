@@ -44,6 +44,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
   List<Map<String, dynamic>> _messages = [];
   bool _loadingMessages = false;
+  String? _loadError;
   StreamSubscription? _messageStream;
   final Set<int> _expandedTimestamps = {};
 
@@ -75,7 +76,10 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Future<void> _loadMessages() async {
     if (widget.connectionId == null) return;
-    setState(() => _loadingMessages = true);
+    setState(() {
+      _loadingMessages = true;
+      _loadError = null;
+    });
     try {
       final msgs = await MatchApi.getMessages(widget.connectionId!);
       if (!mounted) return;
@@ -86,7 +90,15 @@ class _ChatRoomState extends State<ChatRoom> {
       _scrollToBottom();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadingMessages = false);
+      setState(() {
+        _loadingMessages = false;
+        // Realtime may already have delivered the thread; do not cover it
+        // with an error from a slower REST call.
+        if (_messages.isEmpty) {
+          _loadError =
+              'Couldn’t load this conversation.\nPlease check your connection.';
+        }
+      });
     }
   }
 
@@ -100,6 +112,7 @@ class _ChatRoomState extends State<ChatRoom> {
           if (!mounted) return;
           setState(() {
             _messages = _sortMessages(rows);
+            if (rows.isNotEmpty) _loadError = null;
           });
           _scrollToBottom();
         });
@@ -387,7 +400,11 @@ class _ChatRoomState extends State<ChatRoom> {
       body: Column(
         children: [
           Expanded(
-            child: !hasMessages && !showProfileInAppBar
+            child: _loadingMessages
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null && _messages.isEmpty
+                ? _buildLoadError(textTheme)
+                : !hasMessages && !showProfileInAppBar
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -426,9 +443,7 @@ class _ChatRoomState extends State<ChatRoom> {
                       ],
                     ),
                   )
-                : _loadingMessages
-                    ? const Center(child: CircularProgressIndicator())
-                    : _buildMessageList(textTheme),
+                : _buildMessageList(textTheme),
           ),
           SafeArea(
             top: false,
@@ -492,6 +507,35 @@ class _ChatRoomState extends State<ChatRoom> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLoadError(Color textTheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _loadError!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadMessages,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(color: Colors.black, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -29,6 +29,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
   int _currentIndex = 0;
   final List<int> _history = [];
+  bool _actionInFlight = false;
 
   @override
   void initState() {
@@ -70,10 +71,21 @@ class _ExploreExpandState extends State<ExploreExpand> {
   }
 
   void _next() {
+    if (_currentIndex >= _people.length) return;
+
     setState(() {
       _history.add(_currentIndex);
       _currentIndex++;
     });
+  }
+
+  /// Advance only if [person] is still the visible card. This makes a late
+  /// swipe/dismiss callback and a button callback idempotent for one card.
+  void _advanceFrom(Person person) {
+    if (!mounted) return;
+    if (_currentIndex < 0 || _currentIndex >= _people.length) return;
+    if (_people[_currentIndex].id != person.id) return;
+    _next();
   }
 
   void _undo() {
@@ -85,6 +97,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
   }
 
   Future<void> _confirmBlock(Person person) async {
+    if (_actionInFlight) return;
+
     final confirmed = await showConfirmDialog(
       context,
       title: 'Block',
@@ -95,6 +109,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
     if (!confirmed || !mounted) return;
 
+    _actionInFlight = true;
     try {
       await MatchApi.blockUser(person.id);
 
@@ -103,22 +118,26 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
+      _advanceFrom(person);
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+    } finally {
+      _actionInFlight = false;
     }
-
-    _next();
   }
 
   Future<void> _confirmReport(Person person) async {
+    if (_actionInFlight) return;
+
     final reason = await showReportReasonDialog(context, name: person.name);
 
     if (reason == null || !mounted) return;
 
+    _actionInFlight = true;
     try {
       await MatchApi.reportUser(person.id, reason);
 
@@ -127,15 +146,16 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      _advanceFrom(person);
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+    } finally {
+      _actionInFlight = false;
     }
-
-    _next();
   }
 
   Widget _buildEmptyState(Color textColor) {
@@ -178,6 +198,31 @@ class _ExploreExpandState extends State<ExploreExpand> {
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Icon(icon, color: color, size: 36),
+    );
+  }
+
+  Widget _buildDeckCard(Person person) {
+    return Dismissible(
+      key: ValueKey(person.id),
+      direction: DismissDirection.horizontal,
+      background: _swipeBackground(
+        alignment: Alignment.centerLeft,
+        color: AppColors.primary,
+        icon: Icons.check,
+      ),
+      secondaryBackground: _swipeBackground(
+        alignment: Alignment.centerRight,
+        color: Colors.red,
+        icon: Icons.close,
+      ),
+      onDismissed: (_) => _advanceFrom(person),
+      child: PersonCardOverlay(
+        person: person,
+        onAdd: null,
+        onSkip: () => _advanceFrom(person),
+        onBlock: () => _confirmBlock(person),
+        onReport: () => _confirmReport(person),
+      ),
     );
   }
 
@@ -255,28 +300,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
                   : _error != null
                   ? _buildErrorState(textTheme)
                   : hasMore
-                  ? Dismissible(
-                    key: ValueKey(_people[_currentIndex].id),
-                    direction: DismissDirection.horizontal,
-                    background: _swipeBackground(
-                      alignment: Alignment.centerLeft,
-                      color: AppColors.primary,
-                      icon: Icons.check,
-                    ),
-                    secondaryBackground: _swipeBackground(
-                      alignment: Alignment.centerRight,
-                      color: Colors.red,
-                      icon: Icons.close,
-                    ),
-                    onDismissed: (_) => _next(),
-                    child: PersonCardOverlay(
-                      person: _people[_currentIndex],
-                      onAdd: null,
-                      onSkip: _next,
-                      onBlock: () => _confirmBlock(_people[_currentIndex]),
-                      onReport: () => _confirmReport(_people[_currentIndex]),
-                    ),
-                  )
+                  ? _buildDeckCard(_people[_currentIndex])
                   : _buildEmptyState(textTheme),
         ),
       ),

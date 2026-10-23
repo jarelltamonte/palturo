@@ -53,6 +53,7 @@ class _HomePageState extends State<HomePage> {
   bool _undoRight = false;
   int _undoToken = 0;
   bool _openingEditor = false;
+  bool _actionInFlight = false;
 
   @override
   void initState() {
@@ -120,6 +121,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _confirmAdd(Person person) async {
+    if (_actionInFlight) return;
+    _actionInFlight = true;
+
     try {
       await MatchApi.sendConnectionRequest(person.id);
 
@@ -128,15 +132,16 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connection request sent to ${person.name}')),
       );
+      _advanceFrom(person, right: true);
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
+    } finally {
+      _actionInFlight = false;
     }
-
-    _next(right: true);
   }
 
   @override
@@ -215,12 +220,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _next({bool right = false}) {
+    if (_currentIndex >= _filteredPeople.length) return;
+
     setState(() {
       _history.add(_currentIndex);
       _historyRight.add(right);
       _undoActive = false;
       _currentIndex++;
     });
+  }
+
+  /// Advance only if [person] is still the card on screen. A swipe animation
+  /// and a button/request callback can otherwise both advance the same card.
+  void _advanceFrom(Person person, {bool right = false}) {
+    if (!mounted) return;
+    final people = _filteredPeople;
+    if (_currentIndex < 0 || _currentIndex >= people.length) return;
+    if (people[_currentIndex].id != person.id) return;
+    _next(right: right);
   }
 
   void _undo() {
@@ -260,7 +277,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildDeckCard(Person person) {
+    return _wrapUndo(
+      _SwipeableCard(
+        key: ValueKey(person.id),
+        onSwiped: (right) => _advanceFrom(person, right: right),
+        child: PersonCardOverlay(
+          person: person,
+          onAdd: () => _confirmAdd(person),
+          onSkip: () => _advanceFrom(person),
+          onBlock: () => _confirmBlock(person),
+          onReport: () => _confirmReport(person),
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmBlock(Person person) async {
+    if (_actionInFlight) return;
+
     final confirmed = await showConfirmDialog(
       context,
       title: 'Block',
@@ -271,6 +306,7 @@ class _HomePageState extends State<HomePage> {
 
     if (!confirmed || !mounted) return;
 
+    _actionInFlight = true;
     try {
       await MatchApi.blockUser(person.id);
 
@@ -279,22 +315,26 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
+      _advanceFrom(person);
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+    } finally {
+      _actionInFlight = false;
     }
-
-    _next();
   }
 
   Future<void> _confirmReport(Person person) async {
+    if (_actionInFlight) return;
+
     final reason = await showReportReasonDialog(context, name: person.name);
 
     if (reason == null || !mounted) return;
 
+    _actionInFlight = true;
     try {
       await MatchApi.reportUser(person.id, reason);
 
@@ -303,15 +343,16 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      _advanceFrom(person);
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+    } finally {
+      _actionInFlight = false;
     }
-
-    _next();
   }
 
   @override
@@ -412,31 +453,19 @@ class _HomePageState extends State<HomePage> {
                 : _error != null
                 ? _buildErrorState(textTheme)
                 : hasMore
-                ? _wrapUndo(
-                  _SwipeableCard(
-                    key: ValueKey(people[_currentIndex].id),
-                    onSwiped: (right) => _next(right: right),
-                    child: PersonCardOverlay(
-                      person: people[_currentIndex],
-                      onAdd: () => _confirmAdd(people[_currentIndex]),
-                      onSkip: _next,
-                      onBlock: () => _confirmBlock(people[_currentIndex]),
-                      onReport: () => _confirmReport(people[_currentIndex]),
-                    ),
-                  ),
-                )
+                ? _buildDeckCard(people[_currentIndex])
                 : _buildEmptyState(textTheme),
       ),
     );
   }
 
   Widget _buildErrorState(Color textColor) {
-    final raw = (_error ?? '')
-        .replaceFirst(RegExp(r'^Exception:\s*'), '')
-        .trim();
-    final message = raw.contains('Too many deck requests')
-        ? raw
-        : 'Couldn’t load recommendations.\nPlease check your connection.';
+    final raw =
+        (_error ?? '').replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+    final message =
+        raw.contains('Too many deck requests')
+            ? raw
+            : 'Couldn’t load recommendations.\nPlease check your connection.';
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -641,7 +670,13 @@ class _SwipeableCardState extends State<_SwipeableCard>
                 opacity: 1 - fade,
                 child: Transform.translate(
                   offset: Offset(_dx, dy),
-                  child: Transform.rotate(angle: angle, child: widget.child),
+                  child: Transform.rotate(
+                    angle: angle,
+                    child: IgnorePointer(
+                      ignoring: _exiting,
+                      child: widget.child,
+                    ),
+                  ),
                 ),
               ),
             ],

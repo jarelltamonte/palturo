@@ -1,6 +1,7 @@
 project_id = "palturo"
 
 [auth]
+site_url = "palturo://auth/callback"
 additional_redirect_urls = ["palturo://auth/callback", "palturo://auth/reset-callback"]
 
 [auth.email]

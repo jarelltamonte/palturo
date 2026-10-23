@@ -458,6 +458,44 @@ class MatchApi {
     );
   }
 
+  /// Whether the 15-message feedback gate is open and whether this user rated.
+  static Future<({bool gateOpen, bool alreadyRated})> feedbackStatus(
+    String connectionId,
+  ) async {
+    final res =
+        await _Client.c.rpc(
+              'my_feedback_status',
+              params: {'p_connection': connectionId},
+            )
+            as List;
+    final rows = res.whereType<Map>();
+    final row = rows.isEmpty ? null : rows.first;
+    return (
+      gateOpen: row?['gate_open'] == true,
+      alreadyRated: row?['already_rated'] == true,
+    );
+  }
+
+  /// Creates the one-time feedback notifications once a thread reaches 15
+  /// messages. Safe to call after each send; the RPC deduplicates.
+  static Future<void> checkFeedbackGate(String connectionId) => _Client.c.rpc(
+    'check_feedback_gate',
+    params: {'p_connection': connectionId},
+  );
+
+  static Future<void> submitFeedback(
+    String connectionId, {
+    required int clarity,
+    required int reliability,
+  }) => _Client.c.rpc(
+    'submit_feedback',
+    params: {
+      'p_connection': connectionId,
+      'p_clarity': clarity,
+      'p_reliability': reliability,
+    },
+  );
+
   /// Marks unread messages in this connection as read.
   static Future<void> markMessagesRead(String connectionId) async {
     try {

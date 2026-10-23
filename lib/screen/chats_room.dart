@@ -48,6 +48,8 @@ class _ChatRoomState extends State<ChatRoom> {
   StreamSubscription? _messageStream;
   final Set<String> _expandedTimestamps = {};
   bool _sendingMessage = false;
+  bool _feedbackGateOpen = false;
+  bool _feedbackRated = false;
 
   @override
   void initState() {
@@ -60,6 +62,22 @@ class _ChatRoomState extends State<ChatRoom> {
     });
     _loadMessages();
     _subscribeRealtime();
+    _refreshFeedbackStatus();
+  }
+
+  Future<void> _refreshFeedbackStatus() async {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    try {
+      final status = await MatchApi.feedbackStatus(connectionId);
+      if (!mounted) return;
+      setState(() {
+        _feedbackGateOpen = status.gateOpen;
+        _feedbackRated = status.alreadyRated;
+      });
+    } catch (_) {
+      // Feedback is optional; a failed probe must not affect the chat.
+    }
   }
 
   @override
@@ -167,6 +185,14 @@ class _ChatRoomState extends State<ChatRoom> {
       if (_messageController.text.trim() == message) {
         _messageController.clear();
       }
+      final connectionId = widget.connectionId!;
+      unawaited(
+        MatchApi.checkFeedbackGate(connectionId)
+            .then((_) {
+              if (mounted) _refreshFeedbackStatus();
+            })
+            .catchError((_) {}),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -241,8 +267,127 @@ class _ChatRoomState extends State<ChatRoom> {
     );
   }
 
+  Future<void> _showFeedbackDialog() async {
+    final connectionId = widget.connectionId;
+    if (connectionId == null || !_feedbackGateOpen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Feedback unlocks after 15 messages in this chat.'),
+        ),
+      );
+      return;
+    }
+
+    var clarity = 5;
+    var reliability = 5;
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Widget ratingField({
+              required String label,
+              required int value,
+              required ValueChanged<int?> onChanged,
+            }) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTextStyles.regularText.copyWith(fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<int>(
+                    initialValue: value,
+                    items: [
+                      for (var i = 1; i <= 5; i++)
+                        DropdownMenuItem(value: i, child: Text('$i')),
+                    ],
+                    onChanged: onChanged,
+                  ),
+                ],
+              );
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: const Text('Leave feedback'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Rate your experience with ${widget.name}.',
+                    style: AppTextStyles.regularText.copyWith(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ratingField(
+                    label: 'Clarity of instruction',
+                    value: clarity,
+                    onChanged:
+                        (value) => setDialogState(() => clarity = value ?? 5),
+                  ),
+                  const SizedBox(height: 12),
+                  ratingField(
+                    label: 'Reliability',
+                    value: reliability,
+                    onChanged:
+                        (value) =>
+                            setDialogState(() => reliability = value ?? 5),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(this.context);
+                    try {
+                      await MatchApi.submitFeedback(
+                        connectionId,
+                        clarity: clarity,
+                        reliability: reliability,
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext, true);
+                      }
+                    } catch (_) {
+                      if (!mounted) return;
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Couldn’t save feedback. Try again.'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (submitted != true || !mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Thanks for your feedback.')));
+    await _refreshFeedbackStatus();
+  }
+
   Future<void> _handleMenuAction(String action) async {
     FocusScope.of(context).unfocus();
+
+    if (action == 'feedback') {
+      await _showFeedbackDialog();
+      return;
+    }
 
     final peerId = widget.person?.id;
     if (peerId == null || !_uuidPattern.hasMatch(peerId)) {
@@ -359,6 +504,26 @@ class _ChatRoomState extends State<ChatRoom> {
               onSelected: _handleMenuAction,
               itemBuilder:
                   (context) => [
+                    if (_feedbackGateOpen && !_feedbackRated)
+                      PopupMenuItem<String>(
+                        value: 'feedback',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.star_outline,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Leave feedback',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     PopupMenuItem<String>(
                       value: 'report',
                       child: Row(

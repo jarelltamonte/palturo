@@ -154,14 +154,17 @@ class MatchApi {
 
   /// Edge Function: full recommendation pipeline.
   /// [asRole] = the role we want to find ('mentor' from a learner, etc).
+  /// [useCache] lets the function return its cached ranking when it is still
+  /// fresh; false forces a full pipeline recompute (the function interprets
+  /// `refresh: false` as "do not use the cache").
   /// Returns ranked MatchLite list. Throws on hard failure (caller shows UI error).
   static Future<List<MatchLite>> getMatches({
     required String asRole,
-    bool refresh = true,
+    bool useCache = true,
   }) async {
     final res = await _Client.c.functions.invoke(
       'get-matches',
-      body: {'as_role': asRole, 'refresh': refresh},
+      body: {'as_role': asRole, 'refresh': useCache},
     );
     // supabase_flutter may hand res.data back as a decoded Map or a raw JSON
     // string depending on platform — handle both before reading keys.
@@ -292,13 +295,13 @@ class MatchApi {
           .then((_) {}, onError: (_) {});
       return cached;
     }
-    return fetchAndCacheDeck(asRoleDb, enrichLimit);
+    return fetchAndCacheDeck(asRoleDb, enrichLimit, force: force);
   }
 
   static Future<List<Person>> fetchAndCacheDeck(
-      String asRoleDb, int enrichLimit) async {
+      String asRoleDb, int enrichLimit, {bool force = false}) async {
     final key = _deckKey(asRoleDb);
-    final matches = await getMatches(asRole: asRoleDb);
+    final matches = await getMatches(asRole: asRoleDb, useCache: !force);
     final targetMatches = matches.take(enrichLimit).toList();
     final out = <Person>[];
     for (final m in targetMatches) {

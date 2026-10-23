@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -5,8 +6,8 @@ import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/auth_service.dart';
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/block_list.dart';
-import 'package:palturo/screen/history_list.dart';
 
 final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
   splashFactory: NoSplash.splashFactory,
@@ -25,6 +26,13 @@ class _SettingsState extends State<Settings> {
   bool _vibrationEnabled = true;
   bool _isLoggingOut = false;
   bool _isDeleting = false;
+  bool _userChangedSettings = false;
+
+  static const _notificationsKey = 'notifications_enabled';
+  static const _soundKey = 'sound_enabled';
+  static const _vibrationKey = 'vibration_enabled';
+  static const _feedbackKey = 'feedback_entries';
+  static const _reportKey = 'problem_reports';
 
   final TextEditingController _reportController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
@@ -49,6 +57,56 @@ class _SettingsState extends State<Settings> {
     'PalTuro helps me consider relevant factors, such as availability, learning style, language preference, and skill interests, when looking for a learner or mentor.',
     'I would prefer using PalTuro over general social-media platforms when searching for a learner or mentor for Filipino cultural and practical skills.',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = PreferencesService.instance;
+    final notifications = await prefs.getBool(_notificationsKey);
+    final sound = await prefs.getBool(_soundKey);
+    final vibration = await prefs.getBool(_vibrationKey);
+    if (!mounted || _userChangedSettings) return;
+    setState(() {
+      _notificationsEnabled = notifications ?? true;
+      _soundEnabled = sound ?? true;
+      _vibrationEnabled = vibration ?? true;
+    });
+  }
+
+  void _setToggle(String key, bool value, VoidCallback apply) {
+    _userChangedSettings = true;
+    setState(apply);
+    PreferencesService.instance.setBool(key, value);
+  }
+
+  Future<void> _appendLocalEntry(String key, Map<String, dynamic> entry) async {
+    final prefs = PreferencesService.instance;
+    final raw = await prefs.getString(key);
+    final entries = <Map<String, dynamic>>[];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is Map) {
+              entries.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+      } catch (_) {
+        entries.clear();
+      }
+    }
+    entries.add(entry);
+    if (entries.length > 50) {
+      entries.removeRange(0, entries.length - 50);
+    }
+    await prefs.setString(key, jsonEncode(entries));
+  }
 
   @override
   void dispose() {
@@ -236,7 +294,7 @@ class _SettingsState extends State<Settings> {
               ],
             );
 
-            void nextOrSubmit() {
+            Future<void> nextOrSubmit() async {
               if (!isCommentStep) {
                 setDialogState(() {
                   currentStep++;
@@ -250,11 +308,17 @@ class _SettingsState extends State<Settings> {
                     _feedbackStatements[i]: ratings[i],
                 },
                 'comment': _feedbackController.text.trim(),
+                'submitted_at': DateTime.now().toIso8601String(),
               };
 
-              debugPrint('Feedback submitted: $feedbackData');
+              try {
+                await _appendLocalEntry(_feedbackKey, feedbackData);
+              } catch (_) {
+                // Keep the dialog usable if local storage is unavailable.
+              }
 
-              Navigator.pop(dialogContext);
+              if (!mounted) return;
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
 
               ScaffoldMessenger.of(this.context).showSnackBar(
                 const SnackBar(content: Text('Thank you for your feedback!')),
@@ -399,12 +463,22 @@ class _SettingsState extends State<Settings> {
           ),
         );
 
-        void submitReport() {
+        Future<void> submitReport() async {
           final report = _reportController.text.trim();
           if (report.isEmpty) return;
 
+          try {
+            await _appendLocalEntry(_reportKey, {
+              'text': report,
+              'submitted_at': DateTime.now().toIso8601String(),
+            });
+          } catch (_) {
+            // Keep the dialog usable if local storage is unavailable.
+          }
+
+          if (!mounted) return;
           _reportController.clear();
-          Navigator.pop(dialogContext);
+          if (dialogContext.mounted) Navigator.pop(dialogContext);
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Thank you for your report.')),
@@ -715,9 +789,11 @@ class _SettingsState extends State<Settings> {
                     activeThumbColor: AppColors.white,
                     value: _notificationsEnabled,
                     onChanged: (bool value) {
-                      setState(() {
-                        _notificationsEnabled = value;
-                      });
+                      _setToggle(
+                        _notificationsKey,
+                        value,
+                        () => _notificationsEnabled = value,
+                      );
                     },
                   ),
                   SwitchListTile.adaptive(
@@ -731,9 +807,7 @@ class _SettingsState extends State<Settings> {
                     activeThumbColor: AppColors.white,
                     value: _soundEnabled,
                     onChanged: (bool value) {
-                      setState(() {
-                        _soundEnabled = value;
-                      });
+                      _setToggle(_soundKey, value, () => _soundEnabled = value);
                     },
                   ),
                   SwitchListTile.adaptive(
@@ -747,9 +821,11 @@ class _SettingsState extends State<Settings> {
                     activeThumbColor: AppColors.white,
                     value: _vibrationEnabled,
                     onChanged: (bool value) {
-                      setState(() {
-                        _vibrationEnabled = value;
-                      });
+                      _setToggle(
+                        _vibrationKey,
+                        value,
+                        () => _vibrationEnabled = value,
+                      );
                     },
                   ),
                   SwitchListTile.adaptive(
@@ -794,24 +870,6 @@ class _SettingsState extends State<Settings> {
                     ),
                     trailing: Icon(Icons.chevron_right, color: textTheme),
                     onTap: _showReportDialog,
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.history, color: textTheme),
-                    title: Text(
-                      'History',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HistoryListPage(),
-                        ),
-                      );
-                    },
                   ),
                   ListTile(
                     leading: Icon(Icons.block, color: textTheme),

@@ -58,7 +58,14 @@ void main() async {
     'onboarding_done',
   );
 
-  runApp(MyApp(isOnboardingDone: isOnboardingDone ?? false));
+  final bool? darkMode = await PreferencesService.instance.getBool('dark_mode');
+
+  runApp(
+    MyApp(
+      isOnboardingDone: isOnboardingDone ?? false,
+      initialDarkMode: darkMode ?? false,
+    ),
+  );
 }
 
 /// Shown when Supabase configuration was not supplied at build time.
@@ -116,9 +123,14 @@ mixin MyAppThemeController on State<MyApp> {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, required this.isOnboardingDone});
+  const MyApp({
+    super.key,
+    required this.isOnboardingDone,
+    this.initialDarkMode = false,
+  });
 
   final bool isOnboardingDone;
+  final bool initialDarkMode;
 
   static MyAppThemeController of(BuildContext context) {
     return context.findAncestorStateOfType<_MyAppState>()!;
@@ -136,6 +148,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
     setState(() {
       _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
     });
+    PreferencesService.instance.setBool('dark_mode', isDark);
   }
 
   StreamSubscription<AuthState>? _authSubscription;
@@ -178,6 +191,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   @override
   void initState() {
     super.initState();
+    _themeMode = widget.initialDarkMode ? ThemeMode.dark : ThemeMode.light;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 3), FlutterNativeSplash.remove);
@@ -305,9 +319,10 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
       _latestDeepLink = null;
       _latestDeepLinkAt = null;
       _openAuthScreen(
-        (_) => isReset
-            ? const ForgotPasswordExpired()
-            : const EmailConfirmationExpired(),
+        (_) =>
+            isReset
+                ? const ForgotPasswordExpired()
+                : const EmailConfirmationExpired(),
       );
       return;
     }
@@ -318,10 +333,8 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
       _latestDeepLink = null;
       _latestDeepLinkAt = null;
       _openAuthScreen(
-        (_) => ScratchWidget(
-          email: session!.user.email,
-          isConfirmedInitial: true,
-        ),
+        (_) =>
+            ScratchWidget(email: session!.user.email, isConfirmedInitial: true),
       );
     } else if (isReset && session != null) {
       _lastHandledLink = uri;

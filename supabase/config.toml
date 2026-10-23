@@ -1,6 +1,12 @@
 project_id = "palturo"
 
-[functions.classify-skill]
+[functions.moderate-notes]
+verify_jwt = false
+
+[functions.get-matches]
+verify_jwt = true
+
+[functions.generate-embeddings]
 verify_jwt = true
 
 [functions.delete-account]

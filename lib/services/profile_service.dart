@@ -192,13 +192,16 @@ class ProfileService {
 
     final isComplete = !hasUnresolvedOthers;
 
+    await _saveUserSkills(
+      resolvedLearning.map((name) => {'name': name}).toList(),
+      resolvedTeaching.map((name) => {'name': name}).toList(),
+    );
+
     try {
       await _supabase
           .from('profiles')
           .update({
             'role': controller.role?.dbValue ?? 'learner',
-            'learning_skills': resolvedLearning,
-            'teaching_skills': resolvedTeaching,
             'learning_styles': controller.learningStyles.toList(),
             'languages': controller.languages.toList(),
             'availability': availableDays,
@@ -240,10 +243,56 @@ class ProfileService {
           'User';
       final metaLast = user.userMetadata?['last_name'] ?? '';
 
-      return ProfileData.fromMap(
+      final profile = ProfileData.fromMap(
         response,
         fallbackFirst: metaFirst,
         fallbackLast: metaLast,
+      );
+
+      final learningNotes = <String, String>{};
+      final teachingNotes = <String, String>{};
+      var notesLoaded = false;
+      try {
+        final rows = await _supabase
+            .from('user_skills')
+            .select('kind, note, skill:skill_id(name)')
+            .eq('user_id', user.id);
+        for (final row in rows as List) {
+          final skill = row['skill'];
+          final name = skill is Map ? skill['name'] as String? : null;
+          final note = (row['note'] as String?)?.trim() ?? '';
+          if (name == null || name.isEmpty || note.isEmpty) continue;
+          if (row['kind'] == 'learn') {
+            learningNotes[name] = note;
+          } else if (row['kind'] == 'teach') {
+            teachingNotes[name] = note;
+          }
+        }
+
+        // Notes for custom skills that are not taxonomy nodes yet.
+        final privateRows = await _supabase
+            .from('user_skill_notes')
+            .select('kind, name, note')
+            .eq('user_id', user.id);
+        for (final row in privateRows as List) {
+          final name = (row['name'] as String?)?.trim() ?? '';
+          final note = (row['note'] as String?)?.trim() ?? '';
+          if (name.isEmpty || note.isEmpty) continue;
+          if (row['kind'] == 'learn') {
+            learningNotes.putIfAbsent(name, () => note);
+          } else if (row['kind'] == 'teach') {
+            teachingNotes.putIfAbsent(name, () => note);
+          }
+        }
+        notesLoaded = true;
+      } catch (_) {
+        // Notes are optional; the profile still loads without them.
+      }
+
+      return profile.copyWith(
+        learningNotes: learningNotes,
+        teachingNotes: teachingNotes,
+        notesLoaded: notesLoaded,
       );
     } catch (e) {
       return null;
@@ -275,28 +324,43 @@ class ProfileService {
     final Set<String> allCategorySlugs = {};
 
     final List<String> resolvedLearning = [];
+    final List<Map<String, String>> learningPayload = [];
     for (final skill in updatedProfile.learningSkillIds) {
+      String? resolved;
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
-        resolvedLearning.add(_toTitleCase(custom.text));
+        resolved = _toTitleCase(custom.text);
         if (custom.categoryId.isNotEmpty) {
           allCategorySlugs.add(custom.categoryId);
         }
       } else if (!skill.startsWith(kOtherPrefix) &&
           skill.toLowerCase() != 'other' &&
           skill.toLowerCase() != 'others') {
-        resolvedLearning.add(_toTitleCase(skill));
+        resolved = _toTitleCase(skill);
+      }
+      if (resolved != null && resolved.isNotEmpty) {
+        final note = updatedProfile.learningNotes[skill] ?? '';
+        final changed =
+            updatedProfile.changedLearningNotes.contains(skill) ||
+            (!updatedProfile.notesLoaded && note.trim().isNotEmpty);
+        resolvedLearning.add(resolved);
+        learningPayload.add({
+          'name': resolved,
+          if (changed) 'note': note,
+          if (changed) '_changed': '1',
+        });
       }
     }
 
     final List<String> resolvedTeaching = [];
+    final List<Map<String, String>> teachingPayload = [];
     final Map<String, String> skillIdToResolvedName = {};
 
     for (final skill in updatedProfile.teachingSkillIds) {
+      String? formatted;
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
-        final formatted = _toTitleCase(custom.text);
-        resolvedTeaching.add(formatted);
+        formatted = _toTitleCase(custom.text);
         skillIdToResolvedName[skill] = formatted;
         skillIdToResolvedName[custom.text] = formatted;
         if (custom.categoryId.isNotEmpty) {
@@ -305,9 +369,20 @@ class ProfileService {
       } else if (!skill.startsWith(kOtherPrefix) &&
           skill.toLowerCase() != 'other' &&
           skill.toLowerCase() != 'others') {
-        final formatted = _toTitleCase(skill);
-        resolvedTeaching.add(formatted);
+        formatted = _toTitleCase(skill);
         skillIdToResolvedName[skill] = formatted;
+      }
+      if (formatted != null && formatted.isNotEmpty) {
+        final note = updatedProfile.teachingNotes[skill] ?? '';
+        final changed =
+            updatedProfile.changedTeachingNotes.contains(skill) ||
+            (!updatedProfile.notesLoaded && note.trim().isNotEmpty);
+        resolvedTeaching.add(formatted);
+        teachingPayload.add({
+          'name': formatted,
+          if (changed) 'note': note,
+          if (changed) '_changed': '1',
+        });
       }
     }
 
@@ -436,6 +511,11 @@ class ProfileService {
         primaryAvatar.isNotEmpty &&
         hasSkillsForRole;
 
+    // The RPC owns the skill arrays. Run it first so the arrays and
+    // user_skills stay consistent even if the later profile update fails;
+    // the UI reports the failure and the save is safe to retry.
+    await _saveUserSkills(learningPayload, teachingPayload);
+
     await _supabase
         .from('profiles')
         .update({
@@ -446,8 +526,6 @@ class ProfileService {
           'photos': uploadedPhotoUrls.whereType<String>().toList(),
           'teaching_skill_images': uploadedSkillImages,
           'role': updatedProfile.role?.dbValue ?? 'learner',
-          'learning_skills': resolvedLearning,
-          'teaching_skills': resolvedTeaching,
           'skill_categories': allCategorySlugs.toList(),
           'learning_styles': updatedProfile.interests,
           'languages': updatedProfile.languages,
@@ -462,5 +540,19 @@ class ProfileService {
     await refreshEmbeddings();
 
     return refreshed ?? updatedProfile;
+  }
+
+  Future<void> _saveUserSkills(
+    List<Map<String, String>> learning,
+    List<Map<String, String>> teaching,
+  ) async {
+    try {
+      await _supabase.rpc(
+        'save_user_skills',
+        params: {'p_learning': learning, 'p_teaching': teaching},
+      );
+    } catch (e) {
+      throw Exception('Failed to save skills: $e');
+    }
   }
 }

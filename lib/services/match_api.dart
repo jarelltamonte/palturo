@@ -573,30 +573,6 @@ class MatchApi {
     return _leafCache!;
   }
 
-  /// Custom ("Others") skill flow. Body: {name, note, kind: learn|teach}.
-  /// Returns the raw verdict:
-  /// {status: attached|pending|queued|rejected, node: {id,name,path}, ...}
-  /// Custom ("Others") skill flow. Body: {name, note, kind: learn|teach}.
-  /// Returns the raw verdict:
-  /// {status: attached|pending|queued|rejected, node: {id,name,path}, ...}
-  static Future<Map<String, dynamic>?> classifySkill({
-    required String name,
-    String? note,
-    required String kind,
-  }) async {
-    final res = await _Client.c.functions.invoke('classify-skill', body: {
-      'name': name,
-      if (note != null && note.isNotEmpty) 'note': note,
-      'kind': kind,
-    });
-    final dynamic raw = res.data;
-    if (raw is Map) return Map<String, dynamic>.from(raw);
-    if (raw is String && raw.isNotEmpty) {
-      return (jsonDecode(raw) as Map).cast<String, dynamic>();
-    }
-    return null;
-  }
-
   /// The caller's placements: [{kind, note, id, name, path}].
   static Future<List<Map<String, dynamic>>> mySkills() async {
     final res = await _Client.c.from('user_skills').select(

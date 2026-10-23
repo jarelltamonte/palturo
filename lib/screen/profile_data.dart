@@ -20,6 +20,12 @@ class ProfileData {
   /// Per-placement notes keyed by taxonomy leaf id (DEV-22).
   final Map<String, String> learningNotes;
   final Map<String, String> teachingNotes;
+  /// True only when the notes query succeeded. A save must not overwrite
+  /// stored notes with empty values after a transient read failure.
+  final bool notesLoaded;
+  /// Note ids edited in this session (so only those are re-moderated).
+  final Set<String> changedLearningNotes;
+  final Set<String> changedTeachingNotes;
   final bool hasCompletedOnboarding;
   final bool isProfileCompleted;
 
@@ -42,6 +48,9 @@ class ProfileData {
     this.teachingSkillImages = const {},
     this.learningNotes = const {},
     this.teachingNotes = const {},
+    this.notesLoaded = false,
+    this.changedLearningNotes = const {},
+    this.changedTeachingNotes = const {},
     this.hasCompletedOnboarding = false,
     this.isProfileCompleted = false,
   }) : firstName = firstName ?? (name != null ? name.split(' ').first : 'User'),
@@ -74,6 +83,9 @@ class ProfileData {
     Map<String, String>? teachingSkillImages,
     Map<String, String>? learningNotes,
     Map<String, String>? teachingNotes,
+    bool? notesLoaded,
+    Set<String>? changedLearningNotes,
+    Set<String>? changedTeachingNotes,
     bool? hasCompletedOnboarding,
     bool? isProfileCompleted,
   }) {
@@ -95,6 +107,11 @@ class ProfileData {
       teachingSkillImages: teachingSkillImages ?? this.teachingSkillImages,
       learningNotes: learningNotes ?? this.learningNotes,
       teachingNotes: teachingNotes ?? this.teachingNotes,
+      notesLoaded: notesLoaded ?? this.notesLoaded,
+      changedLearningNotes:
+          changedLearningNotes ?? this.changedLearningNotes,
+      changedTeachingNotes:
+          changedTeachingNotes ?? this.changedTeachingNotes,
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,

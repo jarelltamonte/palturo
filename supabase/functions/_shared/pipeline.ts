@@ -205,5 +205,23 @@ export async function ensureFreshEmbeddings(
     cost += vectors.length * 0.00002; // rough estimate for instrumentation honesty
   }
 
+  // Healed vectors change candidate rankings. Invalidate cached decks that
+  // contain this user (and the user's own deck) so stale caches cannot keep
+  // them invisible until the next TTL.
+  const candidateCache = await admin
+    .from("match_cache")
+    .delete()
+    .in("candidate_id", userIds);
+  if (candidateCache.error) {
+    console.error(`[embeddings] cache invalidation (candidate): ${candidateCache.error.message}`);
+  }
+  const userCache = await admin
+    .from("match_cache")
+    .delete()
+    .in("user_id", userIds);
+  if (userCache.error) {
+    console.error(`[embeddings] cache invalidation (user): ${userCache.error.message}`);
+  }
+
   return { upserted: toUpsert.length, costEmbeddings: cost };
 }

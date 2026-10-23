@@ -41,6 +41,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   OnboardingRole? _role;
   late List<String> _learningSkillIds;
   late List<String> _teachingSkillIds;
+  late Map<String, String> _learningNotes;
+  late Map<String, String> _teachingNotes;
+  late Map<String, String> _initialLearningNotes;
+  late Map<String, String> _initialTeachingNotes;
+  final Set<String> _changedLearningNotes = {};
+  final Set<String> _changedTeachingNotes = {};
 
   static const _roleOptions = [
     RoleOption(
@@ -70,6 +76,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);
     _teachingSkillIds = List.from(widget.profile.teachingSkillIds);
+    _learningNotes = Map<String, String>.from(widget.profile.learningNotes);
+    _teachingNotes = Map<String, String>.from(widget.profile.teachingNotes);
+    _initialLearningNotes = Map<String, String>.from(
+      widget.profile.learningNotes,
+    );
+    _initialTeachingNotes = Map<String, String>.from(
+      widget.profile.teachingNotes,
+    );
     _photos = List.from(widget.profile.photos);
     _teachingSkillImages = Map<String, String>.from(
       widget.profile.teachingSkillImages,
@@ -132,6 +146,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (!listEquals(_teachingSkillIds, widget.profile.teachingSkillIds)) {
       return true;
     }
+    if (!mapEquals(_learningNotes, widget.profile.learningNotes)) return true;
+    if (!mapEquals(_teachingNotes, widget.profile.teachingNotes)) return true;
 
     final initialPhotos = widget.profile.photos;
     if (!listEquals(_photos, initialPhotos)) return true;
@@ -476,6 +492,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       photos: _photos,
       learningSkillIds: learningSkills,
       teachingSkillIds: teachingSkills,
+      learningNotes: _learningNotes,
+      teachingNotes: _teachingNotes,
+      changedLearningNotes: Set<String>.from(_changedLearningNotes),
+      changedTeachingNotes: Set<String>.from(_changedTeachingNotes),
     );
 
     setState(() => _isSaving = true);
@@ -678,10 +698,27 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           SkillsCard.toLearn(
                             isEditing: true,
                             initialSkillIds: _learningSkillIds,
+                            notes: _learningNotes,
                             onChanged:
                                 (updatedIds) => setState(
                                   () => _learningSkillIds = updatedIds,
                                 ),
+                            onNoteChanged: (id, note) {
+                              setState(() {
+                                if (note.trim().isEmpty) {
+                                  _learningNotes.remove(id);
+                                } else {
+                                  _learningNotes[id] = note;
+                                }
+                                final initial = _initialLearningNotes[id] ?? '';
+                                final current = _learningNotes[id] ?? '';
+                                if (current.trim() == initial.trim()) {
+                                  _changedLearningNotes.remove(id);
+                                } else {
+                                  _changedLearningNotes.add(id);
+                                }
+                              });
+                            },
                           ),
                           const SizedBox(height: 24),
                         ],
@@ -691,6 +728,23 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             isEditing: true,
                             initialSkillIds: _teachingSkillIds,
                             attachments: _teachingSkillImages,
+                            notes: _teachingNotes,
+                            onNoteChanged: (id, note) {
+                              setState(() {
+                                if (note.trim().isEmpty) {
+                                  _teachingNotes.remove(id);
+                                } else {
+                                  _teachingNotes[id] = note;
+                                }
+                                final initial = _initialTeachingNotes[id] ?? '';
+                                final current = _teachingNotes[id] ?? '';
+                                if (current.trim() == initial.trim()) {
+                                  _changedTeachingNotes.remove(id);
+                                } else {
+                                  _changedTeachingNotes.add(id);
+                                }
+                              });
+                            },
                             onChanged: (updatedIds) {
                               setState(() {
                                 final removed =

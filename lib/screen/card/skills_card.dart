@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
@@ -406,6 +407,10 @@ class _SkillsCardState extends State<SkillsCard> {
   @override
   void didUpdateWidget(covariant SkillsCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.isEditing && !mapEquals(oldWidget.notes, widget.notes)) {
+      _load();
+      return;
+    }
     if (oldWidget.initialSkillIds != widget.initialSkillIds) {
       final incoming = _committed(widget.initialSkillIds);
       final current = _committed(_skillIds);

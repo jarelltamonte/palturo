@@ -363,6 +363,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               SkillsCard.toLearn(
                                 isEditing: false,
                                 initialSkillIds: _profile!.learningSkillIds,
+                                notes: _profile!.learningNotes,
                               ),
                               const SizedBox(height: 24),
                             ],
@@ -371,6 +372,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               SkillsCard.toTeach(
                                 isEditing: false,
                                 initialSkillIds: _profile!.teachingSkillIds,
+                                notes: _profile!.teachingNotes,
                               ),
                           ],
                         ),

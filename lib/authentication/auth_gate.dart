@@ -19,6 +19,9 @@ class _AuthGateState extends State<AuthGate> {
   bool _isLoading = true;
   bool _isProfileCompleted = false;
   bool _hasSkipped = false;
+  bool _loadError = false;
+  int _evaluationId = 0;
+  String? _lastUserId;
 
   @override
   void initState() {
@@ -30,14 +33,18 @@ class _AuthGateState extends State<AuthGate> {
       data,
     ) async {
       if (data.session == null) {
-        await PreferencesService.instance.setBool('skipped_onboarding', false);
+        await _evaluateUserStatus(null);
+        try {
+          await PreferencesService.instance.setBool('skipped_onboarding', false);
+        } catch (_) {}
         if (mounted) {
           setState(() {
             _hasSkipped = false;
           });
         }
+      } else {
+        await _evaluateUserStatus(data.session);
       }
-      _evaluateUserStatus(data.session);
     });
   }
 
@@ -48,36 +55,57 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _evaluateUserStatus(Session? session) async {
+    final evaluation = ++_evaluationId;
+    final userId = session?.user.id;
+    final sameUser = userId != null && userId == _lastUserId;
     _session = session;
 
     if (session == null) {
-      if (mounted) {
+      _lastUserId = null;
+      if (mounted && evaluation == _evaluationId) {
         setState(() {
           _isLoading = false;
           _isProfileCompleted = false;
           _hasSkipped = false;
+          _loadError = false;
         });
       }
       return;
+    }
+
+    // Token refreshes for the same user must not unmount the app shell.
+    final showLoading = !sameUser || _loadError;
+    if (mounted && showLoading) {
+      setState(() {
+        _isLoading = true;
+        _loadError = false;
+      });
     }
 
     try {
       final metaCompleted =
           session.user.userMetadata?['is_profile_completed'] == true;
       if (metaCompleted) {
-        if (mounted) {
+        if (mounted && evaluation == _evaluationId) {
           setState(() {
             _isProfileCompleted = true;
             _isLoading = false;
             _hasSkipped = false;
+            _lastUserId = userId;
+            _loadError = false;
           });
         }
         return;
       }
 
-      final savedSkip =
-          await PreferencesService.instance.getBool('skipped_onboarding') ??
-          false;
+      var savedSkip = false;
+      try {
+        savedSkip =
+            await PreferencesService.instance.getBool('skipped_onboarding') ??
+            false;
+      } catch (_) {
+        // Preferences are optional; fall through to the profile query.
+      }
 
       final data = await Supabase.instance.client
           .from('profiles')
@@ -91,19 +119,25 @@ class _AuthGateState extends State<AuthGate> {
           ((data['has_completed_onboarding'] == true) ||
               (data['is_profile_completed'] == true));
 
-      if (mounted) {
+      if (mounted && evaluation == _evaluationId) {
         setState(() {
           _isProfileCompleted = completedOnboarding;
           _hasSkipped = savedSkip;
           _isLoading = false;
+          _lastUserId = userId;
+          _loadError = false;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isProfileCompleted = false;
-          _isLoading = false;
-        });
+      if (mounted && evaluation == _evaluationId) {
+        // A background refresh failure must not replace a working app.
+        if (showLoading || _lastUserId == null) {
+          setState(() {
+            _isProfileCompleted = false;
+            _isLoading = false;
+            _loadError = true;
+          });
+        }
       }
     }
   }
@@ -114,6 +148,48 @@ class _AuthGateState extends State<AuthGate> {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_loadError) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Couldn’t load your profile. Please try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _loadError = false;
+                    });
+                    _evaluateUserStatus(_session);
+                  },
+                  child: const Text('Retry'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await Supabase.instance.client.auth.signOut();
+                    } catch (_) {}
+                  },
+                  child: const Text('Sign out'),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 

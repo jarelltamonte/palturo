@@ -138,11 +138,13 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
     });
   }
 
-  late final StreamSubscription<AuthState> _authSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
   StreamSubscription<Uri>? _linkSubscription;
   final _appLinks = AppLinks();
 
   Uri? _latestDeepLink;
+  DateTime? _latestDeepLinkAt;
+  Uri? _lastHandledLink;
   WidgetBuilder? _pendingAuthScreen;
   int _authScreenRetry = 0;
 
@@ -181,12 +183,16 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
       Future.delayed(const Duration(seconds: 3), FlutterNativeSplash.remove);
     });
 
-    _appLinks.getInitialLink().then((uri) {
-      if (uri != null) _latestDeepLink = uri;
-    });
+    _initAuthAndLinks();
+  }
 
+  /// Subscribe to auth first, then read the launch link. If signedIn fires
+  /// before the link is known, the late-link handler consumes it.
+  Future<void> _initAuthAndLinks() async {
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       _latestDeepLink = uri;
+      _latestDeepLinkAt = DateTime.now();
+      _handleLateLink(uri);
     });
 
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
@@ -195,33 +201,39 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
         final session = data.session;
         final user = session?.user;
 
-        if (event == AuthChangeEvent.initialSession ||
-            event == AuthChangeEvent.signedOut) {
+        if (event == AuthChangeEvent.initialSession) {
+          return;
+        }
+        if (event == AuthChangeEvent.signedOut) {
+          _latestDeepLink = null;
+          _latestDeepLinkAt = null;
+          _lastHandledLink = null;
           return;
         }
 
         if (event == AuthChangeEvent.passwordRecovery) {
           _latestDeepLink = null;
+          _latestDeepLinkAt = null;
           _openAuthScreen((_) => const ForgotPasswordType());
           return;
         }
 
         if (event == AuthChangeEvent.signedIn ||
             event == AuthChangeEvent.userUpdated) {
-          final isSignupCallback =
-              _latestDeepLink != null &&
-              _latestDeepLink!.scheme == 'palturo' &&
-              _latestDeepLink!.host == 'auth' &&
-              _latestDeepLink!.path == '/callback';
+          if (_latestDeepLinkAt != null &&
+              DateTime.now().difference(_latestDeepLinkAt!) >
+                  const Duration(minutes: 2)) {
+            _latestDeepLink = null;
+            _latestDeepLinkAt = null;
+          }
 
-          if (isSignupCallback &&
+          if (_isAuthLink(_latestDeepLink, '/callback') &&
               user != null &&
               user.emailConfirmedAt != null) {
-            final isPasswordRecovery =
-                session?.user.appMetadata['recovery'] == true;
-            if (isPasswordRecovery) return;
-
+            final handled = _latestDeepLink;
             _latestDeepLink = null;
+            _latestDeepLinkAt = null;
+            _lastHandledLink = handled;
 
             _openAuthScreen(
               (_) => ScratchWidget(email: user.email, isConfirmedInitial: true),
@@ -231,35 +243,98 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
       },
       onError: (error) {
         if (error is AuthException) {
-          final isResetCallback =
-              _latestDeepLink != null &&
-              _latestDeepLink!.scheme == 'palturo' &&
-              _latestDeepLink!.host == 'auth' &&
-              _latestDeepLink!.path == '/reset-callback';
-
-          final isSignupCallback =
-              _latestDeepLink != null &&
-              _latestDeepLink!.scheme == 'palturo' &&
-              _latestDeepLink!.host == 'auth' &&
-              _latestDeepLink!.path == '/callback';
+          final isResetCallback = _isAuthLink(
+            _latestDeepLink,
+            '/reset-callback',
+          );
+          final isSignupCallback = _isAuthLink(_latestDeepLink, '/callback');
 
           if (isResetCallback) {
+            _latestDeepLink = null;
+            _latestDeepLinkAt = null;
             _openAuthScreen((_) => const ForgotPasswordExpired());
             return;
           }
 
           if (isSignupCallback) {
+            _latestDeepLink = null;
+            _latestDeepLinkAt = null;
             _openAuthScreen((_) => const EmailConfirmationExpired());
           }
         }
       },
     );
+
+    _appLinks
+        .getInitialLink()
+        .then((uri) {
+          if (!mounted || uri == null) return;
+          _latestDeepLink = uri;
+          _latestDeepLinkAt = DateTime.now();
+          _handleLateLink(uri);
+        })
+        .catchError((_) {});
+  }
+
+  bool _isAuthLink(Uri? uri, String path) {
+    if (uri == null ||
+        uri.scheme != 'palturo' ||
+        uri.host != 'auth' ||
+        uri.path != path) {
+      return false;
+    }
+    final q = uri.queryParameters;
+    final fragment = uri.fragment;
+    return q.containsKey('code') ||
+        q.containsKey('token_hash') ||
+        q.containsKey('access_token') ||
+        q.containsKey('error') ||
+        fragment.contains('access_token=') ||
+        fragment.contains('error=');
+  }
+
+  /// A link can arrive after signedIn (cold start race); route it once.
+  void _handleLateLink(Uri uri) {
+    final isCallback = _isAuthLink(uri, '/callback');
+    final isReset = _isAuthLink(uri, '/reset-callback');
+    if (!isCallback && !isReset) return;
+    if (_lastHandledLink == uri) return;
+
+    if (uri.queryParameters.containsKey('error')) {
+      _lastHandledLink = uri;
+      _latestDeepLink = null;
+      _latestDeepLinkAt = null;
+      _openAuthScreen(
+        (_) => isReset
+            ? const ForgotPasswordExpired()
+            : const EmailConfirmationExpired(),
+      );
+      return;
+    }
+
+    final session = Supabase.instance.client.auth.currentSession;
+    if (isCallback && session?.user.emailConfirmedAt != null) {
+      _lastHandledLink = uri;
+      _latestDeepLink = null;
+      _latestDeepLinkAt = null;
+      _openAuthScreen(
+        (_) => ScratchWidget(
+          email: session!.user.email,
+          isConfirmedInitial: true,
+        ),
+      );
+    } else if (isReset && session != null) {
+      _lastHandledLink = uri;
+      _latestDeepLink = null;
+      _latestDeepLinkAt = null;
+      _openAuthScreen((_) => const ForgotPasswordType());
+    }
   }
 
   @override
   void dispose() {
     _linkSubscription?.cancel();
-    _authSubscription.cancel();
+    _authSubscription?.cancel();
     super.dispose();
   }
 

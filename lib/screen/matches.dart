@@ -243,8 +243,16 @@ class _MatchesState extends State<Matches> {
 
   Future<void> _blockPal(MatchedUser pal) async {
     if (!mounted) return;
+
+    final target = pal.otherUserId;
+    if (target == null || target.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This profile is unavailable right now.')),
+      );
+      return;
+    }
+
     try {
-      final target = pal.otherUserId ?? pal.id;
       await MatchApi.blockUser(target);
     } catch (e) {
       if (!mounted) return;
@@ -262,8 +270,17 @@ class _MatchesState extends State<Matches> {
 
   Future<void> _reportPal(MatchedUser pal, String reason) async {
     if (!mounted) return;
+
+    final target = pal.otherUserId;
+    if (target == null || target.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This profile is unavailable right now.')),
+      );
+      return;
+    }
+
     try {
-      await MatchApi.reportUser(pal.otherUserId ?? pal.id, reason);
+      await MatchApi.reportUser(target, reason);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thanks for your report.')),

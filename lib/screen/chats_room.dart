@@ -34,6 +34,11 @@ class ChatRoom extends StatefulWidget {
 }
 
 class _ChatRoomState extends State<ChatRoom> {
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+    r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -154,9 +159,19 @@ class _ChatRoomState extends State<ChatRoom> {
     messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _showPeerUnavailable() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This profile is unavailable right now.')),
+    );
+  }
+
   Future<void> _block() async {
-    final target =
-        widget.person?.id ?? widget.connectionId ?? widget.name;
+    final target = widget.person?.id;
+    if (target == null || !_uuidPattern.hasMatch(target)) {
+      _showPeerUnavailable();
+      return;
+    }
     try {
       await MatchApi.blockUser(target);
     } catch (e) {
@@ -170,8 +185,11 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   Future<void> _report(String reason) async {
-    final target =
-        widget.person?.id ?? widget.connectionId ?? widget.name;
+    final target = widget.person?.id;
+    if (target == null || !_uuidPattern.hasMatch(target)) {
+      _showPeerUnavailable();
+      return;
+    }
     try {
       await MatchApi.reportUser(target, reason);
       if (!mounted) return;
@@ -200,6 +218,12 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Future<void> _handleMenuAction(String action) async {
     FocusScope.of(context).unfocus();
+
+    final peerId = widget.person?.id;
+    if (peerId == null || !_uuidPattern.hasMatch(peerId)) {
+      _showPeerUnavailable();
+      return;
+    }
 
     if (action == 'report') {
       final reason = await showReportReasonDialog(

@@ -65,7 +65,7 @@ class ConnectionRequest {
 
   Person toPerson() {
     return Person(
-      id: id,
+      id: requesterId.isNotEmpty ? requesterId : id,
       name: requesterName,
       schedule: schedule,
       language: language,

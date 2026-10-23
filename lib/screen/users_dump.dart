@@ -62,7 +62,9 @@ class MatchedUser {
 
   Person toPerson() {
     return Person(
-      id: 'dump_$id',
+      id: (otherUserId != null && otherUserId!.isNotEmpty)
+          ? otherUserId!
+          : id,
       name: name,
       schedule: schedule,
       language: language,

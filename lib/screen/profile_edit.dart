@@ -434,7 +434,18 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       return;
     }
 
-    final allSelectedSkills = [..._learningSkillIds, ..._teachingSkillIds];
+    // Only persist the skills that are visible for the selected role. A user
+    // who switches Both -> Learn must not keep hidden teaching skills (and
+    // vice versa). A null role keeps both to avoid wiping legacy data.
+    final wantsLearning = _role != OnboardingRole.teach;
+    final wantsTeaching = _role != OnboardingRole.learn;
+
+    final learningSkills = wantsLearning ? _learningSkillIds : <String>[];
+    final teachingSkills = wantsTeaching ? _teachingSkillIds : <String>[];
+    final teachingSkillImages =
+        wantsTeaching ? _teachingSkillImages : <String, String>{};
+
+    final allSelectedSkills = [...learningSkills, ...teachingSkills];
     for (final skill in allSelectedSkills) {
       final lower = skill.trim().toLowerCase();
       if (lower == 'other' || lower == 'others') {
@@ -463,8 +474,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       interests: _learningStyles,
       role: _role,
       photos: _photos,
-      learningSkillIds: _learningSkillIds,
-      teachingSkillIds: _teachingSkillIds,
+      learningSkillIds: learningSkills,
+      teachingSkillIds: teachingSkills,
     );
 
     setState(() => _isSaving = true);
@@ -473,7 +484,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       final savedProfile = await _profileService.updateProfile(
         updated,
         newPhotoLocalPaths: _photos,
-        teachingSkillImages: _teachingSkillImages,
+        teachingSkillImages: teachingSkillImages,
       );
       if (mounted) Navigator.pop(context, savedProfile);
     } catch (e) {

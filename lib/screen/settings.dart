@@ -7,6 +7,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:palturo/screen/block_list.dart';
 
 final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
@@ -27,6 +28,7 @@ class _SettingsState extends State<Settings> {
   bool _isLoggingOut = false;
   bool _isDeleting = false;
   bool _userChangedSettings = false;
+  String _version = '…';
 
   static const _notificationsKey = 'notifications_enabled';
   static const _soundKey = 'sound_enabled';
@@ -62,6 +64,21 @@ class _SettingsState extends State<Settings> {
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      final build = info.buildNumber.trim();
+      setState(() {
+        _version = build.isEmpty ? info.version : '${info.version}+$build';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _version = 'unknown');
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -967,7 +984,7 @@ class _SettingsState extends State<Settings> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Version 1.0.0',
+                      'Version $_version',
                       style: AppTextStyles.regularText.copyWith(
                         color: textTheme.withValues(alpha: 0.5),
                         fontSize: 12,

@@ -1,7 +1,10 @@
 project_id = "palturo"
 
 [auth]
-enable_confirmations = false
+additional_redirect_urls = ["palturo://auth/callback", "palturo://auth/reset-callback"]
+
+[auth.email]
+enable_confirmations = true
 
 [functions.moderate-notes]
 verify_jwt = false

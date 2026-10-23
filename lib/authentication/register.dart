@@ -294,7 +294,7 @@ class _RegisterPageState extends State<RegisterPage> {
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
                 child: Text(
-                  'Set Up Account',
+                  'Go to Log In',
                   style: AppTextStyles.boldText.copyWith(
                     color: AppColors.primary,
                   ),

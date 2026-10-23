@@ -88,7 +88,7 @@ class AuthService {
 
       if (user.emailConfirmedAt == null) {
         await _supabase.auth.signOut();
-        throw Exception('Please confirm your email before logging in.');
+        throw Exception('Invalid Email or Password');
       }
 
       return response;
@@ -180,19 +180,24 @@ class AuthService {
         return AuthRegisterResult.neutral();
       }
 
-      // With autoconfirm enabled (current beta config) signUp returns a
-      // session; keep the existing auto-login flow. When confirmation is
-      // enabled (B3/SMTP), return the neutral check-email result.
+      // With confirmation enabled signUp has no session and returns neutral.
+      // If autoconfirm is ever re-enabled, still avoid auto-login/enumeration.
       if (response.session != null) {
-        return AuthRegisterResult.success(response);
+        try {
+          await _supabase.auth.signOut();
+        } catch (_) {}
       }
       return AuthRegisterResult.neutral();
     } on AuthException catch (e) {
       if (e.code == 'user_already_exists') {
         return AuthRegisterResult.neutral();
       }
-      if (e.code == 'over_request_rate_limit' ||
-          e.code == 'over_email_send_rate_limit') {
+      if (e.code == 'over_email_send_rate_limit') {
+        // A new signup sends mail; an existing one does not. Never expose that
+        // difference through a distinct failure.
+        return AuthRegisterResult.neutral();
+      }
+      if (e.code == 'over_request_rate_limit') {
         _rateLimitCooldownUntil =
             DateTime.now().add(const Duration(seconds: 30));
       }
@@ -310,9 +315,9 @@ class AuthService {
       );
     } on AuthException catch (e) {
       if (e.code == 'over_email_send_rate_limit') {
-        throw Exception(
-          'Too many password reset requests. Please try again later.',
-        );
+        // Do not reveal whether this address exists by distinguishing a
+        // rate-limited existing address from a nonexistent one.
+        return;
       }
       throw Exception('Could not send a reset link. Please try again.');
     } catch (_) {

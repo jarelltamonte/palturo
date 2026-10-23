@@ -18,9 +18,11 @@ class Person {
   final PersonRole role;
   final String bio;
   final List<String?> photoUrls;
+
   /// FR-5 short-form showcase media (image/video thumbnails) — shown first on
   /// the card per spec §6.3 recommendation card.
   final List<String?> showcaseUrls;
+
   /// Reciprocal compatibility (0..1) from the pipeline — spec §6.3 indicator.
   final double? compatibility;
 
@@ -39,10 +41,7 @@ class Person {
   });
 
   /// Card page media: showcase content first, profile photos after.
-  List<String?> get cardMedia => [
-        ...showcaseUrls,
-        ...photoUrls,
-      ];
+  List<String?> get cardMedia => [...showcaseUrls, ...photoUrls];
 }
 
 class PersonCardOverlay extends StatefulWidget {
@@ -86,11 +85,21 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       _photoIndex = 0;
       _bioExpanded = false;
     }
+
+    // Showcase pages can change for the same person (e.g. after an edit).
+    // Keep the index inside the current media list instead of showing a
+    // blank page with no selected dot.
+    final total = widget.person.cardMedia.length;
+    if (total == 0) {
+      _photoIndex = 0;
+    } else if (_photoIndex >= total) {
+      _photoIndex = total - 1;
+    }
   }
 
   void _nextPhoto() {
-    final total = widget.person.photoUrls.length;
-    if (_photoIndex < total - 1) {
+    final total = widget.person.cardMedia.length;
+    if (total > 0 && _photoIndex < total - 1) {
       setState(() => _photoIndex++);
     }
   }
@@ -122,6 +131,12 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         final overflows = painter.didExceedMaxLines;
         painter.dispose();
 
+        // Expanded bios used to grow without a bound and could overflow the
+        // card on short screens or large text scales. Cap the expanded area
+        // and let long text scroll instead.
+        final maxExpandedHeight = (MediaQuery.sizeOf(context).height * 0.16)
+            .clamp(72.0, 140.0);
+
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap:
@@ -142,15 +157,23 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
                   alignment: Alignment.topLeft,
-                  child: Text(
-                    bio,
-                    maxLines: _bioExpanded ? null : 2,
-                    overflow:
-                        _bioExpanded
-                            ? TextOverflow.visible
-                            : TextOverflow.ellipsis,
-                    style: style,
-                  ),
+                  child:
+                      _bioExpanded
+                          ? ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: maxExpandedHeight,
+                            ),
+                            child: SingleChildScrollView(
+                              physics: const ClampingScrollPhysics(),
+                              child: Text(bio, style: style),
+                            ),
+                          )
+                          : Text(
+                            bio,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: style,
+                          ),
                 ),
               ),
             ],
@@ -197,37 +220,43 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         fit: StackFit.expand,
         children: [
           currentPhoto != null
-              ? Image.network(currentPhoto,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: Colors.grey[400]))
+              ? Image.network(
+                currentPhoto,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (_, __, ___) => Container(color: Colors.grey[400]),
+              )
               : Container(color: Colors.grey[400]),
           Row(
             children: [
               Expanded(
                 child: GestureDetector(
+                  key: const ValueKey('card-previous'),
                   behavior: HitTestBehavior.translucent,
                   onTap: _previousPhoto,
                 ),
               ),
               Expanded(
                 child: GestureDetector(
+                  key: const ValueKey('card-next'),
                   behavior: HitTestBehavior.translucent,
                   onTap: _nextPhoto,
                 ),
               ),
             ],
           ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.85),
-                ],
-                stops: const [0.35, 1.0],
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.85),
+                  ],
+                  stops: const [0.35, 1.0],
+                ),
               ),
             ),
           ),
@@ -499,6 +528,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               children: [
                 for (int i = 0; i < photoUrls.length; i++) ...[
                   GestureDetector(
+                    key: ValueKey('card-dot-$i'),
                     onTap: () => setState(() => _photoIndex = i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),

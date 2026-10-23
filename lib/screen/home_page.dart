@@ -54,6 +54,8 @@ class _HomePageState extends State<HomePage> {
   int _undoToken = 0;
   bool _openingEditor = false;
   bool _actionInFlight = false;
+  bool _discovering = false;
+  int _deckGeneration = 0;
 
   @override
   void initState() {
@@ -63,17 +65,19 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadDeck({bool force = false}) async {
     final cached = MatchApi.hasCachedDeck(_roleKey);
+    final generation = ++_deckGeneration;
 
     setState(() {
       _loading = !cached && _people.isEmpty;
       _error = null;
+      _discovering = false;
     });
 
     try {
       final deck = await _fetchDeck(force: force);
       debugPrint('[People] deck loaded: ${deck.length} people');
 
-      if (!mounted) return;
+      if (!mounted || generation != _deckGeneration) return;
 
       setState(() {
         _people = deck;
@@ -86,7 +90,7 @@ class _HomePageState extends State<HomePage> {
     } catch (e, st) {
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
 
-      if (!mounted) return;
+      if (!mounted || generation != _deckGeneration) return;
 
       setState(() {
         _error = e.toString();
@@ -293,6 +297,50 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _discoverRandom() async {
+    if (_discovering) return;
+
+    final generation = _deckGeneration;
+    setState(() => _discovering = true);
+
+    try {
+      final people = await MatchApi.getRandomDeck(limit: 20, role: _roleKey);
+
+      if (!mounted || generation != _deckGeneration) return;
+
+      final seen = _people.map((person) => person.id).toSet();
+      final fresh = people.where((person) => seen.add(person.id)).toList();
+
+      if (fresh.isEmpty) {
+        setState(() => _discovering = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No more people to discover right now.'),
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        final start = _people.length;
+        _people = [..._people, ...fresh];
+        _currentIndex = start;
+        _undoActive = false;
+        _discovering = false;
+      });
+    } catch (e) {
+      debugPrint('[People] _discoverRandom ERROR: $e');
+      if (!mounted || generation != _deckGeneration) return;
+
+      setState(() => _discovering = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t find more people. Please try again.'),
+        ),
+      );
+    }
+  }
+
   Future<void> _confirmBlock(Person person) async {
     if (_actionInFlight) return;
 
@@ -495,46 +543,85 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyState(Color textColor) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Lottie.asset(
-              'assets/lottie/empty.json',
-              width: 220,
-              height: 220,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You have seen all the top results',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(
-                color: textColor.withValues(alpha: 0.7),
+    return LayoutBuilder(
+      builder:
+          (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight:
+                    (constraints.maxHeight - 48)
+                        .clamp(0.0, double.infinity)
+                        .toDouble(),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text.rich(
-              TextSpan(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const TextSpan(text: 'Update your '),
-                  TextSpan(
-                    text: 'settings',
-                    recognizer: _settingsTap,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  Lottie.asset(
+                    'assets/lottie/empty.json',
+                    width: 220,
+                    height: 220,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You have seen all the top results',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textColor.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _discovering ? null : _discoverRandom,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.black,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                    ),
+                    icon:
+                        _discovering
+                            ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.black,
+                              ),
+                            )
+                            : const Icon(Icons.explore),
+                    label: Text(
+                      _discovering ? 'Finding people…' : 'Discover more',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: 'Update your '),
+                        TextSpan(
+                          text: 'settings',
+                          recognizer: _settingsTap,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textColor.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
-                style: AppTextStyles.regularText.copyWith(
-                  color: textColor.withValues(alpha: 0.7),
-                ),
               ),
-              textAlign: TextAlign.center,
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 }

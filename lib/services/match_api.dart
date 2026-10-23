@@ -340,19 +340,48 @@ class MatchApi {
   }
 
   /// Random users after the deck is exhausted (FR-13 discovery).
-  static Future<List<Person>> getRandomDeck({int limit = 20}) async {
+  ///
+  /// [role] filters on the raw DB role before enrichment, so `both` users are
+  /// eligible for either side. The RPC is sampled with extra headroom because
+  /// it has no role parameter; only the first [limit] matches are enriched.
+  static Future<List<Person>> getRandomDeck({
+    int limit = 20,
+    String? role,
+  }) async {
+    final sampleSize =
+        role == null ? limit : (limit * 10).clamp(0, 200).toInt();
     final res = await _Client.c.rpc('browse_random_users',
-        params: {'p_limit': limit}) as List;
+        params: {'p_limit': sampleSize}) as List;
+
+    final seen = <String>{};
     final ids = res
         .whereType<Map>()
+        .where((r) {
+          if (role == null) return true;
+          final rawRole = r['role'] as String?;
+          return rawRole == null || rawRole == role || rawRole == 'both';
+        })
         .map((r) => r['user_id'] as String)
+        .where(seen.add)
+        .take(limit)
         .toList();
-    final out = <Person>[];
-    for (final id in ids) {
-      final person = await getPersonFromPublicProfile(id);
-      if (person != null) {
-        out.add(person);
-      }
+
+    // Enrich concurrently; one missing/deleted profile must not discard the
+    // rest of the batch.
+    final people = await Future.wait(
+      ids.map((id) async {
+        try {
+          return await getPersonFromPublicProfile(id);
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    final out = people.whereType<Person>().toList();
+    if (out.length < ids.length) {
+      debugPrint(
+        '[MatchApi] random discovery enriched ${out.length}/${ids.length}',
+      );
     }
     return out;
   }

@@ -49,7 +49,6 @@ class Validators {
   );
   static final RegExp _consecutiveWhitespaceRegExp = RegExp(r'\s+');
   static final RegExp _unicodeLetterRegExp = RegExp(r'[\p{L}]', unicode: true);
-  static final RegExp _uppercaseLetterRegExp = RegExp(r'^\p{Lu}', unicode: true);
 
   /// Deny whitespace inside email addresses.
   static final TextInputFormatter emailDenyWhitespaceFormatter =
@@ -203,14 +202,8 @@ class Validators {
       return 'Please enter a valid $fieldLabel';
     }
 
-    // Check if each word starts with a capital letter
-    final words = trimmed.split(' ');
-    for (final word in words) {
-      if (word.isNotEmpty && !_uppercaseLetterRegExp.hasMatch(word)) {
-        return '$fieldLabel must start with a capital letter';
-      }
-    }
-
+    // Casing is normalized by sanitizeName(); do not reject lowercase
+    // particles ("van der Berg") or non-cased scripts here.
     return null;
   }
 }

@@ -63,10 +63,14 @@ class AuthService {
     }
 
     try {
-      final response = await _supabase.auth.signInWithPassword(
-        email: cleanEmail,
-        password: password,
-      );
+      final response = await _supabase.auth
+          .signInWithPassword(email: cleanEmail, password: password)
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception(
+              'Sign in timed out. Please check your connection.',
+            ),
+          );
 
       final user = response.user;
 

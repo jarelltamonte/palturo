@@ -137,14 +137,20 @@ class _MatchesState extends State<Matches> {
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     final Map<String, List<MatchedUser>> grouped = {};
     for (final pal in sorted) {
-      final letter = pal.name[0].toUpperCase();
+      final name = pal.name.trim();
+      final letter = name.isEmpty ? '#' : name[0].toUpperCase();
       grouped.putIfAbsent(letter, () => []).add(pal);
     }
     return grouped;
   }
 
   String _initials(String name) {
-    final parts = name.trim().split(' ');
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first[0].toUpperCase();
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }

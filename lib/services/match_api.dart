@@ -145,6 +145,13 @@ class RequestLite {
 }
 
 class MatchApi {
+  /// Backend rows may have a missing display name; never let an empty string
+  /// reach list widgets that index `name[0]`.
+  static String _displayName(dynamic value) {
+    final name = (value ?? '').toString().trim();
+    return name.isEmpty ? 'Community member' : name;
+  }
+
   /// Edge Function: full recommendation pipeline.
   /// [asRole] = the role we want to find ('mentor' from a learner, etc).
   /// Returns ranked MatchLite list. Throws on hard failure (caller shows UI error).
@@ -176,7 +183,7 @@ class MatchApi {
         .map((r) => MatchLite(
               userId: r['user_id'] as String,
               rank: (r['rank'] as num?)?.toInt() ?? 0,
-              displayName: (r['display_name'] ?? '') as String,
+              displayName: _displayName(r['display_name']),
               role: (r['role'] ?? 'both') as String,
               compatibility: (r['compatibility'] as num?)?.toDouble() ?? 0.0,
               pipeline: (r['pipeline'] ?? 'full') as String,
@@ -378,7 +385,7 @@ class MatchApi {
               connectionId: r['connection_id'] as String,
               status: (r['status'] ?? 'pending') as String,
               otherUserId: (r['other_user_id'] ?? '') as String,
-              otherName: (r['other_name'] ?? '') as String,
+              otherName: _displayName(r['other_name']),
               otherRole: (r['other_role'] ?? 'both') as String,
               lastMessage: r['last_message'] as String?,
               lastAt: DateTime.tryParse(r['last_at']?.toString() ?? ''),
@@ -456,7 +463,7 @@ class MatchApi {
       return RequestLite(
         connectionId: r['connection_id'] as String,
         requesterId: r['requester_id'] as String,
-        requesterName: (r['requester_name'] ?? '') as String,
+        requesterName: _displayName(r['requester_name']),
         avatarUrl: r['avatar_url'] as String?,
         skills: skills,
         createdAt: DateTime.tryParse(r['created_at']?.toString() ?? '') ??
@@ -527,7 +534,7 @@ class MatchApi {
       final role = (r['role'] ?? 'both') as String;
       return Person(
         id: r['user_id'] as String,
-        name: (r['name'] ?? '') as String,
+        name: _displayName(r['name']),
         schedule: '',
         language: '',
         learningStyle: '',

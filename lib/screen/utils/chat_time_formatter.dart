@@ -38,13 +38,13 @@ class ChatTimeFormatter {
   /// - Yesterday -> "Yesterday"
   /// - Within last 7 days -> Day of week (e.g. "Mon")
   /// - Older -> "Oct 12" (or "Oct 12, 2025" if different year)
-  static String formatChatListTime(DateTime? dateTime) {
+  static String formatChatListTime(DateTime? dateTime, {DateTime? now}) {
     if (dateTime == null) return '';
 
     final local = dateTime.toLocal();
-    final now = DateTime.now();
+    final current = now ?? DateTime.now();
 
-    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final todayMidnight = DateTime(current.year, current.month, current.day);
     final targetMidnight = DateTime(local.year, local.month, local.day);
     final diffDays = todayMidnight.difference(targetMidnight).inDays;
 
@@ -55,7 +55,7 @@ class ChatTimeFormatter {
     } else if (diffDays > 1 && diffDays < 7) {
       return _shortWeekdays[local.weekday - 1];
     } else {
-      if (local.year == now.year) {
+      if (local.year == current.year) {
         return '${_shortMonths[local.month - 1]} ${local.day}';
       } else {
         return '${_shortMonths[local.month - 1]} ${local.day}, ${local.year}';
@@ -64,11 +64,11 @@ class ChatTimeFormatter {
   }
 
   /// Messenger-style centered session header (e.g. "Today 9:41 PM", "Yesterday 3:15 PM", "Mon 10:20 AM", "Oct 12, 9:41 PM")
-  static String formatMessengerHeader(DateTime dateTime) {
+  static String formatMessengerHeader(DateTime dateTime, {DateTime? now}) {
     final local = dateTime.toLocal();
-    final now = DateTime.now();
+    final current = now ?? DateTime.now();
 
-    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final todayMidnight = DateTime(current.year, current.month, current.day);
     final targetMidnight = DateTime(local.year, local.month, local.day);
     final diffDays = todayMidnight.difference(targetMidnight).inDays;
     final timeStr = formatTimeOnly(local);
@@ -80,7 +80,7 @@ class ChatTimeFormatter {
     } else if (diffDays > 1 && diffDays < 7) {
       return '${_shortWeekdays[local.weekday - 1]} $timeStr';
     } else {
-      if (local.year == now.year) {
+      if (local.year == current.year) {
         return '${_shortMonths[local.month - 1]} ${local.day}, $timeStr';
       } else {
         return '${_shortMonths[local.month - 1]} ${local.day}, ${local.year}, $timeStr';

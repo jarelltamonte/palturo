@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
@@ -27,7 +28,8 @@ class ExploreExpand extends StatefulWidget {
   State<ExploreExpand> createState() => _ExploreExpandState();
 }
 
-class _ExploreExpandState extends State<ExploreExpand> {
+class _ExploreExpandState extends State<ExploreExpand>
+    with SingleTickerProviderStateMixin {
   List<Person> _people = const [];
   bool _loading = true;
   String? _error;
@@ -35,6 +37,30 @@ class _ExploreExpandState extends State<ExploreExpand> {
   int _currentIndex = 0;
   final List<int> _history = [];
   bool _actionInFlight = false;
+  bool? _exitRight;
+
+  late final AnimationController _exitController = AnimationController(
+    vsync: this,
+    duration: AppMotion.exit,
+  );
+
+  @override
+  void dispose() {
+    _exitController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _animateAdvance(Person person, {bool right = false}) async {
+    if (_exitController.isAnimating) return;
+    if (_currentIndex < 0 || _currentIndex >= _people.length) return;
+    if (_people[_currentIndex].id != person.id) return;
+
+    _exitRight = right;
+    await _exitController.forward(from: 0);
+    if (!mounted) return;
+    _advanceFrom(person);
+    _exitController.reset();
+  }
 
   @override
   void initState() {
@@ -113,7 +139,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connection request sent to ${person.name}')),
       );
-      _advanceFrom(person);
+      await _animateAdvance(person, right: true);
     } catch (e) {
       if (!mounted) return;
 
@@ -147,7 +173,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
-      _advanceFrom(person);
+      await _animateAdvance(person);
     } catch (e) {
       if (!mounted) return;
 
@@ -175,7 +201,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
-      _advanceFrom(person);
+      await _animateAdvance(person);
     } catch (e) {
       if (!mounted) return;
 
@@ -231,7 +257,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
   }
 
   Widget _buildDeckCard(Person person) {
-    return Dismissible(
+    final card = Dismissible(
       key: ValueKey(person.id),
       direction: DismissDirection.horizontal,
       background: _swipeBackground(
@@ -248,10 +274,38 @@ class _ExploreExpandState extends State<ExploreExpand> {
       child: PersonCardOverlay(
         person: person,
         onAdd: () => _confirmAdd(person),
-        onSkip: () => _advanceFrom(person),
+        onSkip: () => _animateAdvance(person),
         onBlock: () => _confirmBlock(person),
         onReport: () => _confirmReport(person),
       ),
+    );
+
+    return AnimatedBuilder(
+      animation: _exitController,
+      child: card,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(_exitController.value);
+        if (progress == 0) return child!;
+        final cardWidth = MediaQuery.sizeOf(context).width - 32;
+        final screenHeight = MediaQuery.sizeOf(context).height;
+        final direction = _exitRight == true ? 1.0 : -1.0;
+        return IgnorePointer(
+          ignoring: true,
+          child: Opacity(
+            opacity: 1 - progress,
+            child: Transform.translate(
+              offset: Offset(
+                direction * cardWidth * 1.1 * progress,
+                screenHeight * 0.35 * progress,
+              ),
+              child: Transform.rotate(
+                angle: direction * 0.22 * progress,
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

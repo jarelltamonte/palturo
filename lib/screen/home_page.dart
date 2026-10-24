@@ -56,6 +56,7 @@ class _HomePageState extends State<HomePage> {
   bool _actionInFlight = false;
   bool _discovering = false;
   int _deckGeneration = 0;
+  final GlobalKey<_SwipeableCardState> _swipeKey = GlobalKey();
 
   @override
   void initState() {
@@ -136,7 +137,7 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connection request sent to ${person.name}')),
       );
-      _advanceFrom(person, right: true);
+      _dismissCard(person, right: true);
     } catch (e) {
       if (!mounted) return;
 
@@ -244,6 +245,19 @@ class _HomePageState extends State<HomePage> {
     _next(right: right);
   }
 
+  void _dismissCard(Person person, {bool right = false}) {
+    final people = _filteredPeople;
+    if (_currentIndex < 0 || _currentIndex >= people.length) return;
+    if (people[_currentIndex].id != person.id) return;
+
+    final state = _swipeKey.currentState;
+    if (state == null || state.widget.personId != person.id) {
+      _advanceFrom(person, right: right);
+      return;
+    }
+    state.dismiss(right: right);
+  }
+
   void _undo() {
     if (_history.isEmpty) return;
 
@@ -284,12 +298,13 @@ class _HomePageState extends State<HomePage> {
   Widget _buildDeckCard(Person person) {
     return _wrapUndo(
       _SwipeableCard(
-        key: ValueKey(person.id),
+        key: _swipeKey,
+        personId: person.id,
         onSwiped: (right) => _advanceFrom(person, right: right),
         child: PersonCardOverlay(
           person: person,
           onAdd: () => _confirmAdd(person),
-          onSkip: () => _advanceFrom(person),
+          onSkip: () => _dismissCard(person),
           onBlock: () => _confirmBlock(person),
           onReport: () => _confirmReport(person),
         ),
@@ -363,7 +378,7 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
-      _advanceFrom(person);
+      _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
 
@@ -391,7 +406,7 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
-      _advanceFrom(person);
+      _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
 
@@ -640,11 +655,13 @@ class _HomePageState extends State<HomePage> {
 }
 
 class _SwipeableCard extends StatefulWidget {
+  final String personId;
   final Widget child;
   final ValueChanged<bool> onSwiped;
 
   const _SwipeableCard({
     super.key,
+    required this.personId,
     required this.child,
     required this.onSwiped,
   });
@@ -668,6 +685,27 @@ class _SwipeableCardState extends State<_SwipeableCard>
   double _to = 0;
   double _width = 1;
   bool _exiting = false;
+
+  @override
+  void didUpdateWidget(covariant _SwipeableCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.personId != widget.personId) {
+      _controller.stop();
+      _dx = 0;
+      _from = 0;
+      _to = 0;
+      _exiting = false;
+    }
+  }
+
+  void dismiss({bool right = false}) {
+    if (_exiting) return;
+    _exiting = true;
+    _animateTo(
+      (right ? 1 : -1) * _width * _exitFactor,
+      onDone: () => widget.onSwiped(right),
+    );
+  }
 
   @override
   void dispose() {

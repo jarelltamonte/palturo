@@ -15,7 +15,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 4. [x] P0-02 Startup delay
 5. [x] P0-05 Semantics and tap targets
 6. [x] P1-02 Navigation icons, SafeArea, motion
-7. [ ] P1-01 Branding, splash, metadata
+7. [x] P1-01 Branding, splash, metadata
 8. [ ] P1-03 Settings header, footer, switches
 9. [ ] P1-04 Profile role badge
 10. [ ] P1-05 Request chevron
@@ -43,3 +43,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P0-02 | PASS | PASS | PASS | Native splash removed on first frame; root gate 200ms; landing 600ms; total ~0.8s, deep-link guards intact. |
 | P0-05 | PASS | PASS | PASS | Named 44px icon actions, pager zones, skills/photo controls, dialogs; 20px dots with >10 counter; nav semantics activate. |
 | P1-02 | PASS | PASS | PASS | People/Requests glyphs corrected, SafeArea bottom gap, 180ms scale press, 12px labels, semantics intact. |
+| P1-01 | PASS | PASS | PASS | Removed DRAFTR, regenerated splash with white dark branding, capped web splash, updated metadata/manifest, documented regeneration. |

@@ -16,22 +16,27 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="PalTuro - exchange skills, not fees.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="palturo">
+  <meta name="apple-mobile-web-app-title" content="PalTuro">
+  <meta name="theme-color" content="#262626">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png">
 
-  <title>palturo</title>
+  <title>PalTuro</title>
   <link rel="manifest" href="manifest.json">
   
   
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+  
+  
+  
+  
   
   
   
@@ -55,14 +60,19 @@
       margin: 0;
       min-height: 100%;
       background-color: #FFFFFF;
-          background-size: 100% 100%;
+
     }
 
+    /* Palturo: keep the square mark and wordmark inside the viewport. */
     .center {
       margin: 0;
       position: absolute;
       top: 50%;
       left: 50%;
+      max-width: min(55vw, 260px);
+      max-height: 55vh;
+      width: auto;
+      height: auto;
       -ms-transform: translate(-50%, -50%);
       transform: translate(-50%, -50%);
     }
@@ -84,10 +94,13 @@
       object-fit: cover;
     }
 
+    /* Palturo: splash wordmark, not the old full-width branding. */
     .bottom {
       position: absolute;
-      bottom: 0;
+      bottom: 24px;
       left: 50%;
+      width: min(42vw, 220px);
+      height: auto;
       -ms-transform: translate(-50%, 0);
       transform: translate(-50%, 0);
     }
@@ -129,6 +142,10 @@
       <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
       <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
   </picture>
+  
+  
+  
+  
   
   
   

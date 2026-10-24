@@ -296,7 +296,14 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              Center(child: Image.asset('assets/images/brand.png', width: 145)),
+              Center(
+                child: Image.asset(
+                  isDarkMode
+                      ? 'assets/images/hlogo_white.png'
+                      : 'assets/images/hlogo_black.png',
+                  width: 132,
+                ),
+              ),
             ],
           ),
         ),

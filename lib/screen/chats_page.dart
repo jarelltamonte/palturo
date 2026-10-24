@@ -245,11 +245,11 @@ class _ChatsPageState extends State<ChatsPage> {
 
   Widget _buildSearchField(Color textTheme, Color primaryColor) {
     return Container(
-      height: 40,
+      height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: textTheme.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
         children: [
@@ -279,15 +279,26 @@ class _ChatsPageState extends State<ChatsPage> {
             ),
           ),
           if (_query.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                _searchController.clear();
-                setState(() => _query = '');
-              },
-              child: Icon(
-                Icons.cancel,
-                size: 18,
-                color: textTheme.withValues(alpha: 0.5),
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Clear search',
+              child: GestureDetector(
+                onTap: () {
+                  _searchController.clear();
+                  setState(() => _query = '');
+                },
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Icon(
+                      Icons.cancel,
+                      size: 18,
+                      color: textTheme.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
               ),
             ),
         ],
@@ -448,37 +459,58 @@ class _ChatsPageState extends State<ChatsPage> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        GestureDetector(
-                          onTap: _startSearch,
-                          behavior: HitTestBehavior.opaque,
-                          child: Icon(
+                        IconButton(
+                          tooltip: 'Search chats',
+                          onPressed: _startSearch,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 44,
+                            minHeight: 44,
+                          ),
+                          icon: Icon(
                             CupertinoIcons.search,
                             color: textTheme,
                             size: 24,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        GestureDetector(
-                          onTap: _openFilterSheet,
-                          behavior: HitTestBehavior.opaque,
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(Icons.tune, color: textTheme, size: 24),
-                              if (_hasActiveFilter)
-                                Positioned(
-                                  right: -2,
-                                  top: -2,
-                                  child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.accentText(context),
-                                      shape: BoxShape.circle,
+                        const SizedBox(width: 4),
+                        Semantics(
+                          container: true,
+                          button: true,
+                          label: 'Filter chats',
+                          child: GestureDetector(
+                            onTap: _openFilterSheet,
+                            behavior: HitTestBehavior.opaque,
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      Icons.tune,
+                                      color: textTheme,
+                                      size: 24,
                                     ),
                                   ),
-                                ),
-                            ],
+                                  if (_hasActiveFilter)
+                                    Positioned(
+                                      right: 6,
+                                      top: 6,
+                                      child: Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accentText(context),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],

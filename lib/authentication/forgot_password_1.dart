@@ -104,8 +104,8 @@ class _ForgotPasswordState extends State<ForgotPassword> {
             onPressed: () => Navigator.pop(context),
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(44, 44),
+              tapTargetSize: MaterialTapTargetSize.padded,
               alignment: Alignment.centerLeft,
             ),
             icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),

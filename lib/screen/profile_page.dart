@@ -233,20 +233,24 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const Settings()),
-                );
-              },
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Icon(Icons.settings, color: textTheme),
+            child: Semantics(
+              button: true,
+              label: 'Settings',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const Settings()),
+                  );
+                },
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(Icons.settings, color: textTheme),
+                  ),
                 ),
               ),
             ),
@@ -433,23 +437,28 @@ class _ProfileSummaryCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: onAvatarTap,
-                  child: CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage:
-                        displayAvatar != null
-                            ? NetworkImage(displayAvatar)
-                            : null,
-                    child:
-                        displayAvatar == null
-                            ? Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.grey[600],
-                            )
-                            : null,
+                Semantics(
+                  container: true,
+                  button: true,
+                  label: 'View profile photo',
+                  child: GestureDetector(
+                    onTap: onAvatarTap,
+                    child: CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage:
+                          displayAvatar != null
+                              ? NetworkImage(displayAvatar)
+                              : null,
+                      child:
+                          displayAvatar == null
+                              ? Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.grey[600],
+                              )
+                              : null,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),

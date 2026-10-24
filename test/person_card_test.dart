@@ -20,23 +20,24 @@ void main() {
     photoUrls: [null],
   );
 
-  Widget harness({double textScale = 1.0}) => MaterialApp(
-    home: MediaQuery(
-      data: MediaQueryData(
-        size: const Size(360, 500),
-        textScaler: TextScaler.linear(textScale),
-      ),
-      child: Scaffold(
-        body: Center(
-          child: SizedBox(
-            width: 360,
-            height: 500,
-            child: PersonCardOverlay(person: person()),
+  Widget harness({double textScale = 1.0, Person? personOverride}) =>
+      MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: const Size(360, 500),
+            textScaler: TextScaler.linear(textScale),
+          ),
+          child: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 360,
+                height: 500,
+                child: PersonCardOverlay(person: personOverride ?? person()),
+              ),
+            ),
           ),
         ),
-      ),
-    ),
-  );
+      );
 
   testWidgets('card media pages include showcase pages and stay bounded', (
     tester,
@@ -46,24 +47,48 @@ void main() {
 
     final dots = find.byType(AnimatedContainer);
     expect(dots, findsNWidgets(2));
-    expect(tester.getSize(dots.at(0)).width, 24);
+    expect(tester.getSize(dots.at(0)).width, 20);
     expect(tester.getSize(dots.at(1)).width, 8);
 
     // Right half advances through the combined showcase + photo list.
     await tester.tapAt(const Offset(490, 150));
     await tester.pumpAndSettle();
     expect(tester.getSize(dots.at(0)).width, 8);
-    expect(tester.getSize(dots.at(1)).width, 24);
+    expect(tester.getSize(dots.at(1)).width, 20);
 
     await tester.tapAt(const Offset(310, 150));
     await tester.pumpAndSettle();
-    expect(tester.getSize(dots.at(0)).width, 24);
+    expect(tester.getSize(dots.at(0)).width, 20);
     expect(tester.getSize(dots.at(1)).width, 8);
 
     // Dots jump directly to a page and remain bounded.
     await tester.tap(find.byKey(const ValueKey('card-dot-1')));
     await tester.pumpAndSettle();
-    expect(tester.getSize(dots.at(1)).width, 24);
+    expect(tester.getSize(dots.at(1)).width, 20);
+  });
+
+  testWidgets('many media pages use a counter instead of overflowing', (
+    tester,
+  ) async {
+    final manyMedia = Person(
+      id: 'p2',
+      name: 'Alex Example',
+      schedule: 'Weekends',
+      language: 'English',
+      learningStyle: 'Visual',
+      skillName: 'Spanish',
+      role: PersonRole.learner,
+      bio: bio,
+      showcaseUrls: const [],
+      photoUrls: List<String?>.filled(12, null),
+    );
+
+    await tester.pumpWidget(harness(personOverride: manyMedia));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 / 12'), findsOneWidget);
+    expect(find.byKey(const ValueKey('card-dot-0')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('expanded bio scrolls instead of overflowing', (tester) async {

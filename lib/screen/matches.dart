@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:lottie/lottie.dart';
@@ -26,8 +26,32 @@ class Matches extends StatefulWidget {
 
 class _MatchesState extends State<Matches> {
   static const List<String> _alphabet = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'H',
+    'I',
+    'J',
+    'K',
+    'L',
+    'M',
+    'N',
+    'O',
+    'P',
+    'Q',
+    'R',
+    'S',
+    'T',
+    'U',
+    'V',
+    'W',
+    'X',
+    'Y',
+    'Z',
   ];
 
   static const List<Color> _avatarColors = [
@@ -68,24 +92,28 @@ class _MatchesState extends State<Matches> {
     });
     try {
       final convos = await MatchApi.getConversations();
-      final pals = convos
-          .where((c) => c.status == 'accepted')
-          .map((c) => MatchedUser(
-                id: '${c.connectionId}|${c.otherUserId}',
-                name: c.otherName,
-                role: c.otherRole == 'learner'
-                    ? PersonRole.learner
-                    : PersonRole.mentor,
-                skillName: c.otherSkill ?? '',
-                category: SkillCategory.everydayPractical,
-                schedule: '',
-                language: '',
-                learningStyle: '',
-                avatarUrl: c.otherAvatar,
-                connectionId: c.connectionId,
-                otherUserId: c.otherUserId,
-              ))
-          .toList();
+      final pals =
+          convos
+              .where((c) => c.status == 'accepted')
+              .map(
+                (c) => MatchedUser(
+                  id: '${c.connectionId}|${c.otherUserId}',
+                  name: c.otherName,
+                  role:
+                      c.otherRole == 'learner'
+                          ? PersonRole.learner
+                          : PersonRole.mentor,
+                  skillName: c.otherSkill ?? '',
+                  category: SkillCategory.everydayPractical,
+                  schedule: '',
+                  language: '',
+                  learningStyle: '',
+                  avatarUrl: c.otherAvatar,
+                  connectionId: c.connectionId,
+                  otherUserId: c.otherUserId,
+                ),
+              )
+              .toList();
       if (!mounted) return;
       setState(() {
         _pals = pals;
@@ -100,8 +128,8 @@ class _MatchesState extends State<Matches> {
     }
   }
 
-  late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
-    ..onTap = _startSwiping;
+  late final TapGestureRecognizer _swipeTap =
+      TapGestureRecognizer()..onTap = _startSwiping;
 
   void _startSwiping() {
     final callback = widget.onStartSwiping;
@@ -145,11 +173,12 @@ class _MatchesState extends State<Matches> {
   }
 
   String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
+    final parts =
+        name
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((part) => part.isNotEmpty)
+            .toList();
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first[0].toUpperCase();
     return (parts.first[0] + parts.last[0]).toUpperCase();
@@ -198,11 +227,7 @@ class _MatchesState extends State<Matches> {
 
     final context = _sectionKeys[target]?.currentContext;
     if (context != null) {
-      Scrollable.ensureVisible(
-        context,
-        alignment: 0,
-        duration: Duration.zero,
-      );
+      Scrollable.ensureVisible(context, alignment: 0, duration: Duration.zero);
     }
   }
 
@@ -221,9 +246,9 @@ class _MatchesState extends State<Matches> {
       await MatchApi.unmatch(connectionId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unmatch failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unmatch failed: $e')));
       return;
     }
 
@@ -236,9 +261,9 @@ class _MatchesState extends State<Matches> {
 
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You unmatched ${pal.name}')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('You unmatched ${pal.name}')));
   }
 
   Future<void> _blockPal(MatchedUser pal) async {
@@ -256,16 +281,16 @@ class _MatchesState extends State<Matches> {
       await MatchApi.blockUser(target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Block failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
       return;
     }
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${pal.name}')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('You blocked ${pal.name}')));
   }
 
   Future<void> _reportPal(MatchedUser pal, String reason) async {
@@ -282,14 +307,14 @@ class _MatchesState extends State<Matches> {
     try {
       await MatchApi.reportUser(target, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Report failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
     }
   }
 
@@ -326,14 +351,15 @@ class _MatchesState extends State<Matches> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ChatRoom(
-          name: pal.name,
-          avatarImage: pal.avatarImage,
-          skillName: pal.skillName,
-          role: pal.role,
-          person: pal.toPerson(),
-          connectionId: pal.connectionId,
-        ),
+        builder:
+            (context) => ChatRoom(
+              name: pal.name,
+              avatarImage: pal.avatarImage,
+              skillName: pal.skillName,
+              role: pal.role,
+              person: pal.toPerson(),
+              connectionId: pal.connectionId,
+            ),
       ),
     );
   }
@@ -422,8 +448,10 @@ class _MatchesState extends State<Matches> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () =>
-                              setModalState(() => draftRole = RoleFilter.all),
+                          onPressed:
+                              () => setModalState(
+                                () => draftRole = RoleFilter.all,
+                              ),
                           child: Text(
                             'Reset',
                             style: AppTextStyles.regularText.copyWith(
@@ -451,7 +479,8 @@ class _MatchesState extends State<Matches> {
                           'Learner',
                           draftRole == RoleFilter.learner,
                           () => setModalState(
-                              () => draftRole = RoleFilter.learner),
+                            () => draftRole = RoleFilter.learner,
+                          ),
                           AppColors.primary,
                           textColor,
                         ),
@@ -459,7 +488,8 @@ class _MatchesState extends State<Matches> {
                           'Mentor',
                           draftRole == RoleFilter.mentor,
                           () => setModalState(
-                              () => draftRole = RoleFilter.mentor),
+                            () => draftRole = RoleFilter.mentor,
+                          ),
                           AppColors.primary,
                           textColor,
                         ),
@@ -514,22 +544,27 @@ class _MatchesState extends State<Matches> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            GestureDetector(
-              onTap: () => _openProfile(pal),
-              child: CircleAvatar(
-                radius: 24,
-                backgroundColor: _colorFor(pal.name),
-                backgroundImage: pal.avatarImage,
-                child:
-                    pal.avatarImage == null
-                        ? Text(
-                          _initials(pal.name),
-                          style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                        : null,
+            Semantics(
+              container: true,
+              button: true,
+              label: 'View ${pal.name} profile',
+              child: GestureDetector(
+                onTap: () => _openProfile(pal),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: _colorFor(pal.name),
+                  backgroundImage: pal.avatarImage,
+                  child:
+                      pal.avatarImage == null
+                          ? Text(
+                            _initials(pal.name),
+                            style: AppTextStyles.regularText.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                          : null,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -548,62 +583,77 @@ class _MatchesState extends State<Matches> {
                 ],
               ),
             ),
-            PopupMenuButton<String>(
-              icon: Icon(Icons.more_horiz, color: textTheme),
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.more_horiz, color: textTheme),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (value) => _handleAction(value, pal),
+                itemBuilder:
+                    (context) => [
+                      PopupMenuItem<String>(
+                        value: 'unmatch',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.remove_circle_outline,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Unmatch',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.flag_outlined,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Report',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'block',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.block,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Block',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
               ),
-              onSelected: (value) => _handleAction(value, pal),
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'unmatch',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.remove_circle_outline,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Unmatch',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'report',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flag_outlined,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Report',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'block',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Block',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -617,13 +667,17 @@ class _MatchesState extends State<Matches> {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final letterHeight =
-            (constraints.maxHeight / _alphabet.length).clamp(12.0, 20.0);
+        final letterHeight = (constraints.maxHeight / _alphabet.length).clamp(
+          12.0,
+          20.0,
+        );
         final totalHeight = letterHeight * _alphabet.length;
 
         void handleOffset(double dy) {
-          final index =
-              (dy / letterHeight).floor().clamp(0, _alphabet.length - 1);
+          final index = (dy / letterHeight).floor().clamp(
+            0,
+            _alphabet.length - 1,
+          );
           _jumpToLetter(_alphabet[index], grouped);
         }
 
@@ -631,10 +685,10 @@ class _MatchesState extends State<Matches> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (details) => handleOffset(details.localPosition.dy),
-            onVerticalDragStart: (details) =>
-                handleOffset(details.localPosition.dy),
-            onVerticalDragUpdate: (details) =>
-                handleOffset(details.localPosition.dy),
+            onVerticalDragStart:
+                (details) => handleOffset(details.localPosition.dy),
+            onVerticalDragUpdate:
+                (details) => handleOffset(details.localPosition.dy),
             onTapUp: (_) => setState(() => _activeLetter = null),
             onVerticalDragEnd: (_) => setState(() => _activeLetter = null),
             onVerticalDragCancel: () => setState(() => _activeLetter = null),
@@ -642,27 +696,30 @@ class _MatchesState extends State<Matches> {
               width: 28,
               height: totalHeight,
               child: Column(
-                children: _alphabet.map((letter) {
-                  final hasItems = grouped.containsKey(letter);
-                  final isActive = _activeLetter == letter;
-                  return SizedBox(
-                    height: letterHeight,
-                    child: Center(
-                      child: Text(
-                        letter,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight:
-                              isActive ? FontWeight.w800 : FontWeight.w600,
-                          color: isActive
-                              ? Theme.of(context).colorScheme.primary
-                              : textTheme.withValues(
-                                  alpha: hasItems ? 0.9 : 0.3),
+                children:
+                    _alphabet.map((letter) {
+                      final hasItems = grouped.containsKey(letter);
+                      final isActive = _activeLetter == letter;
+                      return SizedBox(
+                        height: letterHeight,
+                        child: Center(
+                          child: Text(
+                            letter,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight:
+                                  isActive ? FontWeight.w800 : FontWeight.w600,
+                              color:
+                                  isActive
+                                      ? Theme.of(context).colorScheme.primary
+                                      : textTheme.withValues(
+                                        alpha: hasItems ? 0.9 : 0.3,
+                                      ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
             ),
           ),
@@ -756,76 +813,94 @@ class _MatchesState extends State<Matches> {
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: _isSearching
-            ? Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: textTheme.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.search,
-                      size: 18,
-                      color: textTheme.withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocus,
-                        onChanged: (value) => setState(() => _query = value),
-                        textInputAction: TextInputAction.search,
-                        style: AppTextStyles.regularText
-                            .copyWith(color: textTheme),
-                        cursorColor: primaryColor,
-                        decoration: InputDecoration(
-                          hintText: 'Search pals',
-                          hintStyle: AppTextStyles.regularText.copyWith(
-                            color: textTheme.withValues(alpha: 0.4),
+        title:
+            _isSearching
+                ? Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: textTheme.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        CupertinoIcons.search,
+                        size: 18,
+                        color: textTheme.withValues(alpha: 0.6),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocus,
+                          onChanged: (value) => setState(() => _query = value),
+                          textInputAction: TextInputAction.search,
+                          style: AppTextStyles.regularText.copyWith(
+                            color: textTheme,
                           ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
+                          cursorColor: primaryColor,
+                          decoration: InputDecoration(
+                            hintText: 'Search pals',
+                            hintStyle: AppTextStyles.regularText.copyWith(
+                              color: textTheme.withValues(alpha: 0.4),
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
                       ),
-                    ),
-                    if (_query.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                        child: Icon(
-                          Icons.cancel,
-                          size: 18,
-                          color: textTheme.withValues(alpha: 0.5),
+                      if (_query.isNotEmpty)
+                        Semantics(
+                          container: true,
+                          button: true,
+                          label: 'Clear search',
+                          child: GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              setState(() => _query = '');
+                            },
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Center(
+                                child: Icon(
+                                  Icons.cancel,
+                                  size: 18,
+                                  color: textTheme.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+                : Align(
+                  alignment: Alignment.centerLeft,
+                  child: Semantics(
+                    container: true,
+                    button: true,
+                    label: 'Back',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => Navigator.pop(context),
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 24),
+                          child: Icon(
+                            Icons.arrow_back_ios_new,
+                            color: textTheme,
+                            size: 16,
+                          ),
                         ),
                       ),
-                  ],
-                ),
-              )
-            : Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.pop(context),
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      top: 12,
-                      bottom: 12,
-                      right: 24,
-                    ),
-                    child: Icon(
-                      Icons.arrow_back_ios_new,
-                      color: textTheme,
-                      size: 16,
                     ),
                   ),
                 ),
-              ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 4.0),
@@ -844,6 +919,11 @@ class _MatchesState extends State<Matches> {
                   )
                 else
                   IconButton(
+                    tooltip: 'Search pals',
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
                     icon: Icon(CupertinoIcons.search, color: textTheme),
                     onPressed: _startSearch,
                   ),
@@ -851,6 +931,11 @@ class _MatchesState extends State<Matches> {
                   clipBehavior: Clip.none,
                   children: [
                     IconButton(
+                      tooltip: 'Filter pals',
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
                       icon: Icon(Icons.tune, color: textTheme),
                       onPressed: _showFilterSheet,
                     ),
@@ -874,95 +959,110 @@ class _MatchesState extends State<Matches> {
           ),
         ],
       ),
-      body: _loadingPals
-          ? const Center(child: CircularProgressIndicator())
-          : _palsError != null
+      body:
+          _loadingPals
+              ? const Center(child: CircularProgressIndicator())
+              : _palsError != null
               ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Couldn’t load your pals.\nPlease check your connection.',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadPals,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                        ),
-                        child: const Text(
-                          'Retry',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : _pals.isEmpty
-          ? _buildNoPalsState(textTheme)
-          : SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16.0),
-                      child: Text(
-                        'Your Pals',
-                        style: AppTextStyles.headingText
-                            .copyWith(color: textTheme),
+                    Text(
+                      'Couldn’t load your pals.\nPlease check your connection.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadPals,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                      ),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(color: Colors.black, fontSize: 16),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16.0, top: 4),
-                      child: Text(
-                        '${filtered.length} matches',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.6),
+                  ],
+                ),
+              )
+              : _pals.isEmpty
+              ? _buildNoPalsState(textTheme)
+              : SafeArea(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16.0),
+                              child: Text(
+                                'Your Pals',
+                                style: AppTextStyles.headingText.copyWith(
+                                  color: textTheme,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 16.0,
+                                top: 4,
+                              ),
+                              child: Text(
+                                '${filtered.length} matches',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (filtered.isEmpty) _buildEmptyState(textTheme),
+                            for (final entry in grouped.entries) ...[
+                              Padding(
+                                key: _sectionKeys.putIfAbsent(
+                                  entry.key,
+                                  () => GlobalKey(),
+                                ),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  4,
+                                ),
+                                child: Text(
+                                  entry.key,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: textTheme.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              for (final pal in entry.value)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 16,
+                                    right: 4,
+                                  ),
+                                  child: _buildPalTile(pal, textTheme),
+                                ),
+                            ],
+                            const SizedBox(height: 24),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    if (filtered.isEmpty) _buildEmptyState(textTheme),
-                    for (final entry in grouped.entries) ...[
-                      Padding(
-                        key: _sectionKeys.putIfAbsent(
-                            entry.key, () => GlobalKey()),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                        child: Text(
-                          entry.key,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: textTheme.withValues(alpha: 0.6),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      for (final pal in entry.value)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16, right: 4),
-                          child: _buildPalTile(pal, textTheme),
-                        ),
-                    ],
-                    const SizedBox(height: 24),
+                    _buildAlphabetIndex(grouped, textTheme),
+                    const SizedBox(width: 4),
                   ],
                 ),
               ),
-            ),
-            _buildAlphabetIndex(grouped, textTheme),
-            const SizedBox(width: 4),
-          ],
-        ),
-      ),
     );
   }
 }

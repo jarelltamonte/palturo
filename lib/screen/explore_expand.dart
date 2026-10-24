@@ -274,15 +274,24 @@ class _ExploreExpandState extends State<ExploreExpand> {
         titleSpacing: 16,
         title: Row(
           children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.pop(context),
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  color: textTheme,
-                  size: 16,
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Back',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.pop(context),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Icon(
+                      Icons.arrow_back_ios_new,
+                      color: textTheme,
+                      size: 16,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -297,21 +306,27 @@ class _ExploreExpandState extends State<ExploreExpand> {
                 ),
               ),
             ),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _history.isEmpty ? null : _undo,
-              child: SizedBox(
-                width: 40,
-                height: 44,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Icon(
-                    CupertinoIcons.arrow_uturn_left,
-                    color:
-                        _history.isEmpty
-                            ? textTheme.withValues(alpha: 0.3)
-                            : textTheme,
-                    size: 24,
+            Semantics(
+              container: true,
+              button: true,
+              enabled: _history.isNotEmpty,
+              label: 'Undo last person',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _history.isEmpty ? null : _undo,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(
+                      CupertinoIcons.arrow_uturn_left,
+                      color:
+                          _history.isEmpty
+                              ? textTheme.withValues(alpha: 0.3)
+                              : textTheme,
+                      size: 24,
+                    ),
                   ),
                 ),
               ),

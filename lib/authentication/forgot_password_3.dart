@@ -113,9 +113,10 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
 
     final passwordResult = _passwordResult;
     if (!passwordResult.isValid) {
-      final errorMsg = passwordResult.unmetRequirements.isNotEmpty
-          ? passwordResult.unmetRequirements.first
-          : 'Password does not meet security requirements.';
+      final errorMsg =
+          passwordResult.unmetRequirements.isNotEmpty
+              ? passwordResult.unmetRequirements.first
+              : 'Password does not meet security requirements.';
       await _showErrorDialog(errorMsg);
       return;
     }
@@ -174,7 +175,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
 
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
-            !_passwordResult.isValid;
+        !_passwordResult.isValid;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -186,16 +187,10 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
         titleSpacing: 16,
         title: Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+          child: IconButton(
+            tooltip: 'Back',
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              alignment: Alignment.centerLeft,
-            ),
             icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
-            label: Text('', style: TextStyle(color: textTheme, fontSize: 16)),
           ),
         ),
       ),
@@ -236,6 +231,8 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                     ),
                   ],
                   suffixIcon: IconButton(
+                    tooltip:
+                        _isPasswordObscured ? 'Show password' : 'Hide password',
                     icon: Icon(
                       _isPasswordObscured
                           ? Icons.visibility_off_outlined
@@ -254,30 +251,31 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                     padding: const EdgeInsets.only(top: 6, left: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _passwordResult.unmetRequirements.map((req) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.circle,
-                                size: 5,
-                                color: errorColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  req,
-                                  style: AppTextStyles.regularText.copyWith(
+                      children:
+                          _passwordResult.unmetRequirements.map((req) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.circle,
+                                    size: 5,
                                     color: errorColor,
-                                    fontSize: 12,
                                   ),
-                                ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      req,
+                                      style: AppTextStyles.regularText.copyWith(
+                                        color: errorColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                            );
+                          }).toList(),
                     ),
                   ),
                 const SizedBox(height: 16),
@@ -295,6 +293,10 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                     ),
                   ],
                   suffixIcon: IconButton(
+                    tooltip:
+                        _isConfirmPasswordObscured
+                            ? 'Show confirmation password'
+                            : 'Hide confirmation password',
                     icon: Icon(
                       _isConfirmPasswordObscured
                           ? Icons.visibility_off_outlined
@@ -334,18 +336,19 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.textSecondary,
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                          )
-                        : const Text('Reset Password'),
+                            )
+                            : const Text('Reset Password'),
                   ),
                 ),
               ],

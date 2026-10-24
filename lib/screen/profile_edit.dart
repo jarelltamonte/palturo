@@ -586,6 +586,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           scrolledUnderElevation: 0,
           iconTheme: IconThemeData(color: textTheme2),
           leading: IconButton(
+            tooltip: 'Back',
             icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
             onPressed: () async {
               if (_hasUnsavedChanges()) {
@@ -1048,53 +1049,73 @@ class _PhotoSlot extends StatelessWidget {
               : FileImage(File(path!));
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: hasImage ? null : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.primary, width: 3),
-                image:
-                    imageProvider != null
-                        ? DecorationImage(
-                          image: imageProvider,
-                          fit: BoxFit.cover,
-                        )
-                        : null,
+    return Semantics(
+      container: true,
+      button: true,
+      label: path == null ? 'Add photo' : 'Change photo',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: hasImage ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primary, width: 3),
+                  image:
+                      imageProvider != null
+                          ? DecorationImage(
+                            image: imageProvider,
+                            fit: BoxFit.cover,
+                          )
+                          : null,
+                ),
+                child:
+                    hasImage
+                        ? null
+                        : const Center(
+                          child: Icon(
+                            Icons.add,
+                            size: 32,
+                            color: Colors.black54,
+                          ),
+                        ),
               ),
-              child:
-                  hasImage
-                      ? null
-                      : const Center(
-                        child: Icon(Icons.add, size: 32, color: Colors.black54),
+              if (hasImage)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Semantics(
+                    container: true,
+                    button: true,
+                    label: 'Remove photo',
+                    child: GestureDetector(
+                      onTap: onRemove,
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
-            ),
-            if (hasImage)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: GestureDetector(
-                  onTap: onRemove,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 14,
-                      color: Colors.white,
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

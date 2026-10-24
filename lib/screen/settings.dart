@@ -765,15 +765,20 @@ class _SettingsState extends State<Settings> {
               leadingWidth: 60,
               leading: Padding(
                 padding: const EdgeInsets.only(left: 16),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap:
-                      (_isLoggingOut || _isDeleting)
-                          ? null
-                          : () => Navigator.pop(context),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Icon(Icons.close, color: textTheme, size: 24),
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Back',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap:
+                        (_isLoggingOut || _isDeleting)
+                            ? null
+                            : () => Navigator.pop(context),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.close, color: textTheme, size: 24),
+                    ),
                   ),
                 ),
               ),

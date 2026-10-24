@@ -521,16 +521,27 @@ class _SkillsCardState extends State<SkillsCard> {
                 ),
               ),
               if (widget.isEditing && canAddMore)
-                GestureDetector(
-                  onTap: _addSkill,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: textColor,
-                      shape: BoxShape.circle,
+                Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Add skill',
+                  child: GestureDetector(
+                    onTap: _addSkill,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Center(
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: textColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.add, color: themeColor, size: 16),
+                        ),
+                      ),
                     ),
-                    child: Icon(Icons.add, color: themeColor, size: 16),
                   ),
                 ),
             ],
@@ -838,12 +849,18 @@ class _SkillRowState extends State<_SkillRow> {
               ),
             ),
           if (hasText)
-            InkWell(
-              customBorder: const CircleBorder(),
-              onTap: _clearQuery,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(Icons.close, size: 18, color: dim),
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Clear search',
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _clearQuery,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(Icons.close, size: 18, color: dim),
+                ),
               ),
             ),
         ],
@@ -1235,18 +1252,23 @@ class _SkillRowState extends State<_SkillRow> {
             ),
             if (widget.isEditing) ...[
               const SizedBox(width: 12),
-              Material(
-                color: Colors.transparent,
-                shape: CircleBorder(
-                  side: BorderSide(color: textColor, width: 1.5),
-                ),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: widget.onRemove,
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(Icons.close, color: textColor, size: 20),
+              Semantics(
+                container: true,
+                button: true,
+                label: 'Remove skill',
+                child: Material(
+                  color: Colors.transparent,
+                  shape: CircleBorder(
+                    side: BorderSide(color: textColor, width: 1.5),
+                  ),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: widget.onRemove,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Icon(Icons.close, color: textColor, size: 20),
+                    ),
                   ),
                 ),
               ),

@@ -134,10 +134,16 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
               final activeColor = AppColors.accentText(context);
               final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
-              final showBadge = isChat && !isSelected && ChatStateService.instance.totalUnreadCount > 0;
+              final showBadge =
+                  isChat &&
+                  !isSelected &&
+                  ChatStateService.instance.totalUnreadCount > 0;
 
               return _NavItem(
-                icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
+                icon:
+                    isSelected
+                        ? _selectedIcons[index]
+                        : _navigationIcons[index],
                 label: _navigationLabels[index],
                 color: isSelected ? activeColor : inactiveColor,
                 selected: isSelected,
@@ -275,50 +281,63 @@ class _NavItemState extends State<_NavItem>
 
   @override
   Widget build(BuildContext context) {
+    final semanticsLabel =
+        widget.showBadge ? '${widget.label}, unread messages' : widget.label;
+
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: Semantics(
+        button: true,
+        selected: widget.selected,
+        label: semanticsLabel,
+        excludeSemantics: true,
         onTap: _handleTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                AnimatedBuilder(
-                  animation: _jiggle,
-                  builder: (context, child) {
-                    return Transform.rotate(angle: _jiggle.value, child: child);
-                  },
-                  child: Icon(widget.icon, color: widget.color, size: 24),
-                ),
-                if (widget.showBadge)
-                  Positioned(
-                    top: -2,
-                    right: -4,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedBuilder(
+                    animation: _jiggle,
+                    builder: (context, child) {
+                      return Transform.rotate(
+                        angle: _jiggle.value,
+                        child: child,
+                      );
+                    },
+                    child: Icon(widget.icon, color: widget.color, size: 24),
+                  ),
+                  if (widget.showBadge)
+                    Positioned(
+                      top: -2,
+                      right: -4,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              widget.label,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                color: widget.color,
-                fontSize: 11,
-                fontWeight:
-                    widget.selected ? FontWeight.bold : FontWeight.normal,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: widget.color,
+                  fontSize: 11,
+                  fontWeight:
+                      widget.selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

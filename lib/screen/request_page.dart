@@ -436,33 +436,38 @@ class _RequestPageState extends State<RequestPage> {
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
               const Spacer(),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _openFilterSheet,
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Icon(Icons.tune, color: textTheme, size: 24),
-                      ),
-                      if (_hasActiveFilter)
-                        Positioned(
-                          right: -2,
-                          top: 9,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: AppColors.accentText(context),
-                              shape: BoxShape.circle,
+              Semantics(
+                container: true,
+                button: true,
+                label: 'Filter requests',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _openFilterSheet,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Icon(Icons.tune, color: textTheme, size: 24),
+                        ),
+                        if (_hasActiveFilter)
+                          Positioned(
+                            right: -2,
+                            top: 9,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.accentText(context),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

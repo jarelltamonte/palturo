@@ -230,17 +230,27 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
           Row(
             children: [
               Expanded(
-                child: GestureDetector(
-                  key: const ValueKey('card-previous'),
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _previousPhoto,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Previous photo',
+                  child: GestureDetector(
+                    key: const ValueKey('card-previous'),
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _previousPhoto,
+                  ),
                 ),
               ),
               Expanded(
-                child: GestureDetector(
-                  key: const ValueKey('card-next'),
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _nextPhoto,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Next photo',
+                  child: GestureDetector(
+                    key: const ValueKey('card-next'),
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _nextPhoto,
+                  ),
                 ),
               ),
             ],
@@ -343,16 +353,22 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ],
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.more_horiz,
-                    color: Colors.white,
-                    size: 22,
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.more_horiz,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -526,26 +542,58 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (int i = 0; i < photoUrls.length; i++) ...[
-                  GestureDetector(
-                    key: ValueKey('card-dot-$i'),
-                    onTap: () => setState(() => _photoIndex = i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      width: i == _photoIndex ? 24 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color:
-                            i == _photoIndex
-                                ? AppColors.primary
-                                : Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(4),
+                if (photoUrls.length > 10)
+                  Semantics(
+                    label: 'Photo ${_photoIndex + 1} of ${photoUrls.length}',
+                    excludeSemantics: true,
+                    child: Text(
+                      '${_photoIndex + 1} / ${photoUrls.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black54,
+                            blurRadius: 4,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  if (i != photoUrls.length - 1) const SizedBox(width: 6),
-                ],
+                  )
+                else
+                  for (int i = 0; i < photoUrls.length; i++) ...[
+                    Semantics(
+                      button: true,
+                      selected: i == _photoIndex,
+                      label: 'Show photo ${i + 1}',
+                      child: GestureDetector(
+                        key: ValueKey('card-dot-$i'),
+                        onTap: () => setState(() => _photoIndex = i),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: Center(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOut,
+                              width: i == _photoIndex ? 20 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color:
+                                    i == _photoIndex
+                                        ? AppColors.primary
+                                        : Colors.black.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (i != photoUrls.length - 1)
+                      const SizedBox(width: 4),
+                  ],
               ],
             ),
           ),
@@ -557,39 +605,52 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: widget.onSkip,
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.textPrimary),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: widget.onSkip,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.textPrimary,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(32),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        widget.skipLabel,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 16,
+                        child: Text(
+                          widget.skipLabel,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: widget.onAdd,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: widget.onAdd,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(32),
+                          ),
+                          elevation: 0,
                         ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        widget.addLabel,
-                        style: TextStyle(color: AppColors.black, fontSize: 16),
+                        child: Text(
+                          widget.addLabel,
+                          style: TextStyle(
+                            color: AppColors.black,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -676,18 +737,29 @@ void showPersonProfileDialog(
               Positioned(
                 top: 16,
                 left: 16,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(dialogContext),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 18,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Close profile',
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(dialogContext),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

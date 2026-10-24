@@ -438,52 +438,61 @@ class _HomePageState extends State<HomePage> {
               ),
               Row(
                 children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _history.isEmpty ? null : _undo,
-                    child: SizedBox(
-                      width: 40,
-                      height: 44,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Icon(
-                          CupertinoIcons.arrow_uturn_left,
-                          color:
-                              _history.isEmpty
-                                  ? textTheme.withValues(alpha: 0.3)
-                                  : textTheme,
-                          size: 24,
+                  Semantics(
+                    button: true,
+                    enabled: _history.isNotEmpty,
+                    label: 'Undo last person',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _history.isEmpty ? null : _undo,
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Icon(
+                            CupertinoIcons.arrow_uturn_left,
+                            color:
+                                _history.isEmpty
+                                    ? textTheme.withValues(alpha: 0.3)
+                                    : textTheme,
+                            size: 24,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _openFilterSheet,
-                    child: SizedBox(
-                      width: 40,
-                      height: 44,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Icon(Icons.tune, color: textTheme, size: 24),
-                          ),
-                          if (_hasActiveFilter)
-                            Positioned(
-                              right: -2,
-                              top: 8,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: AppColors.accentText(context),
-                                  shape: BoxShape.circle,
+                  Semantics(
+                    button: true,
+                    label: 'Filter people',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _openFilterSheet,
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Icon(Icons.tune, color: textTheme, size: 24),
+                            ),
+                            if (_hasActiveFilter)
+                              Positioned(
+                                right: -2,
+                                top: 8,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accentText(context),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

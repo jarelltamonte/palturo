@@ -161,13 +161,17 @@ class _ExplorePageState extends State<ExplorePage> {
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
               IconButton(
+                tooltip: 'How Explore works',
                 icon: Icon(
                   CupertinoIcons.question_circle,
                   color: textTheme,
                   size: 24,
                 ),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
                 onPressed: () {
                   showAdaptiveDialog(
                     context: context,
@@ -355,7 +359,7 @@ class _RoleToggle extends StatelessWidget {
     }
 
     return Container(
-      height: 40,
+      height: 44,
       decoration: BoxDecoration(
         color: textColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),

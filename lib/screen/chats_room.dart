@@ -440,6 +440,7 @@ class _ChatRoomState extends State<ChatRoom> {
         title: Row(
           children: [
             IconButton(
+              tooltip: 'Back',
               onPressed: () {
                 Navigator.pop(context);
               },
@@ -494,6 +495,7 @@ class _ChatRoomState extends State<ChatRoom> {
             ] else
               const Spacer(),
             PopupMenuButton<String>(
+              tooltip: 'Chat options',
               padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -665,6 +667,7 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
+                    tooltip: 'Send message',
                     onPressed: _sendingMessage ? null : _sendMessage,
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.primary,

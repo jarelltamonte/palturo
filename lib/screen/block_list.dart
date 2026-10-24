@@ -79,6 +79,7 @@ class _BlockListPageState extends State<BlockListPage> {
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
         leading: IconButton(
+          tooltip: 'Back',
           icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
           onPressed: () => Navigator.pop(context),
         ),

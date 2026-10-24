@@ -179,6 +179,8 @@ class _LoginPageState extends State<LoginPage> {
                         controller: _passwordController,
                         obscureText: _isObscured,
                         suffixIcon: IconButton(
+                          tooltip:
+                              _isObscured ? 'Show password' : 'Hide password',
                           icon: Icon(
                             _isObscured
                                 ? Icons.visibility_off_outlined

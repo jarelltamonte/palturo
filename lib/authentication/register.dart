@@ -565,6 +565,10 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ],
                         suffixIcon: IconButton(
+                          tooltip:
+                              _isPasswordObscured
+                                  ? 'Show password'
+                                  : 'Hide password',
                           icon: Icon(
                             _isPasswordObscured
                                 ? Icons.visibility_off_outlined
@@ -626,6 +630,10 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ],
                         suffixIcon: IconButton(
+                          tooltip:
+                              _isConfirmPasswordObscured
+                                  ? 'Show confirmation password'
+                                  : 'Hide confirmation password',
                           icon: Icon(
                             _isConfirmPasswordObscured
                                 ? Icons.visibility_off_outlined

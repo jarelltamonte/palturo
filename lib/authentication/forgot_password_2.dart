@@ -75,16 +75,10 @@ class _ForgotPasswordWaitState extends State<ForgotPasswordWait> {
         titleSpacing: 16,
         title: Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+          child: IconButton(
+            tooltip: 'Back',
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              alignment: Alignment.centerLeft,
-            ),
             icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
-            label: Text('', style: TextStyle(color: textTheme, fontSize: 16)),
           ),
         ),
       ),

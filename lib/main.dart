@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/authentication/scratch.dart';
 import 'package:palturo/root_gate.dart';
 import 'package:palturo/authentication/forgot_password_3.dart';
+import 'package:palturo/widgets/responsive_shell.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -361,6 +362,9 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
       theme: lightMode,
       darkTheme: darkMode,
       themeMode: _themeMode,
+      builder:
+          (context, child) =>
+              ResponsiveShell(child: child ?? const SizedBox.shrink()),
       home: AppRootDecider(isOnboardingDone: widget.isOnboardingDone),
     );
   }

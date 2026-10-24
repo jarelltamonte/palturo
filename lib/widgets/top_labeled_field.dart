@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -46,7 +47,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   late final bool _ownsFocusNode;
 
   static const double _height = 58;
-  static const Duration _duration = Duration(milliseconds: 180);
+  static const Duration _duration = AppMotion.base;
   static const Curve _curve = Curves.easeOut;
 
   bool get _isFloating => _focusNode.hasFocus || _controller.text.isNotEmpty;
@@ -91,7 +92,10 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _focusNode.hasFocus ? AppColors.primary : textColor.withValues(alpha: 0.7),
+            color:
+                _focusNode.hasFocus
+                    ? AppColors.primary
+                    : textColor.withValues(alpha: 0.7),
             width: _focusNode.hasFocus ? 1.5 : 1,
           ),
         ),
@@ -120,12 +124,13 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     maxLength: widget.maxLength,
                     maxLengthEnforcement: MaxLengthEnforcement.enforced,
                     cursorColor: textColor,
-                    buildCounter: (
-                      context, {
-                      required int currentLength,
-                      required bool isFocused,
-                      required int? maxLength,
-                    }) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required int currentLength,
+                          required bool isFocused,
+                          required int? maxLength,
+                        }) => null,
                     style: AppTextStyles.regularText.copyWith(
                       color: textColor,
                       fontSize: 16,

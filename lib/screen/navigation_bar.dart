@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/services/chat_state_service.dart';
 
 import 'home_page.dart';
@@ -259,10 +260,7 @@ class _NavItemState extends State<_NavItem>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    );
+    _controller = AnimationController(vsync: this, duration: AppMotion.press);
 
     _selectionScale = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.92), weight: 1),
@@ -277,7 +275,7 @@ class _NavItemState extends State<_NavItem>
   }
 
   void _handleTap() {
-    if (!widget.selected) {
+    if (!widget.selected && !MediaQuery.disableAnimationsOf(context)) {
       _controller.forward(from: 0);
     }
     widget.onTap();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/utils/schedule_format.dart';
@@ -154,7 +155,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               const SizedBox(width: 6),
               Expanded(
                 child: AnimatedSize(
-                  duration: const Duration(milliseconds: 200),
+                  duration: AppMotion.base,
                   curve: Curves.easeOut,
                   alignment: Alignment.topLeft,
                   child:
@@ -552,12 +553,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black54,
-                            blurRadius: 4,
-                          ),
-                        ],
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                       ),
                     ),
                   )
@@ -575,7 +571,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           height: 20,
                           child: Center(
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
+                              duration: AppMotion.base,
                               curve: Curves.easeOut,
                               width: i == _photoIndex ? 20 : 8,
                               height: 8,
@@ -591,8 +587,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ),
-                    if (i != photoUrls.length - 1)
-                      const SizedBox(width: 4),
+                    if (i != photoUrls.length - 1) const SizedBox(width: 4),
                   ],
               ],
             ),
@@ -610,9 +605,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       child: OutlinedButton(
                         onPressed: widget.onSkip,
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: AppColors.textPrimary,
-                          ),
+                          side: const BorderSide(color: AppColors.textPrimary),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           minimumSize: const Size(0, 44),
                           shape: RoundedRectangleBorder(

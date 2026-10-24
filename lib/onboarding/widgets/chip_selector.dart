@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding_models.dart';
@@ -30,7 +31,8 @@ class ChipSelector extends StatelessWidget {
             _Chip(
               label: option.label,
               selected: selected.contains(option.id),
-              disabled: !selected.contains(option.id) &&
+              disabled:
+                  !selected.contains(option.id) &&
                   selected.length >= maxSelections,
               onTap: () => onToggle(option.id),
             ),
@@ -55,28 +57,33 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? AppColors.textSecondary : Theme.of(context).colorScheme.secondary;
-    
+    final fg =
+        selected
+            ? AppColors.textSecondary
+            : Theme.of(context).colorScheme.secondary;
+
     return GestureDetector(
       onTap: disabled ? null : onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: AppMotion.micro,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: selected
-                ? AppColors.primary
-                : fg.withValues(alpha: disabled ? 0.15 : 0.3),
+            color:
+                selected
+                    ? AppColors.primary
+                    : fg.withValues(alpha: disabled ? 0.15 : 0.3),
           ),
         ),
         child: Text(
           label,
           style: AppTextStyles.regularText.copyWith(
-            color: selected
-                ? AppColors.textSecondary
-                : fg.withValues(alpha: disabled ? 0.35 : 1),
+            color:
+                selected
+                    ? AppColors.textSecondary
+                    : fg.withValues(alpha: disabled ? 0.35 : 1),
           ),
         ),
       ),

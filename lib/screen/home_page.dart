@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
@@ -263,7 +264,7 @@ class _HomePageState extends State<HomePage> {
     return TweenAnimationBuilder<double>(
       key: ValueKey('undo$_undoToken'),
       tween: Tween(begin: 1.0, end: 0.0),
-      duration: const Duration(milliseconds: 350),
+      duration: AppMotion.feedback,
       curve: Curves.easeOutCubic,
       child: child,
       builder:
@@ -475,7 +476,11 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Align(
                               alignment: Alignment.centerRight,
-                              child: Icon(Icons.tune, color: textTheme, size: 24),
+                              child: Icon(
+                                Icons.tune,
+                                color: textTheme,
+                                size: 24,
+                              ),
                             ),
                             if (_hasActiveFilter)
                               Positioned(
@@ -655,7 +660,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 280),
+    duration: AppMotion.exit,
   )..addListener(_onTick);
 
   double _dx = 0;

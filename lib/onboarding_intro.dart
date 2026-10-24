@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 import 'package:palturo/landing_page.dart';
 import 'package:palturo/models/onboarding_item.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/preferences_service.dart';
 
@@ -50,10 +51,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
 
   Future<void> _next() async {
     if (_currentPage < _pages.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
+      _pageController.nextPage(duration: AppMotion.screen, curve: Curves.ease);
     } else {
       await PreferencesService.instance.setBool('onboarding_done', true);
       if (mounted) {
@@ -97,7 +95,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
               spacing: 10,
               children: List.generate(_pages.length, (index) {
                 return AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+                  duration: AppMotion.screen,
                   height: 8,
                   width: _currentPage == index ? 18 : 8,
                   decoration: BoxDecoration(

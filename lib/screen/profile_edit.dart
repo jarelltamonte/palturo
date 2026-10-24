@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/skills_card.dart';
@@ -958,7 +959,7 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
                 ),
                 AnimatedRotation(
                   turns: _isOpen ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
+                  duration: AppMotion.base,
                   curve: Curves.easeInOut,
                   child: Icon(
                     Icons.keyboard_arrow_down_rounded,

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/services/match_api.dart';
@@ -168,10 +169,7 @@ class _ExplorePageState extends State<ExplorePage> {
                   size: 24,
                 ),
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 onPressed: () {
                   showAdaptiveDialog(
                     context: context,
@@ -209,7 +207,7 @@ class _ExplorePageState extends State<ExplorePage> {
     return SizedBox(
       height: 18,
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
+        duration: AppMotion.base,
         child: Text(
           _role == ExploreRole.mentor
               ? 'Showing only categories that match your mentor skills.'
@@ -344,7 +342,7 @@ class _RoleToggle extends StatelessWidget {
           onTap: () => onChanged(role),
           child: Center(
             child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
+              duration: AppMotion.base,
               style: AppTextStyles.regularText.copyWith(
                 fontSize: 14,
                 color:
@@ -367,7 +365,7 @@ class _RoleToggle extends StatelessWidget {
       child: Stack(
         children: [
           AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
+            duration: AppMotion.base,
             curve: Curves.easeOut,
             alignment: isMentor ? Alignment.centerRight : Alignment.centerLeft,
             child: FractionallySizedBox(
@@ -436,7 +434,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           child: Icon(
             _icons[_page],
             key: ValueKey('icon_$_page'),
@@ -446,7 +444,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         ),
         const SizedBox(height: 12),
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           child: Text(
             _titles[_page],
             key: ValueKey('title_$_page'),
@@ -474,7 +472,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
           borderRadius: BorderRadius.circular(8),
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: (_page + 1) / _titles.length),
-            duration: const Duration(milliseconds: 250),
+            duration: AppMotion.screen,
             curve: Curves.easeOut,
             builder: (context, value, _) {
               return LinearProgressIndicator(
@@ -490,10 +488,10 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         ),
         const SizedBox(height: 24),
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           alignment: Alignment.topCenter,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
+            duration: AppMotion.base,
             child: Text(
               _messages[_page],
               key: ValueKey('message_$_page'),

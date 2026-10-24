@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
 class FilterOption {
@@ -51,11 +52,12 @@ class FilterBottomSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => FilterBottomSheet(
-        sections: sections,
-        selected: selected,
-        onApply: onApply,
-      ),
+      builder:
+          (_) => FilterBottomSheet(
+            sections: sections,
+            selected: selected,
+            onApply: onApply,
+          ),
     );
   }
 
@@ -208,15 +210,13 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: AppMotion.micro,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? primaryColor : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected
-                ? primaryColor
-                : textColor.withValues(alpha: 0.3),
+            color: isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
           ),
         ),
         child: Text(

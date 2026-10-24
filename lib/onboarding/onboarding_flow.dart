@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/onboarding/onboarding_complete.dart';
 import 'package:palturo/onboarding/onboarding_entry.dart';
 import 'onboarding_controller.dart';
@@ -203,7 +204,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         child: Stack(
           children: [
             AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
+              duration: AppMotion.screen,
               child: KeyedSubtree(
                 key: ValueKey(_current),
                 child: _buildStep(_current),

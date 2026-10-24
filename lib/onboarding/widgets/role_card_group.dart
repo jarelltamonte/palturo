@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding_models.dart';
@@ -94,7 +95,7 @@ class _RoleCard extends StatelessWidget {
     return GestureDetector(
       onTap: isEditing ? onTap : null,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: AppMotion.micro,
         height: compact ? 44 : 120,
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(

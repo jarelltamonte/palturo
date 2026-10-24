@@ -358,6 +358,15 @@ class _ProfilePageState extends State<ProfilePage> {
                               thickness: 1,
                             ),
                             const SizedBox(height: 16),
+                            Text(
+                              'Role',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: AppColors.mutedText(context),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
                             RoleCardGroup(
                               options: _roleOptions,
                               selected: _profile!.role,

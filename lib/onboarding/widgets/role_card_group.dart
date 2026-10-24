@@ -23,7 +23,24 @@ class RoleCardGroup extends StatelessWidget {
     final visibleOptions =
         isEditing ? options : options.where((o) => o.role == selected).toList();
 
-    final isCompact = visibleOptions.length == 1;
+    if (!isEditing) {
+      if (visibleOptions.isEmpty) return const SizedBox.shrink();
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: IntrinsicWidth(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _RoleCard(
+              option: visibleOptions.single,
+              selected: true,
+              compact: true,
+              isEditing: false,
+              onTap: () {},
+            ),
+          ),
+        ),
+      );
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,8 +52,8 @@ class RoleCardGroup extends StatelessWidget {
               child: _RoleCard(
                 option: option,
                 selected: selected == option.role,
-                compact: isCompact,
-                isEditing: isEditing,
+                compact: false,
+                isEditing: true,
                 onTap: () => onSelect(option.role),
               ),
             ),
@@ -78,7 +95,7 @@ class _RoleCard extends StatelessWidget {
       onTap: isEditing ? onTap : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        height: compact ? 56 : 120,
+        height: compact ? 44 : 120,
         alignment: Alignment.center,
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 16 : 8,

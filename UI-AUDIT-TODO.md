@@ -25,7 +25,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 14. [x] P2-01 Shared motion scale
 15. [x] P2-02 Consistent card exit
 16. [x] P2-03 Tab fade and dead Hero
-17. [ ] P2-04 Loading skeleton
+17. [x] P2-04 Loading skeleton
 18. [ ] P2-05 Empty-state links
 19. [ ] P2-06 Chat timestamps
 20. [ ] P2-07 Profile edit header and save
@@ -53,3 +53,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P2-01 | PASS | PASS | PASS | Added AppMotion press/micro/base/screen/exit/feedback; migrated all UI durations; nav respects reduce-motion. |
 | P2-02 | PASS | PASS | PASS | Person-scoped 280ms exits for Home/Explore; button and swipe paths advance once; stale late actions no longer dismiss another card. |
 | P2-03 | PASS | PASS | PASS | State-preserving 200ms tab crossfade with hidden pages muted/excluded; Hero has a live Login↔Register counterpart, so it was retained. |
+| P2-04 | PASS | PASS | PASS | Card-shaped cold-load skeleton with semantics/shimmer token; cached/refresh/error paths untouched; 25 tests. |

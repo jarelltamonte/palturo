@@ -14,6 +14,7 @@ import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
+import 'package:palturo/widgets/person_card_skeleton.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -525,7 +526,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
         child:
             _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const PersonCardSkeleton()
                 : _error != null
                 ? _buildErrorState(textTheme)
                 : hasMore

@@ -18,4 +18,7 @@ class AppMotion {
 
   /// Restoring an undone action.
   static const Duration feedback = Duration(milliseconds: 350);
+
+  /// Ambient skeleton pulse (not a transition).
+  static const Duration shimmer = Duration(milliseconds: 1100);
 }

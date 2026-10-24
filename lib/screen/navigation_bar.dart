@@ -157,10 +157,8 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
               final activeColor = AppColors.accentText(context);
               final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
-              final showBadge =
-                  isChat &&
-                  !isSelected &&
-                  ChatStateService.instance.totalUnreadCount > 0;
+              final unreadCount =
+                  isChat ? ChatStateService.instance.totalUnreadCount : 0;
 
               return _NavItem(
                 icon:
@@ -171,7 +169,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
                 color: isSelected ? activeColor : inactiveColor,
                 selected: isSelected,
                 onTap: () => _onItemTapped(index),
-                showBadge: showBadge,
+                unreadCount: unreadCount,
               );
             }),
           ),
@@ -255,7 +253,7 @@ class _NavItem extends StatefulWidget {
   final Color color;
   final VoidCallback onTap;
   final bool selected;
-  final bool showBadge;
+  final int unreadCount;
 
   const _NavItem({
     required this.icon,
@@ -263,7 +261,7 @@ class _NavItem extends StatefulWidget {
     required this.color,
     required this.onTap,
     this.selected = false,
-    this.showBadge = false,
+    this.unreadCount = 0,
   });
 
   @override
@@ -301,8 +299,13 @@ class _NavItemState extends State<_NavItem>
 
   @override
   Widget build(BuildContext context) {
+    final showBadge = widget.unreadCount > 0;
+    final unreadLabel =
+        widget.unreadCount == 1
+            ? '1 unread message'
+            : '${widget.unreadCount} unread messages';
     final semanticsLabel =
-        widget.showBadge ? '${widget.label}, unread messages' : widget.label;
+        showBadge ? '${widget.label}, $unreadLabel' : widget.label;
 
     return Expanded(
       child: Semantics(
@@ -330,16 +333,29 @@ class _NavItemState extends State<_NavItem>
                     },
                     child: Icon(widget.icon, color: widget.color, size: 24),
                   ),
-                  if (widget.showBadge)
+                  if (showBadge)
                     Positioned(
-                      top: -2,
-                      right: -4,
+                      top: -8,
+                      right: -12,
                       child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
+                        constraints: const BoxConstraints(minWidth: 18),
+                        height: 18,
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.error,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          widget.unreadCount > 99
+                              ? '99+'
+                              : '${widget.unreadCount}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onError,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            height: 1,
+                          ),
                         ),
                       ),
                     ),

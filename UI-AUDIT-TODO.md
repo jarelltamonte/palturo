@@ -16,7 +16,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 5. [x] P0-05 Semantics and tap targets
 6. [x] P1-02 Navigation icons, SafeArea, motion
 7. [x] P1-01 Branding, splash, metadata
-8. [ ] P1-03 Settings header, footer, switches
+8. [x] P1-03 Settings header, footer, switches
 9. [ ] P1-04 Profile role badge
 10. [ ] P1-05 Request chevron
 11. [ ] P1-06 Filter cleanup
@@ -44,3 +44,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P0-05 | PASS | PASS | PASS | Named 44px icon actions, pager zones, skills/photo controls, dialogs; 20px dots with >10 counter; nav semantics activate. |
 | P1-02 | PASS | PASS | PASS | People/Requests glyphs corrected, SafeArea bottom gap, 180ms scale press, 12px labels, semantics intact. |
 | P1-01 | PASS | PASS | PASS | Removed DRAFTR, regenerated splash with white dark branding, capped web splash, updated metadata/manifest, documented regeneration. |
+| P1-03 | PASS | PASS | PASS | Settings back header/title, scrollable Account section, no fixed footer, readable off switch and dark dividers. |

@@ -762,31 +762,27 @@ class _SettingsState extends State<Settings> {
               scrolledUnderElevation: 0,
               elevation: 0,
               automaticallyImplyLeading: false,
-              leadingWidth: 60,
+              leadingWidth: 56,
               leading: Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: Semantics(
-                  container: true,
-                  button: true,
-                  label: 'Back',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap:
-                        (_isLoggingOut || _isDeleting)
-                            ? null
-                            : () => Navigator.pop(context),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Icon(Icons.close, color: textTheme, size: 24),
-                    ),
+                padding: const EdgeInsets.only(left: 8),
+                child: IconButton(
+                  tooltip: 'Back',
+                  onPressed:
+                      (_isLoggingOut || _isDeleting)
+                          ? null
+                          : () => Navigator.pop(context),
+                  icon: Icon(
+                    Icons.arrow_back_ios_new,
+                    color: textTheme,
+                    size: 16,
                   ),
                 ),
               ),
               title: Text(
                 'Settings',
-                style: AppTextStyles.regularText.copyWith(
+                style: AppTextStyles.headingText.copyWith(
                   color: textTheme,
-                  fontSize: 16,
+                  fontSize: 20,
                 ),
               ),
             ),
@@ -809,6 +805,8 @@ class _SettingsState extends State<Settings> {
                     ),
                     activeTrackColor: AppColors.primary,
                     activeThumbColor: AppColors.white,
+                    inactiveTrackColor: AppColors.switchOffTrack(context),
+                    inactiveThumbColor: AppColors.white,
                     value: _notificationsEnabled,
                     onChanged: (bool value) {
                       _setToggle(
@@ -827,6 +825,8 @@ class _SettingsState extends State<Settings> {
                     ),
                     activeTrackColor: AppColors.primary,
                     activeThumbColor: AppColors.white,
+                    inactiveTrackColor: AppColors.switchOffTrack(context),
+                    inactiveThumbColor: AppColors.white,
                     value: _soundEnabled,
                     onChanged: (bool value) {
                       _setToggle(_soundKey, value, () => _soundEnabled = value);
@@ -841,6 +841,8 @@ class _SettingsState extends State<Settings> {
                     ),
                     activeTrackColor: AppColors.primary,
                     activeThumbColor: AppColors.white,
+                    inactiveTrackColor: AppColors.switchOffTrack(context),
+                    inactiveThumbColor: AppColors.white,
                     value: _vibrationEnabled,
                     onChanged: (bool value) {
                       _setToggle(
@@ -859,15 +861,14 @@ class _SettingsState extends State<Settings> {
                     ),
                     activeTrackColor: AppColors.primary,
                     activeThumbColor: AppColors.white,
+                    inactiveTrackColor: AppColors.switchOffTrack(context),
+                    inactiveThumbColor: AppColors.white,
                     value: isDarkMode,
                     onChanged: (bool value) {
                       MyApp.of(context).setThemeMode(value);
                     },
                   ),
-                  Divider(
-                    height: 20,
-                    color: AppColors.black.withValues(alpha: 0.2),
-                  ),
+                  Divider(height: 20, color: AppColors.border(context)),
                   ListTile(
                     leading: Icon(Icons.feedback_outlined, color: textTheme),
                     title: Text(
@@ -911,92 +912,86 @@ class _SettingsState extends State<Settings> {
                       );
                     },
                   ),
-                ],
-              ),
-            ),
-            bottomNavigationBar: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        splashFactory: NoSplash.splashFactory,
-                        onTap: _showLogoutDialog,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.logout_rounded, color: textTheme),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Logout',
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 16,
-                                ),
+                  const SizedBox(height: 24),
+                  Divider(height: 20, color: AppColors.border(context)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Account',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      splashFactory: NoSplash.splashFactory,
+                      onTap: _showLogoutDialog,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded, color: textTheme),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Log Out',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                                fontSize: 16,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        splashFactory: NoSplash.splashFactory,
-                        onTap: _showDeleteAccountDialog,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.delete_forever,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      splashFactory: NoSplash.splashFactory,
+                      onTap: _showDeleteAccountDialog,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.delete_forever, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Delete Account',
+                              style: AppTextStyles.regularText.copyWith(
                                 color: Colors.red,
+                                fontSize: 16,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Delete Account',
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: Colors.red,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    Image.asset(
-                      isDarkMode
-                          ? 'assets/images/vlogo_white.png'
-                          : 'assets/images/vlogo_black.png',
-                      height: 60,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Version $_version',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Version $_version',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.5),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom),
+                ],
               ),
             ),
           ),

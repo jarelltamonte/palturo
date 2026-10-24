@@ -23,6 +23,8 @@ class AppColors {
   static const Color mutedSurfaceDark = Color(0xFF333333);
   static const Color borderLight = Color(0xFFE2E2E2);
   static const Color borderDark = Color(0xFF3D3D3D);
+  static const Color switchOffTrackLight = Color(0xFF666666);
+  static const Color switchOffTrackDark = switchOffTrackLight;
 
   static const Color white = Colors.white;
   static const Color black = Colors.black;
@@ -44,4 +46,7 @@ class AppColors {
 
   static Color border(BuildContext context) =>
       _isDark(context) ? borderDark : borderLight;
+
+  static Color switchOffTrack(BuildContext context) =>
+      _isDark(context) ? switchOffTrackDark : switchOffTrackLight;
 }

@@ -45,26 +45,34 @@ void main() {
     await tester.pumpWidget(harness());
     await tester.pumpAndSettle();
 
-    final dots = find.byType(AnimatedContainer);
-    expect(dots, findsNWidgets(2));
-    expect(tester.getSize(dots.at(0)).width, 20);
-    expect(tester.getSize(dots.at(1)).width, 8);
+    final dot0 = find.descendant(
+      of: find.byKey(const ValueKey('card-dot-0')),
+      matching: find.byType(AnimatedContainer),
+    );
+    final dot1 = find.descendant(
+      of: find.byKey(const ValueKey('card-dot-1')),
+      matching: find.byType(AnimatedContainer),
+    );
+    expect(dot0, findsOneWidget);
+    expect(dot1, findsOneWidget);
+    expect(tester.getSize(dot0).width, 20);
+    expect(tester.getSize(dot1).width, 8);
 
     // Right half advances through the combined showcase + photo list.
     await tester.tapAt(const Offset(490, 150));
     await tester.pumpAndSettle();
-    expect(tester.getSize(dots.at(0)).width, 8);
-    expect(tester.getSize(dots.at(1)).width, 20);
+    expect(tester.getSize(dot0).width, 8);
+    expect(tester.getSize(dot1).width, 20);
 
     await tester.tapAt(const Offset(310, 150));
     await tester.pumpAndSettle();
-    expect(tester.getSize(dots.at(0)).width, 20);
-    expect(tester.getSize(dots.at(1)).width, 8);
+    expect(tester.getSize(dot0).width, 20);
+    expect(tester.getSize(dot1).width, 8);
 
     // Dots jump directly to a page and remain bounded.
     await tester.tap(find.byKey(const ValueKey('card-dot-1')));
     await tester.pumpAndSettle();
-    expect(tester.getSize(dots.at(1)).width, 20);
+    expect(tester.getSize(dot1).width, 20);
   });
 
   testWidgets('many media pages use a counter instead of overflowing', (
@@ -88,6 +96,17 @@ void main() {
 
     expect(find.text('1 / 12'), findsOneWidget);
     expect(find.byKey(const ValueKey('card-dot-0')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('missing media uses the neutral initials fallback', (
+    tester,
+  ) async {
+    await tester.pumpWidget(harness());
+    await tester.pumpAndSettle();
+
+    expect(find.text('AE'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

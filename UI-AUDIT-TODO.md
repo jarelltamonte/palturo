@@ -29,7 +29,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 18. [x] P2-05 Empty-state links
 19. [x] P2-06 Chat timestamps
 20. [x] P2-07 Profile edit header and save
-21. [ ] P2-08 Person-card fallback
+21. [x] P2-08 Person-card fallback
 22. [ ] P2-09 Unread badge
 23. [ ] P2-10 Desktop max width
 
@@ -57,3 +57,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P2-05 | PASS | PASS | PASS | Empty-state settings/Swiping spans now accent + underline with semantics link action; recognizers unchanged. |
 | P2-06 | PASS | PASS | PASS | Removed chat-list time dot; 6px gap only when a time exists; formatter and ellipsis unchanged. |
 | P2-07 | PASS | PASS | PASS | Edit Profile title, 44px lime Save with saving state, consistent back glyph and header icon color. |
+| P2-08 | PASS | PASS | PASS | Person card null/broken media uses neutral gradient + shared initials; valid images/overlay/dots/actions unchanged; 26 tests. |

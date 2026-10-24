@@ -6,6 +6,7 @@ import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 enum PersonRole { learner, mentor }
 
@@ -225,9 +226,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 currentPhoto,
                 fit: BoxFit.cover,
                 errorBuilder:
-                    (_, __, ___) => Container(color: Colors.grey[400]),
+                    (_, __, ___) => _CardFallback(name: widget.person.name),
               )
-              : Container(color: Colors.grey[400]),
+              : _CardFallback(name: widget.person.name),
           Row(
             children: [
               Expanded(
@@ -651,6 +652,39 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _CardFallback extends StatelessWidget {
+  final String name;
+
+  const _CardFallback({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF3A3A3A), Color(0xFF1F1F1F)],
+        ),
+      ),
+      child: Center(
+        child: CircleAvatar(
+          radius: 56,
+          backgroundColor: Colors.white.withValues(alpha: 0.1),
+          child: Text(
+            UserAvatar.initialsFor(name),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 38,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }

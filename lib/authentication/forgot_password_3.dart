@@ -68,7 +68,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),

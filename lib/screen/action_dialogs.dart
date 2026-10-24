@@ -108,7 +108,7 @@ class _ConfirmDialog extends StatelessWidget {
     }
 
     return AlertDialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: titleWidget,
       content: SizedBox(width: double.maxFinite, child: body),
@@ -228,7 +228,7 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
                 fontSize: 14,
               ),
               filled: true,
-              fillColor: Theme.of(context).colorScheme.surface,
+              fillColor: AppColors.mutedSurface(context),
               contentPadding: const EdgeInsets.all(14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -289,7 +289,7 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
 
     return AlertDialog(
       scrollable: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: titleWidget,
       content: SizedBox(width: double.maxFinite, child: content),

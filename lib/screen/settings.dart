@@ -284,7 +284,7 @@ class _SettingsState extends State<Settings> {
                         fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surface,
+                      fillColor: AppColors.mutedSurface(context),
                       contentPadding: const EdgeInsets.all(14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -389,7 +389,7 @@ class _SettingsState extends State<Settings> {
             }
 
             return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: AppColors.elevatedSurface(context),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
@@ -463,7 +463,7 @@ class _SettingsState extends State<Settings> {
               fontSize: 14,
             ),
             filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
+            fillColor: AppColors.mutedSurface(context),
             contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -542,7 +542,7 @@ class _SettingsState extends State<Settings> {
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -664,7 +664,7 @@ class _SettingsState extends State<Settings> {
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -746,7 +746,7 @@ class _SettingsState extends State<Settings> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final surfaceColor = AppColors.elevatedSurface(context);
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -1120,7 +1120,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
               fontSize: 14,
             ),
             filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
+            fillColor: AppColors.mutedSurface(context),
             contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1179,7 +1179,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
     }
 
     return AlertDialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: Center(
         child: Text(

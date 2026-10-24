@@ -389,7 +389,7 @@ class _MatchesState extends State<Matches> {
   }
 
   void _showFilterSheet() {
-    final bgColor = Theme.of(context).colorScheme.surface;
+    final bgColor = AppColors.elevatedSurface(context);
     final textColor = Theme.of(context).colorScheme.secondary;
     RoleFilter draftRole = _roleFilter;
 

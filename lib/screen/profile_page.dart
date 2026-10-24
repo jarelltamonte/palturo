@@ -297,8 +297,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                     vertical: 12,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: bgTheme,
+                                    color: AppColors.elevatedSurface(context),
                                     borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: AppColors.border(context),
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withValues(
@@ -400,7 +403,7 @@ class _ProfileSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final cardColor = Theme.of(context).colorScheme.surface;
+    final cardColor = AppColors.elevatedSurface(context);
     final displayAvatar =
         (profile.photos.isNotEmpty && profile.photos[0] != null)
             ? profile.photos[0]
@@ -414,6 +417,7 @@ class _ProfileSummaryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.border(context)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),

@@ -10,7 +10,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 ## Ordered cases
 
 1. [x] P0-04 Contrast and text tokens
-2. [ ] P0-03 Dark elevated surfaces
+2. [x] P0-03 Dark elevated surfaces
 3. [ ] P0-01 Login small-screen layout
 4. [ ] P0-02 Startup delay
 5. [ ] P0-05 Semantics and tap targets
@@ -38,3 +38,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | Case | Functionality | Quality | Regression | Notes |
 |---|---|---|---|---|
 | P0-04 | PASS | PASS | PASS | Added accessible accent/muted tokens, removed lime-on-white foregrounds and gray nav labels, fixed dark attachment chip, 21 tests green. |
+| P0-03 | PASS | PASS | PASS | Added elevated/muted/border surfaces, applied to cards/nav/sheets/dialogs, kept page surface separate, fixed auth scaffold and nested-surface inversions, 23 tests green. |

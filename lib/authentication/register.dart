@@ -258,7 +258,7 @@ class _RegisterPageState extends State<RegisterPage> {
       barrierDismissible: false,
       builder:
           (dialogContext) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            backgroundColor: AppColors.elevatedSurface(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -354,7 +354,7 @@ class _RegisterPageState extends State<RegisterPage> {
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),

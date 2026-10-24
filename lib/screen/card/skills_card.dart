@@ -479,7 +479,7 @@ class _SkillsCardState extends State<SkillsCard> {
   @override
   Widget build(BuildContext context) {
     final accentColor = AppColors.accentText(context);
-    final themeColor = Theme.of(context).colorScheme.surface;
+    final themeColor = AppColors.elevatedSurface(context);
     final textColor = Theme.of(context).colorScheme.secondary;
     final canAddMore =
         _skillIds.length < widget.maxSkills && !_skillIds.contains('');
@@ -489,6 +489,7 @@ class _SkillsCardState extends State<SkillsCard> {
       decoration: BoxDecoration(
         color: themeColor,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -922,7 +923,7 @@ class _SkillRowState extends State<_SkillRow> {
   }
 
   Widget _buildSuggestionsOverlay(Color textColor) {
-    final surface = Theme.of(context).colorScheme.surface;
+    final surface = AppColors.mutedSurface(context);
     final ordered = _suggestions.reversed.toList();
     return CompositedTransformFollower(
       link: _layerLink,
@@ -1074,7 +1075,7 @@ class _SkillRowState extends State<_SkillRow> {
           widget.attachmentPath != null && widget.attachmentPath!.isNotEmpty
               ? Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
+                  color: AppColors.mutedSurface(context),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: widget.accentColor, width: 1.5),
                   boxShadow: [

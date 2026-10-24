@@ -45,7 +45,7 @@ class FilterBottomSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       useSafeArea: true,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(

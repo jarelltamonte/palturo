@@ -11,7 +11,7 @@ Future<Set<String>?> showMultiSelectPicker({
   return showModalBottomSheet<Set<String>>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: AppColors.elevatedSurface(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -68,7 +68,7 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
             : await showModalBottomSheet<Set<String>>(
               context: context,
               isScrollControlled: true,
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: AppColors.elevatedSurface(context),
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),

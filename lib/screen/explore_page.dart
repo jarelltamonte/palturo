@@ -534,7 +534,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
     }
 
     return AlertDialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: title,
       content: SizedBox(width: double.maxFinite, child: content),
@@ -575,9 +575,13 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final cardColor = Theme.of(context).colorScheme.surface;
+    final cardColor = AppColors.elevatedSurface(context);
 
     return Container(
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border(context)),
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         boxShadow: [

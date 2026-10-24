@@ -225,7 +225,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -315,7 +315,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }) async {
     final result = await showModalBottomSheet<List<String>>(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -395,7 +395,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       context: context,
       builder:
           (context) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            backgroundColor: AppColors.elevatedSurface(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -445,7 +445,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       context: context,
       builder:
           (context) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            backgroundColor: AppColors.elevatedSurface(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),

@@ -68,7 +68,7 @@ class _RoleCard extends StatelessWidget {
             ? AppColors.textSecondary
             : Theme.of(context).colorScheme.secondary;
 
-    final cardColor = Theme.of(context).colorScheme.surface;
+    final cardColor = AppColors.elevatedSurface(context);
 
     final labelParts = option.label.split('\n');
     final firstLine = labelParts.first;
@@ -87,6 +87,9 @@ class _RoleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : cardColor,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border(context),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),

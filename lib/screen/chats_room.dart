@@ -424,7 +424,7 @@ class _ChatRoomState extends State<ChatRoom> {
     final hasMessages = _messages.isNotEmpty;
 
     final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
-    final bgColor = Theme.of(context).colorScheme.onPrimary;
+    final bgColor = AppColors.mutedSurface(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -498,7 +498,7 @@ class _ChatRoomState extends State<ChatRoom> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              color: Theme.of(context).colorScheme.surface,
+              color: AppColors.elevatedSurface(context),
               elevation: 6,
               offset: const Offset(0, 40),
               onSelected: _handleMenuAction,

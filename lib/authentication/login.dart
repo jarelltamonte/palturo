@@ -102,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),

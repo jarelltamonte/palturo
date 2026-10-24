@@ -73,4 +73,47 @@ void main() {
     expect(accent, AppColors.primary);
     expect(muted, AppColors.mutedTextDark);
   });
+
+  testWidgets('dark cards have a distinct elevated surface and border', (
+    tester,
+  ) async {
+    late Color elevated;
+    late Color muted;
+    late Color border;
+
+    await tester.pumpWidget(MaterialApp(
+      theme: darkMode,
+      home: Builder(builder: (context) {
+        elevated = AppColors.elevatedSurface(context);
+        muted = AppColors.mutedSurface(context);
+        border = AppColors.border(context);
+        return const SizedBox.shrink();
+      }),
+    ));
+
+    expect(elevated, AppColors.elevatedDark);
+    expect(elevated, isNot(AppColors.background));
+    expect(muted, AppColors.mutedSurfaceDark);
+    expect(border, AppColors.borderDark);
+  });
+
+  testWidgets('light cards stay white with a subtle border', (tester) async {
+    late Color elevated;
+    late Color muted;
+    late Color border;
+
+    await tester.pumpWidget(MaterialApp(
+      theme: lightMode,
+      home: Builder(builder: (context) {
+        elevated = AppColors.elevatedSurface(context);
+        muted = AppColors.mutedSurface(context);
+        border = AppColors.border(context);
+        return const SizedBox.shrink();
+      }),
+    ));
+
+    expect(elevated, AppColors.elevatedLight);
+    expect(muted, AppColors.mutedSurfaceLight);
+    expect(border, AppColors.borderLight);
+  });
 }

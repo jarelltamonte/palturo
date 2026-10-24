@@ -269,7 +269,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                color: Theme.of(context).colorScheme.surface,
+                color: AppColors.elevatedSurface(context),
                 elevation: 6,
                 offset: const Offset(0, 40),
                 onSelected: (value) {

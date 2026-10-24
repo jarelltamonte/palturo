@@ -17,6 +17,13 @@ class AppColors {
   static const Color mutedTextLight = Color(0xFF5C6B73);
   static const Color mutedTextDark = secondary;
 
+  static const Color elevatedLight = Color(0xFFFFFFFF);
+  static const Color elevatedDark = Color(0xFF303030);
+  static const Color mutedSurfaceLight = Color(0xFFF5F5F5);
+  static const Color mutedSurfaceDark = Color(0xFF333333);
+  static const Color borderLight = Color(0xFFE2E2E2);
+  static const Color borderDark = Color(0xFF3D3D3D);
+
   static const Color white = Colors.white;
   static const Color black = Colors.black;
 
@@ -28,4 +35,13 @@ class AppColors {
 
   static Color mutedText(BuildContext context) =>
       _isDark(context) ? mutedTextDark : mutedTextLight;
+
+  static Color elevatedSurface(BuildContext context) =>
+      _isDark(context) ? elevatedDark : elevatedLight;
+
+  static Color mutedSurface(BuildContext context) =>
+      _isDark(context) ? mutedSurfaceDark : mutedSurfaceLight;
+
+  static Color border(BuildContext context) =>
+      _isDark(context) ? borderDark : borderLight;
 }

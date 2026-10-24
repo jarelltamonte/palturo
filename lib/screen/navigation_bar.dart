@@ -103,7 +103,25 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       },
       child: Scaffold(
         extendBody: true,
-        body: IndexedStack(index: _selectedIndex, children: _pages),
+        body: Stack(
+          children: List.generate(_pages.length, (index) {
+            final active = index == _selectedIndex;
+            return Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !active,
+                child: ExcludeSemantics(
+                  excluding: !active,
+                  child: AnimatedOpacity(
+                    duration: AppMotion.base,
+                    curve: Curves.easeOut,
+                    opacity: active ? 1 : 0,
+                    child: TickerMode(enabled: active, child: _pages[index]),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
         bottomNavigationBar: SafeArea(
           top: false,
           minimum: const EdgeInsets.only(bottom: 20),

@@ -24,7 +24,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 13. [x] P1-08 Avatar fallback
 14. [x] P2-01 Shared motion scale
 15. [x] P2-02 Consistent card exit
-16. [ ] P2-03 Tab fade and dead Hero
+16. [x] P2-03 Tab fade and dead Hero
 17. [ ] P2-04 Loading skeleton
 18. [ ] P2-05 Empty-state links
 19. [ ] P2-06 Chat timestamps
@@ -52,3 +52,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P1-08 | PASS | PASS | PASS | Shared UserAvatar initials-on-neutral fallback across chats, Pals, requests, profile, chat room, block list; images/error fallback preserved. |
 | P2-01 | PASS | PASS | PASS | Added AppMotion press/micro/base/screen/exit/feedback; migrated all UI durations; nav respects reduce-motion. |
 | P2-02 | PASS | PASS | PASS | Person-scoped 280ms exits for Home/Explore; button and swipe paths advance once; stale late actions no longer dismiss another card. |
+| P2-03 | PASS | PASS | PASS | State-preserving 200ms tab crossfade with hidden pages muted/excluded; Hero has a live Login↔Register counterpart, so it was retained. |

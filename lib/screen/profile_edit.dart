@@ -563,7 +563,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final textTheme2 = Theme.of(context).colorScheme.surface;
     final lightColor = Theme.of(context).colorScheme.surface;
 
     final scheduleDisplay = formatScheduleDays(_availability.keys);
@@ -585,10 +584,18 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
-          iconTheme: IconThemeData(color: textTheme2),
+          iconTheme: IconThemeData(color: textTheme),
+          titleSpacing: 0,
+          title: Text(
+            'Edit Profile',
+            style: AppTextStyles.headingText.copyWith(
+              color: textTheme,
+              fontSize: 20,
+            ),
+          ),
           leading: IconButton(
             tooltip: 'Back',
-            icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
+            icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
             onPressed: () async {
               if (_hasUnsavedChanges()) {
                 final canDiscard = await _confirmDiscardChanges();
@@ -606,10 +613,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
               child: TextButton(
                 style: TextButton.styleFrom(
                   backgroundColor:
-                      _isSaving ? textTheme.withValues(alpha: 0.5) : textTheme,
+                      _isSaving
+                          ? AppColors.mutedSurface(context)
+                          : AppColors.primary,
+                  foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
+                  minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 8,
@@ -618,7 +629,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 onPressed: _isSaving ? null : _save,
                 child: Text(
                   'Save',
-                  style: AppTextStyles.regularText.copyWith(color: textTheme2),
+                  style: AppTextStyles.regularText.copyWith(
+                    color:
+                        _isSaving ? AppColors.mutedText(context) : Colors.black,
+                  ),
                 ),
               ),
             ),

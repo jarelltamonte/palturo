@@ -150,6 +150,7 @@ class _SettingsState extends State<Settings> {
             final bool isCommentStep =
                 currentStep == _feedbackStatements.length;
             final int selectedRating = ratings[currentStep] ?? 0;
+            final bool canAdvance = isCommentStep || selectedRating > 0;
 
             Widget buildOption(int index) {
               final int value = index + 1;
@@ -380,7 +381,10 @@ class _SettingsState extends State<Settings> {
                     child: Text(
                       isCommentStep ? 'Submit' : 'Next',
                       style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.primary,
+                        color:
+                            canAdvance
+                                ? AppColors.accentText(context)
+                                : textTheme.withValues(alpha: 0.38),
                       ),
                     ),
                   ),
@@ -426,7 +430,10 @@ class _SettingsState extends State<Settings> {
                   child: Text(
                     isCommentStep ? 'Submit' : 'Next',
                     style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.primary,
+                      color:
+                          canAdvance
+                              ? AppColors.accentText(context)
+                              : textTheme.withValues(alpha: 0.38),
                     ),
                   ),
                 ),
@@ -528,14 +535,23 @@ class _SettingsState extends State<Settings> {
                   style: AppTextStyles.regularText.copyWith(color: textTheme),
                 ),
               ),
-              CupertinoDialogAction(
-                onPressed: submitReport,
-                child: Text(
-                  'Submit',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _reportController,
+                builder: (context, value, _) {
+                  final canSubmit = value.text.trim().isNotEmpty;
+                  return CupertinoDialogAction(
+                    onPressed: canSubmit ? submitReport : null,
+                    child: Text(
+                      'Submit',
+                      style: AppTextStyles.regularText.copyWith(
+                        color:
+                            canSubmit
+                                ? AppColors.accentText(context)
+                                : textTheme.withValues(alpha: 0.38),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           );
@@ -568,15 +584,24 @@ class _SettingsState extends State<Settings> {
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
-            TextButton(
-              style: _noSplashButtonStyle,
-              onPressed: submitReport,
-              child: Text(
-                'Submit',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _reportController,
+              builder: (context, value, _) {
+                final canSubmit = value.text.trim().isNotEmpty;
+                return TextButton(
+                  style: _noSplashButtonStyle,
+                  onPressed: canSubmit ? submitReport : null,
+                  child: Text(
+                    'Submit',
+                    style: AppTextStyles.regularText.copyWith(
+                      color:
+                          canSubmit
+                              ? AppColors.accentText(context)
+                              : textTheme.withValues(alpha: 0.38),
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         );

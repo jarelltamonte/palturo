@@ -22,12 +22,13 @@ Future<bool> showConfirmDialog(
 }) async {
   final result = await showAdaptiveDialog<bool>(
     context: context,
-    builder: (dialogContext) => _ConfirmDialog(
-      title: title,
-      message: message,
-      confirmLabel: confirmLabel,
-      destructive: destructive,
-    ),
+    builder:
+        (dialogContext) => _ConfirmDialog(
+          title: title,
+          message: message,
+          confirmLabel: confirmLabel,
+          destructive: destructive,
+        ),
   );
   return result ?? false;
 }
@@ -74,10 +75,7 @@ class _ConfirmDialog extends StatelessWidget {
     final body = Text(
       message,
       textAlign: TextAlign.center,
-      style: AppTextStyles.regularText.copyWith(
-        color: textTheme,
-        fontSize: 14,
-      ),
+      style: AppTextStyles.regularText.copyWith(color: textTheme, fontSize: 14),
     );
 
     if (isIOS) {
@@ -122,19 +120,20 @@ class _ConfirmDialog extends StatelessWidget {
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, true),
-          style: destructive
-              ? TextButton.styleFrom(
-                  backgroundColor: Colors.red.withValues(alpha: 0.12),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                )
-              : null,
+          style:
+              destructive
+                  ? TextButton.styleFrom(
+                    backgroundColor: Colors.red.withValues(alpha: 0.12),
+                    foregroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  )
+                  : null,
           child: Text(
             confirmLabel,
             style: AppTextStyles.regularText.copyWith(color: confirmColor),
@@ -232,15 +231,11 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
               contentPadding: const EdgeInsets.all(14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: textTheme.withValues(alpha: 0.2),
-                ),
+                borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: textTheme.withValues(alpha: 0.2),
-                ),
+                borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -277,9 +272,10 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
             child: Text(
               'Report',
               style: AppTextStyles.regularText.copyWith(
-                color: AppColors.primary.withValues(
-                  alpha: canSubmit ? 1 : 0.4,
-                ),
+                color:
+                    canSubmit
+                        ? AppColors.accentText(context)
+                        : textTheme.withValues(alpha: 0.38),
               ),
             ),
           ),
@@ -306,9 +302,10 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
           child: Text(
             'Report',
             style: AppTextStyles.regularText.copyWith(
-              color: AppColors.primary.withValues(
-                alpha: canSubmit ? 1 : 0.4,
-              ),
+              color:
+                  canSubmit
+                      ? AppColors.accentText(context)
+                      : textTheme.withValues(alpha: 0.38),
             ),
           ),
         ),
@@ -346,9 +343,10 @@ class _ReasonTile extends StatelessWidget {
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
                 size: 20,
-                color: selected
-                    ? AppColors.primary
-                    : textTheme.withValues(alpha: 0.5),
+                color:
+                    selected
+                        ? AppColors.primary
+                        : textTheme.withValues(alpha: 0.5),
               ),
               const SizedBox(width: 12),
               Expanded(

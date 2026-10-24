@@ -19,7 +19,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 8. [x] P1-03 Settings header, footer, switches
 9. [x] P1-04 Profile role badge
 10. [x] P1-05 Request chevron
-11. [ ] P1-06 Filter cleanup
+11. [x] P1-06 Filter cleanup
 12. [ ] P1-07 Disabled actions
 13. [ ] P1-08 Avatar fallback
 14. [ ] P2-01 Shared motion scale
@@ -47,3 +47,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P1-03 | PASS | PASS | PASS | Settings back header/title, scrollable Account section, no fixed footer, readable off switch and dark dividers. |
 | P1-04 | PASS | PASS | PASS | Profile role is an intrinsic 44px non-interactive badge with a Role label; edit/onboarding remain three 120px cards. |
 | P1-05 | PASS | PASS | PASS | Request card uses a right chevron matching detail navigation; taps/Accept/Decline/layout unchanged. |
+| P1-06 | PASS | PASS | PASS | Removed dead Skills/Coming soon sections; Requests section renamed Sort by; all filters still apply/reset. |

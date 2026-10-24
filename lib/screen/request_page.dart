@@ -152,10 +152,9 @@ class _RequestPageState extends State<RequestPage> {
         FilterOption('Mentor', 'mentor'),
       ],
     ),
-    FilterSection(key: 'skills', title: 'Skills'),
     FilterSection(
       key: 'sort',
-      title: 'Filter',
+      title: 'Sort by',
       defaultValue: 'newest',
       options: [
         FilterOption('Newest', 'newest'),

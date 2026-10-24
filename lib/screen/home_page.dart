@@ -42,7 +42,6 @@ class _HomePageState extends State<HomePage> {
         FilterOption('Mentor', 'mentor'),
       ],
     ),
-    FilterSection(key: 'skills', title: 'Skills'),
   ];
 
   RoleFilter _roleFilter = RoleFilter.all;

@@ -495,16 +495,6 @@ class _MatchesState extends State<Matches> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Skills', textColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coming soon',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.4),
-                        fontSize: 13,
-                      ),
-                    ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,

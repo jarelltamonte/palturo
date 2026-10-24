@@ -53,7 +53,6 @@ class _ChatsPageState extends State<ChatsPage> {
         FilterOption('Read', 'read'),
       ],
     ),
-    FilterSection(key: 'skills', title: 'Skills'),
   ];
 
   static const int _maxMatchCards = 8;

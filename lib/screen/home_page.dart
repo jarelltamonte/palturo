@@ -638,7 +638,12 @@ class _HomePageState extends State<HomePage> {
                         TextSpan(
                           text: 'settings',
                           recognizer: _settingsTap,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.accentText(context),
+                            decoration: TextDecoration.underline,
+                            decorationThickness: 1.5,
+                          ),
                         ),
                       ],
                       style: AppTextStyles.regularText.copyWith(

@@ -359,7 +359,9 @@ class _ChatsPageState extends State<ChatsPage> {
                     recognizer: _swipeTap,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: textTheme,
+                      color: AppColors.accentText(context),
+                      decoration: TextDecoration.underline,
+                      decorationThickness: 1.5,
                     ),
                   ),
                 ],

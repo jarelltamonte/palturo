@@ -137,6 +137,10 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final compact = constraints.maxHeight < 560;
+            final veryCompact = constraints.maxHeight < 430;
+            final logoWidth = veryCompact ? 150.0 : (compact ? 190.0 : 285.0);
+
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -158,11 +162,11 @@ class _LoginPageState extends State<LoginPage> {
                             isDarkMode
                                 ? 'assets/images/logo_white.png'
                                 : 'assets/images/logo_black.png',
-                            width: 285,
+                            width: logoWidth,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 56),
+                      SizedBox(height: compact ? 20 : 56),
 
                       TopLabeledField(
                         label: 'Email',
@@ -251,7 +255,12 @@ class _LoginPageState extends State<LoginPage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
+          padding: EdgeInsets.fromLTRB(
+            16.0,
+            0.0,
+            16.0,
+            MediaQuery.sizeOf(context).height < 760 ? 16.0 : 32.0,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -327,8 +327,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                                   : '$_friendCount',
                                               style: AppTextStyles.regularText
                                                   .copyWith(
-                                                    color: textTheme.withValues(
-                                                      alpha: 0.6,
+                                                    color: AppColors.mutedText(
+                                                      context,
                                                     ),
                                                     fontSize: 12,
                                                   ),

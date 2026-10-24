@@ -86,7 +86,7 @@ class RequestCard extends StatelessWidget {
               Text(
                 timeAgo,
                 style: AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.5),
+                  color: AppColors.mutedText(context),
                   fontSize: 12,
                 ),
               ),

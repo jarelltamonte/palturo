@@ -478,7 +478,7 @@ class _SkillsCardState extends State<SkillsCard> {
 
   @override
   Widget build(BuildContext context) {
-    const accentColor = AppColors.primary;
+    final accentColor = AppColors.accentText(context);
     final themeColor = Theme.of(context).colorScheme.surface;
     final textColor = Theme.of(context).colorScheme.secondary;
     final canAddMore =
@@ -511,7 +511,7 @@ class _SkillsCardState extends State<SkillsCard> {
                     const TextSpan(text: 'Skills to '),
                     TextSpan(
                       text: widget.labelSuffix,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: accentColor,
                       ),
@@ -825,14 +825,14 @@ class _SkillRowState extends State<_SkillRow> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),
@@ -881,7 +881,7 @@ class _SkillRowState extends State<_SkillRow> {
           border: _border(dim, 1.5, 28),
           enabledBorder: _border(dim, 1.5, 28),
           disabledBorder: _border(dim, 1.5, 28),
-          focusedBorder: _border(AppColors.primary, 1.5, 28),
+          focusedBorder: _border(widget.accentColor, 1.5, 28),
         ),
       ),
     );
@@ -959,7 +959,7 @@ class _SkillRowState extends State<_SkillRow> {
                                 : (categoryById(s.categoryId)?.icon ??
                                     Icons.label_outline),
                             size: 20,
-                            color: s.isCustom ? AppColors.primary : textColor,
+                            color: s.isCustom ? widget.accentColor : textColor,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1074,9 +1074,9 @@ class _SkillRowState extends State<_SkillRow> {
           widget.attachmentPath != null && widget.attachmentPath!.isNotEmpty
               ? Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  border: Border.all(color: widget.accentColor, width: 1.5),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.05),
@@ -1101,10 +1101,10 @@ class _SkillRowState extends State<_SkillRow> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.check_circle,
                               size: 16,
-                              color: AppColors.primary,
+                              color: widget.accentColor,
                             ),
                             const SizedBox(width: 6),
                             ConstrainedBox(
@@ -1113,8 +1113,8 @@ class _SkillRowState extends State<_SkillRow> {
                                 _getDisplayName(widget.attachmentPath!),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
+                                style: TextStyle(
+                                  color: widget.accentColor,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),

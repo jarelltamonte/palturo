@@ -130,8 +130,8 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navigationIcons.length, (index) {
               final isSelected = _selectedIndex == index;
-              final activeColor = AppColors.primary;
-              final inactiveColor = Colors.grey;
+              final activeColor = AppColors.accentText(context);
+              final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
               final showBadge = isChat && !isSelected && ChatStateService.instance.totalUnreadCount > 0;
 
@@ -139,6 +139,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
                 icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
                 label: _navigationLabels[index],
                 color: isSelected ? activeColor : inactiveColor,
+                selected: isSelected,
                 onTap: () => _onItemTapped(index),
                 showBadge: showBadge,
               );
@@ -223,6 +224,7 @@ class _NavItem extends StatefulWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool selected;
   final bool showBadge;
 
   const _NavItem({
@@ -230,6 +232,7 @@ class _NavItem extends StatefulWidget {
     required this.label,
     required this.color,
     required this.onTap,
+    this.selected = false,
     this.showBadge = false,
   });
 
@@ -311,9 +314,7 @@ class _NavItemState extends State<_NavItem>
                 color: widget.color,
                 fontSize: 11,
                 fontWeight:
-                    widget.color == AppColors.primary
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    widget.selected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ],

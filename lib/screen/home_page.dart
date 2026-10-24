@@ -477,8 +477,8 @@ class _HomePageState extends State<HomePage> {
                               child: Container(
                                 width: 8,
                                 height: 8,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentText(context),
                                   shape: BoxShape.circle,
                                 ),
                               ),

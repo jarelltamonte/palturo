@@ -862,7 +862,7 @@ class _MatchesState extends State<Matches> {
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: AppColors.accentText(context),
                             shape: BoxShape.circle,
                           ),
                         ),

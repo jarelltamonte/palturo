@@ -166,8 +166,6 @@ class _RequestPageState extends State<RequestPage> {
     ),
   ];
 
-  Color get _filterDotColor => AppColors.primary;
-
   bool get _hasActiveFilter =>
       _dateFilter != DateFilter.all ||
       _roleFilter != RoleFilter.all ||
@@ -459,7 +457,7 @@ class _RequestPageState extends State<RequestPage> {
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: _filterDotColor,
+                              color: AppColors.accentText(context),
                               shape: BoxShape.circle,
                             ),
                           ),

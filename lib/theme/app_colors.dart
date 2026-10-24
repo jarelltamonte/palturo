@@ -11,6 +11,21 @@ class AppColors {
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFF262626);
 
+  /// Derived tokens. These keep the lime brand fill intact while giving text
+  /// and muted controls enough contrast on light surfaces.
+  static const Color accentTextLight = Color(0xFF5F7300);
+  static const Color mutedTextLight = Color(0xFF5C6B73);
+  static const Color mutedTextDark = secondary;
+
   static const Color white = Colors.white;
   static const Color black = Colors.black;
+
+  static bool _isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  static Color accentText(BuildContext context) =>
+      _isDark(context) ? primary : accentTextLight;
+
+  static Color mutedText(BuildContext context) =>
+      _isDark(context) ? mutedTextDark : mutedTextLight;
 }

@@ -473,7 +473,7 @@ class _ChatsPageState extends State<ChatsPage> {
                                     width: 8,
                                     height: 8,
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary,
+                                      color: AppColors.accentText(context),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -634,9 +634,9 @@ class MatchesShortcutItem extends StatelessWidget {
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
+              child: const Icon(
                 CupertinoIcons.person_3_fill,
-                color: textTheme,
+                color: AppColors.black,
                 size: 36,
               ),
             ),

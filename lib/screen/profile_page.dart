@@ -15,6 +15,7 @@ import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
   final custom = CustomSkill.tryParse(id);
@@ -452,21 +453,13 @@ class _ProfileSummaryCard extends StatelessWidget {
                   label: 'View profile photo',
                   child: GestureDetector(
                     onTap: onAvatarTap,
-                    child: CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.grey[300],
-                      backgroundImage:
+                    child: UserAvatar(
+                      name: profile.name,
+                      image:
                           displayAvatar != null
                               ? NetworkImage(displayAvatar)
                               : null,
-                      child:
-                          displayAvatar == null
-                              ? Icon(
-                                Icons.person,
-                                size: 40,
-                                color: Colors.grey[600],
-                              )
-                              : null,
+                      size: 80,
                     ),
                   ),
                 ),

@@ -10,6 +10,7 @@ import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 class ChatRoom extends StatefulWidget {
   final String? connectionId;
@@ -454,10 +455,10 @@ class _ChatRoomState extends State<ChatRoom> {
                   behavior: HitTestBehavior.opaque,
                   child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey,
-                        backgroundImage: widget.avatarImage,
+                      UserAvatar(
+                        name: widget.name,
+                        image: widget.avatarImage,
+                        size: 40,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -589,10 +590,10 @@ class _ChatRoomState extends State<ChatRoom> {
                         children: [
                           GestureDetector(
                             onTap: _showProfile,
-                            child: CircleAvatar(
-                              radius: 50,
-                              backgroundColor: Colors.grey,
-                              backgroundImage: widget.avatarImage,
+                            child: UserAvatar(
+                              name: widget.name,
+                              image: widget.avatarImage,
+                              size: 100,
                             ),
                           ),
                           const SizedBox(height: 12),

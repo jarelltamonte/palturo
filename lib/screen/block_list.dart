@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
@@ -198,13 +199,13 @@ class _BlockedTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.grey.withValues(alpha: 0.3),
-            backgroundImage:
+          UserAvatar(
+            name: person.name,
+            image:
                 person.photoUrls[0] == null
                     ? null
                     : NetworkImage(person.photoUrls[0]!),
+            size: 48,
           ),
           const SizedBox(width: 12),
           Expanded(

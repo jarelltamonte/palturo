@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 class RequestCard extends StatelessWidget {
   final String skillName;
@@ -103,15 +104,7 @@ class RequestCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFE8E8E8),
-                ),
-                child: const Icon(Icons.person, size: 28, color: Colors.grey),
-              ),
+              UserAvatar(name: requesterName, size: 40),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

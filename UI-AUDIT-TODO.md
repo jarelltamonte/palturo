@@ -21,7 +21,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 10. [x] P1-05 Request chevron
 11. [x] P1-06 Filter cleanup
 12. [x] P1-07 Disabled actions
-13. [ ] P1-08 Avatar fallback
+13. [x] P1-08 Avatar fallback
 14. [ ] P2-01 Shared motion scale
 15. [ ] P2-02 Consistent card exit
 16. [ ] P2-03 Tab fade and dead Hero
@@ -49,3 +49,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P1-05 | PASS | PASS | PASS | Request card uses a right chevron matching detail navigation; taps/Accept/Decline/layout unchanged. |
 | P1-06 | PASS | PASS | PASS | Removed dead Skills/Coming soon sections; Requests section renamed Sort by; all filters still apply/reset. |
 | P1-07 | PASS | PASS | PASS | Feedback Next and report Submit are truly disabled and gray until valid; report reason uses the same enabled/disabled tokens. |
+| P1-08 | PASS | PASS | PASS | Shared UserAvatar initials-on-neutral fallback across chats, Pals, requests, profile, chat room, block list; images/error fallback preserved. |

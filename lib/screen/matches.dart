@@ -12,6 +12,7 @@ import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -52,17 +53,6 @@ class _MatchesState extends State<Matches> {
     'X',
     'Y',
     'Z',
-  ];
-
-  static const List<Color> _avatarColors = [
-    Color(0xFFE57373),
-    Color(0xFFBA68C8),
-    Color(0xFF7986CB),
-    Color(0xFF4FC3F7),
-    Color(0xFF4DB6AC),
-    Color(0xFF81C784),
-    Color(0xFFFFB74D),
-    Color(0xFFA1887F),
   ];
 
   final Map<String, GlobalKey> _sectionKeys = {};
@@ -170,22 +160,6 @@ class _MatchesState extends State<Matches> {
       grouped.putIfAbsent(letter, () => []).add(pal);
     }
     return grouped;
-  }
-
-  String _initials(String name) {
-    final parts =
-        name
-            .trim()
-            .split(RegExp(r'\s+'))
-            .where((part) => part.isNotEmpty)
-            .toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
-  Color _colorFor(String name) {
-    return _avatarColors[name.hashCode.abs() % _avatarColors.length];
   }
 
   void _startSearch() {
@@ -540,20 +514,10 @@ class _MatchesState extends State<Matches> {
               label: 'View ${pal.name} profile',
               child: GestureDetector(
                 onTap: () => _openProfile(pal),
-                child: CircleAvatar(
-                  radius: 24,
-                  backgroundColor: _colorFor(pal.name),
-                  backgroundImage: pal.avatarImage,
-                  child:
-                      pal.avatarImage == null
-                          ? Text(
-                            _initials(pal.name),
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          )
-                          : null,
+                child: UserAvatar(
+                  name: pal.name,
+                  image: pal.avatarImage,
+                  size: 48,
                 ),
               ),
             ),

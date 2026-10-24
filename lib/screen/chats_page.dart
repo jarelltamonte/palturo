@@ -15,6 +15,7 @@ import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 class ChatsPage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
@@ -716,24 +717,13 @@ class ChatProfileItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 100,
+            UserAvatar(
+              name: name,
+              image: avatarImage,
+              size: 100,
               height: 120,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(12),
-                image:
-                    avatarImage != null
-                        ? DecorationImage(
-                          image: avatarImage!,
-                          fit: BoxFit.cover,
-                        )
-                        : null,
-              ),
-              child:
-                  avatarImage == null
-                      ? Icon(Icons.person, color: Colors.grey[600], size: 28)
-                      : null,
+              circular: false,
+              borderRadius: 12,
             ),
             const SizedBox(height: 4),
             SizedBox(
@@ -789,15 +779,7 @@ class ChatListItem extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: Colors.grey[300],
-              backgroundImage: avatarImage,
-              child:
-                  avatarImage == null
-                      ? Icon(Icons.person, color: Colors.grey[600], size: 28)
-                      : null,
-            ),
+            UserAvatar(name: name, image: avatarImage, size: 56),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

@@ -24,18 +24,18 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
 
   final List<IconData> _navigationIcons = [
-    CupertinoIcons.arrowtriangle_left,
+    CupertinoIcons.person_2,
     CupertinoIcons.compass,
     CupertinoIcons.chat_bubble,
-    CupertinoIcons.heart,
+    CupertinoIcons.tray,
     CupertinoIcons.person,
   ];
 
   final List<IconData> _selectedIcons = [
-    CupertinoIcons.arrowtriangle_left_fill,
+    CupertinoIcons.person_2_fill,
     CupertinoIcons.compass_fill,
     CupertinoIcons.chat_bubble_fill,
-    CupertinoIcons.heart_fill,
+    CupertinoIcons.tray_fill,
     CupertinoIcons.person_fill,
   ];
 
@@ -103,7 +103,11 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       child: Scaffold(
         extendBody: true,
         body: IndexedStack(index: _selectedIndex, children: _pages),
-        bottomNavigationBar: _buildNavBar(),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: 20),
+          child: _buildNavBar(),
+        ),
       ),
     );
   }
@@ -114,7 +118,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       builder: (context, _) {
         return Container(
           height: 60,
-          margin: const EdgeInsets.only(right: 16, left: 16, bottom: 20),
+          margin: const EdgeInsets.only(right: 16, left: 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             color: AppColors.elevatedSurface(context),
@@ -250,22 +254,20 @@ class _NavItem extends StatefulWidget {
 class _NavItemState extends State<_NavItem>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _jiggle;
+  late final Animation<double> _selectionScale;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 180),
     );
 
-    _jiggle = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.15), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -0.15, end: 0.15), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 0.15, end: -0.1), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: -0.1, end: 0.0), weight: 1),
-    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _selectionScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.92), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.92, end: 1.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -275,7 +277,9 @@ class _NavItemState extends State<_NavItem>
   }
 
   void _handleTap() {
-    _controller.forward(from: 0);
+    if (!widget.selected) {
+      _controller.forward(from: 0);
+    }
     widget.onTap();
   }
 
@@ -301,10 +305,10 @@ class _NavItemState extends State<_NavItem>
                 clipBehavior: Clip.none,
                 children: [
                   AnimatedBuilder(
-                    animation: _jiggle,
+                    animation: _selectionScale,
                     builder: (context, child) {
-                      return Transform.rotate(
-                        angle: _jiggle.value,
+                      return Transform.scale(
+                        scale: _selectionScale.value,
                         child: child,
                       );
                     },
@@ -331,7 +335,7 @@ class _NavItemState extends State<_NavItem>
                 style: TextStyle(
                   fontFamily: 'Inter',
                   color: widget.color,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight:
                       widget.selected ? FontWeight.bold : FontWeight.normal,
                 ),

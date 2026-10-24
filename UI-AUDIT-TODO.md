@@ -27,7 +27,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 16. [x] P2-03 Tab fade and dead Hero
 17. [x] P2-04 Loading skeleton
 18. [x] P2-05 Empty-state links
-19. [ ] P2-06 Chat timestamps
+19. [x] P2-06 Chat timestamps
 20. [ ] P2-07 Profile edit header and save
 21. [ ] P2-08 Person-card fallback
 22. [ ] P2-09 Unread badge
@@ -55,3 +55,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P2-03 | PASS | PASS | PASS | State-preserving 200ms tab crossfade with hidden pages muted/excluded; Hero has a live Login↔Register counterpart, so it was retained. |
 | P2-04 | PASS | PASS | PASS | Card-shaped cold-load skeleton with semantics/shimmer token; cached/refresh/error paths untouched; 25 tests. |
 | P2-05 | PASS | PASS | PASS | Empty-state settings/Swiping spans now accent + underline with semantics link action; recognizers unchanged. |
+| P2-06 | PASS | PASS | PASS | Removed chat-list time dot; 6px gap only when a time exists; formatter and ellipsis unchanged. |

@@ -832,13 +832,16 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Text(
-                        ' · $time',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.7),
-                          fontSize: 12,
+                      if (time.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          time,
+                          style: AppTextStyles.regularText.copyWith(
+                            color: textTheme.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ],

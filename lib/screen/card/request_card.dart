@@ -68,7 +68,7 @@ class RequestCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.keyboard_arrow_up, color: textTheme),
+              Icon(Icons.chevron_right, color: textTheme),
             ],
           ),
           const SizedBox(height: 4),

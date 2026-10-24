@@ -12,7 +12,7 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 1. [x] P0-04 Contrast and text tokens
 2. [x] P0-03 Dark elevated surfaces
 3. [x] P0-01 Login small-screen layout
-4. [ ] P0-02 Startup delay
+4. [x] P0-02 Startup delay
 5. [ ] P0-05 Semantics and tap targets
 6. [ ] P1-02 Navigation icons, SafeArea, motion
 7. [ ] P1-01 Branding, splash, metadata
@@ -40,3 +40,4 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P0-04 | PASS | PASS | PASS | Added accessible accent/muted tokens, removed lime-on-white foregrounds and gray nav labels, fixed dark attachment chip, 21 tests green. |
 | P0-03 | PASS | PASS | PASS | Added elevated/muted/border surfaces, applied to cards/nav/sheets/dialogs, kept page surface separate, fixed auth scaffold and nested-surface inversions, 23 tests green. |
 | P0-01 | PASS | PASS | PASS | Responsive login: 285/190/150 logo tiers, compact gap/footer; 360/320 fit, 390 safe-area keeps original layout; 23 tests green. |
+| P0-02 | PASS | PASS | PASS | Native splash removed on first frame; root gate 200ms; landing 600ms; total ~0.8s, deep-link guards intact. |

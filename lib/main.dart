@@ -193,8 +193,9 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
     super.initState();
     _themeMode = widget.initialDarkMode ? ThemeMode.dark : ThemeMode.light;
 
+    // Keep the native splash only until Flutter paints its first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 3), FlutterNativeSplash.remove);
+      FlutterNativeSplash.remove();
     });
 
     _initAuthAndLinks();

@@ -18,7 +18,9 @@ class _AppRootDeciderState extends State<AppRootDecider> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(milliseconds: 800), () {
+    // Give a cold-start deep link a deterministic window to arrive without
+    // adding a visible pause before the onboarding/landing decision.
+    Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) {
         setState(() {
           _isCheckingInitialLink = false;

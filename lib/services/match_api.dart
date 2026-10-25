@@ -727,6 +727,12 @@ class MatchApi {
   static Future<void> markNotificationsRead() =>
       _Client.c.rpc('mark_notifications_read');
 
+  /// Marks one notification read so opening a row does not silently clear
+  /// unrelated unread items.
+  static Future<void> markNotificationRead(String id) async {
+    await _Client.c.rpc('mark_notification_read', params: {'p_id': id});
+  }
+
   // ---- Skill selection (spec: taxonomy + notes + classify) ----
 
   /// The caller's placements: [{kind, note, id, name, path}].

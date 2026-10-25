@@ -130,8 +130,13 @@ enum RequestView { incoming, sent }
 
 class RequestPage extends StatefulWidget {
   final ValueListenable<int>? refreshSignal;
+  final RequestView initialView;
 
-  const RequestPage({super.key, this.refreshSignal});
+  const RequestPage({
+    super.key,
+    this.refreshSignal,
+    this.initialView = RequestView.incoming,
+  });
 
   @override
   State<RequestPage> createState() => _RequestPageState();
@@ -194,6 +199,7 @@ class _RequestPageState extends State<RequestPage> {
   @override
   void initState() {
     super.initState();
+    _view = widget.initialView;
     widget.refreshSignal?.addListener(_refreshFromShell);
     ActivityService.instance.addListener(_onActivityChanged);
     _loadRequests();
@@ -715,6 +721,18 @@ class _RequestPageState extends State<RequestPage> {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
+        leading:
+            ModalRoute.of(context)?.isFirst == false
+                ? IconButton(
+                  tooltip: 'Back',
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(
+                    Icons.arrow_back_ios_new,
+                    size: 16,
+                    color: textTheme,
+                  ),
+                )
+                : null,
         titleSpacing: 0,
         title: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

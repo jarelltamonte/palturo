@@ -67,7 +67,6 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
     Haptics.selection();
     if (index == 3) {
       _requestsRefresh.value++;
-      ActivityService.instance.markRead();
     }
     if (index == _exploreIndex && _selectedIndex == _exploreIndex) {
       _exploreNavKey.currentState?.popUntil((route) => route.isFirst);

@@ -92,88 +92,100 @@ class _RoleCard extends StatelessWidget {
     final firstLine = labelParts.first;
     final secondLine = labelParts.length > 1 ? labelParts[1] : '';
 
-    return GestureDetector(
+    return Semantics(
+      container: true,
+      button: isEditing,
+      selected: selected,
+      label: option.label.replaceAll('\n', ' '),
+      excludeSemantics: true,
       onTap: isEditing ? onTap : null,
-      child: AnimatedContainer(
-        duration: AppMotion.micro,
-        height: compact ? 44 : 120,
-        alignment: Alignment.center,
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 16 : 8,
-          vertical: compact ? 8 : 4,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : cardColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border(context),
+      child: GestureDetector(
+        onTap: isEditing ? onTap : null,
+        child: AnimatedContainer(
+          duration: AppMotion.micro,
+          constraints: BoxConstraints(minHeight: compact ? 44 : 120),
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 16 : 8,
+            vertical: compact ? 8 : 4,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              spreadRadius: 0,
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border(context),
             ),
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                spreadRadius: 0,
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child:
+              compact
+                  ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        option.iconAsset,
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                      ),
+                      const SizedBox(width: 8),
+                      RichText(
+                        text: TextSpan(
+                          style: AppTextStyles.regularText.copyWith(color: fg),
+                          children: [
+                            TextSpan(text: '$firstLine '),
+                            TextSpan(
+                              text: secondLine,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                  : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        option.iconAsset,
+                        width: 24,
+                        height: 24,
+                        colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                      ),
+                      const SizedBox(height: 8),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: '$firstLine\n'),
+                            TextSpan(
+                              text: secondLine,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: fg,
+                          height: 1.1,
+                          leadingDistribution: TextLeadingDistribution.even,
+                        ),
+                      ),
+                    ],
+                  ),
         ),
-        child:
-            compact
-                ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SvgPicture.asset(
-                      option.iconAsset,
-                      width: 20,
-                      height: 20,
-                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                    ),
-                    const SizedBox(width: 8),
-                    RichText(
-                      text: TextSpan(
-                        style: AppTextStyles.regularText.copyWith(color: fg),
-                        children: [
-                          TextSpan(text: '$firstLine '),
-                          TextSpan(
-                            text: secondLine,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                )
-                : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SvgPicture.asset(
-                      option.iconAsset,
-                      width: 24,
-                      height: 24,
-                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                    ),
-                    const SizedBox(height: 8),
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: '$firstLine\n'),
-                          TextSpan(
-                            text: secondLine,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: fg,
-                        height: 1.1,
-                        leadingDistribution: TextLeadingDistribution.even,
-                      ),
-                    ),
-                  ],
-                ),
       ),
     );
   }

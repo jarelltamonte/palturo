@@ -18,6 +18,7 @@ Future<bool> showConfirmDialog(
   required String title,
   required String message,
   required String confirmLabel,
+  String cancelLabel = 'Cancel',
   bool destructive = true,
 }) async {
   final result = await showAdaptiveDialog<bool>(
@@ -27,6 +28,7 @@ Future<bool> showConfirmDialog(
           title: title,
           message: message,
           confirmLabel: confirmLabel,
+          cancelLabel: cancelLabel,
           destructive: destructive,
         ),
   );
@@ -47,12 +49,14 @@ class _ConfirmDialog extends StatelessWidget {
   final String title;
   final String message;
   final String confirmLabel;
+  final String cancelLabel;
   final bool destructive;
 
   const _ConfirmDialog({
     required this.title,
     required this.message,
     required this.confirmLabel,
+    required this.cancelLabel,
     required this.destructive,
   });
 
@@ -92,7 +96,7 @@ class _ConfirmDialog extends StatelessWidget {
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              'Cancel',
+              cancelLabel,
               style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
           ),
@@ -117,7 +121,7 @@ class _ConfirmDialog extends StatelessWidget {
         TextButton(
           onPressed: () => Navigator.pop(context, false),
           child: Text(
-            'Cancel',
+            cancelLabel,
             style: AppTextStyles.regularText.copyWith(color: textTheme),
           ),
         ),

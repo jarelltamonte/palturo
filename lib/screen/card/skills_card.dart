@@ -1144,22 +1144,32 @@ class _SkillRowState extends State<_SkillRow> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(right: 6.0),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: widget.onRemoveAttachment,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.close,
-                              size: 14,
-                              color: Colors.grey.shade700,
+                      padding: const EdgeInsets.only(right: 2.0),
+                      child: Semantics(
+                        button: true,
+                        label: 'Remove attachment',
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Center(
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: widget.onRemoveAttachment,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1168,26 +1178,41 @@ class _SkillRowState extends State<_SkillRow> {
                   ],
                 ),
               )
-              : GestureDetector(
+              : Semantics(
+                button: true,
+                label: 'Attach a file',
+                excludeSemantics: true,
                 onTap: widget.onAttachFile,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.attach_file,
-                      size: 16,
-                      color: widget.accentColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Attach a file',
-                      style: TextStyle(
-                        color: widget.accentColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onAttachFile,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.attach_file,
+                            size: 16,
+                            color: widget.accentColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Attach a file',
+                              style: TextStyle(
+                                color: widget.accentColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
     );

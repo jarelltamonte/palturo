@@ -48,6 +48,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late Map<String, String> _initialTeachingNotes;
   final Set<String> _changedLearningNotes = {};
   final Set<String> _changedTeachingNotes = {};
+  final GlobalKey _teachingSkillsKey = GlobalKey();
 
   static const _roleOptions = [
     RoleOption(
@@ -204,10 +205,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (!_hasUnsavedChanges()) return true;
     return showConfirmDialog(
       context,
-      title: 'Unsaved Changes',
-      message: 'You have unsaved changes. Wish to go back?',
-      confirmLabel: 'OK',
-      destructive: false,
+      title: 'Discard changes?',
+      message: 'Your edits have not been saved.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      destructive: true,
     );
   }
 
@@ -480,6 +482,34 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  ProfileData _draftProfile() {
+    final selectedDays = parseAvailableDays(_availability.keys);
+    return widget.profile.copyWith(
+      bio: _bioController.text.trim(),
+      schedule: formatScheduleDays(selectedDays),
+      availableDays: selectedDays,
+      languages: _languages,
+      interests: _learningStyles,
+      role: _role,
+      photos: _photos,
+      learningSkillIds: _learningSkillIds,
+      teachingSkillIds: _teachingSkillIds,
+      learningNotes: _learningNotes,
+      teachingNotes: _teachingNotes,
+      changedLearningNotes: Set<String>.from(_changedLearningNotes),
+      changedTeachingNotes: Set<String>.from(_changedTeachingNotes),
+    );
+  }
+
+  void _openPreview() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _ProfilePreviewPage(profile: _draftProfile()),
+      ),
+    );
+  }
+
   Future<void> _save() async {
     if (widget.profile.id.isEmpty) {
       if (_showingProfileError) return;
@@ -492,16 +522,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       return;
     }
 
-    // Only persist the skills that are visible for the selected role. A user
-    // who switches Both -> Learn must not keep hidden teaching skills (and
-    // vice versa). A null role keeps both to avoid wiping legacy data.
-    final wantsLearning = _role != OnboardingRole.teach;
-    final wantsTeaching = _role != OnboardingRole.learn;
-
-    final learningSkills = wantsLearning ? _learningSkillIds : <String>[];
-    final teachingSkills = wantsTeaching ? _teachingSkillIds : <String>[];
-    final teachingSkillImages =
-        wantsTeaching ? _teachingSkillImages : <String, String>{};
+    // Keep both skill sets regardless of the visible role. Switching roles
+    // hides one side of the editor; it must not silently delete that work.
+    final learningSkills = _learningSkillIds;
+    final teachingSkills = _teachingSkillIds;
+    final teachingSkillImages = _teachingSkillImages;
 
     final allSelectedSkills = [...learningSkills, ...teachingSkills];
     for (final skill in allSelectedSkills) {
@@ -550,10 +575,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       );
       if (mounted) Navigator.pop(context, savedProfile);
     } catch (e) {
+      debugPrint('[ProfileEdit] save failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Couldn’t save your profile. Please try again.'),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -568,11 +596,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final scheduleDisplay = formatScheduleDays(_availability.keys);
 
     final hasChanges = _hasUnsavedChanges();
+    final canSave = hasChanges && !_isSaving;
+    final largeText = MediaQuery.textScalerOf(context).scale(20) > 28;
 
     return PopScope(
-      canPop: !hasChanges,
+      canPop: !hasChanges && !_isSaving,
       onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
+        if (didPop || _isSaving) return;
         final canDiscard = await _confirmDiscardChanges();
         if (canDiscard && context.mounted) {
           Navigator.of(context).pop();
@@ -587,7 +617,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           iconTheme: IconThemeData(color: textTheme),
           titleSpacing: 0,
           title: Text(
-            'Edit Profile',
+            largeText ? 'Edit' : 'Edit Profile',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: AppTextStyles.headingText.copyWith(
               color: textTheme,
               fontSize: 20,
@@ -597,6 +629,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             tooltip: 'Back',
             icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
             onPressed: () async {
+              if (_isSaving) return;
               if (_hasUnsavedChanges()) {
                 final canDiscard = await _confirmDiscardChanges();
                 if (canDiscard && context.mounted) {
@@ -608,15 +641,36 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             },
           ),
           actions: [
+            IconButton(
+              tooltip: 'Preview profile',
+              onPressed: _isSaving ? null : _openPreview,
+              icon: Icon(Icons.visibility_outlined, color: textTheme),
+            ),
+            if (hasChanges)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Semantics(
+                  label: 'Unsaved changes',
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentText(context),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 16.0),
               child: TextButton(
                 style: TextButton.styleFrom(
                   backgroundColor:
-                      _isSaving
-                          ? AppColors.mutedSurface(context)
-                          : AppColors.primary,
-                  foregroundColor: Colors.black,
+                      canSave
+                          ? AppColors.primary
+                          : AppColors.mutedSurface(context),
+                  foregroundColor:
+                      canSave ? Colors.black : AppColors.mutedText(context),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -626,12 +680,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     vertical: 8,
                   ),
                 ),
-                onPressed: _isSaving ? null : _save,
+                onPressed: canSave ? _save : null,
                 child: Text(
                   'Save',
                   style: AppTextStyles.regularText.copyWith(
                     color:
-                        _isSaving ? AppColors.mutedText(context) : Colors.black,
+                        canSave ? Colors.black : AppColors.mutedText(context),
                   ),
                 ),
               ),
@@ -647,6 +701,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: _ProfileSectionHeader(title: 'Profile photos'),
+                  ),
+                  const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: _PhotoPickerRow(
@@ -657,7 +716,23 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       },
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'The main photo appears on your profile and cards.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: _ProfileSectionHeader(title: 'About you'),
+                  ),
+                  const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
@@ -674,6 +749,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     child: TopLabeledField(
                       label: 'Introduce yourself',
                       controller: _bioController,
+                      onChanged: (_) => setState(() {}),
                       maxLines: null,
                       maxLength: kBioMaxLength,
                       keyboardType: TextInputType.multiline,
@@ -746,13 +822,25 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        const _ProfileSectionHeader(title: 'Role'),
+                        const SizedBox(height: 10),
                         RoleCardGroup(
                           options: _roleOptions,
                           selected: _role,
                           isEditing: true,
                           onSelect: (role) => setState(() => _role = role),
                         ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Changing role hides skills; it does not delete them.',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: AppColors.mutedText(context),
+                            fontSize: 12,
+                          ),
+                        ),
                         const SizedBox(height: 24),
+                        const _ProfileSectionHeader(title: 'Skills'),
+                        const SizedBox(height: 12),
                         if (_role == OnboardingRole.learn ||
                             _role == OnboardingRole.both) ...[
                           SkillsCard.toLearn(
@@ -784,67 +872,105 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         ],
                         if (_role == OnboardingRole.teach ||
                             _role == OnboardingRole.both)
-                          SkillsCard.toTeach(
-                            isEditing: true,
-                            initialSkillIds: _teachingSkillIds,
-                            attachments: _teachingSkillImages,
-                            notes: _teachingNotes,
-                            onNoteChanged: (id, note) {
-                              setState(() {
-                                if (note.trim().isEmpty) {
-                                  _teachingNotes.remove(id);
-                                } else {
-                                  _teachingNotes[id] = note;
-                                }
-                                final initial = _initialTeachingNotes[id] ?? '';
-                                final current = _teachingNotes[id] ?? '';
-                                if (current.trim() == initial.trim()) {
-                                  _changedTeachingNotes.remove(id);
-                                } else {
-                                  _changedTeachingNotes.add(id);
-                                }
-                              });
-                            },
-                            onChanged: (updatedIds) {
-                              setState(() {
-                                // A proof can be waiting while a row has no
-                                // selection; restore it if that skill is
-                                // re-added through another row.
-                                for (final entry
-                                    in _pendingTeachingImages.entries
-                                        .toList()) {
-                                  if (updatedIds.contains(entry.key)) {
-                                    if (!_teachingSkillImages.containsKey(
-                                      entry.key,
-                                    )) {
-                                      _teachingSkillImages[entry.key] =
-                                          entry.value;
+                          KeyedSubtree(
+                            key: _teachingSkillsKey,
+                            child: SkillsCard.toTeach(
+                              isEditing: true,
+                              initialSkillIds: _teachingSkillIds,
+                              attachments: _teachingSkillImages,
+                              notes: _teachingNotes,
+                              onNoteChanged: (id, note) {
+                                setState(() {
+                                  if (note.trim().isEmpty) {
+                                    _teachingNotes.remove(id);
+                                  } else {
+                                    _teachingNotes[id] = note;
+                                  }
+                                  final initial =
+                                      _initialTeachingNotes[id] ?? '';
+                                  final current = _teachingNotes[id] ?? '';
+                                  if (current.trim() == initial.trim()) {
+                                    _changedTeachingNotes.remove(id);
+                                  } else {
+                                    _changedTeachingNotes.add(id);
+                                  }
+                                });
+                              },
+                              onChanged: (updatedIds) {
+                                setState(() {
+                                  // A proof can be waiting while a row has no
+                                  // selection; restore it if that skill is
+                                  // re-added through another row.
+                                  for (final entry
+                                      in _pendingTeachingImages.entries
+                                          .toList()) {
+                                    if (updatedIds.contains(entry.key)) {
+                                      if (!_teachingSkillImages.containsKey(
+                                        entry.key,
+                                      )) {
+                                        _teachingSkillImages[entry.key] =
+                                            entry.value;
+                                      }
+                                      _pendingTeachingImages.remove(entry.key);
                                     }
-                                    _pendingTeachingImages.remove(entry.key);
                                   }
-                                }
-                                final removed =
-                                    _teachingSkillIds
-                                        .where((id) => !updatedIds.contains(id))
-                                        .toList();
-                                for (final oldId in removed) {
-                                  if (_pendingTeachingImages.containsKey(
-                                    oldId,
-                                  )) {
-                                    continue;
+                                  final removed =
+                                      _teachingSkillIds
+                                          .where(
+                                            (id) => !updatedIds.contains(id),
+                                          )
+                                          .toList();
+                                  for (final oldId in removed) {
+                                    if (_pendingTeachingImages.containsKey(
+                                      oldId,
+                                    )) {
+                                      continue;
+                                    }
+                                    _teachingSkillImages.remove(oldId);
                                   }
-                                  _teachingSkillImages.remove(oldId);
-                                }
-                                _teachingSkillIds = updatedIds;
-                              });
-                            },
-                            onSkillReplaced: _replaceTeachingImage,
-                            onSkillRemoved: _removeTeachingImage,
-                            onAttachFile:
-                                (skillId) => _pickAttachmentForSkill(skillId),
-                            onRemoveAttachment:
-                                (skillId) => _removeAttachmentForSkill(skillId),
+                                  _teachingSkillIds = updatedIds;
+                                });
+                              },
+                              onSkillReplaced: _replaceTeachingImage,
+                              onSkillRemoved: _removeTeachingImage,
+                              onAttachFile:
+                                  (skillId) => _pickAttachmentForSkill(skillId),
+                              onRemoveAttachment:
+                                  (skillId) =>
+                                      _removeAttachmentForSkill(skillId),
+                            ),
                           ),
+                        const SizedBox(height: 24),
+                        const _ProfileSectionHeader(title: 'Showcase'),
+                        const SizedBox(height: 8),
+                        Text(
+                          _role == OnboardingRole.teach ||
+                                  _role == OnboardingRole.both
+                              ? 'Showcase media is attached to a teaching skill. Use Attach a file on a teaching skill above to add it.'
+                              : 'Switch to Teach or Both to add showcase media to a teaching skill.',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: AppColors.mutedText(context),
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (_role == OnboardingRole.teach ||
+                            _role == OnboardingRole.both) ...[
+                          const SizedBox(height: 4),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final target = _teachingSkillsKey.currentContext;
+                              if (target == null) return;
+                              await Scrollable.ensureVisible(
+                                target,
+                                duration: const Duration(milliseconds: 280),
+                                curve: Curves.easeInOut,
+                              );
+                            },
+                            icon: const Icon(Icons.image_outlined, size: 18),
+                            label: const Text('Manage teaching showcase'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -902,6 +1028,252 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 }
 
+class _ProfilePreviewPage extends StatelessWidget {
+  final ProfileData profile;
+
+  const _ProfilePreviewPage({required this.profile});
+
+  String get _roleLabel {
+    switch (profile.role) {
+      case OnboardingRole.learn:
+        return 'Learner';
+      case OnboardingRole.teach:
+        return 'Mentor';
+      case OnboardingRole.both:
+        return 'Learner & Mentor';
+      case null:
+        return 'Role not set';
+    }
+  }
+
+  String? get _mainPhoto {
+    if (profile.photos.isEmpty) return null;
+    final main = profile.photos[0];
+    return main != null && main.trim().isNotEmpty ? main : null;
+  }
+
+  ImageProvider? get _imageProvider {
+    final path = _mainPhoto;
+    if (path == null) return null;
+    if (path.startsWith('http') || kIsWeb) return NetworkImage(path);
+    return FileImage(File(path));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final schedule = formatScheduleDays(profile.availableDays);
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          tooltip: 'Back',
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.arrow_back_ios_new, size: 16, color: textTheme),
+        ),
+        title: Text(
+          'Profile preview',
+          style: AppTextStyles.headingText.copyWith(
+            color: textTheme,
+            fontSize: 20,
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: AspectRatio(
+              aspectRatio: 1.35,
+              child:
+                  _imageProvider != null
+                      ? Image(
+                        image: _imageProvider!,
+                        fit: BoxFit.cover,
+                        errorBuilder:
+                            (_, _, _) =>
+                                _PreviewPhotoFallback(name: profile.name),
+                      )
+                      : _PreviewPhotoFallback(name: profile.name),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            profile.name,
+            style: AppTextStyles.headingText.copyWith(
+              color: textTheme,
+              fontSize: 24,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _roleLabel,
+            style: AppTextStyles.boldText.copyWith(
+              color: AppColors.accentText(context),
+              fontSize: 13,
+            ),
+          ),
+          if (profile.bio.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              profile.bio.trim(),
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.82),
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          _PreviewRow(
+            icon: Icons.calendar_today_outlined,
+            label: 'Availability',
+            value: schedule.isEmpty ? 'Not set' : schedule,
+          ),
+          _PreviewRow(
+            icon: Icons.translate,
+            label: 'Languages',
+            value:
+                profile.languages.isEmpty
+                    ? 'Not set'
+                    : profile.languages.join(', '),
+          ),
+          _PreviewRow(
+            icon: Icons.psychology_outlined,
+            label: 'Learning style',
+            value:
+                profile.interests.isEmpty
+                    ? 'Not set'
+                    : profile.interests.join(', '),
+          ),
+          _PreviewRow(
+            icon: Icons.menu_book_outlined,
+            label: 'Skills to learn',
+            value: '${profile.learningSkillIds.length} selected',
+          ),
+          _PreviewRow(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Skills to teach',
+            value: '${profile.teachingSkillIds.length} selected',
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.mutedSurface(context),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border(context)),
+            ),
+            child: Text(
+              'This preview shows unsaved edits. Public cards also include your skill names, notes, and attached showcase media.',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _PreviewRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.mutedText(context)),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 118,
+            child: Text(
+              label,
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewPhotoFallback extends StatelessWidget {
+  final String name;
+
+  const _PreviewPhotoFallback({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial =
+        name.trim().isEmpty ? 'P' : name.trim().characters.first.toUpperCase();
+    return Container(
+      color: AppColors.mutedSurface(context),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: AppTextStyles.headingText.copyWith(
+          color: AppColors.mutedText(context),
+          fontSize: 44,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileSectionHeader extends StatelessWidget {
+  final String title;
+
+  const _ProfileSectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      header: true,
+      child: Text(
+        title.toUpperCase(),
+        style: AppTextStyles.regularText.copyWith(
+          color: AppColors.mutedText(context),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
 class _DropdownInfoField extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -937,54 +1309,68 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
     final textColor = Theme.of(context).colorScheme.secondary;
     final showHint = widget.value.isEmpty;
 
-    return GestureDetector(
+    return Semantics(
+      container: true,
+      button: true,
+      label: '${widget.label}, ${showHint ? widget.hint : widget.value}',
+      excludeSemantics: true,
       onTap: _handleTap,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(widget.icon, size: 18, color: textColor),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 120,
-            child: Text(
-              widget.label,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
+                Icon(widget.icon, size: 18, color: textColor),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 120,
                   child: Text(
-                    showHint ? widget.hint : widget.value,
-                    overflow: TextOverflow.ellipsis,
+                    widget.label,
                     style: TextStyle(
-                      color:
-                          showHint
-                              ? textColor.withValues(alpha: 0.4)
-                              : textColor,
+                      color: textColor,
                       fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                AnimatedRotation(
-                  turns: _isOpen ? 0.5 : 0,
-                  duration: AppMotion.base,
-                  curve: Curves.easeInOut,
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: textColor.withValues(alpha: 0.6),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          showHint ? widget.hint : widget.value,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color:
+                                showHint
+                                    ? textColor.withValues(alpha: 0.4)
+                                    : textColor,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      AnimatedRotation(
+                        turns: _isOpen ? 0.5 : 0,
+                        duration: AppMotion.base,
+                        curve: Curves.easeInOut,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 20,
+                          color: textColor.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1025,6 +1411,7 @@ class _PhotoPickerRow extends StatelessWidget {
         for (int i = 0; i < 3; i++) ...[
           Expanded(
             child: _PhotoSlot(
+              index: i,
               path: photoPaths.length > i ? photoPaths[i] : null,
               onTap: () => _pickPhoto(i),
               onRemove: () => _removePhoto(i),
@@ -1038,11 +1425,13 @@ class _PhotoPickerRow extends StatelessWidget {
 }
 
 class _PhotoSlot extends StatelessWidget {
+  final int index;
   final String? path;
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
   const _PhotoSlot({
+    required this.index,
     required this.path,
     required this.onTap,
     required this.onRemove,
@@ -1064,10 +1453,20 @@ class _PhotoSlot extends StatelessWidget {
               : FileImage(File(path!));
     }
 
+    final slotLabel =
+        hasImage
+            ? (index == 0 ? 'Main photo' : 'Photo ${index + 1}')
+            : (index == 0
+                ? 'Add main photo'
+                : index == 1
+                ? 'Add second photo'
+                : 'Add third photo');
+
     return Semantics(
       container: true,
       button: true,
-      label: path == null ? 'Add photo' : 'Change photo',
+      label: slotLabel,
+      hint: hasImage ? 'Change photo' : 'Add photo',
       child: GestureDetector(
         onTap: onTap,
         child: AspectRatio(
@@ -1076,7 +1475,7 @@ class _PhotoSlot extends StatelessWidget {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: hasImage ? null : Colors.white,
+                  color: hasImage ? null : AppColors.mutedSurface(context),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.primary, width: 3),
                   image:
@@ -1090,14 +1489,40 @@ class _PhotoSlot extends StatelessWidget {
                 child:
                     hasImage
                         ? null
-                        : const Center(
+                        : Center(
                           child: Icon(
                             Icons.add,
                             size: 32,
-                            color: Colors.black54,
+                            color: AppColors.mutedText(context),
                           ),
                         ),
               ),
+              if (index == 0)
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const ExcludeSemantics(
+                      child: Text(
+                        'MAIN',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (hasImage)
                 Positioned(
                   top: 0,

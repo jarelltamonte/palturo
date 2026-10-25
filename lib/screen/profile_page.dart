@@ -564,7 +564,7 @@ class _ProfileTip extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Add a showcase or finish your details to improve your recommendations.',
+              'Finish your profile details to improve your recommendations.',
               style: AppTextStyles.regularText.copyWith(
                 color: textColor,
                 fontSize: 13,

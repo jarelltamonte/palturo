@@ -84,6 +84,9 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
     final bgColor =
         isDark ? AppColors.inputBackground : AppColors.binputBackground;
     final textColor = Theme.of(context).colorScheme.secondary;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final floatingHeight = textScaler.scale(16);
+    final contentTop = floating ? (8 + textScaler.scale(12) + 8) : 28.0;
 
     final field = GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -104,7 +107,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
         child: Stack(
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(16, 28, suffixWidth, 8),
+              padding: EdgeInsets.fromLTRB(16, contentTop, suffixWidth, 8),
               child: AnimatedOpacity(
                 duration: _duration,
                 curve: _curve,
@@ -154,7 +157,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
               left: 16,
               right: suffixWidth,
               top: floating ? 8 : 0,
-              height: floating ? 16 : _height,
+              height: floating ? floatingHeight : _height,
               child: IgnorePointer(
                 child: Align(
                   alignment: Alignment.centerLeft,

@@ -13,6 +13,7 @@ class OnboardingInterestsScreen extends StatelessWidget {
   final VoidCallback onContinue;
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
+  final String stepLabel;
 
   const OnboardingInterestsScreen({
     super.key,
@@ -25,6 +26,7 @@ class OnboardingInterestsScreen extends StatelessWidget {
     required this.onContinue,
     this.onBack,
     this.onSkip,
+    this.stepLabel = 'Step 2 of 4 - Skills',
   });
 
   @override
@@ -35,6 +37,7 @@ class OnboardingInterestsScreen extends StatelessWidget {
       title: 'What are you interested in $highlightWord?',
       highlightWord: highlightWord,
       subtitle: 'Select up to $maxSelections that apply',
+      stepLabel: stepLabel,
       progress: progress,
       showBackButton: true,
       onBack: onBack,

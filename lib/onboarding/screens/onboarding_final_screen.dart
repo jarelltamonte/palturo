@@ -29,6 +29,8 @@ class OnboardingFinalScreen extends StatelessWidget {
   final VoidCallback onDone;
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
+  final String stepLabel;
+  final double progress;
 
   const OnboardingFinalScreen({
     super.key,
@@ -36,6 +38,8 @@ class OnboardingFinalScreen extends StatelessWidget {
     required this.onDone,
     this.onBack,
     this.onSkip,
+    this.stepLabel = 'Step 3 of 4 - Availability',
+    this.progress = 0.85,
   });
 
   void _setAvailableDays(Set<String> days) {
@@ -59,10 +63,11 @@ class OnboardingFinalScreen extends StatelessWidget {
           title: 'One last thing',
           subtitle:
               'Help us personalize your matches by adding one final detail.',
-          progress: 0.9,
+          stepLabel: stepLabel,
+          progress: progress,
           showBackButton: true,
           onBack: onBack,
-          primaryLabel: 'Done',
+          primaryLabel: 'Review',
           onPrimaryPressed: isValid ? onDone : null,
           onSkip: onSkip,
           child: SingleChildScrollView(

@@ -7,6 +7,7 @@ class OnboardingScaffold extends StatelessWidget {
   final String title;
   final String? highlightWord;
   final String? subtitle;
+  final String? stepLabel;
   final Widget child;
 
   final double progress;
@@ -24,6 +25,7 @@ class OnboardingScaffold extends StatelessWidget {
     required this.title,
     this.highlightWord,
     this.subtitle,
+    this.stepLabel,
     required this.child,
     this.progress = 0,
     this.showBackButton = false,
@@ -58,10 +60,17 @@ class OnboardingScaffold extends StatelessWidget {
                     children: [
                       if (showBackButton)
                         Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: GestureDetector(
-                            onTap: onBack ?? () => Navigator.maybePop(context),
-                            child: Icon(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: IconButton(
+                            tooltip: 'Back',
+                            onPressed:
+                                onBack ?? () => Navigator.maybePop(context),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 44,
+                              minHeight: 44,
+                            ),
+                            icon: Icon(
                               Icons.arrow_back_ios_new,
                               size: 18,
                               color: secondary,
@@ -99,6 +108,22 @@ class OnboardingScaffold extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (stepLabel != null) ...[
+                Semantics(
+                  header: true,
+                  label: stepLabel,
+                  excludeSemantics: true,
+                  child: Text(
+                    stepLabel!,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
               _Title(
                 title: title,
                 highlightWord: highlightWord,

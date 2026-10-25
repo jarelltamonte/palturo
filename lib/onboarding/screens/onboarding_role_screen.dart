@@ -9,6 +9,8 @@ class OnboardingRoleScreen extends StatelessWidget {
   final VoidCallback onContinue;
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
+  final String stepLabel;
+  final double progress;
 
   const OnboardingRoleScreen({
     super.key,
@@ -16,6 +18,8 @@ class OnboardingRoleScreen extends StatelessWidget {
     required this.onContinue,
     this.onBack,
     this.onSkip,
+    this.stepLabel = 'Step 1 of 4 - Role',
+    this.progress = 0.2,
   });
 
   static const _options = [
@@ -40,7 +44,11 @@ class OnboardingRoleScreen extends StatelessWidget {
         return OnboardingScaffold(
           title: 'What describes\nyou best?',
           subtitle: 'Select one that applies',
-          progress: 0.2,
+          stepLabel:
+              controller.role == OnboardingRole.both
+                  ? 'Step 1 of 5 - Role'
+                  : 'Step 1 of 4 - Role',
+          progress: controller.role == OnboardingRole.both ? 1 / 5 : 1 / 4,
           showBackButton: true,
           onBack: onBack,
           onPrimaryPressed: controller.role == null ? null : onContinue,

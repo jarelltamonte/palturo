@@ -1,13 +1,18 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/onboarding/onboarding_complete.dart';
 import 'package:palturo/onboarding/onboarding_entry.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_models.dart';
 import 'screens/onboarding_final_screen.dart';
+import 'screens/onboarding_review_screen.dart';
 import 'screens/onboarding_interests_screen.dart';
 import 'screens/onboarding_role_screen.dart';
 import '../services/profile_service.dart';
+import '../services/preferences_service.dart';
+import '../screen/action_dialogs.dart';
 
 enum OnboardingStep {
   intro,
@@ -15,6 +20,7 @@ enum OnboardingStep {
   learningInterests,
   teachingInterests,
   finalDetails,
+  review,
   complete,
 }
 
@@ -90,13 +96,144 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   bool _isSaving = false;
 
   static const int _targetSkillsCount = 11;
+  bool _returnToReview = false;
 
   OnboardingStep get _current => _history.last;
 
   @override
   void initState() {
     super.initState();
+    _controller.addListener(_persistDraft);
+    _restoreDraft();
     _fetchRandomCommunitySkills();
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_persistDraft);
+    super.dispose();
+  }
+
+  String get _draftKey {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    return uid == null ? 'onboarding_draft' : 'onboarding_draft_$uid';
+  }
+
+  OnboardingOption _optionForId(String id) {
+    return OnboardingOption(
+      id,
+      id
+          .split('_')
+          .where((part) => part.isNotEmpty)
+          .map((part) => part[0].toUpperCase() + part.substring(1))
+          .join(' '),
+    );
+  }
+
+  void _persistDraft() {
+    final raw = jsonEncode(_controller.toJson());
+    PreferencesService.instance.setString(_draftKey, raw).catchError((_) {});
+  }
+
+  Future<void> _restoreDraft() async {
+    final raw = await PreferencesService.instance.getString(_draftKey);
+    if (raw == null || raw.trim().isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final map = Map<String, dynamic>.from(decoded);
+      if (map['role'] == null) return;
+      _controller.applyJson(map);
+      if (!mounted) return;
+      final selected = {
+        ..._controller.learningInterests,
+        ..._controller.teachingInterests,
+      };
+      final extras =
+          selected
+              .where((id) => !_dynamicOptions.any((option) => option.id == id))
+              .map(_optionForId)
+              .toList();
+      setState(() {
+        if (extras.isNotEmpty) {
+          _dynamicOptions = [...extras, ..._dynamicOptions];
+        }
+        _history
+          ..clear()
+          ..add(OnboardingStep.review);
+      });
+    } catch (_) {
+      // A malformed draft must never block onboarding.
+    }
+  }
+
+  Future<void> _confirmSkip() async {
+    final leave = await showConfirmDialog(
+      context,
+      title: 'Finish later?',
+      message:
+          'Your matches will be less relevant until you add your role, skills, and availability.',
+      confirmLabel: 'Finish later',
+      cancelLabel: 'Keep editing',
+      destructive: false,
+    );
+    if (!leave || !mounted) return;
+    widget.onSkip();
+  }
+
+  void _editFromReview(OnboardingStep step) {
+    setState(() {
+      _returnToReview = true;
+      _history.add(step);
+    });
+  }
+
+  void _backOrSkip() {
+    if (_history.length > 1) {
+      _back();
+    } else {
+      _confirmSkip();
+    }
+  }
+
+  String _stepLabel(OnboardingStep step) {
+    final both = _controller.role == OnboardingRole.both;
+    final total = both ? 5 : 4;
+    switch (step) {
+      case OnboardingStep.role:
+        return 'Step 1 of 4 - Role';
+      case OnboardingStep.learningInterests:
+        return 'Step 2 of $total - Learning skills';
+      case OnboardingStep.teachingInterests:
+        return 'Step ${both ? 3 : 2} of $total - Teaching skills';
+      case OnboardingStep.finalDetails:
+        return 'Step ${both ? 4 : 3} of $total - Availability';
+      case OnboardingStep.review:
+        return 'Step $total of $total - Review';
+      case OnboardingStep.intro:
+      case OnboardingStep.complete:
+        return '';
+    }
+  }
+
+  double _progress(OnboardingStep step) {
+    final both = _controller.role == OnboardingRole.both;
+    final total = both ? 5 : 4;
+    switch (step) {
+      case OnboardingStep.role:
+        return 1 / total;
+      case OnboardingStep.learningInterests:
+        return 2 / total;
+      case OnboardingStep.teachingInterests:
+        return (both ? 3 : 2) / total;
+      case OnboardingStep.finalDetails:
+        return (both ? 4 : 3) / total;
+      case OnboardingStep.review:
+      case OnboardingStep.complete:
+        return 1;
+      case OnboardingStep.intro:
+        return 0;
+    }
   }
 
   Future<void> _fetchRandomCommunitySkills() async {
@@ -126,8 +263,22 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final selectedSkills = pool.take(_targetSkillsCount).toList();
 
     if (mounted) {
+      final selected = {
+        ..._controller.learningInterests,
+        ..._controller.teachingInterests,
+      };
+      final preserved =
+          selected
+              .where(
+                (id) =>
+                    id != 'others' &&
+                    !selectedSkills.any((option) => option.id == id),
+              )
+              .map(_optionForId)
+              .toList();
       setState(() {
         _dynamicOptions = [
+          ...preserved,
           ...selectedSkills,
           const OnboardingOption('others', 'Others'),
         ];
@@ -144,6 +295,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   OnboardingStep _next(OnboardingStep from) {
+    if (_returnToReview && from != OnboardingStep.intro) {
+      return OnboardingStep.review;
+    }
     switch (from) {
       case OnboardingStep.intro:
         return OnboardingStep.role;
@@ -158,6 +312,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       case OnboardingStep.teachingInterests:
         return OnboardingStep.finalDetails;
       case OnboardingStep.finalDetails:
+        return OnboardingStep.review;
+      case OnboardingStep.review:
         return OnboardingStep.complete;
       case OnboardingStep.complete:
         return OnboardingStep.complete;
@@ -168,7 +324,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     setState(() => _isSaving = true);
     try {
       await _profileService.saveOnboardingPreferences(_controller);
+      try {
+        await PreferencesService.instance.setString(_draftKey, '');
+        await PreferencesService.instance.setBool('skipped_onboarding', false);
+      } catch (_) {
+        // The profile is already saved; preference cleanup is best-effort.
+      }
       if (!mounted) return;
+      _returnToReview = false;
       _goTo(OnboardingStep.complete);
     } catch (e) {
       if (!mounted) return;
@@ -197,7 +360,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        _back();
+        _backOrSkip();
       },
       child: Container(
         color: Theme.of(context).colorScheme.surface,
@@ -230,8 +393,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         return OnboardingRoleScreen(
           controller: _controller,
           onContinue: () => _goTo(_next(step)),
-          onBack: _back,
-          onSkip: widget.onSkip,
+          onBack: _backOrSkip,
+          onSkip: _confirmSkip,
+          stepLabel: _stepLabel(step),
+          progress: _progress(step),
         );
 
       case OnboardingStep.learningInterests:
@@ -245,10 +410,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 maxSelections: 3,
                 onToggle:
                     (id) => _controller.toggleLearningInterest(id, max: 3),
-                progress: 0.5,
+                progress: _progress(step),
+                stepLabel: _stepLabel(step),
                 onContinue: () => _goTo(_next(step)),
-                onBack: _back,
-                onSkip: widget.onSkip,
+                onBack: _backOrSkip,
+                onSkip: _confirmSkip,
               ),
         );
 
@@ -263,10 +429,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 maxSelections: 2,
                 onToggle:
                     (id) => _controller.toggleTeachingInterest(id, max: 2),
-                progress: 0.75,
+                progress: _progress(step),
+                stepLabel: _stepLabel(step),
                 onContinue: () => _goTo(_next(step)),
-                onBack: _back,
-                onSkip: widget.onSkip,
+                onBack: _backOrSkip,
+                onSkip: _confirmSkip,
               ),
         );
 
@@ -276,10 +443,27 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           builder:
               (context, _) => OnboardingFinalScreen(
                 controller: _controller,
-                onDone: _saveAndProceed,
-                onBack: _back,
-                onSkip: widget.onSkip,
+                onDone: () => _goTo(OnboardingStep.review),
+                onBack: _backOrSkip,
+                onSkip: _confirmSkip,
+                stepLabel: _stepLabel(step),
+                progress: _progress(step),
               ),
+        );
+
+      case OnboardingStep.review:
+        return OnboardingReviewScreen(
+          controller: _controller,
+          onSave: _saveAndProceed,
+          onBack: _backOrSkip,
+          onSkip: _confirmSkip,
+          stepLabel: _stepLabel(step),
+          onEditRole: () => _editFromReview(OnboardingStep.role),
+          onEditLearning:
+              () => _editFromReview(OnboardingStep.learningInterests),
+          onEditTeaching:
+              () => _editFromReview(OnboardingStep.teachingInterests),
+          onEditDetails: () => _editFromReview(OnboardingStep.finalDetails),
         );
 
       case OnboardingStep.complete:

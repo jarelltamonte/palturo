@@ -62,28 +62,38 @@ class _Chip extends StatelessWidget {
             ? AppColors.textSecondary
             : Theme.of(context).colorScheme.secondary;
 
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: !disabled,
+      label: label,
+      excludeSemantics: true,
       onTap: disabled ? null : onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.micro,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color:
-                selected
-                    ? AppColors.primary
-                    : fg.withValues(alpha: disabled ? 0.15 : 0.3),
+      child: GestureDetector(
+        onTap: disabled ? null : onTap,
+        child: AnimatedContainer(
+          duration: AppMotion.micro,
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color:
+                  selected
+                      ? AppColors.primary
+                      : fg.withValues(alpha: disabled ? 0.15 : 0.3),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color:
-                selected
-                    ? AppColors.textSecondary
-                    : fg.withValues(alpha: disabled ? 0.35 : 1),
+          child: Text(
+            label,
+            style: AppTextStyles.regularText.copyWith(
+              color:
+                  selected
+                      ? AppColors.textSecondary
+                      : fg.withValues(alpha: disabled ? 0.35 : 1),
+            ),
           ),
         ),
       ),

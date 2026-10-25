@@ -4,7 +4,8 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
-    show kLearningOptions, kTeachingOptions;
+    show OnboardingFlow, kLearningOptions, kTeachingOptions;
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
@@ -44,6 +45,7 @@ class _ProfilePageState extends State<ProfilePage> {
       'Couldn’t load your profile.\nPlease check your connection.';
   int? _friendCount;
   bool _openingEditor = false;
+  bool _hasSkipped = false;
 
   @override
   void initState() {
@@ -51,7 +53,43 @@ class _ProfilePageState extends State<ProfilePage> {
     ChatStateService.instance.addListener(_onPalsChanged);
     _onPalsChanged();
     ChatStateService.instance.loadConversations(showSpinner: false);
+    _loadSkipped();
     _loadProfile();
+  }
+
+  Future<void> _loadSkipped() async {
+    final skipped =
+        await PreferencesService.instance.getBool('skipped_onboarding') ??
+        false;
+    if (mounted) setState(() => _hasSkipped = skipped);
+  }
+
+  Future<void> _openSetup() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => OnboardingFlow(
+              onFinished: () async {
+                await PreferencesService.instance.setBool(
+                  'skipped_onboarding',
+                  false,
+                );
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                setState(() => _hasSkipped = false);
+                _loadProfile();
+              },
+              onSkip: () async {
+                await PreferencesService.instance.setBool(
+                  'skipped_onboarding',
+                  true,
+                );
+                if (mounted) Navigator.of(context).pop();
+              },
+            ),
+      ),
+    );
   }
 
   void _onPalsChanged() {
@@ -294,6 +332,11 @@ class _ProfilePageState extends State<ProfilePage> {
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: _ProfileTip(onEdit: _openEdit),
+                        ),
+                      if (_hasSkipped)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: _ContinueSetupCard(onTap: _openSetup),
                         ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -541,6 +584,66 @@ class _ProfileSummaryCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueSetupCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ContinueSetupCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          decoration: BoxDecoration(
+            color: AppColors.elevatedSurface(context),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border(context)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.play_circle_outline,
+                color: AppColors.accentText(context),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Continue setup',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: textColor,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Add the details that power better matches.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: AppColors.mutedText(context)),
+            ],
+          ),
         ),
       ),
     );

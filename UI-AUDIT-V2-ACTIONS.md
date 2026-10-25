@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 36c8e3b`  
+**Branch:** `ui-features @ d3d8bdb`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**9 / 14 complete. Next: Case 10.**
+**10 / 14 complete. Next: Case 11.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -71,7 +71,7 @@ Each case contains:
 | 07 Chat state model | **DONE** | PASS | PASS | PASS | `28ec5ba` |
 | 08 Pals integrity | **DONE** | PASS | PASS | PASS | `a961935` |
 | 09 Requests after accept | **DONE** | PASS | PASS | PASS | `36c8e3b` |
-| 10 Onboarding durability | Not started | - | - | - | - |
+| 10 Onboarding durability | **DONE** | PASS | PASS | PASS | `d3d8bdb` |
 | 11 Copy and routing | Not started | - | - | - | - |
 | 12 System consistency | Not started | - | - | - | - |
 | 13 Feedback survey navigation | Not started | - | - | - | - |
@@ -92,7 +92,7 @@ Each case contains:
 | 07 | Chat state model | **DONE** | P2 |
 | 08 | Pals integrity | **DONE** | P2 |
 | 09 | Requests after accept | **DONE** | P2 |
-| 10 | Onboarding durability | PARTIAL | P2 |
+| 10 | Onboarding durability | **DONE** | P2 |
 | 11 | Copy and routing clarity | NEW GAP | P2 |
 | 12 | System consistency | PARTIAL | P2 |
 | 13 | Feedback survey navigation | PARTIAL | P2 |
@@ -1172,8 +1172,10 @@ Include accepted history if the backend can return it; otherwise label Sent as �
 
 ## Case 10 — Onboarding durability
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `d3d8bdb`  
 **PDF reference:** page 17
 
 ### Problem

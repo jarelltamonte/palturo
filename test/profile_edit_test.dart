@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
+import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,14 +30,14 @@ void main() {
     teachingSkillIds: const ['other:Teaching skill:everyday_skills'],
   );
 
-  Future<void> pumpEdit(WidgetTester tester) async {
+  Future<void> pumpEdit(WidgetTester tester, {ThemeData? theme}) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
-        theme: ThemeData.light(),
+        theme: theme ?? lightMode,
         home: ProfileEditPage(profile: profile()),
       ),
     );
@@ -80,6 +82,34 @@ void main() {
     expect(find.text('Keep editing'), findsOneWidget);
     expect(find.text('Discard'), findsOneWidget);
     expect(find.text('OK'), findsNothing);
+  });
+
+  testWidgets('dark empty photo slots use theme surface', (tester) async {
+    await pumpEdit(tester, theme: darkMode);
+    final context = tester.element(find.byType(ProfileEditPage));
+    expect(Theme.of(context).brightness, Brightness.dark);
+    final slots =
+        tester.widgetList<Container>(find.byType(Container)).where((container) {
+          final decoration = container.decoration;
+          if (decoration is! BoxDecoration) return false;
+          final border = decoration.border;
+          return border is Border && border.top.width == 3;
+        }).toList();
+    expect(slots, hasLength(3));
+    for (final slot in slots) {
+      final color = (slot.decoration as BoxDecoration).color;
+      expect(color, AppColors.mutedSurface(context));
+      expect(color, isNot(Colors.white));
+    }
+    final addIcons =
+        tester
+            .widgetList<Icon>(find.byIcon(Icons.add))
+            .where((icon) => icon.size == 32)
+            .toList();
+    expect(addIcons, hasLength(3));
+    for (final icon in addIcons) {
+      expect(icon.color, AppColors.mutedText(context));
+    }
   });
 
   testWidgets('core controls survive 200% text scale', (tester) async {

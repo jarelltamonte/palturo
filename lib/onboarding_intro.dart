@@ -65,6 +65,10 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
 
   @override
   Widget build(BuildContext context) {
+    final inactiveDotColor =
+        Theme.of(context).brightness == Brightness.dark
+            ? AppColors.mutedText(context).withValues(alpha: 0.55)
+            : AppColors.textSecondary;
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Padding(
@@ -102,7 +106,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
                     color:
                         _currentPage == index
                             ? AppColors.primary
-                            : AppColors.textSecondary,
+                            : inactiveDotColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 );

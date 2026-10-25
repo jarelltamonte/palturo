@@ -5,13 +5,15 @@ import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/activity_service.dart';
-import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:palturo/screen/account/change_password_page.dart';
-import 'package:palturo/screen/account/delete_account_page.dart';
-import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/authentication/legal_dialogs.dart';
+import 'package:palturo/screen/account/account_settings_page.dart';
+import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/widgets/user_avatar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
   splashFactory: NoSplash.splashFactory,
@@ -28,9 +30,11 @@ class _SettingsState extends State<Settings> {
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
-  bool _isLoggingOut = false;
   bool _userChangedSettings = false;
   String _version = '…';
+  ProfileData? _profile;
+  String? _email;
+  String? _authName;
 
   static const _notificationsKey = 'notifications_enabled';
   static const _soundKey = 'sound_enabled';
@@ -65,6 +69,7 @@ class _SettingsState extends State<Settings> {
     super.initState();
     _loadSettings();
     _loadVersion();
+    _loadAccountSummary();
   }
 
   Future<void> _loadVersion() async {
@@ -79,6 +84,27 @@ class _SettingsState extends State<Settings> {
       if (!mounted) return;
       setState(() => _version = 'unknown');
     }
+  }
+
+  Future<void> _loadAccountSummary() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final first = user?.userMetadata?['first_name']?.toString().trim() ?? '';
+    final last = user?.userMetadata?['last_name']?.toString().trim() ?? '';
+    final authName = [first, last].where((part) => part.isNotEmpty).join(' ');
+    if (mounted) {
+      setState(() {
+        _email = user?.email;
+        _authName = authName.isEmpty ? null : authName;
+      });
+    }
+    ProfileData? profile;
+    try {
+      profile = await ProfileService().getCurrentUserProfile();
+    } catch (_) {
+      // Identity is optional; the account page still exposes auth details.
+    }
+    if (!mounted) return;
+    setState(() => _profile = profile);
   }
 
   Future<void> _loadSettings() async {
@@ -660,508 +686,321 @@ class _SettingsState extends State<Settings> {
     submitting.dispose();
   }
 
-  Future<void> _handleLogout() async {
-    setState(() => _isLoggingOut = true);
-
-    try {
-      await AuthService().logout();
-
-      if (mounted) {
-        Navigator.of(
-          context,
-          rootNavigator: true,
-        ).popUntil((route) => route.isFirst);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoggingOut = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to log out: $e')));
-      }
-    }
+  void _openAccount() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
+    );
+    if (mounted) _loadAccountSummary();
   }
 
-  void _showLogoutDialog() {
+  void _showHelpDialog() {
     final textTheme = Theme.of(context).colorScheme.secondary;
-
-    showAdaptiveDialog(
+    showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-
-        final message = Text(
-          'Are you sure you want to log out of PalTuro?',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
-          ),
-        );
-
-        if (isIOS) {
-          return CupertinoAlertDialog(
-            title: Center(
-              child: Text(
-                'Log Out',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                  fontSize: 18,
-                ),
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(context),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            title: Text(
+              'Help',
+              style: AppTextStyles.boldText.copyWith(
+                color: textTheme,
+                fontSize: 18,
               ),
             ),
-            content: Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Material(color: Colors.transparent, child: message),
+            content: Text(
+              'Use Report a Problem to send an issue to the PalTuro team. For account access problems, include the email address on your account so the team can identify you.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+                height: 1.45,
+              ),
             ),
             actions: [
-              CupertinoDialogAction(
+              TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
                 child: Text(
-                  'Cancel',
-                  style: AppTextStyles.regularText.copyWith(color: textTheme),
-                ),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                  _handleLogout();
-                },
-                child: Text(
-                  'Log Out',
-                  style: AppTextStyles.regularText.copyWith(
+                  'Close',
+                  style: AppTextStyles.boldText.copyWith(
                     color: AppColors.accentText(context),
                   ),
                 ),
               ),
             ],
-          );
-        }
+          ),
+    );
+  }
 
-        return AlertDialog(
-          backgroundColor: AppColors.elevatedSurface(context),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Center(
-            child: Text(
-              'Log Out',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-                fontSize: 18,
-              ),
-            ),
-          ),
-          content: SizedBox(width: double.maxFinite, child: message),
-          actions: [
-            TextButton(
-              style: _noSplashButtonStyle,
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: AppTextStyles.regularText.copyWith(color: textTheme),
-              ),
-            ),
-            TextButton(
-              style: _noSplashButtonStyle,
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _handleLogout();
-              },
-              child: Text(
-                'Log Out',
+  Widget _sectionLabel(String label) => Padding(
+    padding: const EdgeInsets.only(top: 20, bottom: 4),
+    child: Semantics(
+      header: true,
+      child: Text(
+        label.toUpperCase(),
+        style: AppTextStyles.regularText.copyWith(
+          color: AppColors.mutedText(context),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
+    ),
+  );
+
+  Widget _settingsTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+    Color? color,
+  }) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final c = color ?? textTheme;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: c),
+      title: Text(title, style: AppTextStyles.regularText.copyWith(color: c)),
+      subtitle:
+          subtitle == null
+              ? null
+              : Text(
+                subtitle,
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.accentText(context),
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
                 ),
               ),
-            ),
-          ],
-        );
-      },
+      trailing: trailing ?? Icon(Icons.chevron_right, color: c),
+      onTap: onTap,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final surfaceColor = AppColors.elevatedSurface(context);
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final accountName = _profile?.name ?? _authName ?? _email ?? 'Your account';
+    final accountSubtitle =
+        _profile == null
+            ? (_email ?? 'Account & security')
+            : (_email ?? 'Password, blocked users, privacy');
 
-    return PopScope(
-      canPop: !_isLoggingOut,
-      child: Stack(
-        children: [
-          Scaffold(
-            appBar: AppBar(
-              toolbarHeight: adaptiveHeight,
-              backgroundColor: Colors.transparent,
-              scrolledUnderElevation: 0,
-              elevation: 0,
-              automaticallyImplyLeading: false,
-              leadingWidth: 56,
-              leading: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: IconButton(
-                  tooltip: 'Back',
-                  onPressed:
-                      _isLoggingOut ? null : () => Navigator.pop(context),
-                  icon: Icon(
-                    Icons.arrow_back_ios_new,
-                    color: textTheme,
-                    size: 16,
-                  ),
-                ),
-              ),
-              title: Text(
-                'Settings',
-                style: AppTextStyles.headingText.copyWith(
-                  color: textTheme,
-                  fontSize: 20,
-                ),
-              ),
-            ),
-            body: Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(splashFactory: NoSplash.splashFactory),
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 24.0,
-                ),
-                children: [
-                  Text(
-                    'Preferences',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Notifications',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Show activity badges for requests and messages.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    inactiveTrackColor: AppColors.switchOffTrack(context),
-                    inactiveThumbColor: AppColors.white,
-                    value: _notificationsEnabled,
-                    onChanged: (bool value) {
-                      _setToggle(
-                        _notificationsKey,
-                        value,
-                        () => _notificationsEnabled = value,
-                      );
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Sound',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Play confirmation sounds on launch and setup.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    inactiveTrackColor: AppColors.switchOffTrack(context),
-                    inactiveThumbColor: AppColors.white,
-                    value: _soundEnabled,
-                    onChanged: (bool value) {
-                      _setToggle(_soundKey, value, () => _soundEnabled = value);
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Vibration',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Use haptic feedback for swipes and confirms.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    inactiveTrackColor: AppColors.switchOffTrack(context),
-                    inactiveThumbColor: AppColors.white,
-                    value: _vibrationEnabled,
-                    onChanged: (bool value) {
-                      _setToggle(
-                        _vibrationKey,
-                        value,
-                        () => _vibrationEnabled = value,
-                      );
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Dark Mode',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Switch to the charcoal PalTuro theme.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    inactiveTrackColor: AppColors.switchOffTrack(context),
-                    inactiveThumbColor: AppColors.white,
-                    value: isDarkMode,
-                    onChanged: (bool value) {
-                      MyApp.of(context).setThemeMode(value);
-                    },
-                  ),
-                  Divider(height: 20, color: AppColors.border(context)),
-                  ListTile(
-                    leading: Icon(Icons.feedback_outlined, color: textTheme),
-                    title: Text(
-                      'Send Feedback',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: _showFeedbackDialog,
-                  ),
-                  ListTile(
-                    leading: Icon(
-                      Icons.report_problem_outlined,
-                      color: textTheme,
-                    ),
-                    title: Text(
-                      'Report a Problem',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: _showReportDialog,
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.block, color: textTheme),
-                    title: Text(
-                      'Blocked Users',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const BlockListPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Divider(height: 20, color: AppColors.border(context)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Account',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    leading: Icon(Icons.password_outlined, color: textTheme),
-                    title: Text(
-                      'Change password',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap:
-                        _isLoggingOut
-                            ? null
-                            : () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ChangePasswordPage(),
-                              ),
-                            ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      splashFactory: NoSplash.splashFactory,
-                      onTap: _showLogoutDialog,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.logout_rounded, color: textTheme),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Log Out',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Danger zone',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.dangerText(context),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.danger.withValues(alpha: 0.18),
-                      ),
-                    ),
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      leading: Icon(
-                        Icons.delete_forever_outlined,
-                        color: AppColors.dangerText(context),
-                      ),
-                      title: Text(
-                        'Delete account',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: AppColors.dangerText(context),
-                          fontSize: 15,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Permanently remove your profile, Pals, and chats.',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: AppColors.mutedText(context),
-                          fontSize: 12,
-                        ),
-                      ),
-                      trailing: Icon(
-                        Icons.chevron_right,
-                        color: AppColors.dangerText(context),
-                      ),
-                      onTap:
-                          _isLoggingOut
-                              ? null
-                              : () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const DeleteAccountPage(),
-                                ),
-                              ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Version $_version',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 12,
-                    ),
-                  ),
-                  SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom),
-                ],
-              ),
-            ),
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        toolbarHeight: adaptiveHeight,
+        backgroundColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leadingWidth: 56,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: IconButton(
+            tooltip: 'Back',
+            onPressed: () => Navigator.pop(context),
+            icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
           ),
-          if (_isLoggingOut)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.5),
-                alignment: Alignment.center,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 24,
-                    ),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primary,
-                          ),
-                          strokeWidth: 3.5,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Logging out...',
-                          style: AppTextStyles.boldText.copyWith(
-                            color: textTheme,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
+        ),
+        title: Text(
+          'Settings',
+          style: AppTextStyles.headingText.copyWith(
+            color: textTheme,
+            fontSize: 20,
+          ),
+        ),
+      ),
+      body: Theme(
+        data: Theme.of(context).copyWith(splashFactory: NoSplash.splashFactory),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+          children: [
+            _sectionLabel('Preferences'),
+            SwitchListTile.adaptive(
+              title: Text(
+                'Notifications',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              subtitle: Text(
+                'Show activity badges for requests and messages.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+              activeTrackColor: AppColors.primary,
+              activeThumbColor: AppColors.white,
+              inactiveTrackColor: AppColors.switchOffTrack(context),
+              inactiveThumbColor: AppColors.white,
+              value: _notificationsEnabled,
+              onChanged: (bool value) {
+                _setToggle(
+                  _notificationsKey,
+                  value,
+                  () => _notificationsEnabled = value,
+                );
+              },
+            ),
+            SwitchListTile.adaptive(
+              title: Text(
+                'Sound',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              subtitle: Text(
+                'Play confirmation sounds on launch and setup.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+              activeTrackColor: AppColors.primary,
+              activeThumbColor: AppColors.white,
+              inactiveTrackColor: AppColors.switchOffTrack(context),
+              inactiveThumbColor: AppColors.white,
+              value: _soundEnabled,
+              onChanged: (bool value) {
+                _setToggle(_soundKey, value, () => _soundEnabled = value);
+              },
+            ),
+            SwitchListTile.adaptive(
+              title: Text(
+                'Vibration',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              subtitle: Text(
+                'Use haptic feedback for swipes and confirms.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+              activeTrackColor: AppColors.primary,
+              activeThumbColor: AppColors.white,
+              inactiveTrackColor: AppColors.switchOffTrack(context),
+              inactiveThumbColor: AppColors.white,
+              value: _vibrationEnabled,
+              onChanged: (bool value) {
+                _setToggle(
+                  _vibrationKey,
+                  value,
+                  () => _vibrationEnabled = value,
+                );
+              },
+            ),
+            SwitchListTile.adaptive(
+              title: Text(
+                'Dark Mode',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              subtitle: Text(
+                'Switch to the charcoal PalTuro theme.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+              activeTrackColor: AppColors.primary,
+              activeThumbColor: AppColors.white,
+              inactiveTrackColor: AppColors.switchOffTrack(context),
+              inactiveThumbColor: AppColors.white,
+              value: isDarkMode,
+              onChanged: (bool value) {
+                MyApp.of(context).setThemeMode(value);
+              },
+            ),
+
+            _sectionLabel('Account & security'),
+            Semantics(
+              container: true,
+              button: true,
+              label:
+                  'Account and security, $accountName'
+                  '${_email == null ? '' : ', $_email'}',
+              excludeSemantics: true,
+              onTap: _openAccount,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: UserAvatar(
+                  name: accountName,
+                  image:
+                      _profile?.avatarUrl != null
+                          ? NetworkImage(_profile!.avatarUrl!)
+                          : null,
+                  size: 44,
+                ),
+                title: Text(
+                  accountName,
+                  style: AppTextStyles.boldText.copyWith(color: textTheme),
+                ),
+                subtitle: Text(
+                  accountSubtitle,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(context),
+                    fontSize: 12,
                   ),
+                ),
+                trailing: Icon(Icons.chevron_right, color: textTheme),
+                onTap: _openAccount,
+              ),
+            ),
+
+            _sectionLabel('Support'),
+            _settingsTile(
+              icon: Icons.feedback_outlined,
+              title: 'Send feedback',
+              onTap: _showFeedbackDialog,
+            ),
+            _settingsTile(
+              icon: Icons.report_problem_outlined,
+              title: 'Report a problem',
+              onTap: _showReportDialog,
+            ),
+            _settingsTile(
+              icon: Icons.help_outline,
+              title: 'Help',
+              onTap: _showHelpDialog,
+            ),
+
+            _sectionLabel('Legal & about'),
+            _settingsTile(
+              icon: Icons.description_outlined,
+              title: 'Terms of Service',
+              onTap: () => LegalDialogs.showTermsOfService(context),
+            ),
+            _settingsTile(
+              icon: Icons.shield_outlined,
+              title: 'Data Policy',
+              onTap: () => LegalDialogs.showDataPolicy(context),
+            ),
+            _settingsTile(
+              icon: Icons.cookie_outlined,
+              title: 'Cookies Policy',
+              onTap: () => LegalDialogs.showCookiesPolicy(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.info_outline, color: textTheme),
+              title: Text(
+                'Version',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              trailing: Text(
+                _version,
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
                 ),
               ),
             ),
-        ],
+            SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom),
+          ],
+        ),
       ),
     );
   }

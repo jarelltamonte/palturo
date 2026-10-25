@@ -61,7 +61,9 @@ class _ConfirmDialog extends StatelessWidget {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
     final confirmColor =
-        destructive ? AppColors.dangerText(context) : AppColors.primary;
+        destructive
+            ? AppColors.dangerText(context)
+            : AppColors.accentText(context);
 
     final titleWidget = Center(
       child: Text(

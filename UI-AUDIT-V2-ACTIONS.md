@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 1f773df`  
+**Branch:** `ui-features @ c4acdb6`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**5 / 14 complete. Next: Case 06.**
+**6 / 14 complete. Next: Case 07.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -67,7 +67,7 @@ Each case contains:
 | 03 Category card context | **DONE** | PASS | PASS | PASS | `7784152` |
 | 04 Edit Profile structure | **DONE** | PASS | PASS | PASS | `903634f` |
 | 05 Dark-mode edges | **DONE** | PASS | PASS | PASS | `1f773df` |
-| 06 Activity destination | Not started | - | - | - | - |
+| 06 Activity destination | **DONE** | PASS | PASS | PASS | `c4acdb6` |
 | 07 Chat state model | Not started | - | - | - | - |
 | 08 Pals integrity | Not started | - | - | - | - |
 | 09 Requests after accept | Not started | - | - | - | - |
@@ -88,7 +88,7 @@ Each case contains:
 | 03 | Category card context | **DONE** | P1 |
 | 04 | Edit Profile structure and role safety | **DONE** | P1 |
 | 05 | Dark-mode edges | **DONE** | P1 |
-| 06 | Activity destination | PARTIAL | P1 |
+| 06 | Activity destination | **DONE** | P1 |
 | 07 | Chat state model | PARTIAL | P2 |
 | 08 | Pals integrity | PARTIAL | P2 |
 | 09 | Requests after accept | PARTIAL | P2 |
@@ -847,8 +847,10 @@ Both surfaces use the same semantic surface/muted/accent roles as the rest of th
 
 ## Case 06 — Activity destination
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P1  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `c4acdb6`  
 **PDF reference:** page 16
 
 ### Problem

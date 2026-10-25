@@ -294,11 +294,18 @@ class _ExploreExpandState extends State<ExploreExpand>
             ),
             const SizedBox(height: 8),
             Text(
-              'Nothing more to show',
+              _people.isEmpty
+                  ? 'No people in this category yet.'
+                  : 'You’ve seen everyone in this category.',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor.withValues(alpha: 0.7),
               ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Back to category'),
             ),
           ],
         ),
@@ -319,6 +326,82 @@ class _ExploreExpandState extends State<ExploreExpand>
       alignment: alignment,
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Icon(icon, color: color, size: 36),
+    );
+  }
+
+  Widget _buildDeck() {
+    final current = _people[_currentIndex];
+    final next =
+        _currentIndex + 1 < _people.length ? _people[_currentIndex + 1] : null;
+
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        if (next != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Transform.scale(
+                scale: 0.97,
+                alignment: Alignment.bottomCenter,
+                child: Transform.translate(
+                  offset: const Offset(0, 10),
+                  child: Opacity(
+                    opacity: 0.55,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: ExcludeSemantics(
+                        child: PersonCardOverlay(
+                          person: next,
+                          showActions: false,
+                          showMenu: false,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Padding(
+          padding: EdgeInsets.only(bottom: next == null ? 0 : 26),
+          child: _buildDeckCard(current),
+        ),
+        if (next != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 3,
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 210),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.elevatedSurface(
+                      context,
+                    ).withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.border(context)),
+                  ),
+                  child: Text(
+                    'Up next · ${next.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -364,6 +447,9 @@ class _ExploreExpandState extends State<ExploreExpand>
         onSkip: () => _animateAdvance(person),
         onBlock: () => _confirmBlock(person),
         onReport: () => _confirmReport(person),
+        onOpenProfile: () => showPersonProfileDialog(context, person),
+        skipLabel: 'Pass',
+        addLabel: 'Send request',
       ),
     );
 
@@ -494,7 +580,7 @@ class _ExploreExpandState extends State<ExploreExpand>
                         : _error != null
                         ? _buildErrorState(textTheme)
                         : hasMore
-                        ? _buildDeckCard(_people[_currentIndex])
+                        ? _buildDeck()
                         : _buildEmptyState(textTheme),
               ),
             ),

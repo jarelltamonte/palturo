@@ -42,7 +42,7 @@ class Person {
     required this.role,
     this.bio = '',
     this.photoUrls = const [null],
-    this.showcaseUrls = const [null],
+    this.showcaseUrls = const [],
     this.compatibility,
     this.pipeline = 'full',
   });
@@ -212,6 +212,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ? 'Wants to learn'
             : 'Wants to teach';
     final bio = widget.person.bio.trim();
+    final language = widget.person.language.trim();
+    final learningStyle = widget.person.learningStyle.trim();
     final scheduleText = formatSchedule(widget.person.schedule);
 
     return Container(
@@ -568,65 +570,69 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ],
                   ],
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 16,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.translate,
-                          size: 15,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          widget.person.language,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white70,
-                            fontSize: 13,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.psychology,
-                          size: 15,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.person.learningStyle.isNotEmpty
-                                ? widget.person.learningStyle
-                                : 'No learning styles set',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.regularText.copyWith(
+                if (language.isNotEmpty || learningStyle.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 16,
+                    children: [
+                      if (language.isNotEmpty)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.translate,
+                              size: 15,
                               color: Colors.white70,
-                              fontSize: 13,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  blurRadius: 6,
-                                ),
-                              ],
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Text(
+                              language,
+                              style: AppTextStyles.regularText.copyWith(
+                                color: Colors.white70,
+                                fontSize: 13,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      if (learningStyle.isNotEmpty)
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.psychology,
+                              size: 15,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                learningStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
                 if (bio.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   _buildBio(context, bio),

@@ -281,7 +281,7 @@ class MatchApi {
       role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
       photoUrls: [(p['p_avatar'] as String?)],
-      showcaseUrls: showcases.isNotEmpty ? showcases : const [null],
+      showcaseUrls: showcases,
     );
   }
 
@@ -694,13 +694,21 @@ class MatchApi {
             )
             as List;
     return (res.whereType<Map>()).map((r) {
+      final availability = r['availability'];
+      final languages = List<String>.from(r['languages'] ?? const []);
+      final learningStyles = List<String>.from(
+        r['learning_styles'] ?? const [],
+      );
       return Person(
         id: r['user_id'] as String,
         name: _displayName(r['name']),
-        schedule: '',
-        language: '',
-        learningStyle: '',
-        skillName: '',
+        schedule:
+            availability is Map
+                ? formatScheduleDays(parseAvailableDays(availability))
+                : formatSchedule(availability),
+        language: languages.join(', '),
+        learningStyle: learningStyles.join(', '),
+        skillName: (r['skill_name'] ?? '').toString(),
         // The card is shown in a teaching or learning deck, so reflect the
         // placement being browsed rather than the profile's global role.
         role: kind == 'learn' ? PersonRole.learner : PersonRole.mentor,

@@ -11,6 +11,7 @@ import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
+import 'package:palturo/screen/chat_pending_message.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 class ChatRoom extends StatefulWidget {
@@ -52,6 +53,9 @@ class _ChatRoomState extends State<ChatRoom> {
   bool _sendingMessage = false;
   bool _feedbackGateOpen = false;
   bool _feedbackRated = false;
+  bool _feedbackCollapsed = false;
+  final List<PendingChatMessage> _pending = [];
+  int _pendingSequence = 0;
 
   @override
   void initState() {
@@ -179,15 +183,31 @@ class _ChatRoomState extends State<ChatRoom> {
       return;
     }
 
-    setState(() => _sendingMessage = true);
+    final pending = PendingChatMessage(
+      localId:
+          'pending-${DateTime.now().microsecondsSinceEpoch}-${_pendingSequence++}',
+      body: message,
+      createdAt: DateTime.now(),
+    );
+    _messageController.clear();
+    setState(() {
+      _pending.add(pending);
+      _sendingMessage = true;
+    });
+    _scrollToBottom();
+    await _deliverPending(pending);
+  }
+
+  Future<void> _deliverPending(PendingChatMessage pending) async {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
     try {
-      await MatchApi.sendMessage(widget.connectionId!, message);
+      await MatchApi.sendMessage(connectionId, pending.body);
       if (!mounted) return;
-      // Keep anything the user typed while the request was in flight.
-      if (_messageController.text.trim() == message) {
-        _messageController.clear();
-      }
-      final connectionId = widget.connectionId!;
+      setState(() {
+        _pending.removeWhere((item) => item.localId == pending.localId);
+      });
+      await _reloadMessagesSilently();
       unawaited(
         MatchApi.checkFeedbackGate(connectionId)
             .then((_) {
@@ -195,13 +215,50 @@ class _ChatRoomState extends State<ChatRoom> {
             })
             .catchError((_) {}),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send: $e')));
+      setState(() {
+        final index = _pending.indexWhere(
+          (item) => item.localId == pending.localId,
+        );
+        if (index != -1) {
+          _pending[index] = _pending[index].copyWith(
+            status: PendingMessageStatus.failed,
+          );
+        }
+      });
     } finally {
       if (mounted) setState(() => _sendingMessage = false);
+    }
+  }
+
+  Future<void> _retryPending(PendingChatMessage pending) async {
+    if (_sendingMessage) return;
+    setState(() {
+      final index = _pending.indexWhere(
+        (item) => item.localId == pending.localId,
+      );
+      if (index != -1) {
+        _pending[index] = _pending[index].copyWith(
+          status: PendingMessageStatus.sending,
+        );
+      }
+      _sendingMessage = true;
+    });
+    await _deliverPending(pending);
+  }
+
+  Future<void> _reloadMessagesSilently() async {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    try {
+      final msgs = await MatchApi.getMessages(connectionId);
+      if (!mounted) return;
+      setState(() {
+        _messages = _sortMessages(msgs);
+      });
+    } catch (_) {
+      // Realtime will reconcile; the optimistic bubble already cleared.
     }
   }
 
@@ -278,6 +335,9 @@ class _ChatRoomState extends State<ChatRoom> {
         ),
       );
       return;
+    }
+    if (!_feedbackCollapsed) {
+      setState(() => _feedbackCollapsed = true);
     }
 
     var clarity = 5;
@@ -449,6 +509,11 @@ class _ChatRoomState extends State<ChatRoom> {
       return;
     }
 
+    if (action == 'profile') {
+      _showProfile();
+      return;
+    }
+
     final peerId = widget.person?.id;
     if (peerId == null || !_uuidPattern.hasMatch(peerId)) {
       _showPeerUnavailable();
@@ -481,7 +546,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final keyboardIsOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isTyping = _messageController.text.isNotEmpty;
-    final hasMessages = _messages.isNotEmpty;
+    final hasMessages = _messages.isNotEmpty || _pending.isNotEmpty;
 
     final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
     final bgColor = AppColors.mutedSurface(context);
@@ -586,6 +651,33 @@ class _ChatRoomState extends State<ChatRoom> {
                           ],
                         ),
                       ),
+                    if (widget.person != null)
+                      PopupMenuItem<String>(
+                        value: 'profile',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              color: textTheme,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'View profile',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const PopupMenuItem<String>(
+                      enabled: false,
+                      child: Text(
+                        'Mute, archive, mark unread coming soon',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
                     PopupMenuItem<String>(
                       value: 'report',
                       child: Row(
@@ -771,8 +863,8 @@ class _ChatRoomState extends State<ChatRoom> {
         child: Row(
           children: [
             Icon(
-              Icons.check_circle_outline,
-              size: 16,
+              Icons.verified_outlined,
+              size: 15,
               color: AppColors.accentText(context),
             ),
             const SizedBox(width: 6),
@@ -790,90 +882,140 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final count = _messages.length.clamp(0, 15);
     final open = _feedbackGateOpen || count >= 15;
+
+    if (!open || _feedbackCollapsed) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: open ? _showFeedbackDialog : null,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    open ? Icons.star_outline : Icons.lock_clock,
+                    size: 16,
+                    color:
+                        open
+                            ? AppColors.accentText(context)
+                            : AppColors.mutedText(context),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      open
+                          ? 'Feedback is ready'
+                          : 'Feedback unlocks at 15 messages - $count/15',
+                      style: AppTextStyles.regularText.copyWith(
+                        color:
+                            open
+                                ? AppColors.accentText(context)
+                                : AppColors.mutedText(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  if (open)
+                    Text(
+                      'Leave feedback',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.accentText(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
         decoration: BoxDecoration(
-          color:
-              open
-                  ? AppColors.primary.withValues(alpha: 0.12)
-                  : AppColors.mutedSurface(context),
+          color: AppColors.elevatedSurface(context),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color:
-                open
-                    ? AppColors.primary.withValues(alpha: 0.5)
-                    : AppColors.border(context),
-          ),
+          border: Border.all(color: AppColors.border(context)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              open ? Icons.rate_review_outlined : Icons.lock_clock_outlined,
-              size: 18,
-              color:
-                  open
-                      ? AppColors.accentText(context)
-                      : AppColors.mutedText(context),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    open
-                        ? 'Feedback is unlocked'
-                        : 'Feedback unlocks at 15 messages',
+            Row(
+              children: [
+                Icon(
+                  Icons.star_outline,
+                  size: 17,
+                  color: AppColors.accentText(context),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'Feedback is unlocked',
                     style: AppTextStyles.boldText.copyWith(
                       color: textTheme,
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  if (open)
-                    Text(
-                      'Rate clarity and reliability for this exchange.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.65),
-                        fontSize: 11,
-                      ),
-                    )
-                  else ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: count / 15,
-                        minHeight: 4,
-                        backgroundColor: textTheme.withValues(alpha: 0.08),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '$count of 15 · ${15 - count} more to go',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.6),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+                Text(
+                  'Ready',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(context),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: count / 15,
+                minHeight: 5,
+                backgroundColor: AppColors.mutedSurface(context),
+                color: AppColors.primary,
               ),
             ),
-            if (open)
-              TextButton(
-                onPressed: _showFeedbackDialog,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.accentText(context),
-                  minimumSize: const Size(0, 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                child: const Text('Rate'),
+            const SizedBox(height: 4),
+            Text(
+              'Rate your exchange when you are ready.',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+                fontSize: 11,
               ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => setState(() => _feedbackCollapsed = true),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: const Text('Hide', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton(
+                  onPressed: _showFeedbackDialog,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: const Text(
+                    'Leave feedback',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -883,16 +1025,16 @@ class _ChatRoomState extends State<ChatRoom> {
   Widget _buildLoadError(Color textTheme) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _loadError!,
+              _loadError ?? 'Couldn’t load this conversation.',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             ElevatedButton(
               onPressed: _loadMessages,
               style: ElevatedButton.styleFrom(
@@ -900,7 +1042,7 @@ class _ChatRoomState extends State<ChatRoom> {
               ),
               child: const Text(
                 'Retry',
-                style: TextStyle(color: Colors.black, fontSize: 16),
+                style: TextStyle(color: Colors.black, fontSize: 15),
               ),
             ),
           ],
@@ -911,100 +1053,124 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Widget _buildMessageList(Color textTheme) {
     final myId = Supabase.instance.client.auth.currentUser?.id;
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      itemCount: _messages.length,
-      itemBuilder: (context, i) {
-        final msg = _messages[i];
-        final mine = msg['sender_id'] == myId;
-        final currTime = DateTime.tryParse(msg['created_at']?.toString() ?? '');
-        DateTime? prevTime;
-        if (i > 0) {
-          prevTime = DateTime.tryParse(
-            _messages[i - 1]['created_at']?.toString() ?? '',
-          );
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollUpdateNotification &&
+            notification.dragDetails != null &&
+            _feedbackGateOpen &&
+            !_feedbackCollapsed) {
+          setState(() => _feedbackCollapsed = true);
         }
+        return false;
+      },
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        itemCount: _messages.length + _pending.length,
+        itemBuilder: (context, i) {
+          if (i >= _messages.length) {
+            final pending = _pending[i - _messages.length];
+            return PendingMessageBubble(
+              message: pending,
+              onRetry:
+                  pending.status == PendingMessageStatus.failed &&
+                          !_sendingMessage
+                      ? () => _retryPending(pending)
+                      : null,
+            );
+          }
+          final msg = _messages[i];
+          final mine = msg['sender_id'] == myId;
+          final currTime = DateTime.tryParse(
+            msg['created_at']?.toString() ?? '',
+          );
+          DateTime? prevTime;
+          if (i > 0) {
+            prevTime = DateTime.tryParse(
+              _messages[i - 1]['created_at']?.toString() ?? '',
+            );
+          }
 
-        final showHeader =
-            currTime != null &&
-            ChatTimeFormatter.shouldShowMessengerHeader(prevTime, currTime);
-        final messageKey =
-            msg['id']?.toString() ??
-            '${msg['created_at']}-${msg['sender_id']}-${msg['body']}';
-        final isSelected = _expandedTimestamps.contains(messageKey);
+          final showHeader =
+              currTime != null &&
+              ChatTimeFormatter.shouldShowMessengerHeader(prevTime, currTime);
+          final messageKey =
+              msg['id']?.toString() ??
+              '${msg['created_at']}-${msg['sender_id']}-${msg['body']}';
+          final isSelected = _expandedTimestamps.contains(messageKey);
 
-        return Column(
-          crossAxisAlignment:
-              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            if (showHeader)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+          return Column(
+            crossAxisAlignment:
+                mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              if (showHeader)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      ChatTimeFormatter.formatMessengerHeader(currTime),
+                      style: AppTextStyles.regularText.copyWith(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: textTheme.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (_expandedTimestamps.contains(messageKey)) {
+                      _expandedTimestamps.remove(messageKey);
+                    } else {
+                      _expandedTimestamps.add(messageKey);
+                    }
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        mine
+                            ? AppColors.primary.withValues(alpha: 0.9)
+                            : Colors.grey.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Text(
-                    ChatTimeFormatter.formatMessengerHeader(currTime),
+                    (msg['body'] ?? '').toString(),
                     style: AppTextStyles.regularText.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: textTheme.withValues(alpha: 0.5),
+                      color: mine ? Colors.black : textTheme,
                     ),
                   ),
                 ),
               ),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (_expandedTimestamps.contains(messageKey)) {
-                    _expandedTimestamps.remove(messageKey);
-                  } else {
-                    _expandedTimestamps.add(messageKey);
-                  }
-                });
-              },
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 2),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.75,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      mine
-                          ? AppColors.primary.withValues(alpha: 0.9)
-                          : Colors.grey.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  (msg['body'] ?? '').toString(),
-                  style: AppTextStyles.regularText.copyWith(
-                    color: mine ? Colors.black : textTheme,
+              if (isSelected && currTime != null)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: 2,
+                    bottom: 4,
+                    left: 4,
+                    right: 4,
+                  ),
+                  child: Text(
+                    ChatTimeFormatter.formatTimeOnly(currTime),
+                    style: AppTextStyles.regularText.copyWith(
+                      fontSize: 11,
+                      color: textTheme.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            if (isSelected && currTime != null)
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: 2,
-                  bottom: 4,
-                  left: 4,
-                  right: 4,
-                ),
-                child: Text(
-                  ChatTimeFormatter.formatTimeOnly(currTime),
-                  style: AppTextStyles.regularText.copyWith(
-                    fontSize: 11,
-                    color: textTheme.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 }

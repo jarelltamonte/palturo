@@ -17,6 +17,7 @@ import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
+import 'package:palturo/screen/utils/chat_unread.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
@@ -78,9 +79,7 @@ class _ChatsPageState extends State<ChatsPage> {
               learningStyle: '',
               lastMessage: c.lastMessage,
               lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
-              hasUnread:
-                  PreferencesService.instance.notificationsEnabled &&
-                  c.unread > 0,
+              hasUnread: conversationHasUnread(c),
               avatarUrl: c.otherAvatar,
               connectionId: c.connectionId,
               otherUserId: c.otherUserId,
@@ -210,9 +209,6 @@ class _ChatsPageState extends State<ChatsPage> {
     Person? person,
     String? connectionId,
   }) async {
-    if (connectionId != null) {
-      ChatStateService.instance.enterRoom(connectionId);
-    }
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -227,9 +223,6 @@ class _ChatsPageState extends State<ChatsPage> {
             ),
       ),
     );
-    if (connectionId != null) {
-      ChatStateService.instance.leaveRoom(connectionId);
-    }
   }
 
   void _openMatches(BuildContext context) {
@@ -564,7 +557,7 @@ class _ChatsPageState extends State<ChatsPage> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16.0),
                   child: Text(
-                    'Your Pals',
+                    'Quick access to Pals',
                     style: AppTextStyles.boldText.copyWith(color: textTheme),
                   ),
                 ),
@@ -626,7 +619,9 @@ class _ChatsPageState extends State<ChatsPage> {
                     name: chat.name,
                     message: chat.lastMessage!,
                     time: chat.lastMessageTime ?? '',
-                    hasUnread: chat.hasUnread,
+                    hasUnread:
+                        chat.hasUnread &&
+                        PreferencesService.instance.notificationsEnabled,
                     skillName: chat.skillName,
                     role: chat.role,
                     avatarImage: avatarImage,

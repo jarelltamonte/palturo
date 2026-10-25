@@ -80,7 +80,9 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   Widget build(BuildContext context) {
     final double suffixWidth = widget.suffixIcon != null ? 48 : 16;
     final bool floating = _isFloating;
-    final bgColor = Theme.of(context).colorScheme.onPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor =
+        isDark ? AppColors.inputBackground : AppColors.binputBackground;
     final textColor = Theme.of(context).colorScheme.secondary;
 
     final field = GestureDetector(

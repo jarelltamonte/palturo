@@ -90,7 +90,7 @@ class _EmailConfirmationExpiredState extends State<EmailConfirmationExpired> {
                       TextSpan(
                         text: 'sign up again',
                         style: AppTextStyles.boldText.copyWith(
-                          color: AppColors.primary,
+                          color: AppColors.accentText(context),
                           decoration: TextDecoration.underline,
                         ),
                         recognizer: _registerTap,

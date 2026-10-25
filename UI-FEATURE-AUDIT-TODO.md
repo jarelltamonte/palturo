@@ -181,3 +181,34 @@ Each case must pass **functionality**, **quality**, and **regression** before th
 - Playwright 360 / 390 / 1440 / dark 390: PASS (no console or page errors)
 - Live checks: feedback insert, request send/cancel, outgoing list, activity badge, readiness
 - Working tree: changes remain for review/commit.
+
+
+## Independent subagent audit ? final
+
+All 15 cases were re-audited by a separate general-purpose agent with no source edits.
+
+| Case | Functionality | Quality | Regression | Verdict |
+|---|---|---|---|---|
+| C01 | PASS | PASS | PASS | PASS |
+| C02 | PASS | PASS | PASS | PASS |
+| C03 | PASS | PASS | PASS | PASS |
+| C04 | PASS | PASS | PASS | PASS |
+| C05 | PASS | PASS | PASS | PASS |
+| C06 | PASS | PASS | PASS | PASS |
+| C07 | PASS | PASS | PASS | PASS |
+| C08 | PASS | PASS | PASS | PASS |
+| C09 | PASS | PASS | PASS | PASS |
+| C10 | PASS | PASS | PASS | PASS |
+| C11 | PASS | PASS | PASS | PASS |
+| C12 | PASS | PASS | PASS | PASS |
+| C13 | PASS | PASS | PASS | PASS |
+| C14 | PASS | PASS | PASS | PASS |
+| C15 | PASS | PASS | PASS | PASS |
+
+Final validation on the latest tree:
+- `flutter analyze --no-pub`: PASS
+- `flutter test --no-pub`: PASS (37/37)
+- Release web build: PASS
+- Playwright 360x640 / 390x844 / 1440x900 and dark 390x844: PASS, no console/page errors
+- Live smoke: match why sheet, profile tap, right-swipe + Undo withdrawal, Sent refresh + Withdraw, activity badge/list, report privacy + insert, feedback gate 13/15
+- Database migration `20261025000100_requests_feedback.sql` applied to the live Supabase project

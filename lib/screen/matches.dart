@@ -222,7 +222,7 @@ class _MatchesState extends State<Matches> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Unmatch failed: $e')));
+      ).showSnackBar(SnackBar(content: Text('Remove pal failed: $e')));
       return;
     }
 
@@ -235,9 +235,9 @@ class _MatchesState extends State<Matches> {
 
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('You unmatched ${pal.name}')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('You removed ${pal.name} from your Pals')),
+    );
   }
 
   Future<void> _blockPal(MatchedUser pal) async {
@@ -296,10 +296,10 @@ class _MatchesState extends State<Matches> {
     if (action == 'unmatch') {
       final confirmed = await showConfirmDialog(
         context,
-        title: 'Unmatch',
+        title: 'Remove pal',
         message:
-            'Unmatch ${pal.name}? You’ll lose this match and your chat history.',
-        confirmLabel: 'Unmatch',
+            'Remove ${pal.name} from your Pals? You’ll lose this pal and your chat history.',
+        confirmLabel: 'Remove pal',
       );
       if (!confirmed) return;
       _unmatchPal(pal);
@@ -312,7 +312,7 @@ class _MatchesState extends State<Matches> {
         context,
         title: 'Block',
         message:
-            '${pal.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+            '${pal.name} won’t be able to find or message you, and will be removed from your Pals. You can unblock them anytime in Settings.',
         confirmLabel: 'Block',
       );
       if (!confirmed) return;
@@ -553,14 +553,14 @@ class _MatchesState extends State<Matches> {
                         value: 'unmatch',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.remove_circle_outline,
-                              color: AppColors.danger,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Unmatch',
+                              'Remove pal',
                               style: AppTextStyles.regularText.copyWith(
                                 color: textTheme,
                               ),
@@ -572,9 +572,9 @@ class _MatchesState extends State<Matches> {
                         value: 'report',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.flag_outlined,
-                              color: AppColors.danger,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -591,9 +591,9 @@ class _MatchesState extends State<Matches> {
                         value: 'block',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.block,
-                              color: AppColors.danger,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),

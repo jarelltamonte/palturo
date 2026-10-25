@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart' show ConnectionRequest;
+import 'package:palturo/screen/utils/schedule_format.dart';
 
 class _Client {
   static SupabaseClient get c => Supabase.instance.client;
@@ -269,10 +270,11 @@ class MatchApi {
             .map((m) => m['media'] as String?)
             .whereType<String>()
             .toList();
+    final availabilityDays = parseAvailableDays(p['p_availability']);
     return Person(
       id: userId,
       name: name,
-      schedule: '', // availability lives in p_availability jsonb (legacy shape)
+      schedule: formatScheduleDays(availabilityDays),
       language: (p['p_languages'] ?? '') as String,
       learningStyle: (p['p_styles'] ?? '') as String,
       skillName: skill,
@@ -366,6 +368,7 @@ class MatchApi {
           photoUrls: person.photoUrls,
           showcaseUrls: person.showcaseUrls,
           compatibility: compat,
+          pipeline: m.pipeline,
         ),
       );
     }

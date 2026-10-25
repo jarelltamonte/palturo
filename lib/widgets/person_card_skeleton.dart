@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
 
 /// A quiet card-shaped placeholder for the cold People deck load.
 class PersonCardSkeleton extends StatefulWidget {
@@ -29,13 +30,11 @@ class _PersonCardSkeletonState extends State<PersonCardSkeleton>
   }
 
   Widget _bar(double width, double height) {
-    return Container(
+    return SkeletonBox(
       width: width,
       height: height,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(height / 2),
-      ),
+      radius: height / 2,
+      color: AppColors.white.withValues(alpha: 0.14),
     );
   }
 

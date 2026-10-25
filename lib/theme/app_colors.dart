@@ -27,6 +27,7 @@ class AppColors {
   static const Color switchOffTrackDark = switchOffTrackLight;
 
   static const Color danger = Color(0xFFB42318);
+  static const Color dangerLight = Color(0xFFFF8A80);
   static const Color dangerSurface = Color(0xFFFDF0EE);
   static const Color success = Color(0xFF4F6B00);
   static const Color white = Colors.white;
@@ -52,4 +53,8 @@ class AppColors {
 
   static Color switchOffTrack(BuildContext context) =>
       _isDark(context) ? switchOffTrackDark : switchOffTrackLight;
+
+  /// Danger used as foreground text, not as a fill.
+  static Color dangerText(BuildContext context) =>
+      _isDark(context) ? dangerLight : danger;
 }

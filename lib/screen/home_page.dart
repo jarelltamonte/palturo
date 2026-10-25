@@ -137,7 +137,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _confirmAdd(Person person) {
-    if (_actionInFlight || _sendingRequest) return;
+    if (_actionInFlight || _sendingRequest || _undoing) return;
     // The request is committed by _handleSwiped after the card exits, so the
     // button and a right swipe share exactly one network path.
     _dismissCard(person, right: true);
@@ -220,7 +220,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _next({bool right = false, String? connectionId}) {
-    if (_currentIndex >= _filteredPeople.length) return;
+    if (_currentIndex >= _filteredPeople.length || _undoing) return;
 
     setState(() {
       _history.add(_currentIndex);
@@ -249,7 +249,7 @@ class _HomePageState extends State<HomePage> {
       _advanceFrom(person);
       return;
     }
-    if (_actionInFlight) {
+    if (_actionInFlight || _undoing) {
       _resetCard();
       return;
     }
@@ -267,7 +267,10 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Connection request sent to ${person.name}'),
-          action: SnackBarAction(label: 'Undo', onPressed: _undo),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => _undoRequest(connectionId),
+          ),
         ),
       );
     } catch (e) {
@@ -304,8 +307,21 @@ class _HomePageState extends State<HomePage> {
     state.dismiss(right: right);
   }
 
+  Future<void> _undoRequest(String connectionId) async {
+    if (_historyConnectionIds.isEmpty ||
+        _historyConnectionIds.last != connectionId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That request is no longer the latest action.'),
+        ),
+      );
+      return;
+    }
+    await _undo();
+  }
+
   Future<void> _undo() async {
-    if (_history.isEmpty || _undoing) return;
+    if (_history.isEmpty || _undoing || _sendingRequest) return;
 
     final index = _history.last;
     final right = _historyRight.last;
@@ -327,6 +343,7 @@ class _HomePageState extends State<HomePage> {
       }
       _undoing = false;
       if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Connection request withdrawn')),
       );
@@ -532,7 +549,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _showWhyMatch(Person person) async {
-    final score = ((person.compatibility ?? 0) * 100).round();
+    final score = (((person.compatibility ?? 0) * 100).clamp(0, 100)).round();
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.elevatedSurface(context),
@@ -542,105 +559,109 @@ class _HomePageState extends State<HomePage> {
       ),
       builder:
           (sheetContext) => SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome,
-                          size: 20,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Why this match?',
-                          style: AppTextStyles.headingText.copyWith(
-                            color: Theme.of(context).colorScheme.secondary,
-                            fontSize: 20,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            size: 20,
+                            color: Colors.black,
                           ),
                         ),
-                      ),
-                      Text(
-                        '$score%',
-                        style: AppTextStyles.headingText.copyWith(
-                          color: AppColors.accentText(context),
-                          fontSize: 22,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Why this match?',
+                            style: AppTextStyles.headingText.copyWith(
+                              color: Theme.of(context).colorScheme.secondary,
+                              fontSize: 20,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'PalTuro compares your learning and teaching profiles in both directions, then weighs the fit. A reciprocal score rewards mutual alignment, not just a one-sided interest.',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontSize: 14,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _MatchFactor(
-                    icon: Icons.school_outlined,
-                    label: 'Skill',
-                    value:
-                        person.skillName.trim().isEmpty
-                            ? 'Shared skill interest'
-                            : toTitleCase(person.skillName),
-                  ),
-                  _MatchFactor(
-                    icon: Icons.translate,
-                    label: 'Language',
-                    value:
-                        person.language.trim().isEmpty
-                            ? 'Not specified'
-                            : person.language,
-                  ),
-                  _MatchFactor(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Availability',
-                    value:
-                        person.schedule.trim().isEmpty
-                            ? 'Not specified'
-                            : formatSchedule(person.schedule),
-                  ),
-                  _MatchFactor(
-                    icon: Icons.psychology_outlined,
-                    label: 'Learning style',
-                    value:
-                        person.learningStyle.trim().isEmpty
-                            ? 'Not specified'
-                            : person.learningStyle,
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(sheetContext),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
+                        Text(
+                          '$score%',
+                          style: AppTextStyles.headingText.copyWith(
+                            color: AppColors.accentText(context),
+                            fontSize: 22,
+                          ),
                         ),
-                      ),
-                      child: const Text('Got it'),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      person.pipeline == 'basic_bi'
+                          ? 'This result uses basic profile similarity because the full reciprocal reranker was unavailable. Treat it as a lighter signal, not a two-way guarantee.'
+                          : 'PalTuro compares your learning and teaching profiles in both directions, then weighs the fit. A reciprocal score rewards mutual alignment, not just a one-sided interest.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontSize: 14,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _MatchFactor(
+                      icon: Icons.school_outlined,
+                      label: 'Skill',
+                      value:
+                          person.skillName.trim().isEmpty
+                              ? 'Shared skill interest'
+                              : toTitleCase(person.skillName),
+                    ),
+                    _MatchFactor(
+                      icon: Icons.translate,
+                      label: 'Language',
+                      value:
+                          person.language.trim().isEmpty
+                              ? 'Not specified'
+                              : person.language,
+                    ),
+                    _MatchFactor(
+                      icon: Icons.calendar_today_outlined,
+                      label: 'Availability',
+                      value:
+                          person.schedule.trim().isEmpty
+                              ? 'Not specified'
+                              : formatSchedule(person.schedule),
+                    ),
+                    _MatchFactor(
+                      icon: Icons.psychology_outlined,
+                      label: 'Learning style',
+                      value:
+                          person.learningStyle.trim().isEmpty
+                              ? 'Not specified'
+                              : person.learningStyle,
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text('Got it'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -665,7 +686,7 @@ class _HomePageState extends State<HomePage> {
         setState(() => _discovering = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No more people to discover right now.'),
+            content: Text('No more matches to discover right now.'),
           ),
         );
         return;
@@ -685,7 +706,7 @@ class _HomePageState extends State<HomePage> {
       setState(() => _discovering = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Couldn’t find more people. Please try again.'),
+          content: Text('Couldn’t find more matches. Please try again.'),
         ),
       );
     }
@@ -794,7 +815,10 @@ class _HomePageState extends State<HomePage> {
                     label: 'Undo last person',
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: _history.isEmpty ? null : _undo,
+                      onTap:
+                          _history.isEmpty || _sendingRequest || _undoing
+                              ? null
+                              : _undo,
                       child: SizedBox(
                         width: 44,
                         height: 44,
@@ -803,7 +827,7 @@ class _HomePageState extends State<HomePage> {
                           child: Icon(
                             CupertinoIcons.arrow_uturn_left,
                             color:
-                                _history.isEmpty
+                                _history.isEmpty || _sendingRequest || _undoing
                                     ? textTheme.withValues(alpha: 0.3)
                                     : textTheme,
                             size: 24,
@@ -814,7 +838,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   Semantics(
                     button: true,
-                    label: 'Filter people',
+                    label: 'Filter recommendations',
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: _openFilterSheet,
@@ -963,7 +987,7 @@ class _HomePageState extends State<HomePage> {
                               )
                               : const Icon(Icons.explore),
                       label: Text(
-                        _discovering ? 'Finding people…' : 'Discover more',
+                        _discovering ? 'Finding matches…' : 'Discover more',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -1185,7 +1209,8 @@ class _SwipeableCardState extends State<_SwipeableCard>
         final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
 
         final goingRight = _dx > 0;
-        final tint = goingRight ? AppColors.primary : AppColors.danger;
+        final tint =
+            goingRight ? AppColors.primary : AppColors.dangerText(context);
 
         return GestureDetector(
           behavior: HitTestBehavior.translucent,

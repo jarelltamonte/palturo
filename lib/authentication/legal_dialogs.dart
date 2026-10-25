@@ -78,7 +78,7 @@ PalTuro is primarily designed as a mobile application and does not rely on brows
                 child: Text(
                   'Close',
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -123,7 +123,7 @@ PalTuro is primarily designed as a mobile application and does not rely on brows
               child: Text(
                 'Close',
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),

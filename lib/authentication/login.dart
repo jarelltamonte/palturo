@@ -93,7 +93,7 @@ class _LoginPageState extends State<LoginPage> {
                 child: Text(
                   'OK',
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -114,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
               child: Text(
                 'OK',
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),

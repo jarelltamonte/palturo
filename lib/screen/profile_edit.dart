@@ -430,7 +430,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 child: Text(
                   'OK',
                   style: AppTextStyles.boldText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -471,7 +471,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 child: Text(
                   'OK',
                   style: AppTextStyles.boldText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),

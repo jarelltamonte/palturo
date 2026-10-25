@@ -5,12 +5,14 @@ class SkeletonBox extends StatelessWidget {
   final double? width;
   final double height;
   final double radius;
+  final Color? color;
 
   const SkeletonBox({
     super.key,
     this.width,
     required this.height,
     this.radius = 8,
+    this.color,
   });
 
   @override
@@ -19,7 +21,7 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.mutedSurface(context),
+        color: color ?? AppColors.mutedSurface(context),
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -33,35 +35,44 @@ class ExploreGridSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: 'Loading categories',
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          mainAxisExtent: 170,
-        ),
-        itemCount: 6,
-        itemBuilder:
-            (_, __) => Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.elevatedSurface(context),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.border(context)),
-              ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SkeletonBox(width: 48, height: 48, radius: 24),
-                  SizedBox(height: 14),
-                  SkeletonBox(width: 112, height: 12),
-                  SizedBox(height: 8),
-                  SkeletonBox(width: 88, height: 10),
-                ],
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const spacing = 16.0;
+          const topInset = 8.0;
+          const bottomInset = 90.0;
+          final itemHeight =
+              (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              mainAxisExtent: itemHeight,
             ),
+            itemCount: 4,
+            itemBuilder:
+                (_, __) => Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.elevatedSurface(context),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.border(context)),
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SkeletonBox(width: 48, height: 48, radius: 24),
+                      SizedBox(height: 14),
+                      SkeletonBox(width: 112, height: 12),
+                      SizedBox(height: 8),
+                      SkeletonBox(width: 88, height: 10),
+                    ],
+                  ),
+                ),
+          );
+        },
       ),
     );
   }
@@ -71,7 +82,7 @@ class ListRowsSkeleton extends StatelessWidget {
   final int count;
   final double rowHeight;
 
-  const ListRowsSkeleton({super.key, this.count = 6, this.rowHeight = 74});
+  const ListRowsSkeleton({super.key, this.count = 6, this.rowHeight = 72});
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +97,7 @@ class ListRowsSkeleton extends StatelessWidget {
               height: rowHeight,
               child: Row(
                 children: [
-                  const SkeletonBox(width: 52, height: 52, radius: 26),
+                  const SkeletonBox(width: 56, height: 56, radius: 28),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -120,7 +131,7 @@ class RequestCardsSkeleton extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(height: 14),
         itemBuilder:
             (_, __) => Container(
-              height: 250,
+              height: 220,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: AppColors.elevatedSurface(context),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 
 /// Shared avatar treatment for list rows, chat headers, and profile summaries.
 ///
@@ -61,24 +62,30 @@ class UserAvatar extends StatelessWidget {
         child:
             image == null
                 ? fallback
-                : Image(
-                  image: image!,
-                  fit: BoxFit.cover,
-                  frameBuilder: (
-                    context,
-                    child,
-                    frame,
-                    wasSynchronouslyLoaded,
-                  ) {
-                    if (wasSynchronouslyLoaded) return child;
-                    return AnimatedOpacity(
-                      opacity: frame == null ? 0 : 1,
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      child: child,
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => fallback,
+                : Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    fallback,
+                    Image(
+                      image: image!,
+                      fit: BoxFit.cover,
+                      frameBuilder: (
+                        context,
+                        child,
+                        frame,
+                        wasSynchronouslyLoaded,
+                      ) {
+                        if (wasSynchronouslyLoaded) return child;
+                        return AnimatedOpacity(
+                          opacity: frame == null ? 0 : 1,
+                          duration: AppMotion.image,
+                          curve: Curves.easeOut,
+                          child: child,
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
       ),
     );

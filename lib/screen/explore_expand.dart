@@ -7,6 +7,7 @@ import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 
 class ExploreExpand extends StatefulWidget {
@@ -37,7 +38,10 @@ class _ExploreExpandState extends State<ExploreExpand>
   int _currentIndex = 0;
   final List<int> _history = [];
   final List<String?> _historyConnectionIds = [];
+  final Map<String, String> _pendingSwipeIds = {};
   bool _actionInFlight = false;
+  bool _undoing = false;
+  bool _sendingRequest = false;
   bool? _exitRight;
 
   late final AnimationController _exitController = AnimationController(
@@ -80,6 +84,7 @@ class _ExploreExpandState extends State<ExploreExpand>
       _currentIndex = 0;
       _history.clear();
       _historyConnectionIds.clear();
+      _pendingSwipeIds.clear();
     });
 
     try {
@@ -108,7 +113,7 @@ class _ExploreExpandState extends State<ExploreExpand>
   }
 
   void _next({String? connectionId}) {
-    if (_currentIndex >= _people.length) return;
+    if (_currentIndex >= _people.length || _undoing) return;
 
     setState(() {
       _history.add(_currentIndex);
@@ -126,8 +131,22 @@ class _ExploreExpandState extends State<ExploreExpand>
     _next(connectionId: connectionId);
   }
 
+  Future<void> _undoRequest(String connectionId) async {
+    if (_historyConnectionIds.isEmpty ||
+        _historyConnectionIds.last != connectionId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That request is no longer the latest action.'),
+        ),
+      );
+      return;
+    }
+    await _undo();
+  }
+
   Future<void> _undo() async {
-    if (_history.isEmpty) return;
+    if (_history.isEmpty || _undoing || _actionInFlight) return;
+    _undoing = true;
 
     final index = _history.last;
     final connectionId = _historyConnectionIds.last;
@@ -135,6 +154,7 @@ class _ExploreExpandState extends State<ExploreExpand>
       try {
         await MatchApi.cancelConnectionRequest(connectionId);
       } catch (e) {
+        _undoing = false;
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not withdraw request: $e')),
@@ -143,7 +163,9 @@ class _ExploreExpandState extends State<ExploreExpand>
       }
     }
 
+    _undoing = false;
     if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     setState(() {
       _history.removeLast();
       _historyConnectionIds.removeLast();
@@ -151,53 +173,48 @@ class _ExploreExpandState extends State<ExploreExpand>
     });
   }
 
-  Future<void> _sendSwipeRequest(Person person) async {
-    if (_actionInFlight) return;
+  Future<String?> _sendRequest(Person person) async {
+    if (_actionInFlight || _undoing) return null;
     _actionInFlight = true;
+    if (mounted) setState(() => _sendingRequest = true);
     try {
       final connectionId = await MatchApi.sendConnectionRequest(person.id);
-      if (!mounted) return;
-      _advanceFrom(person, connectionId: connectionId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connection request sent to ${person.name}'),
-          action: SnackBarAction(label: 'Undo', onPressed: _undo),
-        ),
-      );
+      if (connectionId == null || connectionId.isEmpty) {
+        throw Exception('The server did not confirm the request.');
+      }
+      Haptics.success();
+      return connectionId;
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
-      _loadPeople();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not send request: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+      }
+      return null;
     } finally {
       _actionInFlight = false;
+      if (mounted) setState(() => _sendingRequest = false);
     }
   }
 
   Future<void> _confirmAdd(Person person) async {
-    if (_actionInFlight) return;
-    _actionInFlight = true;
-
-    try {
-      final connectionId = await MatchApi.sendConnectionRequest(person.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connection request sent to ${person.name}'),
-          action: SnackBarAction(label: 'Undo', onPressed: _undo),
+    final connectionId = await _sendRequest(person);
+    if (!mounted || connectionId == null) return;
+    await _animateAdvance(person, right: true, connectionId: connectionId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Connection request sent to ${person.name}'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _undoRequest(connectionId),
         ),
-      );
-      await _animateAdvance(person, right: true, connectionId: connectionId);
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
-    } finally {
-      _actionInFlight = false;
-    }
+      ),
+    );
   }
 
   Future<void> _confirmBlock(Person person) async {
@@ -316,14 +333,29 @@ class _ExploreExpandState extends State<ExploreExpand>
       ),
       secondaryBackground: _swipeBackground(
         alignment: Alignment.centerRight,
-        color: AppColors.danger,
+        color: AppColors.dangerText(context),
         icon: Icons.close,
       ),
+      confirmDismiss: (direction) async {
+        if (direction != DismissDirection.startToEnd) return true;
+        final connectionId = await _sendRequest(person);
+        if (connectionId == null) return false;
+        _pendingSwipeIds[person.id] = connectionId;
+        return true;
+      },
       onDismissed: (direction) {
+        final connectionId = _pendingSwipeIds.remove(person.id);
+        _advanceFrom(person, connectionId: connectionId);
         if (direction == DismissDirection.startToEnd) {
-          _sendSwipeRequest(person);
-        } else {
-          _advanceFrom(person);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Connection request sent to ${person.name}'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () => _undoRequest(connectionId ?? ''),
+              ),
+            ),
+          );
         }
       },
       child: PersonCardOverlay(
@@ -445,16 +477,28 @@ class _ExploreExpandState extends State<ExploreExpand>
       ),
       body: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-          child:
-              _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? _buildErrorState(textTheme)
-                  : hasMore
-                  ? _buildDeckCard(_people[_currentIndex])
-                  : _buildEmptyState(textTheme),
+        child: Column(
+          children: [
+            if (_sendingRequest)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.primary,
+                backgroundColor: Colors.transparent,
+              ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+                child:
+                    _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _error != null
+                        ? _buildErrorState(textTheme)
+                        : hasMore
+                        ? _buildDeckCard(_people[_currentIndex])
+                        : _buildEmptyState(textTheme),
+              ),
+            ),
+          ],
         ),
       ),
     );

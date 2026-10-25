@@ -13,6 +13,7 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
@@ -128,7 +129,9 @@ enum SortFilter { newest, oldest, ascending, descending }
 enum RequestView { incoming, sent }
 
 class RequestPage extends StatefulWidget {
-  const RequestPage({super.key});
+  final ValueListenable<int>? refreshSignal;
+
+  const RequestPage({super.key, this.refreshSignal});
 
   @override
   State<RequestPage> createState() => _RequestPageState();
@@ -191,6 +194,25 @@ class _RequestPageState extends State<RequestPage> {
   @override
   void initState() {
     super.initState();
+    widget.refreshSignal?.addListener(_refreshFromShell);
+    ActivityService.instance.addListener(_onActivityChanged);
+    _loadRequests();
+    _loadOutgoing();
+  }
+
+  @override
+  void dispose() {
+    widget.refreshSignal?.removeListener(_refreshFromShell);
+    ActivityService.instance.removeListener(_onActivityChanged);
+    super.dispose();
+  }
+
+  void _onActivityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _refreshFromShell() {
+    if (!mounted) return;
     _loadRequests();
     _loadOutgoing();
   }
@@ -439,7 +461,14 @@ class _RequestPageState extends State<RequestPage> {
           label: label,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _view = value),
+            onTap: () {
+              if (_view == value) {
+                if (value == RequestView.sent) _loadOutgoing();
+                return;
+              }
+              setState(() => _view = value);
+              if (value == RequestView.sent) _loadOutgoing();
+            },
             child: AnimatedContainer(
               duration: AppMotion.base,
               curve: Curves.easeOut,
@@ -713,7 +742,8 @@ class _RequestPageState extends State<RequestPage> {
                       color: textTheme,
                       size: 24,
                     ),
-                    if (ActivityService.instance.unread > 0)
+                    if (PreferencesService.instance.notificationsEnabled &&
+                        ActivityService.instance.unread > 0)
                       Positioned(
                         right: -1,
                         top: -1,
@@ -794,7 +824,9 @@ class _SentRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
     final statusColor =
-        request.isPending ? AppColors.accentText(context) : AppColors.danger;
+        request.isPending
+            ? AppColors.accentText(context)
+            : AppColors.dangerText(context);
     final statusLabel = request.isPending ? 'Waiting for reply' : 'Declined';
 
     return Container(
@@ -887,7 +919,7 @@ class _SentRequestCard extends StatelessWidget {
                     child: TextButton(
                       onPressed: onWithdraw,
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.danger,
+                        foregroundColor: AppColors.dangerText(context),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,

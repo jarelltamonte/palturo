@@ -26,6 +26,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
 
   final List<int> _tabHistory = [0];
   final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
+  final ValueNotifier<int> _requestsRefresh = ValueNotifier<int>(0);
 
   final List<IconData> _navigationIcons = [
     CupertinoIcons.person_2,
@@ -58,12 +59,16 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       isActive: () => _selectedIndex == _exploreIndex,
     ),
     ChatsPage(onStartSwiping: () => _onItemTapped(0)),
-    const RequestPage(),
+    RequestPage(refreshSignal: _requestsRefresh),
     const ProfilePage(),
   ];
 
   void _onItemTapped(int index) {
     Haptics.selection();
+    if (index == 3) {
+      _requestsRefresh.value++;
+      ActivityService.instance.markRead();
+    }
     if (index == _exploreIndex && _selectedIndex == _exploreIndex) {
       _exploreNavKey.currentState?.popUntil((route) => route.isFirst);
       return;
@@ -76,10 +81,12 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       _tabHistory.remove(index);
       _tabHistory.add(index);
     });
+  }
 
-    if (index == 3) {
-      ActivityService.instance.markRead();
-    }
+  @override
+  void dispose() {
+    _requestsRefresh.dispose();
+    super.dispose();
   }
 
   @override
@@ -116,25 +123,34 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             final active = index == _selectedIndex;
             final reducedMotion = MediaQuery.disableAnimationsOf(context);
             return Positioned.fill(
-              child: IgnorePointer(
-                ignoring: !active,
-                child: ExcludeSemantics(
-                  excluding: !active,
-                  child: AnimatedSlide(
-                    duration: reducedMotion ? Duration.zero : AppMotion.base,
-                    curve: Curves.easeOut,
-                    offset:
-                        active
-                            ? Offset.zero
-                            : Offset(
-                              index < _selectedIndex ? -0.035 : 0.035,
-                              0,
-                            ),
-                    child: AnimatedOpacity(
+              child: ExcludeFocus(
+                excluding: !active,
+                child: IgnorePointer(
+                  ignoring: !active,
+                  child: ExcludeSemantics(
+                    excluding: !active,
+                    child: AnimatedSlide(
                       duration: reducedMotion ? Duration.zero : AppMotion.base,
                       curve: Curves.easeOut,
-                      opacity: active ? 1 : 0,
-                      child: TickerMode(enabled: active, child: _pages[index]),
+                      offset:
+                          active
+                              ? Offset.zero
+                              : Offset(
+                                index < _selectedIndex ? -0.035 : 0.035,
+                                0,
+                              ),
+                      child: AnimatedOpacity(
+                        duration:
+                            !active || reducedMotion
+                                ? Duration.zero
+                                : AppMotion.base,
+                        curve: Curves.easeOut,
+                        opacity: active ? 1 : 0,
+                        child: TickerMode(
+                          enabled: active,
+                          child: _pages[index],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -333,10 +349,11 @@ class _NavItemState extends State<_NavItem>
   @override
   Widget build(BuildContext context) {
     final showBadge = widget.unreadCount > 0;
+    final isRequests = widget.label == 'Requests';
     final unreadLabel =
         widget.unreadCount == 1
-            ? '1 unread message'
-            : '${widget.unreadCount} unread messages';
+            ? (isRequests ? '1 unread update' : '1 unread message')
+            : '${widget.unreadCount} unread ${isRequests ? 'updates' : 'messages'}';
     final semanticsLabel =
         showBadge ? '${widget.label}, $unreadLabel' : widget.label;
 
@@ -407,11 +424,14 @@ class _NavItemState extends State<_NavItem>
               ),
               const SizedBox(height: 3),
               AnimatedContainer(
-                duration: AppMotion.micro,
+                duration:
+                    MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : AppMotion.micro,
                 width: widget.selected ? 5 : 0,
                 height: 5,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                decoration: BoxDecoration(
+                  color: AppColors.accentText(context),
                   shape: BoxShape.circle,
                 ),
               ),

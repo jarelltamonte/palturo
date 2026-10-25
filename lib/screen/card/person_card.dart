@@ -29,6 +29,9 @@ class Person {
   /// Reciprocal compatibility (0..1) from the pipeline — spec §6.3 indicator.
   final double? compatibility;
 
+  /// 'full' or 'basic_bi'. Basic mode is one-way similarity.
+  final String pipeline;
+
   const Person({
     required this.id,
     required this.name,
@@ -41,6 +44,7 @@ class Person {
     this.photoUrls = const [null],
     this.showcaseUrls = const [null],
     this.compatibility,
+    this.pipeline = 'full',
   });
 
   /// Card page media: showcase content first, profile photos after.
@@ -197,6 +201,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         photoUrls.isNotEmpty && _photoIndex < photoUrls.length
             ? photoUrls[_photoIndex]
             : null;
+    final hasVideo = isVideoUrl(currentPhoto);
 
     final roleIconAsset =
         widget.person.role == PersonRole.learner
@@ -226,7 +231,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (widget.onOpenProfile != null)
+          if (widget.onOpenProfile != null && hasVideo)
             Positioned.fill(
               child: Semantics(
                 container: true,
@@ -242,8 +247,21 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ? ShowcaseMedia(
                 url: currentPhoto,
                 fallback: _CardFallback(name: widget.person.name),
+                onOpenProfile: widget.onOpenProfile,
               )
               : _CardFallback(name: widget.person.name),
+          if (widget.onOpenProfile != null && !hasVideo)
+            Positioned.fill(
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'Open ${widget.person.name} profile',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onOpenProfile,
+                ),
+              ),
+            ),
           Positioned(
             left: 0,
             top: 0,
@@ -327,16 +345,18 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.person.compatibility != null)
+                  if (widget.person.compatibility != null &&
+                      widget.onWhyMatch != null)
                     _GlassPill(
                       onTap: widget.onWhyMatch,
                       icon: Icons.auto_awesome,
                       label:
-                          '${(widget.person.compatibility! * 100).round()}% match',
+                          '${((widget.person.compatibility! * 100).clamp(0, 100)).round()}% match',
                       semanticsLabel:
-                          '${(widget.person.compatibility! * 100).round()} percent reciprocal match. Why this match?',
+                          '${((widget.person.compatibility! * 100).clamp(0, 100)).round()} percent match. Why this match?',
                     ),
                   if (widget.person.compatibility != null &&
+                      widget.onWhyMatch != null &&
                       widget.onOpenProfile != null)
                     const SizedBox(height: 6),
                   if (widget.onOpenProfile != null)
@@ -377,14 +397,14 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           value: 'unmatch',
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.remove_circle_outline,
-                                color: AppColors.danger,
+                                color: AppColors.dangerText(context),
                                 size: 20,
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                'Unmatch',
+                                'Remove pal',
                                 style: AppTextStyles.regularText.copyWith(
                                   color:
                                       Theme.of(context).colorScheme.secondary,
@@ -397,9 +417,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         value: 'report',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.flag_outlined,
-                              color: AppColors.danger,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -416,9 +436,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         value: 'block',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.block,
-                              color: AppColors.danger,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -803,11 +823,17 @@ class _GlassPill extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
+      excludeSemantics: true,
       label: semanticsLabel,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: pill,
+      onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: SizedBox(height: 44, child: Center(child: pill)),
+        ),
       ),
     );
   }
@@ -881,10 +907,10 @@ void showPersonProfileDialog(
                         : () async {
                           final confirmed = await showConfirmDialog(
                             dialogContext,
-                            title: 'Unmatch',
+                            title: 'Remove pal',
                             message:
-                                'Unmatch ${person.name}? You’ll lose this match and your chat history.',
-                            confirmLabel: 'Unmatch',
+                                'Remove ${person.name} from your Pals? You’ll lose this pal and your chat history.',
+                            confirmLabel: 'Remove pal',
                           );
                           if (!confirmed || !dialogContext.mounted) return;
                           Navigator.pop(dialogContext);
@@ -909,7 +935,7 @@ void showPersonProfileDialog(
                             dialogContext,
                             title: 'Block',
                             message:
-                                '${person.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+                                '${person.name} won’t be able to find or message you, and will be removed from your Pals. You can unblock them anytime in Settings.',
                             confirmLabel: 'Block',
                           );
                           if (!confirmed || !dialogContext.mounted) return;

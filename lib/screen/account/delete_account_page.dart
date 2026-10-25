@@ -94,9 +94,9 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.warning_amber_rounded,
-                        color: AppColors.danger,
+                        color: AppColors.dangerText(context),
                         size: 30,
                       ),
                       const SizedBox(height: 12),
@@ -146,8 +146,8 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: AppColors.danger,
+                      borderSide: BorderSide(
+                        color: AppColors.dangerText(context),
                         width: 1.5,
                       ),
                     ),

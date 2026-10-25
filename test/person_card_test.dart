@@ -165,6 +165,11 @@ void main() {
     await tester.tap(find.text('View profile'));
     await tester.pumpAndSettle();
     expect(profileOpened, isTrue);
+
+    profileOpened = false;
+    await tester.tapAt(const Offset(400, 160));
+    await tester.pumpAndSettle();
+    expect(profileOpened, isTrue);
   });
 
   testWidgets('expanded bio scrolls instead of overflowing', (tester) async {

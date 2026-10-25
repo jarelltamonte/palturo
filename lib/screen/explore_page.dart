@@ -440,7 +440,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
             _icons[_page],
             key: ValueKey('icon_$_page'),
             size: 42,
-            color: AppColors.primary,
+            color: AppColors.accentText(context),
           ),
         ),
         const SizedBox(height: 12),
@@ -528,7 +528,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
             child: Text(
               _isLastPage ? 'Okay' : 'Next',
               style: AppTextStyles.regularText.copyWith(
-                color: AppColors.primary,
+                color: AppColors.accentText(context),
               ),
             ),
           ),
@@ -554,7 +554,9 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
           onPressed: _next,
           child: Text(
             _isLastPage ? 'Okay' : 'Next',
-            style: AppTextStyles.regularText.copyWith(color: AppColors.primary),
+            style: AppTextStyles.regularText.copyWith(
+              color: AppColors.accentText(context),
+            ),
           ),
         ),
       ],

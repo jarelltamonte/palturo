@@ -13,7 +13,9 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -76,7 +78,9 @@ class _ChatsPageState extends State<ChatsPage> {
               learningStyle: '',
               lastMessage: c.lastMessage,
               lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
-              hasUnread: c.unread > 0,
+              hasUnread:
+                  PreferencesService.instance.notificationsEnabled &&
+                  c.unread > 0,
               avatarUrl: c.otherAvatar,
               connectionId: c.connectionId,
               otherUserId: c.otherUserId,
@@ -94,6 +98,7 @@ class _ChatsPageState extends State<ChatsPage> {
   void initState() {
     super.initState();
     ChatStateService.instance.addListener(_onChatStateChanged);
+    ActivityService.instance.addListener(_onChatStateChanged);
     _loadChats();
   }
 
@@ -116,6 +121,7 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   void dispose() {
     ChatStateService.instance.removeListener(_onChatStateChanged);
+    ActivityService.instance.removeListener(_onChatStateChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -394,7 +400,18 @@ class _ChatsPageState extends State<ChatsPage> {
     if (_loadingChats) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        body: const ListRowsSkeleton(),
+        appBar: AppBar(
+          toolbarHeight: adaptiveHeight,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          titleSpacing: 16,
+          title: Text(
+            'Chats',
+            style: AppTextStyles.headingText.copyWith(color: textTheme),
+          ),
+        ),
+        body: const SafeArea(bottom: false, child: ListRowsSkeleton()),
       );
     }
     if (_chatsError != null) {
@@ -804,8 +821,8 @@ class ChatListItem extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.danger,
+                          decoration: BoxDecoration(
+                            color: AppColors.dangerText(context),
                             shape: BoxShape.circle,
                           ),
                         ),

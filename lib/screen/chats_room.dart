@@ -464,7 +464,7 @@ class _ChatRoomState extends State<ChatRoom> {
         context,
         title: 'Block',
         message:
-            '${widget.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+            '${widget.name} won’t be able to find or message you, and will be removed from your Pals. You can unblock them anytime in Settings.',
         confirmLabel: 'Block',
       );
       if (!confirmed) return;
@@ -590,9 +590,9 @@ class _ChatRoomState extends State<ChatRoom> {
                       value: 'report',
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.flag_outlined,
-                            color: AppColors.danger,
+                            color: AppColors.dangerText(context),
                             size: 20,
                           ),
                           const SizedBox(width: 12),
@@ -609,9 +609,9 @@ class _ChatRoomState extends State<ChatRoom> {
                       value: 'block',
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.block,
-                            color: AppColors.danger,
+                            color: AppColors.dangerText(context),
                             size: 20,
                           ),
                           const SizedBox(width: 12),

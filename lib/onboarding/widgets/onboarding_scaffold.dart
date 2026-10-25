@@ -192,7 +192,7 @@ class _Title extends StatelessWidget {
           TextSpan(text: parts.first),
           TextSpan(
             text: highlightWord,
-            style: style.copyWith(color: AppColors.primary),
+            style: style.copyWith(color: AppColors.accentText(context)),
           ),
           if (parts.length > 1)
             TextSpan(text: parts.sublist(1).join(highlightWord!)),

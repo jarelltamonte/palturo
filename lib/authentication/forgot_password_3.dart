@@ -92,7 +92,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
               child: Text(
                 'OK',
                 style: AppTextStyles.boldText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),

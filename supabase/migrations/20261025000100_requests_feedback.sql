@@ -117,6 +117,7 @@ create policy "app_feedback_insert_own"
   to authenticated
   with check (user_id = auth.uid());
 
+drop policy if exists "app_feedback_select_own" on public.app_feedback;
 create policy "app_feedback_select_own"
   on public.app_feedback
   for select

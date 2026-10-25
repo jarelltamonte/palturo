@@ -26,6 +26,20 @@ void main() {
     expect(lightMode.snackBarTheme.behavior, SnackBarBehavior.floating);
   });
 
+  test('light input text meets WCAG AA on input fill', () {
+    expect(
+      _contrast(AppColors.textSecondary, AppColors.binputBackground),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
+  test('snackbar action lime is legible on charcoal', () {
+    expect(
+      _contrast(AppColors.primary, AppColors.background),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
   test('light accent text meets WCAG AA on white', () {
     expect(
       _contrast(AppColors.accentTextLight, AppColors.white),

@@ -21,4 +21,7 @@ class AppMotion {
 
   /// Ambient skeleton pulse (not a transition).
   static const Duration shimmer = Duration(milliseconds: 1100);
+
+  /// Network image fade-in.
+  static const Duration image = Duration(milliseconds: 220);
 }

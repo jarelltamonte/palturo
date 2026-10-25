@@ -187,7 +187,7 @@ class RequestCard extends StatelessWidget {
                     child: Text(
                       'Decline',
                       style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.danger,
+                        color: AppColors.dangerText(context),
                         fontSize: 16,
                       ),
                     ),

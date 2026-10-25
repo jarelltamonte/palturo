@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:video_player/video_player.dart';
 
 bool isVideoUrl(String? url) {
@@ -14,12 +15,14 @@ class ShowcaseMedia extends StatefulWidget {
   final String url;
   final Widget fallback;
   final BoxFit fit;
+  final VoidCallback? onOpenProfile;
 
   const ShowcaseMedia({
     super.key,
     required this.url,
     required this.fallback,
     this.fit = BoxFit.cover,
+    this.onOpenProfile,
   });
 
   @override
@@ -29,6 +32,8 @@ class ShowcaseMedia extends StatefulWidget {
 class _ShowcaseMediaState extends State<ShowcaseMedia> {
   VideoPlayerController? _controller;
   bool _failed = false;
+  bool _lastPlaying = false;
+  bool _lastHasError = false;
 
   bool get _isVideo => isVideoUrl(widget.url);
 
@@ -44,26 +49,53 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
     if (oldWidget.url != widget.url) {
       _disposeVideo();
       _failed = false;
+      _lastPlaying = false;
+      _lastHasError = false;
       if (_isVideo) _openVideo();
     }
   }
 
   Future<void> _openVideo() async {
+    _failed = false;
     final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
     _controller = controller;
     try {
       await controller.initialize();
+      if (!identical(_controller, controller)) return;
       await controller.setLooping(true);
-      await controller.play();
+      await controller.setVolume(0);
+      controller.addListener(_onControllerChanged);
       if (mounted) setState(() {});
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && identical(_controller, controller)) {
+        setState(() => _failed = true);
+      }
     }
+  }
+
+  void _onControllerChanged() {
+    final controller = _controller;
+    if (!mounted || controller == null) return;
+    final hasError = controller.value.hasError;
+    if (hasError) {
+      if (!_lastHasError) {
+        _lastHasError = true;
+        setState(() {});
+      }
+      return;
+    }
+    if (!controller.value.isInitialized) return;
+    final playing = controller.value.isPlaying;
+    if (playing == _lastPlaying && hasError == _lastHasError) return;
+    _lastPlaying = playing;
+    _lastHasError = hasError;
+    setState(() {});
   }
 
   void _disposeVideo() {
     final controller = _controller;
     _controller = null;
+    controller?.removeListener(_onControllerChanged);
     controller?.dispose();
   }
 
@@ -83,7 +115,7 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
           if (wasSynchronouslyLoaded) return child;
           return AnimatedOpacity(
             opacity: frame == null ? 0 : 1,
-            duration: const Duration(milliseconds: 220),
+            duration: AppMotion.image,
             curve: Curves.easeOut,
             child: child,
           );
@@ -98,54 +130,97 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
     }
 
     final controller = _controller;
-    if (_failed) return widget.fallback;
+    if (_failed || controller?.value.hasError == true) {
+      return widget.fallback;
+    }
     if (controller == null || !controller.value.isInitialized) {
       return _MediaLoading(fallback: widget.fallback);
     }
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () async {
-        if (controller.value.isPlaying) {
-          await controller.pause();
-        } else {
-          await controller.play();
-        }
-        if (mounted) setState(() {});
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          FittedBox(
-            fit: widget.fit,
-            clipBehavior: Clip.hardEdge,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
-            ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        FittedBox(
+          fit: widget.fit,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
           ),
-          Center(
-            child: AnimatedOpacity(
-              opacity: controller.value.isPlaying ? 0 : 1,
-              duration: const Duration(milliseconds: 160),
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 30,
+        ),
+        Positioned(
+          top: 12,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Semantics(
+                button: true,
+                label:
+                    controller.value.isPlaying ? 'Pause video' : 'Play video',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () async {
+                    if (controller.value.isPlaying) {
+                      await controller.pause();
+                    } else {
+                      await controller.play();
+                    }
+                    if (mounted) setState(() {});
+                  },
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    child: Icon(
+                      controller.value.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (widget.onOpenProfile != null) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  button: true,
+                  label: 'View profile',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: widget.onOpenProfile,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.62),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.22),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.person_outline_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

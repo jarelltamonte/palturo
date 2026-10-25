@@ -302,7 +302,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Text(
                   'Go to Log In',
                   style: AppTextStyles.boldText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -351,7 +351,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Text(
                   'OK',
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -372,7 +372,7 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Text(
                 'OK',
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),

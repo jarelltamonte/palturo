@@ -101,6 +101,7 @@ class _SettingsState extends State<Settings> {
       case _notificationsKey:
         PreferencesService.instance.setNotificationsEnabled(value);
         ActivityService.instance.refresh();
+        ActivityService.instance.notifyPreferenceChanged();
         break;
       case _soundKey:
         PreferencesService.instance.setSoundEnabled(value);
@@ -113,6 +114,11 @@ class _SettingsState extends State<Settings> {
     }
   }
 
+  String _deliveryError(Object error) {
+    debugPrint('[Settings] delivery failed: $error');
+    return "Couldn't send this right now. Please try again.";
+  }
+
   @override
   void dispose() {
     _reportController.dispose();
@@ -123,6 +129,7 @@ class _SettingsState extends State<Settings> {
   void _showFeedbackDialog() {
     int currentStep = 0;
     final Map<int, int> ratings = {};
+    var submitting = false;
 
     _feedbackController.clear();
 
@@ -189,10 +196,10 @@ class _SettingsState extends State<Settings> {
                             ),
                           ),
                           if (selected)
-                            const Icon(
+                            Icon(
                               Icons.check_circle,
                               size: 18,
-                              color: AppColors.primary,
+                              color: AppColors.accentText(context),
                             ),
                         ],
                       ),
@@ -224,7 +231,16 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+                Text(
+                  'Responses are stored securely with your PalTuro account.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme.withValues(alpha: 0.55),
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 18),
                 if (!isCommentStep) ...[
                   Text(
                     _feedbackStatements[currentStep],
@@ -301,6 +317,7 @@ class _SettingsState extends State<Settings> {
             );
 
             Future<void> nextOrSubmit() async {
+              if (submitting) return;
               if (!isCommentStep) {
                 setDialogState(() {
                   currentStep++;
@@ -317,6 +334,8 @@ class _SettingsState extends State<Settings> {
                 'submitted_at': DateTime.now().toIso8601String(),
               };
 
+              submitting = true;
+              setDialogState(() {});
               try {
                 await MatchApi.submitAppFeedback(
                   kind: 'survey',
@@ -324,13 +343,11 @@ class _SettingsState extends State<Settings> {
                 );
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Couldn’t send feedback: ${e.toString().replaceFirst('Exception: ', '')}',
-                    ),
-                  ),
-                );
+                submitting = false;
+                if (dialogContext.mounted) setDialogState(() {});
+                ScaffoldMessenger.of(
+                  this.context,
+                ).showSnackBar(SnackBar(content: Text(_deliveryError(e))));
                 return;
               }
 
@@ -374,11 +391,15 @@ class _SettingsState extends State<Settings> {
                   ),
                   CupertinoDialogAction(
                     onPressed:
-                        !isCommentStep && selectedRating == 0
+                        submitting || (!isCommentStep && selectedRating == 0)
                             ? null
                             : nextOrSubmit,
                     child: Text(
-                      isCommentStep ? 'Submit' : 'Next',
+                      submitting
+                          ? 'Sending...'
+                          : isCommentStep
+                          ? 'Submit'
+                          : 'Next',
                       style: AppTextStyles.regularText.copyWith(
                         color:
                             canAdvance
@@ -423,11 +444,15 @@ class _SettingsState extends State<Settings> {
                 TextButton(
                   style: _noSplashButtonStyle,
                   onPressed:
-                      !isCommentStep && selectedRating == 0
+                      submitting || (!isCommentStep && selectedRating == 0)
                           ? null
                           : nextOrSubmit,
                   child: Text(
-                    isCommentStep ? 'Submit' : 'Next',
+                    submitting
+                        ? 'Sending...'
+                        : isCommentStep
+                        ? 'Submit'
+                        : 'Next',
                     style: AppTextStyles.regularText.copyWith(
                       color:
                           canAdvance
@@ -444,10 +469,12 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  void _showReportDialog() {
+  Future<void> _showReportDialog() async {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final submitting = ValueNotifier<bool>(false);
+    var dialogOpen = true;
 
-    showAdaptiveDialog(
+    await showAdaptiveDialog(
       context: context,
       builder: (dialogContext) {
         final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
@@ -464,6 +491,8 @@ class _SettingsState extends State<Settings> {
           ),
           decoration: InputDecoration(
             hintText: 'Tell us what went wrong...',
+            helperText: 'Stored securely with your account for review.',
+            helperMaxLines: 2,
             hintStyle: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.45),
               fontSize: 14,
@@ -487,9 +516,11 @@ class _SettingsState extends State<Settings> {
         );
 
         Future<void> submitReport() async {
+          if (submitting.value) return;
           final report = _reportController.text.trim();
           if (report.isEmpty) return;
 
+          submitting.value = true;
           try {
             await MatchApi.submitAppFeedback(
               kind: 'problem',
@@ -499,14 +530,12 @@ class _SettingsState extends State<Settings> {
               },
             );
           } catch (e) {
+            if (!dialogOpen) return;
+            submitting.value = false;
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Couldn’t send report: ${e.toString().replaceFirst('Exception: ', '')}',
-                ),
-              ),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(_deliveryError(e))));
             return;
           }
 
@@ -537,6 +566,7 @@ class _SettingsState extends State<Settings> {
             actions: [
               CupertinoDialogAction(
                 onPressed: () {
+                  if (submitting.value) return;
                   _reportController.clear();
                   Navigator.pop(dialogContext);
                 },
@@ -549,17 +579,21 @@ class _SettingsState extends State<Settings> {
                 valueListenable: _reportController,
                 builder: (context, value, _) {
                   final canSubmit = value.text.trim().isNotEmpty;
-                  return CupertinoDialogAction(
-                    onPressed: canSubmit ? submitReport : null,
-                    child: Text(
-                      'Submit',
-                      style: AppTextStyles.regularText.copyWith(
-                        color:
-                            canSubmit
-                                ? AppColors.accentText(context)
-                                : textTheme.withValues(alpha: 0.38),
-                      ),
-                    ),
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: submitting,
+                    builder:
+                        (context, busy, _) => CupertinoDialogAction(
+                          onPressed: canSubmit && !busy ? submitReport : null,
+                          child: Text(
+                            busy ? 'Sending...' : 'Submit',
+                            style: AppTextStyles.regularText.copyWith(
+                              color:
+                                  canSubmit && !busy
+                                      ? AppColors.accentText(context)
+                                      : textTheme.withValues(alpha: 0.38),
+                            ),
+                          ),
+                        ),
                   );
                 },
               ),
@@ -586,6 +620,7 @@ class _SettingsState extends State<Settings> {
             TextButton(
               style: _noSplashButtonStyle,
               onPressed: () {
+                if (submitting.value) return;
                 _reportController.clear();
                 Navigator.pop(dialogContext);
               },
@@ -598,18 +633,22 @@ class _SettingsState extends State<Settings> {
               valueListenable: _reportController,
               builder: (context, value, _) {
                 final canSubmit = value.text.trim().isNotEmpty;
-                return TextButton(
-                  style: _noSplashButtonStyle,
-                  onPressed: canSubmit ? submitReport : null,
-                  child: Text(
-                    'Submit',
-                    style: AppTextStyles.regularText.copyWith(
-                      color:
-                          canSubmit
-                              ? AppColors.accentText(context)
-                              : textTheme.withValues(alpha: 0.38),
-                    ),
-                  ),
+                return ValueListenableBuilder<bool>(
+                  valueListenable: submitting,
+                  builder:
+                      (context, busy, _) => TextButton(
+                        style: _noSplashButtonStyle,
+                        onPressed: canSubmit && !busy ? submitReport : null,
+                        child: Text(
+                          busy ? 'Sending...' : 'Submit',
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                canSubmit && !busy
+                                    ? AppColors.accentText(context)
+                                    : textTheme.withValues(alpha: 0.38),
+                          ),
+                        ),
+                      ),
                 );
               },
             ),
@@ -617,6 +656,8 @@ class _SettingsState extends State<Settings> {
         );
       },
     );
+    dialogOpen = false;
+    submitting.dispose();
   }
 
   Future<void> _handleLogout() async {
@@ -690,7 +731,7 @@ class _SettingsState extends State<Settings> {
                 child: Text(
                   'Log Out',
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -731,7 +772,7 @@ class _SettingsState extends State<Settings> {
               child: Text(
                 'Log Out',
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),
@@ -792,6 +833,15 @@ class _SettingsState extends State<Settings> {
                   vertical: 24.0,
                 ),
                 children: [
+                  Text(
+                    'Preferences',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   SwitchListTile.adaptive(
                     title: Text(
                       'Notifications',
@@ -1000,7 +1050,7 @@ class _SettingsState extends State<Settings> {
                   Text(
                     'Danger zone',
                     style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.danger,
+                      color: AppColors.dangerText(context),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1018,27 +1068,27 @@ class _SettingsState extends State<Settings> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.delete_forever_outlined,
-                        color: AppColors.danger,
+                        color: AppColors.dangerText(context),
                       ),
                       title: Text(
                         'Delete account',
                         style: AppTextStyles.regularText.copyWith(
-                          color: AppColors.danger,
+                          color: AppColors.dangerText(context),
                           fontSize: 15,
                         ),
                       ),
                       subtitle: Text(
-                        'Permanently remove your profile, matches, and chats.',
+                        'Permanently remove your profile, Pals, and chats.',
                         style: AppTextStyles.regularText.copyWith(
                           color: AppColors.mutedText(context),
                           fontSize: 12,
                         ),
                       ),
-                      trailing: const Icon(
+                      trailing: Icon(
                         Icons.chevron_right,
-                        color: AppColors.danger,
+                        color: AppColors.dangerText(context),
                       ),
                       onTap:
                           _isLoggingOut

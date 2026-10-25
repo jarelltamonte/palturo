@@ -16,8 +16,8 @@ ThemeData _baseTheme({
             onPrimary: AppColors.black,
             secondary: onSurface,
             onSecondary: AppColors.black,
-            error: AppColors.danger,
-            onError: AppColors.white,
+            error: AppColors.dangerLight,
+            onError: AppColors.black,
             surface: surface,
             onSurface: onSurface,
           )
@@ -109,6 +109,8 @@ ThemeData _baseTheme({
         color: AppColors.white,
         fontFamily: 'Inter',
       ),
+      actionTextColor: AppColors.primary,
+      disabledActionTextColor: AppColors.secondary,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
   );

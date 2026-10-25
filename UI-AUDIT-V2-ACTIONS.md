@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 903634f`  
+**Branch:** `ui-features @ 1f773df`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**4 / 14 complete. Next: Case 05.**
+**5 / 14 complete. Next: Case 06.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -66,7 +66,7 @@ Each case contains:
 | 02 Browse depth & taxonomy | **DONE** | PASS | PASS | PASS | `f06b544` |
 | 03 Category card context | **DONE** | PASS | PASS | PASS | `7784152` |
 | 04 Edit Profile structure | **DONE** | PASS | PASS | PASS | `903634f` |
-| 05 Dark-mode edges | Not started | - | - | - | - |
+| 05 Dark-mode edges | **DONE** | PASS | PASS | PASS | `1f773df` |
 | 06 Activity destination | Not started | - | - | - | - |
 | 07 Chat state model | Not started | - | - | - | - |
 | 08 Pals integrity | Not started | - | - | - | - |
@@ -87,7 +87,7 @@ Each case contains:
 | 02 | Browse depth and taxonomy | **DONE** | P1 |
 | 03 | Category card context | **DONE** | P1 |
 | 04 | Edit Profile structure and role safety | **DONE** | P1 |
-| 05 | Dark-mode edges | NEW GAP | P1 |
+| 05 | Dark-mode edges | **DONE** | P1 |
 | 06 | Activity destination | PARTIAL | P1 |
 | 07 | Chat state model | PARTIAL | P2 |
 | 08 | Pals integrity | PARTIAL | P2 |
@@ -792,8 +792,10 @@ The current profile prompt promises a showcase. Choose one:
 
 ## Case 05 — Dark-mode edges
 
-**Status:** NEW GAP  
+**Status:** DONE
 **Priority:** P1  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `1f773df`  
 **PDF reference:** pages 11 and 18
 
 ### Problem

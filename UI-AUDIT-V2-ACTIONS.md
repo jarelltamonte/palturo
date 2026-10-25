@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 3cd767c`  
+**Branch:** `ui-features @ 7784152`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -30,6 +30,7 @@ Each case contains:
 
 | Status | Meaning |
 |---|---|
+| **DONE** | v2 case implemented, independently audited, and committed. |
 | **SHIPPED** | Implemented and accepted in the 15-case baseline. Do not reimplement. |
 | **PARTIAL** | A surface exists, but its workflow, state model, or depth is incomplete. |
 | **MISSING** | No destination, control, or data surface exists. |
@@ -55,13 +56,36 @@ Each case contains:
 
 ---
 
+### Implementation progress
+
+**3 / 14 complete. Next: Case 04.**
+
+| Case | State | Functionality | Quality | Regression | Commit |
+|---|---|---|---|---|---|
+| 01 Settings & account hierarchy | **DONE** | PASS | PASS | PASS | `bd68b75` |
+| 02 Browse depth & taxonomy | **DONE** | PASS | PASS | PASS | `f06b544` |
+| 03 Category card context | **DONE** | PASS | PASS | PASS | `7784152` |
+| 04 Edit Profile structure | Not started | - | - | - | - |
+| 05 Dark-mode edges | Not started | - | - | - | - |
+| 06 Activity destination | Not started | - | - | - | - |
+| 07 Chat state model | Not started | - | - | - | - |
+| 08 Pals integrity | Not started | - | - | - | - |
+| 09 Requests after accept | Not started | - | - | - | - |
+| 10 Onboarding durability | Not started | - | - | - | - |
+| 11 Copy and routing | Not started | - | - | - | - |
+| 12 System consistency | Not started | - | - | - | - |
+| 13 Feedback survey navigation | Not started | - | - | - | - |
+| 14 Auth and accessibility | Not started | - | - | - | - |
+
+**Last updated:** 25 October 2026 - flutter analyze clean - flutter test 37/37 - release web build current.
+
 ### Case index
 
 | Case | Title | Status | Priority |
 |---|---|---|---|
-| 01 | Settings and Account hierarchy | MISSING | P1 |
-| 02 | Browse depth and taxonomy | MISSING | P1 |
-| 03 | Category card context | PARTIAL | P1 |
+| 01 | Settings and Account hierarchy | **DONE** | P1 |
+| 02 | Browse depth and taxonomy | **DONE** | P1 |
+| 03 | Category card context | **DONE** | P1 |
 | 04 | Edit Profile structure and role safety | PARTIAL | P1 |
 | 05 | Dark-mode edges | NEW GAP | P1 |
 | 06 | Activity destination | PARTIAL | P1 |
@@ -223,8 +247,10 @@ Use a single page-title scale:
 
 ## Case 01 — Settings and Account hierarchy
 
-**Status:** MISSING  
+**Status:** DONE  
 **Priority:** P1  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `bd68b75`  
 **PDF reference:** pages 12–13
 
 ### Problem
@@ -378,8 +404,10 @@ Delete account            Permanently remove profile, Pals, chats
 
 ## Case 02 — Browse depth and taxonomy
 
-**Status:** MISSING  
+**Status:** DONE  
 **Priority:** P1  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `f06b544`  
 **PDF reference:** page 8
 
 ### Problem
@@ -501,8 +529,10 @@ Keep the current grid, but add:
 
 ## Case 03 — Category card context
 
-**Status:** PARTIAL  
+**Status:** DONE  
 **Priority:** P1  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `7784152`  
 **PDF reference:** page 9
 
 ### Problem

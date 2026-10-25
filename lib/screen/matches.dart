@@ -1022,7 +1022,7 @@ class _MatchesState extends State<Matches> {
                                 (_hasActiveFilter ||
                                             _query.trim().isNotEmpty) &&
                                         filtered.length != _pals.length
-                                    ? '${filtered.length} of ${_pals.length} pals'
+                                    ? '${filtered.length} of ${palCountLabel(_pals.length)}'
                                     : palCountLabel(filtered.length),
                                 style: AppTextStyles.regularText.copyWith(
                                   color: textTheme.withValues(alpha: 0.6),

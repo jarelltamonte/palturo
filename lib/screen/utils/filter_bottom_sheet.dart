@@ -171,17 +171,21 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             ),
           )
         else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Column(
             children: [
               for (final option in section.options)
-                _filterChip(
-                  option.label,
-                  _draft[section.key] == option.value,
-                  () => setState(() => _draft[section.key] = option.value),
-                  textColor,
-                  primaryColor,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: _filterChip(
+                      option.label,
+                      _draft[section.key] == option.value,
+                      () => setState(() => _draft[section.key] = option.value),
+                      textColor,
+                      primaryColor,
+                    ),
+                  ),
                 ),
             ],
           ),

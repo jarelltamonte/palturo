@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'support_page.dart';
 
 /// A dedicated destructive destination. Kept out of the routine account list
 /// so Delete Account is never the next tap after Log Out.
@@ -181,6 +182,15 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                     fontSize: 12,
                     height: 1.4,
                   ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SupportPage()),
+                    );
+                  },
+                  child: const Text('Contact support'),
                 ),
               ],
             ),

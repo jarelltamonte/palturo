@@ -76,7 +76,7 @@ class PersonCardOverlay extends StatefulWidget {
     this.onOpenProfile,
     this.onWhyMatch,
     this.skipLabel = 'Skip',
-    this.addLabel = 'Add',
+    this.addLabel = 'Send request',
     this.showActions = true,
     this.showMenu = true,
   });

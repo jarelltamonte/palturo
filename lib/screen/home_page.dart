@@ -1,7 +1,6 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -19,8 +18,8 @@ import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/profile_service.dart';
-import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/widgets/profile_update_link.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -37,17 +36,14 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
 
-  late final TapGestureRecognizer _settingsTap =
-      TapGestureRecognizer()..onTap = _openSettings;
-
   static const List<FilterSection> _filterSections = [
     FilterSection(
       key: 'role',
-      title: 'Role',
+      title: 'Show',
       options: [
-        FilterOption('All', 'all'),
-        FilterOption('Learner', 'learner'),
-        FilterOption('Mentor', 'mentor'),
+        FilterOption('All roles', 'all'),
+        FilterOption('Learners', 'learner'),
+        FilterOption('Mentors', 'mentor'),
       ],
     ),
   ];
@@ -76,7 +72,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadDeck({bool force = false}) async {
-    final cached = MatchApi.hasCachedDeck(_roleKey);
+    final cached =
+        _roleFilter == RoleFilter.all
+            ? MatchApi.hasCachedDeck('learner') &&
+                MatchApi.hasCachedDeck('mentor')
+            : MatchApi.hasCachedDeck(_roleKey);
     final generation = ++_deckGeneration;
 
     setState(() {
@@ -115,19 +115,42 @@ class _HomePageState extends State<HomePage> {
   String get _roleKey => switch (_roleFilter) {
     RoleFilter.learner => 'learner',
     RoleFilter.mentor => 'mentor',
-    RoleFilter.all => _oppositeRoleKey,
+    RoleFilter.all => 'all',
   };
-
-  String get _oppositeRoleKey {
-    final role = _myProfile?.role;
-    return role == OnboardingRole.teach ? 'learner' : 'mentor';
-  }
 
   Future<List<Person>> _fetchDeck({bool force = false}) async {
     final me = await ProfileService().getCurrentUserProfile();
 
     if (mounted && me != null) {
       setState(() => _myProfile = me);
+    }
+
+    if (_roleFilter == RoleFilter.all) {
+      final decks = await Future.wait([
+        MatchApi.getMatchDeck(
+          asRoleDb: 'learner',
+          force: force,
+          enrichLimit: 10,
+        ),
+        MatchApi.getMatchDeck(
+          asRoleDb: 'mentor',
+          force: force,
+          enrichLimit: 10,
+        ),
+      ]);
+      final byId = <String, Person>{};
+      for (final person in decks.expand((deck) => deck)) {
+        final existing = byId[person.id];
+        if (existing == null ||
+            (person.compatibility ?? 0) > (existing.compatibility ?? 0)) {
+          byId[person.id] = person;
+        }
+      }
+      final merged =
+          byId.values.toList()..sort(
+            (a, b) => (b.compatibility ?? 0).compareTo(a.compatibility ?? 0),
+          );
+      return merged;
     }
 
     return MatchApi.getMatchDeck(
@@ -142,12 +165,6 @@ class _HomePageState extends State<HomePage> {
     // The request is committed by _handleSwiped after the card exits, so the
     // button and a right swipe share exactly one network path.
     _dismissCard(person, right: true);
-  }
-
-  @override
-  void dispose() {
-    _settingsTap.dispose();
-    super.dispose();
   }
 
   Future<void> _openSettings() async {
@@ -401,6 +418,7 @@ class _HomePageState extends State<HomePage> {
         },
         child: PersonCardOverlay(
           person: person,
+          addLabel: 'Send request',
           onAdd: () => _confirmAdd(person),
           onSkip: () => _dismissCard(person),
           onBlock: () => _confirmBlock(person),
@@ -676,7 +694,10 @@ class _HomePageState extends State<HomePage> {
     setState(() => _discovering = true);
 
     try {
-      final people = await MatchApi.getRandomDeck(limit: 20, role: _roleKey);
+      final people = await MatchApi.getRandomDeck(
+        limit: 20,
+        role: _roleFilter == RoleFilter.all ? null : _roleKey,
+      );
 
       if (!mounted || generation != _deckGeneration) return;
 
@@ -993,27 +1014,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(text: 'Update your '),
-                          TextSpan(
-                            text: 'settings',
-                            recognizer: _settingsTap,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.accentText(context),
-                              decoration: TextDecoration.underline,
-                              decorationThickness: 1.5,
-                            ),
-                          ),
-                        ],
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textColor.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                    ProfileUpdateLink(onTap: _openSettings),
                   ],
                 ),
               ),

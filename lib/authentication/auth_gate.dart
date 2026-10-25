@@ -35,7 +35,10 @@ class _AuthGateState extends State<AuthGate> {
       if (data.session == null) {
         await _evaluateUserStatus(null);
         try {
-          await PreferencesService.instance.setBool('skipped_onboarding', false);
+          await PreferencesService.instance.setBool(
+            'skipped_onboarding',
+            false,
+          );
         } catch (_) {}
         if (mounted) {
           setState(() {

@@ -48,9 +48,12 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _scheduleMidnightTimer();
 
     // Listen to Supabase auth events
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       final event = data.event;
-      if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.tokenRefreshed) {
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.tokenRefreshed) {
         loadConversations();
         _subscribeRealtime();
       } else if (event == AuthChangeEvent.signedOut) {
@@ -102,15 +105,16 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     final currentUser = client.auth.currentUser;
     if (currentUser == null) return;
 
-    _realtimeChannel = client
-        .channel('chat_state_global_messages')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'messages',
-          callback: _handleRealtimeMessage,
-        )
-        .subscribe();
+    _realtimeChannel =
+        client
+            .channel('chat_state_global_messages')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'messages',
+              callback: _handleRealtimeMessage,
+            )
+            .subscribe();
   }
 
   void _handleRealtimeMessage(PostgresChangePayload payload) {
@@ -121,24 +125,30 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       final connectionId = newRecord['connection_id']?.toString();
       final senderId = newRecord['sender_id']?.toString();
       final body = newRecord['body']?.toString() ?? '';
-      final createdAt = DateTime.tryParse(newRecord['created_at']?.toString() ?? '') ?? DateTime.now();
+      final createdAt =
+          DateTime.tryParse(newRecord['created_at']?.toString() ?? '') ??
+          DateTime.now();
 
       if (connectionId == null) return;
 
       final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       final isMine = senderId == currentUserId;
       final isRoomActiveAndResumed =
-          _activeConnectionId == connectionId && _lifecycleState == AppLifecycleState.resumed;
+          _activeConnectionId == connectionId &&
+          _lifecycleState == AppLifecycleState.resumed;
 
       if (!isMine && isRoomActiveAndResumed) {
         // Active room viewing this chat right now -> mark read immediately
         MatchApi.markMessagesRead(connectionId);
       }
 
-      final index = _conversations.indexWhere((c) => c.connectionId == connectionId);
+      final index = _conversations.indexWhere(
+        (c) => c.connectionId == connectionId,
+      );
       if (index != -1) {
         final old = _conversations[index];
-        final newUnread = (isMine || isRoomActiveAndResumed) ? 0 : old.unread + 1;
+        final newUnread =
+            (isMine || isRoomActiveAndResumed) ? 0 : old.unread + 1;
         final updated = old.copyWith(
           lastMessage: body,
           lastAt: createdAt,
@@ -157,7 +167,9 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       final connectionId = newRecord['connection_id']?.toString();
 
       if (isRead && connectionId != null) {
-        final index = _conversations.indexWhere((c) => c.connectionId == connectionId);
+        final index = _conversations.indexWhere(
+          (c) => c.connectionId == connectionId,
+        );
         if (index != -1 && _conversations[index].unread > 0) {
           final old = _conversations[index];
           _conversations[index] = old.copyWith(unread: 0);
@@ -171,7 +183,9 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> enterRoom(String connectionId) async {
     _activeConnectionId = connectionId;
 
-    final index = _conversations.indexWhere((c) => c.connectionId == connectionId);
+    final index = _conversations.indexWhere(
+      (c) => c.connectionId == connectionId,
+    );
     if (index != -1 && _conversations[index].unread > 0) {
       final old = _conversations[index];
       _conversations[index] = old.copyWith(unread: 0);
@@ -206,7 +220,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _midnightTimer?.cancel();
     final now = DateTime.now();
     final tomorrowMidnight = DateTime(now.year, now.month, now.day + 1);
-    final durationUntilMidnight = tomorrowMidnight.difference(now) + const Duration(seconds: 1);
+    final durationUntilMidnight =
+        tomorrowMidnight.difference(now) + const Duration(seconds: 1);
 
     _midnightTimer = Timer(durationUntilMidnight, () {
       notifyListeners(); // Refresh relative date strings ("Today" -> "Yesterday")

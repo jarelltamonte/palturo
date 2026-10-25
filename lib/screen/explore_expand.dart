@@ -36,6 +36,7 @@ class _ExploreExpandState extends State<ExploreExpand>
 
   int _currentIndex = 0;
   final List<int> _history = [];
+  final List<String?> _historyConnectionIds = [];
   bool _actionInFlight = false;
   bool? _exitRight;
 
@@ -50,7 +51,11 @@ class _ExploreExpandState extends State<ExploreExpand>
     super.dispose();
   }
 
-  Future<void> _animateAdvance(Person person, {bool right = false}) async {
+  Future<void> _animateAdvance(
+    Person person, {
+    bool right = false,
+    String? connectionId,
+  }) async {
     if (_exitController.isAnimating) return;
     if (_currentIndex < 0 || _currentIndex >= _people.length) return;
     if (_people[_currentIndex].id != person.id) return;
@@ -58,7 +63,7 @@ class _ExploreExpandState extends State<ExploreExpand>
     _exitRight = right;
     await _exitController.forward(from: 0);
     if (!mounted) return;
-    _advanceFrom(person);
+    _advanceFrom(person, connectionId: connectionId);
     _exitController.reset();
   }
 
@@ -74,6 +79,7 @@ class _ExploreExpandState extends State<ExploreExpand>
       _error = null;
       _currentIndex = 0;
       _history.clear();
+      _historyConnectionIds.clear();
     });
 
     try {
@@ -101,30 +107,72 @@ class _ExploreExpandState extends State<ExploreExpand>
     }
   }
 
-  void _next() {
+  void _next({String? connectionId}) {
     if (_currentIndex >= _people.length) return;
 
     setState(() {
       _history.add(_currentIndex);
+      _historyConnectionIds.add(connectionId);
       _currentIndex++;
     });
   }
 
   /// Advance only if [person] is still the visible card. This makes a late
   /// swipe/dismiss callback and a button callback idempotent for one card.
-  void _advanceFrom(Person person) {
+  void _advanceFrom(Person person, {String? connectionId}) {
     if (!mounted) return;
     if (_currentIndex < 0 || _currentIndex >= _people.length) return;
     if (_people[_currentIndex].id != person.id) return;
-    _next();
+    _next(connectionId: connectionId);
   }
 
-  void _undo() {
+  Future<void> _undo() async {
     if (_history.isEmpty) return;
 
+    final index = _history.last;
+    final connectionId = _historyConnectionIds.last;
+    if (connectionId != null) {
+      try {
+        await MatchApi.cancelConnectionRequest(connectionId);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not withdraw request: $e')),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     setState(() {
-      _currentIndex = _history.removeLast();
+      _history.removeLast();
+      _historyConnectionIds.removeLast();
+      _currentIndex = index;
     });
+  }
+
+  Future<void> _sendSwipeRequest(Person person) async {
+    if (_actionInFlight) return;
+    _actionInFlight = true;
+    try {
+      final connectionId = await MatchApi.sendConnectionRequest(person.id);
+      if (!mounted) return;
+      _advanceFrom(person, connectionId: connectionId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connection request sent to ${person.name}'),
+          action: SnackBarAction(label: 'Undo', onPressed: _undo),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
+      _loadPeople();
+    } finally {
+      _actionInFlight = false;
+    }
   }
 
   Future<void> _confirmAdd(Person person) async {
@@ -132,14 +180,15 @@ class _ExploreExpandState extends State<ExploreExpand>
     _actionInFlight = true;
 
     try {
-      await MatchApi.sendConnectionRequest(person.id);
-
+      final connectionId = await MatchApi.sendConnectionRequest(person.id);
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection request sent to ${person.name}')),
+        SnackBar(
+          content: Text('Connection request sent to ${person.name}'),
+          action: SnackBarAction(label: 'Undo', onPressed: _undo),
+        ),
       );
-      await _animateAdvance(person, right: true);
+      await _animateAdvance(person, right: true, connectionId: connectionId);
     } catch (e) {
       if (!mounted) return;
 
@@ -267,10 +316,16 @@ class _ExploreExpandState extends State<ExploreExpand>
       ),
       secondaryBackground: _swipeBackground(
         alignment: Alignment.centerRight,
-        color: Colors.red,
+        color: AppColors.danger,
         icon: Icons.close,
       ),
-      onDismissed: (_) => _advanceFrom(person),
+      onDismissed: (direction) {
+        if (direction == DismissDirection.startToEnd) {
+          _sendSwipeRequest(person);
+        } else {
+          _advanceFrom(person);
+        }
+      },
       child: PersonCardOverlay(
         person: person,
         onAdd: () => _confirmAdd(person),

@@ -57,12 +57,15 @@ class Validators {
   /// Capitalize the first letter of each word in a string.
   static String capitalizeWords(String text) {
     if (text.isEmpty) return text;
-    return text.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      final firstChar = word.substring(0, 1).toUpperCase();
-      final rest = word.length > 1 ? word.substring(1) : '';
-      return '$firstChar$rest';
-    }).join(' ');
+    return text
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          final firstChar = word.substring(0, 1).toUpperCase();
+          final rest = word.length > 1 ? word.substring(1) : '';
+          return '$firstChar$rest';
+        })
+        .join(' ');
   }
 
   /// Normalize email by trimming outer whitespace and lowercasing.
@@ -73,10 +76,11 @@ class Validators {
   /// Sanitizes name inputs by stripping control/zero-width chars,
   /// collapsing internal spaces, trimming, and capitalizing the first letter of each word.
   static String sanitizeName(String name) {
-    final cleaned = name
-        .replaceAll(_controlAndZeroWidthRegExp, '')
-        .replaceAll(_consecutiveWhitespaceRegExp, ' ')
-        .trim();
+    final cleaned =
+        name
+            .replaceAll(_controlAndZeroWidthRegExp, '')
+            .replaceAll(_consecutiveWhitespaceRegExp, ' ')
+            .trim();
     return capitalizeWords(cleaned);
   }
 
@@ -142,7 +146,8 @@ class Validators {
       }
     }
 
-    final isValid = hasMin &&
+    final isValid =
+        hasMin &&
         hasMax &&
         hasLower &&
         hasUpper &&
@@ -184,10 +189,11 @@ class Validators {
       return '$fieldLabel is required';
     }
 
-    final trimmed = rawName
-        .replaceAll(_controlAndZeroWidthRegExp, '')
-        .replaceAll(_consecutiveWhitespaceRegExp, ' ')
-        .trim();
+    final trimmed =
+        rawName
+            .replaceAll(_controlAndZeroWidthRegExp, '')
+            .replaceAll(_consecutiveWhitespaceRegExp, ' ')
+            .trim();
 
     if (trimmed.isEmpty) {
       return '$fieldLabel is required';
@@ -207,4 +213,3 @@ class Validators {
     return null;
   }
 }
-

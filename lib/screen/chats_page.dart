@@ -15,6 +15,7 @@ import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 class ChatsPage extends StatefulWidget {
@@ -40,7 +41,7 @@ class _ChatsPageState extends State<ChatsPage> {
       key: 'role',
       title: 'Role',
       options: [
-        FilterOption('All', 'all'),
+        FilterOption('View all', 'all'),
         FilterOption('Learner', 'learner'),
         FilterOption('Mentor', 'mentor'),
       ],
@@ -49,7 +50,7 @@ class _ChatsPageState extends State<ChatsPage> {
       key: 'status',
       title: 'Status',
       options: [
-        FilterOption('All', 'all'),
+        FilterOption('View all', 'all'),
         FilterOption('Unread', 'unread'),
         FilterOption('Read', 'read'),
       ],
@@ -377,7 +378,6 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
@@ -394,7 +394,7 @@ class _ChatsPageState extends State<ChatsPage> {
     if (_loadingChats) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        body: const Center(child: CircularProgressIndicator()),
+        body: const ListRowsSkeleton(),
       );
     }
     if (_chatsError != null) {
@@ -448,7 +448,7 @@ class _ChatsPageState extends State<ChatsPage> {
         titleSpacing: 16,
         title:
             _isSearching
-                ? _buildSearchField(textTheme, primaryColor)
+                ? _buildSearchField(textTheme, AppColors.accentText(context))
                 : Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -547,7 +547,7 @@ class _ChatsPageState extends State<ChatsPage> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 16.0),
                   child: Text(
-                    'Your matches',
+                    'Your Pals',
                     style: AppTextStyles.boldText.copyWith(color: textTheme),
                   ),
                 ),
@@ -678,7 +678,7 @@ class MatchesShortcutItem extends StatelessWidget {
             SizedBox(
               width: 100,
               child: Text(
-                'All',
+                'View all',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -805,7 +805,7 @@ class ChatListItem extends StatelessWidget {
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Colors.red,
+                            color: AppColors.danger,
                             shape: BoxShape.circle,
                           ),
                         ),

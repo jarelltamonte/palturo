@@ -60,7 +60,7 @@ class _ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-    final confirmColor = destructive ? Colors.red : AppColors.primary;
+    final confirmColor = destructive ? AppColors.danger : AppColors.primary;
 
     final titleWidget = Center(
       child: Text(
@@ -123,8 +123,8 @@ class _ConfirmDialog extends StatelessWidget {
           style:
               destructive
                   ? TextButton.styleFrom(
-                    backgroundColor: Colors.red.withValues(alpha: 0.12),
-                    foregroundColor: Colors.red,
+                    backgroundColor: AppColors.danger.withValues(alpha: 0.12),
+                    foregroundColor: AppColors.danger,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 10,

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/preferences_service.dart';
 
 import 'home_page.dart';
 import 'explore_page.dart';
@@ -41,8 +44,8 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   final List<String> _navigationLabels = [
-    'People',
-    'Explore',
+    'For You',
+    'Browse',
     'Chats',
     'Requests',
     'Profile',
@@ -60,6 +63,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   void _onItemTapped(int index) {
+    Haptics.selection();
     if (index == _exploreIndex && _selectedIndex == _exploreIndex) {
       _exploreNavKey.currentState?.popUntil((route) => route.isFirst);
       return;
@@ -72,6 +76,10 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       _tabHistory.remove(index);
       _tabHistory.add(index);
     });
+
+    if (index == 3) {
+      ActivityService.instance.markRead();
+    }
   }
 
   @override
@@ -106,16 +114,28 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
         body: Stack(
           children: List.generate(_pages.length, (index) {
             final active = index == _selectedIndex;
+            final reducedMotion = MediaQuery.disableAnimationsOf(context);
             return Positioned.fill(
               child: IgnorePointer(
                 ignoring: !active,
                 child: ExcludeSemantics(
                   excluding: !active,
-                  child: AnimatedOpacity(
-                    duration: AppMotion.base,
+                  child: AnimatedSlide(
+                    duration: reducedMotion ? Duration.zero : AppMotion.base,
                     curve: Curves.easeOut,
-                    opacity: active ? 1 : 0,
-                    child: TickerMode(enabled: active, child: _pages[index]),
+                    offset:
+                        active
+                            ? Offset.zero
+                            : Offset(
+                              index < _selectedIndex ? -0.035 : 0.035,
+                              0,
+                            ),
+                    child: AnimatedOpacity(
+                      duration: reducedMotion ? Duration.zero : AppMotion.base,
+                      curve: Curves.easeOut,
+                      opacity: active ? 1 : 0,
+                      child: TickerMode(enabled: active, child: _pages[index]),
+                    ),
                   ),
                 ),
               ),
@@ -133,8 +153,14 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
 
   Widget _buildNavBar() {
     return ListenableBuilder(
-      listenable: ChatStateService.instance,
+      listenable: Listenable.merge([
+        ChatStateService.instance,
+        ActivityService.instance,
+      ]),
       builder: (context, _) {
+        final badgesEnabled = PreferencesService.instance.notificationsEnabled;
+        final requestUnread =
+            badgesEnabled ? ActivityService.instance.unread : 0;
         return Container(
           height: 60,
           margin: const EdgeInsets.only(right: 16, left: 16),
@@ -157,8 +183,15 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
               final activeColor = AppColors.accentText(context);
               final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
+              final isRequests = index == 3;
               final unreadCount =
-                  isChat ? ChatStateService.instance.totalUnreadCount : 0;
+                  isChat
+                      ? (badgesEnabled
+                          ? ChatStateService.instance.totalUnreadCount
+                          : 0)
+                      : isRequests
+                      ? requestUnread
+                      : 0;
 
               return _NavItem(
                 icon:
@@ -370,6 +403,16 @@ class _NavItemState extends State<_NavItem>
                   fontSize: 12,
                   fontWeight:
                       widget.selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              const SizedBox(height: 3),
+              AnimatedContainer(
+                duration: AppMotion.micro,
+                width: widget.selected ? 5 : 0,
+                height: 5,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
                 ),
               ),
             ],

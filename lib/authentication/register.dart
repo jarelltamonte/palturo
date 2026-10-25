@@ -46,7 +46,8 @@ class _RegisterPageState extends State<RegisterPage> {
     super.initState();
 
     _firstNameFocusNode.addListener(() {
-      if (!_firstNameFocusNode.hasFocus && _firstNameController.text.isNotEmpty) {
+      if (!_firstNameFocusNode.hasFocus &&
+          _firstNameController.text.isNotEmpty) {
         setState(() => _firstNameTouched = true);
       }
     });
@@ -152,8 +153,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Validate name fields
-    final firstNameError =
-        Validators.validateName(_firstNameController.text, 'First name');
+    final firstNameError = Validators.validateName(
+      _firstNameController.text,
+      'First name',
+    );
     if (firstNameError != null) {
       setState(() {
         _firstNameTouched = true;
@@ -162,8 +165,10 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    final lastNameError =
-        Validators.validateName(_lastNameController.text, 'Last name');
+    final lastNameError = Validators.validateName(
+      _lastNameController.text,
+      'Last name',
+    );
     if (lastNameError != null) {
       setState(() {
         _lastNameTouched = true;
@@ -173,15 +178,15 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Validate password policy
-    final passwordResult =
-        Validators.checkPassword(_passwordController.text);
+    final passwordResult = Validators.checkPassword(_passwordController.text);
     if (!passwordResult.isValid) {
       setState(() {
         _passwordTouched = true;
       });
-      final errorMsg = passwordResult.unmetRequirements.isNotEmpty
-          ? passwordResult.unmetRequirements.first
-          : 'Password does not meet security requirements.';
+      final errorMsg =
+          passwordResult.unmetRequirements.isNotEmpty
+              ? passwordResult.unmetRequirements.first
+              : 'Password does not meet security requirements.';
       await _showSignUpFailedDialog(errorMsg);
       return;
     }
@@ -224,7 +229,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (result.isSuccess) {
         await _showAccountCreatedDialog(
-          message: result.message ??
+          message:
+              result.message ??
               'If your account is ready, please log in to continue.',
         );
 
@@ -386,7 +392,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
-            !_passwordResult.isValid;
+        !_passwordResult.isValid;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -451,8 +457,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   controller: _firstNameController,
                                   focusNode: _firstNameFocusNode,
                                   keyboardType: TextInputType.name,
-                                  textCapitalization:
-                                      TextCapitalization.words,
+                                  textCapitalization: TextCapitalization.words,
                                   textInputAction: TextInputAction.next,
                                   autofillHints: const [
                                     AutofillHints.givenName,
@@ -471,8 +476,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                     ),
                                     child: Text(
                                       _firstNameError!,
-                                      style:
-                                          AppTextStyles.regularText.copyWith(
+                                      style: AppTextStyles.regularText.copyWith(
                                         color: errorColor,
                                         fontSize: 12,
                                       ),
@@ -492,8 +496,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   controller: _lastNameController,
                                   focusNode: _lastNameFocusNode,
                                   keyboardType: TextInputType.name,
-                                  textCapitalization:
-                                      TextCapitalization.words,
+                                  textCapitalization: TextCapitalization.words,
                                   textInputAction: TextInputAction.next,
                                   autofillHints: const [
                                     AutofillHints.familyName,
@@ -512,8 +515,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                     ),
                                     child: Text(
                                       _lastNameError!,
-                                      style:
-                                          AppTextStyles.regularText.copyWith(
+                                      style: AppTextStyles.regularText.copyWith(
                                         color: errorColor,
                                         fontSize: 12,
                                       ),
@@ -587,32 +589,32 @@ class _RegisterPageState extends State<RegisterPage> {
                           padding: const EdgeInsets.only(top: 6, left: 4),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _passwordResult.unmetRequirements
-                                .map((req) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.circle,
-                                      size: 5,
-                                      color: errorColor,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        req,
-                                        style:
-                                            AppTextStyles.regularText.copyWith(
+                            children:
+                                _passwordResult.unmetRequirements.map((req) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.circle,
+                                          size: 5,
                                           color: errorColor,
-                                          fontSize: 12,
                                         ),
-                                      ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            req,
+                                            style: AppTextStyles.regularText
+                                                .copyWith(
+                                                  color: errorColor,
+                                                  fontSize: 12,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                }).toList(),
                           ),
                         ),
                       const SizedBox(height: 10),
@@ -746,18 +748,19 @@ class _RegisterPageState extends State<RegisterPage> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.textSecondary,
+                  child:
+                      _isSubmitting
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                        )
-                      : const Text('Sign Up'),
+                          )
+                          : const Text('Sign Up'),
                 ),
               ),
             ],

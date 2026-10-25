@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 
 const kOtherId = 'other';
@@ -1199,6 +1200,73 @@ class _SkillRowState extends State<_SkillRow> {
         widget.isEditing
             ? textColor.withValues(alpha: 0.7)
             : textColor.withValues(alpha: 0.5);
+
+    if (!widget.isEditing) {
+      if (widget.selectedId.trim().isEmpty) return const SizedBox.shrink();
+      final category = categoryById(_categoryIdFor(widget.selectedId));
+      final note = widget.initialNote.trim();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: widget.accentColor.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                category?.icon ?? Icons.check,
+                size: 16,
+                color: widget.accentColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _labelFor(widget.selectedId),
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (category != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        category.label,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  if (note.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        note,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.75),
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final hasSelection = widget.selectedId.isNotEmpty;
     final category =
         hasSelection ? categoryById(_categoryIdFor(widget.selectedId)) : null;

@@ -6,6 +6,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
+import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
@@ -46,15 +47,17 @@ void main() async {
     return;
   }
 
-  playSplashSound();
-
   await Supabase.initialize(
     url: kSupabaseUrl,
     publishableKey: kSupabasePublishableKey,
   );
 
-  PreferencesService.instance.init();
+  await PreferencesService.instance.init();
+  if (PreferencesService.instance.soundEnabled) {
+    playSplashSound();
+  }
   ChatStateService.instance.init();
+  ActivityService.instance.init();
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );

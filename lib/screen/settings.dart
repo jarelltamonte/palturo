@@ -1,13 +1,16 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/auth_service.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:palturo/screen/account/change_password_page.dart';
+import 'package:palturo/screen/account/delete_account_page.dart';
 import 'package:palturo/screen/block_list.dart';
 
 final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
@@ -26,15 +29,12 @@ class _SettingsState extends State<Settings> {
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _isLoggingOut = false;
-  bool _isDeleting = false;
   bool _userChangedSettings = false;
   String _version = '…';
 
   static const _notificationsKey = 'notifications_enabled';
   static const _soundKey = 'sound_enabled';
   static const _vibrationKey = 'vibration_enabled';
-  static const _feedbackKey = 'feedback_entries';
-  static const _reportKey = 'problem_reports';
 
   final TextEditingController _reportController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
@@ -97,32 +97,20 @@ class _SettingsState extends State<Settings> {
   void _setToggle(String key, bool value, VoidCallback apply) {
     _userChangedSettings = true;
     setState(apply);
-    PreferencesService.instance.setBool(key, value);
-  }
-
-  Future<void> _appendLocalEntry(String key, Map<String, dynamic> entry) async {
-    final prefs = PreferencesService.instance;
-    final raw = await prefs.getString(key);
-    final entries = <Map<String, dynamic>>[];
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          for (final item in decoded) {
-            if (item is Map) {
-              entries.add(Map<String, dynamic>.from(item));
-            }
-          }
-        }
-      } catch (_) {
-        entries.clear();
-      }
+    switch (key) {
+      case _notificationsKey:
+        PreferencesService.instance.setNotificationsEnabled(value);
+        ActivityService.instance.refresh();
+        break;
+      case _soundKey:
+        PreferencesService.instance.setSoundEnabled(value);
+        break;
+      case _vibrationKey:
+        PreferencesService.instance.setVibrationEnabled(value);
+        break;
+      default:
+        PreferencesService.instance.setBool(key, value);
     }
-    entries.add(entry);
-    if (entries.length > 50) {
-      entries.removeRange(0, entries.length - 50);
-    }
-    await prefs.setString(key, jsonEncode(entries));
   }
 
   @override
@@ -330,9 +318,20 @@ class _SettingsState extends State<Settings> {
               };
 
               try {
-                await _appendLocalEntry(_feedbackKey, feedbackData);
-              } catch (_) {
-                // Keep the dialog usable if local storage is unavailable.
+                await MatchApi.submitAppFeedback(
+                  kind: 'survey',
+                  payload: feedbackData,
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Couldn’t send feedback: ${e.toString().replaceFirst('Exception: ', '')}',
+                    ),
+                  ),
+                );
+                return;
               }
 
               if (!mounted) return;
@@ -492,12 +491,23 @@ class _SettingsState extends State<Settings> {
           if (report.isEmpty) return;
 
           try {
-            await _appendLocalEntry(_reportKey, {
-              'text': report,
-              'submitted_at': DateTime.now().toIso8601String(),
-            });
-          } catch (_) {
-            // Keep the dialog usable if local storage is unavailable.
+            await MatchApi.submitAppFeedback(
+              kind: 'problem',
+              payload: {
+                'text': report,
+                'submitted_at': DateTime.now().toIso8601String(),
+              },
+            );
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Couldn’t send report: ${e.toString().replaceFirst('Exception: ', '')}',
+                ),
+              ),
+            );
+            return;
           }
 
           if (!mounted) return;
@@ -731,43 +741,6 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  Future<void> _handleDeleteAccount() async {
-    if (_isDeleting) return;
-    setState(() => _isDeleting = true);
-
-    try {
-      await AuthService().deleteAccount();
-
-      if (!mounted) return;
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).popUntil((route) => route.isFirst);
-      // Keep the busy overlay until this route is disposed, so it cannot
-      // flash away during the exit animation.
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isDeleting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
-    }
-  }
-
-  void _showDeleteAccountDialog() {
-    showAdaptiveDialog(
-      context: context,
-      builder: (dialogContext) {
-        return _DeleteAccountDialog(
-          onConfirm: () {
-            Navigator.pop(dialogContext);
-            _handleDeleteAccount();
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
@@ -777,7 +750,7 @@ class _SettingsState extends State<Settings> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
-      canPop: !_isLoggingOut && !_isDeleting,
+      canPop: !_isLoggingOut,
       child: Stack(
         children: [
           Scaffold(
@@ -793,9 +766,7 @@ class _SettingsState extends State<Settings> {
                 child: IconButton(
                   tooltip: 'Back',
                   onPressed:
-                      (_isLoggingOut || _isDeleting)
-                          ? null
-                          : () => Navigator.pop(context),
+                      _isLoggingOut ? null : () => Navigator.pop(context),
                   icon: Icon(
                     Icons.arrow_back_ios_new,
                     color: textTheme,
@@ -828,6 +799,13 @@ class _SettingsState extends State<Settings> {
                         color: textTheme,
                       ),
                     ),
+                    subtitle: Text(
+                      'Show activity badges for requests and messages.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
+                      ),
+                    ),
                     activeTrackColor: AppColors.primary,
                     activeThumbColor: AppColors.white,
                     inactiveTrackColor: AppColors.switchOffTrack(context),
@@ -848,6 +826,13 @@ class _SettingsState extends State<Settings> {
                         color: textTheme,
                       ),
                     ),
+                    subtitle: Text(
+                      'Play confirmation sounds on launch and setup.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
+                      ),
+                    ),
                     activeTrackColor: AppColors.primary,
                     activeThumbColor: AppColors.white,
                     inactiveTrackColor: AppColors.switchOffTrack(context),
@@ -862,6 +847,13 @@ class _SettingsState extends State<Settings> {
                       'Vibration',
                       style: AppTextStyles.regularText.copyWith(
                         color: textTheme,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Use haptic feedback for swipes and confirms.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
                       ),
                     ),
                     activeTrackColor: AppColors.primary,
@@ -882,6 +874,13 @@ class _SettingsState extends State<Settings> {
                       'Dark Mode',
                       style: AppTextStyles.regularText.copyWith(
                         color: textTheme,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Switch to the charcoal PalTuro theme.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
                       ),
                     ),
                     activeTrackColor: AppColors.primary,
@@ -949,6 +948,26 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  ListTile(
+                    leading: Icon(Icons.password_outlined, color: textTheme),
+                    title: Text(
+                      'Change password',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: textTheme),
+                    onTap:
+                        _isLoggingOut
+                            ? null
+                            : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ChangePasswordPage(),
+                              ),
+                            ),
+                  ),
+                  const SizedBox(height: 4),
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withValues(alpha: 0.1),
@@ -977,33 +996,59 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Danger zone',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.danger,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(24),
+                      color: AppColors.danger.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.danger.withValues(alpha: 0.18),
+                      ),
                     ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      splashFactory: NoSplash.splashFactory,
-                      onTap: _showDeleteAccountDialog,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.delete_forever, color: Colors.red),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Delete Account',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: Colors.red,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      leading: const Icon(
+                        Icons.delete_forever_outlined,
+                        color: AppColors.danger,
+                      ),
+                      title: Text(
+                        'Delete account',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.danger,
+                          fontSize: 15,
                         ),
                       ),
+                      subtitle: Text(
+                        'Permanently remove your profile, matches, and chats.',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.mutedText(context),
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppColors.danger,
+                      ),
+                      onTap:
+                          _isLoggingOut
+                              ? null
+                              : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const DeleteAccountPage(),
+                                ),
+                              ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -1020,7 +1065,7 @@ class _SettingsState extends State<Settings> {
               ),
             ),
           ),
-          if (_isLoggingOut || _isDeleting)
+          if (_isLoggingOut)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withValues(alpha: 0.5),
@@ -1054,9 +1099,7 @@ class _SettingsState extends State<Settings> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _isDeleting
-                              ? 'Deleting account...'
-                              : 'Logging out...',
+                          'Logging out...',
                           style: AppTextStyles.boldText.copyWith(
                             color: textTheme,
                             fontSize: 15,
@@ -1070,185 +1113,6 @@ class _SettingsState extends State<Settings> {
             ),
         ],
       ),
-    );
-  }
-}
-
-class _DeleteAccountDialog extends StatefulWidget {
-  final VoidCallback onConfirm;
-
-  const _DeleteAccountDialog({required this.onConfirm});
-
-  @override
-  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
-}
-
-class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  static const String _keyword = 'DELETE';
-
-  final TextEditingController _controller = TextEditingController();
-
-  bool get _canConfirm => _controller.text.trim().toUpperCase() == _keyword;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).colorScheme.secondary;
-    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'This permanently deletes your profile, matches, and chats. This can’t be undone.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Type $_keyword to confirm',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme.withValues(alpha: 0.5),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _controller,
-          textCapitalization: TextCapitalization.characters,
-          textInputAction: TextInputAction.done,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
-          ),
-          decoration: InputDecoration(
-            hintText: _keyword,
-            hintStyle: AppTextStyles.regularText.copyWith(
-              color: textTheme.withValues(alpha: 0.45),
-              fontSize: 14,
-            ),
-            filled: true,
-            fillColor: AppColors.mutedSurface(context),
-            contentPadding: const EdgeInsets.all(14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: Colors.red, width: 1.5),
-            ),
-          ),
-        ),
-      ],
-    );
-
-    if (isIOS) {
-      return CupertinoAlertDialog(
-        title: Center(
-          child: Text(
-            'Delete Account',
-            style: AppTextStyles.regularText.copyWith(
-              color: textTheme,
-              fontSize: 18,
-            ),
-          ),
-        ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Material(color: Colors.transparent, child: content),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Cancel',
-              style: AppTextStyles.regularText.copyWith(color: textTheme),
-            ),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: _canConfirm ? widget.onConfirm : null,
-            child: Text(
-              'I agree',
-              style: AppTextStyles.regularText.copyWith(
-                color: Colors.red.withValues(alpha: _canConfirm ? 1 : 0.4),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return AlertDialog(
-      backgroundColor: AppColors.elevatedSurface(context),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Center(
-        child: Text(
-          'Delete Account',
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 18,
-          ),
-        ),
-      ),
-      content: SizedBox(width: double.maxFinite, child: content),
-      actions: [
-        TextButton(
-          style: _noSplashButtonStyle,
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          child: Text(
-            'Cancel',
-            style: AppTextStyles.regularText.copyWith(color: textTheme),
-          ),
-        ),
-        TextButton(
-          onPressed: _canConfirm ? widget.onConfirm : null,
-          style: TextButton.styleFrom(
-            splashFactory: NoSplash.splashFactory,
-            backgroundColor: Colors.red.withValues(
-              alpha: _canConfirm ? 0.12 : 0.06,
-            ),
-            foregroundColor: Colors.red,
-            disabledForegroundColor: Colors.red.withValues(alpha: 0.4),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-          child: Text(
-            'I agree',
-            style: AppTextStyles.regularText.copyWith(
-              color: Colors.red.withValues(alpha: _canConfirm ? 1 : 0.4),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

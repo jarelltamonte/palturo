@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,10 +9,13 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
+import 'package:palturo/screen/utils/schedule_format.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
@@ -50,11 +55,15 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   final List<int> _history = [];
   final List<bool> _historyRight = [];
+  final List<String?> _historyConnectionIds = [];
   bool _undoActive = false;
   bool _undoRight = false;
+  bool _undoing = false;
   int _undoToken = 0;
   bool _openingEditor = false;
   bool _actionInFlight = false;
+  bool _sendingRequest = false;
+  double _dragProgress = 0;
   bool _discovering = false;
   int _deckGeneration = 0;
   final GlobalKey<_SwipeableCardState> _swipeKey = GlobalKey();
@@ -87,6 +96,7 @@ class _HomePageState extends State<HomePage> {
         _currentIndex = 0;
         _history.clear();
         _historyRight.clear();
+        _historyConnectionIds.clear();
         _undoActive = false;
       });
     } catch (e, st) {
@@ -126,28 +136,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _confirmAdd(Person person) async {
-    if (_actionInFlight) return;
-    _actionInFlight = true;
-
-    try {
-      await MatchApi.sendConnectionRequest(person.id);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection request sent to ${person.name}')),
-      );
-      _dismissCard(person, right: true);
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
-    } finally {
-      _actionInFlight = false;
-    }
+  void _confirmAdd(Person person) {
+    if (_actionInFlight || _sendingRequest) return;
+    // The request is committed by _handleSwiped after the card exits, so the
+    // button and a right swipe share exactly one network path.
+    _dismissCard(person, right: true);
   }
 
   @override
@@ -216,6 +209,7 @@ class _HomePageState extends State<HomePage> {
             _currentIndex = 0;
             _history.clear();
             _historyRight.clear();
+            _historyConnectionIds.clear();
             _undoActive = false;
           });
 
@@ -225,25 +219,76 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _next({bool right = false}) {
+  void _next({bool right = false, String? connectionId}) {
     if (_currentIndex >= _filteredPeople.length) return;
 
     setState(() {
       _history.add(_currentIndex);
       _historyRight.add(right);
+      _historyConnectionIds.add(connectionId);
       _undoActive = false;
       _currentIndex++;
+      _dragProgress = 0;
     });
   }
 
   /// Advance only if [person] is still the card on screen. A swipe animation
   /// and a button/request callback can otherwise both advance the same card.
-  void _advanceFrom(Person person, {bool right = false}) {
+  void _advanceFrom(Person person, {bool right = false, String? connectionId}) {
     if (!mounted) return;
     final people = _filteredPeople;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
     if (people[_currentIndex].id != person.id) return;
-    _next(right: right);
+    _next(right: right, connectionId: connectionId);
+  }
+
+  /// A right swipe and the Connect button both land here. The request is the
+  /// commit action: failure restores the card instead of pretending success.
+  Future<void> _handleSwiped(Person person, bool right) async {
+    if (!right) {
+      _advanceFrom(person);
+      return;
+    }
+    if (_actionInFlight) {
+      _resetCard();
+      return;
+    }
+
+    _actionInFlight = true;
+    setState(() => _sendingRequest = true);
+    try {
+      final connectionId = await MatchApi.sendConnectionRequest(person.id);
+      if (!mounted) return;
+      if (connectionId == null || connectionId.isEmpty) {
+        throw Exception('The server did not confirm the request.');
+      }
+      _advanceFrom(person, right: true, connectionId: connectionId);
+      Haptics.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connection request sent to ${person.name}'),
+          action: SnackBarAction(label: 'Undo', onPressed: _undo),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _resetCard();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not send request: ${_cleanError(e)}')),
+      );
+    } finally {
+      _actionInFlight = false;
+      if (mounted) setState(() => _sendingRequest = false);
+    }
+  }
+
+  String _cleanError(Object error) =>
+      error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+
+  void _resetCard() {
+    if (!mounted) return;
+    setState(() => _dragProgress = 0);
+    _swipeKey.currentState?.reset();
   }
 
   void _dismissCard(Person person, {bool right = false}) {
@@ -253,18 +298,47 @@ class _HomePageState extends State<HomePage> {
 
     final state = _swipeKey.currentState;
     if (state == null || state.widget.personId != person.id) {
-      _advanceFrom(person, right: right);
+      _handleSwiped(person, right);
       return;
     }
     state.dismiss(right: right);
   }
 
-  void _undo() {
-    if (_history.isEmpty) return;
+  Future<void> _undo() async {
+    if (_history.isEmpty || _undoing) return;
 
+    final index = _history.last;
+    final right = _historyRight.last;
+    final connectionId = _historyConnectionIds.last;
+
+    if (right && connectionId != null) {
+      _undoing = true;
+      try {
+        await MatchApi.cancelConnectionRequest(connectionId);
+      } catch (e) {
+        if (!mounted) return;
+        _undoing = false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not withdraw request: ${_cleanError(e)}'),
+          ),
+        );
+        return;
+      }
+      _undoing = false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connection request withdrawn')),
+      );
+    }
+
+    if (!mounted) return;
     setState(() {
-      _currentIndex = _history.removeLast();
-      _undoRight = _historyRight.removeLast();
+      _history.removeLast();
+      _historyRight.removeLast();
+      _historyConnectionIds.removeLast();
+      _currentIndex = index;
+      _undoRight = right;
       _undoActive = true;
       _undoToken++;
     });
@@ -301,15 +375,275 @@ class _HomePageState extends State<HomePage> {
       _SwipeableCard(
         key: _swipeKey,
         personId: person.id,
-        onSwiped: (right) => _advanceFrom(person, right: right),
+        onSwiped: (right) => _handleSwiped(person, right),
+        onDragProgress: (value) {
+          if ((value - _dragProgress).abs() > 0.01) {
+            setState(() => _dragProgress = value);
+          }
+        },
         child: PersonCardOverlay(
           person: person,
           onAdd: () => _confirmAdd(person),
           onSkip: () => _dismissCard(person),
           onBlock: () => _confirmBlock(person),
           onReport: () => _confirmReport(person),
+          onOpenProfile: () => _openProfile(person),
+          onWhyMatch:
+              person.compatibility == null ? null : () => _showWhyMatch(person),
         ),
       ),
+    );
+  }
+
+  Widget _buildDeck(List<Person> people) {
+    final current = people[_currentIndex];
+    final next =
+        _currentIndex + 1 < people.length ? people[_currentIndex + 1] : null;
+    final progress = _dragProgress.clamp(0.0, 1.0);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        if (next != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Transform.scale(
+                scale: 0.97 + (0.03 * progress),
+                alignment: Alignment.bottomCenter,
+                child: Transform.translate(
+                  offset: Offset(0, 10 * (1 - progress)),
+                  child: Opacity(
+                    opacity: 0.55 + (0.45 * progress),
+                    child: ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(
+                        sigmaX: reduceMotion ? 0 : 3 * (1 - progress),
+                        sigmaY: reduceMotion ? 0 : 3 * (1 - progress),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: ExcludeSemantics(
+                          child: PersonCardOverlay(
+                            person: next,
+                            showActions: false,
+                            showMenu: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Padding(
+          padding: EdgeInsets.only(
+            bottom: next == null ? 0 : 26 * (1 - progress),
+          ),
+          child: _buildDeckCard(current),
+        ),
+        if (next != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 3,
+            child: IgnorePointer(
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 210),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.elevatedSurface(
+                      context,
+                    ).withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.border(context)),
+                  ),
+                  child: Text(
+                    'Up next · ${next.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (_sendingRequest)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.elevatedSurface(context),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Sending request…',
+                          style: AppTextStyles.boldText.copyWith(
+                            color: Theme.of(context).colorScheme.secondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _openProfile(Person person) {
+    showPersonProfileDialog(
+      context,
+      person,
+      onBlock: () => _confirmBlock(person),
+      onReport: (reason) => _confirmReport(person),
+    );
+  }
+
+  Future<void> _showWhyMatch(Person person) async {
+    final score = ((person.compatibility ?? 0) * 100).round();
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.elevatedSurface(context),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder:
+          (sheetContext) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          size: 20,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Why this match?',
+                          style: AppTextStyles.headingText.copyWith(
+                            color: Theme.of(context).colorScheme.secondary,
+                            fontSize: 20,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$score%',
+                        style: AppTextStyles.headingText.copyWith(
+                          color: AppColors.accentText(context),
+                          fontSize: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'PalTuro compares your learning and teaching profiles in both directions, then weighs the fit. A reciprocal score rewards mutual alignment, not just a one-sided interest.',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _MatchFactor(
+                    icon: Icons.school_outlined,
+                    label: 'Skill',
+                    value:
+                        person.skillName.trim().isEmpty
+                            ? 'Shared skill interest'
+                            : toTitleCase(person.skillName),
+                  ),
+                  _MatchFactor(
+                    icon: Icons.translate,
+                    label: 'Language',
+                    value:
+                        person.language.trim().isEmpty
+                            ? 'Not specified'
+                            : person.language,
+                  ),
+                  _MatchFactor(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Availability',
+                    value:
+                        person.schedule.trim().isEmpty
+                            ? 'Not specified'
+                            : formatSchedule(person.schedule),
+                  ),
+                  _MatchFactor(
+                    icon: Icons.psychology_outlined,
+                    label: 'Learning style',
+                    value:
+                        person.learningStyle.trim().isEmpty
+                            ? 'Not specified'
+                            : person.learningStyle,
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      child: const Text('Got it'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
     );
   }
 
@@ -530,7 +864,7 @@ class _HomePageState extends State<HomePage> {
                 : _error != null
                 ? _buildErrorState(textTheme)
                 : hasMore
-                ? _buildDeckCard(people[_currentIndex])
+                ? _buildDeck(people)
                 : _buildEmptyState(textTheme),
       ),
     );
@@ -663,16 +997,65 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class _MatchFactor extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _MatchFactor({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.accentText(context)),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 86,
+            child: Text(
+              label,
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SwipeableCard extends StatefulWidget {
   final String personId;
   final Widget child;
   final ValueChanged<bool> onSwiped;
+  final ValueChanged<double>? onDragProgress;
 
   const _SwipeableCard({
     super.key,
     required this.personId,
     required this.child,
     required this.onSwiped,
+    this.onDragProgress,
   });
 
   @override
@@ -716,6 +1099,17 @@ class _SwipeableCardState extends State<_SwipeableCard>
     );
   }
 
+  /// Restore a card after a failed request or a cancelled gesture.
+  void reset() {
+    _controller.stop();
+    _exiting = false;
+    _dx = 0;
+    _from = 0;
+    _to = 0;
+    widget.onDragProgress?.call(0);
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -728,6 +1122,9 @@ class _SwipeableCardState extends State<_SwipeableCard>
           _from +
           (_to - _from) * Curves.easeOutCubic.transform(_controller.value);
     });
+    widget.onDragProgress?.call(
+      (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0),
+    );
   }
 
   void _animateTo(double target, {VoidCallback? onDone}) {
@@ -747,6 +1144,9 @@ class _SwipeableCardState extends State<_SwipeableCard>
   void _onDragUpdate(DragUpdateDetails d) {
     if (_exiting) return;
     setState(() => _dx += d.delta.dx);
+    widget.onDragProgress?.call(
+      (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0),
+    );
   }
 
   void _onDragEnd(DragEndDetails d) {
@@ -763,6 +1163,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
 
     final right = _dx > 0;
     _exiting = true;
+    Haptics.impact();
 
     _animateTo(
       (right ? 1 : -1) * _width * _exitFactor,
@@ -784,7 +1185,7 @@ class _SwipeableCardState extends State<_SwipeableCard>
         final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
 
         final goingRight = _dx > 0;
-        final tint = goingRight ? AppColors.primary : Colors.red;
+        final tint = goingRight ? AppColors.primary : AppColors.danger;
 
         return GestureDetector(
           behavior: HitTestBehavior.translucent,

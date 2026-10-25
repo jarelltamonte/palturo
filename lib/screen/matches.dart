@@ -555,7 +555,7 @@ class _MatchesState extends State<Matches> {
                           children: [
                             const Icon(
                               Icons.remove_circle_outline,
-                              color: Colors.red,
+                              color: AppColors.danger,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -574,7 +574,7 @@ class _MatchesState extends State<Matches> {
                           children: [
                             const Icon(
                               Icons.flag_outlined,
-                              color: Colors.red,
+                              color: AppColors.danger,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -593,7 +593,7 @@ class _MatchesState extends State<Matches> {
                           children: [
                             const Icon(
                               Icons.block,
-                              color: Colors.red,
+                              color: AppColors.danger,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -665,7 +665,7 @@ class _MatchesState extends State<Matches> {
                                   isActive ? FontWeight.w800 : FontWeight.w600,
                               color:
                                   isActive
-                                      ? Theme.of(context).colorScheme.primary
+                                      ? AppColors.accentText(context)
                                       : textTheme.withValues(
                                         alpha: hasItems ? 0.9 : 0.3,
                                       ),
@@ -754,7 +754,6 @@ class _MatchesState extends State<Matches> {
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     final filtered = _filteredPals();
@@ -795,7 +794,7 @@ class _MatchesState extends State<Matches> {
                           style: AppTextStyles.regularText.copyWith(
                             color: textTheme,
                           ),
-                          cursorColor: primaryColor,
+                          cursorColor: AppColors.accentText(context),
                           decoration: InputDecoration(
                             hintText: 'Search pals',
                             hintStyle: AppTextStyles.regularText.copyWith(
@@ -972,7 +971,7 @@ class _MatchesState extends State<Matches> {
                                 top: 4,
                               ),
                               child: Text(
-                                '${filtered.length} matches',
+                                '${filtered.length} pals',
                                 style: AppTextStyles.regularText.copyWith(
                                   color: textTheme.withValues(alpha: 0.6),
                                 ),

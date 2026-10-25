@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/services/match_api.dart';
@@ -270,7 +271,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Future<void> _showFeedbackDialog() async {
     final connectionId = widget.connectionId;
-    if (connectionId == null || !_feedbackGateOpen) {
+    if (connectionId == null || (!_feedbackGateOpen && _messages.length < 15)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Feedback unlocks after 15 messages in this chat.'),
@@ -291,21 +292,79 @@ class _ChatRoomState extends State<ChatRoom> {
               required int value,
               required ValueChanged<int?> onChanged,
             }) {
+              final textColor = Theme.of(context).colorScheme.secondary;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     label,
-                    style: AppTextStyles.regularText.copyWith(fontSize: 13),
+                    style: AppTextStyles.boldText.copyWith(fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (var i = 1; i <= 5; i++)
+                        Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: i == 5 ? 0 : 6),
+                            child: Semantics(
+                              button: true,
+                              selected: value == i,
+                              label: '$label, $i out of 5',
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onChanged(i),
+                                child: AnimatedContainer(
+                                  duration: AppMotion.micro,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        value == i
+                                            ? AppColors.primary
+                                            : AppColors.mutedSurface(context),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color:
+                                          value == i
+                                              ? AppColors.primary
+                                              : AppColors.border(context),
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    '$i',
+                                    style: AppTextStyles.boldText.copyWith(
+                                      color:
+                                          value == i ? Colors.black : textColor,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  DropdownButtonFormField<int>(
-                    initialValue: value,
-                    items: [
-                      for (var i = 1; i <= 5; i++)
-                        DropdownMenuItem(value: i, child: Text('$i')),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Needs work',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.5),
+                          fontSize: 10,
+                        ),
+                      ),
+                      Text(
+                        'Excellent',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.5),
+                          fontSize: 10,
+                        ),
+                      ),
                     ],
-                    onChanged: onChanged,
                   ),
                 ],
               );
@@ -533,7 +592,7 @@ class _ChatRoomState extends State<ChatRoom> {
                         children: [
                           const Icon(
                             Icons.flag_outlined,
-                            color: Colors.red,
+                            color: AppColors.danger,
                             size: 20,
                           ),
                           const SizedBox(width: 12),
@@ -550,7 +609,11 @@ class _ChatRoomState extends State<ChatRoom> {
                       value: 'block',
                       child: Row(
                         children: [
-                          const Icon(Icons.block, color: Colors.red, size: 20),
+                          const Icon(
+                            Icons.block,
+                            color: AppColors.danger,
+                            size: 20,
+                          ),
                           const SizedBox(width: 12),
                           Text(
                             'Block',
@@ -577,6 +640,10 @@ class _ChatRoomState extends State<ChatRoom> {
       ),
       body: Column(
         children: [
+          if (widget.connectionId != null &&
+              !_loadingMessages &&
+              _loadError == null)
+            _buildFeedbackProgress(textTheme),
           Expanded(
             child:
                 _loadingMessages
@@ -693,6 +760,122 @@ class _ChatRoomState extends State<ChatRoom> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackProgress(Color textTheme) {
+    if (_feedbackRated) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Row(
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              size: 16,
+              color: AppColors.accentText(context),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Feedback submitted. Thank you!',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final count = _messages.length.clamp(0, 15);
+    final open = _feedbackGateOpen || count >= 15;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+        decoration: BoxDecoration(
+          color:
+              open
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.mutedSurface(context),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color:
+                open
+                    ? AppColors.primary.withValues(alpha: 0.5)
+                    : AppColors.border(context),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              open ? Icons.rate_review_outlined : Icons.lock_clock_outlined,
+              size: 18,
+              color:
+                  open
+                      ? AppColors.accentText(context)
+                      : AppColors.mutedText(context),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    open
+                        ? 'Feedback is unlocked'
+                        : 'Feedback unlocks at 15 messages',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  if (open)
+                    Text(
+                      'Rate clarity and reliability for this exchange.',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.65),
+                        fontSize: 11,
+                      ),
+                    )
+                  else ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: count / 15,
+                        minHeight: 4,
+                        backgroundColor: textTheme.withValues(alpha: 0.08),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$count of 15 · ${15 - count} more to go',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (open)
+              TextButton(
+                onPressed: _showFeedbackDialog,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accentText(context),
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: const Text('Rate'),
+              ),
+          ],
+        ),
       ),
     );
   }

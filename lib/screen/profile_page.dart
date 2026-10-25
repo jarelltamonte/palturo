@@ -5,7 +5,6 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
     show kLearningOptions, kTeachingOptions;
-import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
@@ -15,6 +14,7 @@ import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
@@ -41,20 +41,6 @@ class _ProfilePageState extends State<ProfilePage> {
       'Couldn’t load your profile.\nPlease check your connection.';
   int? _friendCount;
   bool _openingEditor = false;
-
-  static const _roleOptions = [
-    RoleOption(
-      OnboardingRole.learn,
-      'assets/icons/rlearner.svg',
-      'I want to\nlearn',
-    ),
-    RoleOption(
-      OnboardingRole.teach,
-      'assets/icons/rmentor.svg',
-      'I want to\nteach',
-    ),
-    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
-  ];
 
   @override
   void initState() {
@@ -173,6 +159,16 @@ class _ProfilePageState extends State<ProfilePage> {
     showPersonProfileDialog(context, _profileToPerson());
   }
 
+  bool _needsProfileTip(ProfileData profile) {
+    final wantsTeaching =
+        profile.role == OnboardingRole.teach ||
+        profile.role == OnboardingRole.both;
+    return profile.bio.trim().isEmpty ||
+        profile.languages.isEmpty ||
+        profile.availableDays.isEmpty ||
+        (wantsTeaching && profile.teachingSkillImages.isEmpty);
+  }
+
   Widget _buildErrorState(Color textTheme) {
     return Center(
       child: Padding(
@@ -260,7 +256,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       body:
           _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const ProfileSkeleton()
               : _profile == null
               ? _buildErrorState(textTheme)
               : RefreshIndicator(
@@ -277,6 +273,11 @@ class _ProfilePageState extends State<ProfilePage> {
                           onAvatarTap: _showMyProfile,
                         ),
                       ),
+                      if (_needsProfileTip(_profile!))
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: _ProfileTip(onEdit: _openEdit),
+                        ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
                         child: Column(
@@ -368,12 +369,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            RoleCardGroup(
-                              options: _roleOptions,
-                              selected: _profile!.role,
-                              isEditing: false,
-                              onSelect: (_) {},
-                            ),
+                            _RoleSummary(role: _profile!.role),
                             const SizedBox(height: 24),
                             if (_profile!.role == OnboardingRole.learn ||
                                 _profile!.role == OnboardingRole.both) ...[
@@ -473,7 +469,7 @@ class _ProfileSummaryCard extends StatelessWidget {
                         profile.name,
                         style: AppTextStyles.headingText.copyWith(
                           color: textColor,
-                          fontSize: 20,
+                          fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -499,7 +495,15 @@ class _ProfileSummaryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: textColor),
+                TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accentText(context),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 36),
+                  ),
+                  child: const Text('Edit'),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -530,6 +534,111 @@ class _ProfileSummaryCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileTip extends StatelessWidget {
+  final VoidCallback onEdit;
+
+  const _ProfileTip({required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.auto_awesome_outlined,
+            color: AppColors.accentText(context),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Add a showcase or finish your details to improve your matches.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+          TextButton(onPressed: onEdit, child: const Text('Improve')),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleSummary extends StatelessWidget {
+  final OnboardingRole? role;
+
+  const _RoleSummary({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <Widget>[];
+    if (role == OnboardingRole.learn || role == OnboardingRole.both) {
+      chips.add(
+        _RoleChip(
+          icon: Icons.menu_book_outlined,
+          label: role == OnboardingRole.both ? 'Learner' : 'I want to learn',
+        ),
+      );
+    }
+    if (role == OnboardingRole.teach || role == OnboardingRole.both) {
+      chips.add(
+        _RoleChip(
+          icon: Icons.workspace_premium_outlined,
+          label: role == OnboardingRole.both ? 'Mentor' : 'I want to teach',
+        ),
+      );
+    }
+    if (chips.isEmpty) {
+      chips.add(_RoleChip(icon: Icons.help_outline, label: 'Role not set'));
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+}
+
+class _RoleChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _RoleChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppColors.accentText(context)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.regularText.copyWith(
+              color: Theme.of(context).colorScheme.secondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

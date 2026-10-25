@@ -242,7 +242,7 @@ class _LoginPageState extends State<LoginPage> {
                             'Forgot Password?',
                             textAlign: TextAlign.center,
                             style: AppTextStyles.boldText.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
+                              color: AppColors.accentText(context),
                             ),
                           ),
                         ),
@@ -280,11 +280,11 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: AppColors.accentText(context),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     side: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppColors.accentText(context),
                       width: 1,
                     ),
                     shape: const RoundedRectangleBorder(

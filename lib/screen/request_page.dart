@@ -2,13 +2,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
+import 'package:palturo/screen/notifications_page.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 class ConnectionRequest {
   final String id;
@@ -119,6 +125,8 @@ enum RoleFilter { all, learner, mentor }
 
 enum SortFilter { newest, oldest, ascending, descending }
 
+enum RequestView { incoming, sent }
+
 class RequestPage extends StatefulWidget {
   const RequestPage({super.key});
 
@@ -130,6 +138,7 @@ class _RequestPageState extends State<RequestPage> {
   DateFilter _dateFilter = DateFilter.all;
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
+  RequestView _view = RequestView.incoming;
 
   static const List<FilterSection> _filterSections = [
     FilterSection(
@@ -171,14 +180,19 @@ class _RequestPageState extends State<RequestPage> {
       _sortFilter != SortFilter.newest;
 
   late List<ConnectionRequest> _requests = const [];
+  late List<OutgoingRequestLite> _outgoing = const [];
   bool _loading = true;
+  bool _loadingOutgoing = true;
   String? _loadError;
+  String? _outgoingError;
   bool _responding = false;
+  bool _cancelling = false;
 
   @override
   void initState() {
     super.initState();
     _loadRequests();
+    _loadOutgoing();
   }
 
   Future<void> _loadRequests() async {
@@ -200,6 +214,69 @@ class _RequestPageState extends State<RequestPage> {
         _loading = false;
         _loadError = 'Couldn’t load requests.\nPlease check your connection.';
       });
+    }
+  }
+
+  Future<void> _loadOutgoing() async {
+    setState(() {
+      _loadingOutgoing = true;
+      _outgoingError = null;
+    });
+    try {
+      final sent = await MatchApi.getOutgoingRequests();
+      if (!mounted) return;
+      setState(() {
+        _outgoing = sent;
+        _loadingOutgoing = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingOutgoing = false;
+        _outgoingError =
+            'Couldn’t load sent requests.\nPlease check your connection.';
+      });
+    }
+  }
+
+  Future<void> _cancelOutgoing(OutgoingRequestLite request) async {
+    if (_cancelling) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Withdraw request',
+      message:
+          'Withdraw your connection request to ${request.recipientName}? They will no longer see it.',
+      confirmLabel: 'Withdraw',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await MatchApi.cancelConnectionRequest(request.connectionId);
+      if (!mounted) return;
+      setState(() {
+        _outgoing =
+            _outgoing
+                .where((item) => item.connectionId != request.connectionId)
+                .toList();
+      });
+      ActivityService.instance.refresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Request to ${request.recipientName} withdrawn'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not withdraw request: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
     }
   }
 
@@ -284,6 +361,7 @@ class _RequestPageState extends State<RequestPage> {
       await MatchApi.respondToRequest(request.id, accept);
       if (!mounted) return;
 
+      ActivityService.instance.refresh();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -347,6 +425,191 @@ class _RequestPageState extends State<RequestPage> {
             orElse: () => SortFilter.newest,
           );
         });
+      },
+    );
+  }
+
+  Widget _buildViewToggle(Color textTheme) {
+    Widget segment(String label, RequestView value) {
+      final selected = _view == value;
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: label,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _view = value),
+            child: AnimatedContainer(
+              duration: AppMotion.base,
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                style: AppTextStyles.regularText.copyWith(
+                  color:
+                      selected
+                          ? Colors.black
+                          : textTheme.withValues(alpha: 0.65),
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 44,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: textTheme.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        children: [
+          segment('Incoming', RequestView.incoming),
+          segment('Sent', RequestView.sent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncoming(Color textTheme) {
+    final requests = _filteredAndSortedRequests;
+    if (_loading) return const RequestCardsSkeleton();
+    if (_loadError != null) return _buildLoadError(textTheme);
+    if (requests.isEmpty) return _buildEmptyState(textTheme);
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      itemCount: requests.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'They want to connect with you. Like back to start exchanging skills right away!',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+          );
+        }
+        final request = requests[index - 1];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: GestureDetector(
+            onTap: () => _openDetail(request),
+            child: RequestCard(
+              skillName: request.skillName,
+              requesterName: request.requesterName,
+              schedule: request.schedule,
+              language: request.language,
+              learningStyle: request.learningStyle,
+              timeAgo: timeAgo(request.requestedAt),
+              iconAsset: request.iconAsset,
+              seekingLabel: request.seekingLabel,
+              onAccept: () => _respond(request, true),
+              onDecline: () => _respond(request, false),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSent(Color textTheme) {
+    if (_loadingOutgoing) {
+      return const ListRowsSkeleton(count: 3, rowHeight: 96);
+    }
+    if (_outgoingError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _outgoingError!,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadOutgoing,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_outgoing.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.outbox_outlined,
+                size: 44,
+                color: textTheme.withValues(alpha: 0.35),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No sent requests yet',
+                style: AppTextStyles.boldText.copyWith(color: textTheme),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Requests you send from For You or Browse will appear here with their status.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.65),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      itemCount: _outgoing.length + 1,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              'Requests you sent. Pending requests can be withdrawn at any time.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+          );
+        }
+        final request = _outgoing[index - 1];
+        return _SentRequestCard(
+          request: request,
+          onWithdraw: request.isPending ? () => _cancelOutgoing(request) : null,
+        );
       },
     );
   }
@@ -415,8 +678,6 @@ class _RequestPageState extends State<RequestPage> {
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
-    final requests = _filteredAndSortedRequests;
-
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -435,89 +696,213 @@ class _RequestPageState extends State<RequestPage> {
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
               const Spacer(),
-              Semantics(
-                container: true,
-                button: true,
-                label: 'Filter requests',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _openFilterSheet,
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Icon(Icons.tune, color: textTheme, size: 24),
+              IconButton(
+                tooltip: 'Activity',
+                onPressed:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsPage(),
+                      ),
+                    ),
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      color: textTheme,
+                      size: 24,
+                    ),
+                    if (ActivityService.instance.unread > 0)
+                      Positioned(
+                        right: -1,
+                        top: -1,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                        if (_hasActiveFilter)
-                          Positioned(
-                            right: -2,
-                            top: 9,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: AppColors.accentText(context),
-                                shape: BoxShape.circle,
+                      ),
+                  ],
+                ),
+              ),
+              if (_view == RequestView.incoming)
+                Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Filter requests',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _openFilterSheet,
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Icon(Icons.tune, color: textTheme, size: 24),
+                          ),
+                          if (_hasActiveFilter)
+                            Positioned(
+                              right: -2,
+                              top: 9,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentText(context),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
       ),
-      body:
-          _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _loadError != null
-              ? _buildLoadError(textTheme)
-              : requests.isEmpty
-              ? _buildEmptyState(textTheme)
-              : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                itemCount: requests.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
+      body: Column(
+        children: [
+          _buildViewToggle(textTheme),
+          Expanded(
+            child:
+                _view == RequestView.incoming
+                    ? _buildIncoming(textTheme)
+                    : _buildSent(textTheme),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SentRequestCard extends StatelessWidget {
+  final OutgoingRequestLite request;
+  final VoidCallback? onWithdraw;
+
+  const _SentRequestCard({required this.request, this.onWithdraw});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    final statusColor =
+        request.isPending ? AppColors.accentText(context) : AppColors.danger;
+    final statusLabel = request.isPending ? 'Waiting for reply' : 'Declined';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.elevatedSurface(context),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border(context)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          UserAvatar(
+            name: request.recipientName,
+            image:
+                request.avatarUrl == null
+                    ? null
+                    : NetworkImage(request.avatarUrl!),
+            size: 48,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        'They want to connect with you. Like back to start exchanging skills right away!',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.7),
-                          fontSize: 14,
+                        request.recipientName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.boldText.copyWith(
+                          color: textColor,
+                          fontSize: 15,
                         ),
                       ),
-                    );
-                  }
-                  final request = requests[index - 1];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: GestureDetector(
-                      onTap: () => _openDetail(request),
-                      child: RequestCard(
-                        skillName: request.skillName,
-                        requesterName: request.requesterName,
-                        schedule: request.schedule,
-                        language: request.language,
-                        learningStyle: request.learningStyle,
-                        timeAgo: timeAgo(request.requestedAt),
-                        iconAsset: request.iconAsset,
-                        seekingLabel: request.seekingLabel,
-                        onAccept: () => _respond(request, true),
-                        onDecline: () => _respond(request, false),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  request.skills.isEmpty
+                      ? 'Skill exchange'
+                      : request.skills.first,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textColor.withValues(alpha: 0.7),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  timeAgo(request.createdAt),
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(context),
+                    fontSize: 12,
+                  ),
+                ),
+                if (onWithdraw != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: onWithdraw,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        minimumSize: const Size(0, 36),
+                      ),
+                      child: const Text('Withdraw'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

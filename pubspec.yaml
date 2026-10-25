@@ -17,6 +17,7 @@ dependencies:
   flutter_svg: ^2.0.0
   flutter_otp_text_field: ^1.1.0+2
   lottie: ^3.1.2
+  video_player: ^2.9.3
   shared_preferences: ^2.5.5
   flutter_native_splash: ^2.4.8
 

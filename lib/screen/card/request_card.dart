@@ -34,7 +34,7 @@ class RequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final accentColor = AppColors.accentText(context);
 
     return Container(
       width: double.infinity,
@@ -80,7 +80,7 @@ class RequestCard extends StatelessWidget {
                 child: Text(
                   skillName,
                   style: AppTextStyles.boldText.copyWith(
-                    color: primaryColor,
+                    color: accentColor,
                     fontSize: 20,
                   ),
                 ),
@@ -187,7 +187,7 @@ class RequestCard extends StatelessWidget {
                     child: Text(
                       'Decline',
                       style: AppTextStyles.regularText.copyWith(
-                        color: Colors.red,
+                        color: AppColors.danger,
                         fontSize: 16,
                       ),
                     ),
@@ -207,7 +207,7 @@ class RequestCard extends StatelessWidget {
                     child: Text(
                       'Accept',
                       style: AppTextStyles.regularText.copyWith(
-                        color: primaryColor,
+                        color: accentColor,
                         fontSize: 16,
                       ),
                     ),

@@ -26,6 +26,9 @@ class AppColors {
   static const Color switchOffTrackLight = Color(0xFF666666);
   static const Color switchOffTrackDark = switchOffTrackLight;
 
+  static const Color danger = Color(0xFFB42318);
+  static const Color dangerSurface = Color(0xFFFDF0EE);
+  static const Color success = Color(0xFF4F6B00);
   static const Color white = Colors.white;
   static const Color black = Colors.black;
 

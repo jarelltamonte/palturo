@@ -12,6 +12,20 @@ double _contrast(Color a, Color b) {
 }
 
 void main() {
+  test('brand primary is lime and on-primary is black in both themes', () {
+    expect(lightMode.colorScheme.primary, AppColors.primary);
+    expect(lightMode.colorScheme.onPrimary, AppColors.black);
+    expect(darkMode.colorScheme.primary, AppColors.primary);
+    expect(darkMode.colorScheme.onPrimary, AppColors.black);
+  });
+
+  test('shared button and input themes are configured', () {
+    expect(lightMode.elevatedButtonTheme.style, isNotNull);
+    expect(lightMode.textButtonTheme.style, isNotNull);
+    expect(lightMode.inputDecorationTheme.focusedBorder, isNotNull);
+    expect(lightMode.snackBarTheme.behavior, SnackBarBehavior.floating);
+  });
+
   test('light accent text meets WCAG AA on white', () {
     expect(
       _contrast(AppColors.accentTextLight, AppColors.white),
@@ -44,14 +58,18 @@ void main() {
     late Color accent;
     late Color muted;
 
-    await tester.pumpWidget(MaterialApp(
-      theme: lightMode,
-      home: Builder(builder: (context) {
-        accent = AppColors.accentText(context);
-        muted = AppColors.mutedText(context);
-        return const SizedBox.shrink();
-      }),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Builder(
+          builder: (context) {
+            accent = AppColors.accentText(context);
+            muted = AppColors.mutedText(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
 
     expect(accent, AppColors.accentTextLight);
     expect(muted, AppColors.mutedTextLight);
@@ -61,14 +79,18 @@ void main() {
     late Color accent;
     late Color muted;
 
-    await tester.pumpWidget(MaterialApp(
-      theme: darkMode,
-      home: Builder(builder: (context) {
-        accent = AppColors.accentText(context);
-        muted = AppColors.mutedText(context);
-        return const SizedBox.shrink();
-      }),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: darkMode,
+        home: Builder(
+          builder: (context) {
+            accent = AppColors.accentText(context);
+            muted = AppColors.mutedText(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
 
     expect(accent, AppColors.primary);
     expect(muted, AppColors.mutedTextDark);
@@ -81,15 +103,19 @@ void main() {
     late Color muted;
     late Color border;
 
-    await tester.pumpWidget(MaterialApp(
-      theme: darkMode,
-      home: Builder(builder: (context) {
-        elevated = AppColors.elevatedSurface(context);
-        muted = AppColors.mutedSurface(context);
-        border = AppColors.border(context);
-        return const SizedBox.shrink();
-      }),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: darkMode,
+        home: Builder(
+          builder: (context) {
+            elevated = AppColors.elevatedSurface(context);
+            muted = AppColors.mutedSurface(context);
+            border = AppColors.border(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
 
     expect(elevated, AppColors.elevatedDark);
     expect(elevated, isNot(AppColors.background));
@@ -102,15 +128,19 @@ void main() {
     late Color muted;
     late Color border;
 
-    await tester.pumpWidget(MaterialApp(
-      theme: lightMode,
-      home: Builder(builder: (context) {
-        elevated = AppColors.elevatedSurface(context);
-        muted = AppColors.mutedSurface(context);
-        border = AppColors.border(context);
-        return const SizedBox.shrink();
-      }),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Builder(
+          builder: (context) {
+            elevated = AppColors.elevatedSurface(context);
+            muted = AppColors.mutedSurface(context);
+            border = AppColors.border(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
 
     expect(elevated, AppColors.elevatedLight);
     expect(muted, AppColors.mutedSurfaceLight);

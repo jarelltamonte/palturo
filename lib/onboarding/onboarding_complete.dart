@@ -1,6 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import '../services/preferences_service.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_colors.dart';
 
@@ -34,13 +35,11 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
   }
 
   Future<void> _playSound() async {
-    if (!mounted) return;
+    if (!mounted || !PreferencesService.instance.soundEnabled) return;
 
     try {
       await _player.stop();
-      await _player.play(
-        AssetSource('sounds/newmatch.wav'),
-      );
+      await _player.play(AssetSource('sounds/newmatch.wav'));
     } catch (_) {}
   }
 

@@ -144,6 +144,29 @@ class RequestLite {
   }
 }
 
+/// Outgoing connection request from get_outgoing_requests.
+class OutgoingRequestLite {
+  final String connectionId;
+  final String recipientId;
+  final String recipientName;
+  final String? avatarUrl;
+  final List<String> skills;
+  final String status; // pending | declined
+  final DateTime createdAt;
+
+  const OutgoingRequestLite({
+    required this.connectionId,
+    required this.recipientId,
+    required this.recipientName,
+    this.avatarUrl,
+    required this.skills,
+    required this.status,
+    required this.createdAt,
+  });
+
+  bool get isPending => status == 'pending';
+}
+
 class MatchApi {
   /// Backend rows may have a missing display name; never let an empty string
   /// reach list widgets that index `name[0]`.
@@ -546,8 +569,78 @@ class MatchApi {
     );
   }
 
-  static Future<void> sendConnectionRequest(String userId) =>
-      _Client.c.rpc('send_connection_request', params: {'p_recipient': userId});
+  static Future<String?> sendConnectionRequest(String userId) async {
+    final id = await _Client.c.rpc(
+      'send_connection_request',
+      params: {'p_recipient': userId},
+    );
+    return id?.toString();
+  }
+
+  /// Withdraw a pending request the caller sent. The RPC is idempotent when
+  /// the row was already removed by a retry.
+  static Future<void> cancelConnectionRequest(String connectionId) => _Client.c
+      .rpc('cancel_connection_request', params: {'p_connection': connectionId});
+
+  /// Outgoing pending/declined requests for the Requests → Sent surface.
+  static Future<List<OutgoingRequestLite>> getOutgoingRequests({
+    int limit = 25,
+  }) async {
+    final res =
+        await _Client.c.rpc('get_outgoing_requests', params: {'p_limit': limit})
+            as List;
+    return res
+        .whereType<Map>()
+        .map(
+          (r) => OutgoingRequestLite(
+            connectionId: r['connection_id'] as String,
+            recipientId: r['recipient_id'] as String,
+            recipientName: _displayName(r['recipient_name']),
+            avatarUrl: r['avatar_url'] as String?,
+            skills:
+                ((r['skills'] as List?) ?? [])
+                    .whereType<dynamic>()
+                    .map((s) => s.toString())
+                    .toList(),
+            status: (r['status'] ?? 'pending') as String,
+            createdAt:
+                DateTime.tryParse(r['created_at']?.toString() ?? '') ??
+                DateTime.now(),
+          ),
+        )
+        .toList();
+  }
+
+  /// App-level feedback / problem reports. RLS only permits the caller's row.
+  static Future<void> submitAppFeedback({
+    required String kind,
+    required Map<String, dynamic> payload,
+  }) async {
+    final user = _Client.c.auth.currentUser;
+    if (user == null) throw Exception('Please sign in again.');
+    await _Client.c.from('app_feedback').insert({
+      'user_id': user.id,
+      'kind': kind,
+      'payload': payload,
+    });
+  }
+
+  /// Notification rows for the activity surface.
+  static Future<List<Map<String, dynamic>>> listNotifications({
+    bool unreadOnly = false,
+    int limit = 30,
+  }) async {
+    final res =
+        await _Client.c.rpc(
+              'list_notifications',
+              params: {'p_unread_only': unreadOnly, 'p_limit': limit},
+            )
+            as List;
+    return res
+        .whereType<Map>()
+        .map((r) => Map<String, dynamic>.from(r))
+        .toList();
+  }
 
   static Future<void> blockUser(String userId) =>
       _Client.c.rpc('block_user', params: {'p_target': userId});

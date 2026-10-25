@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/services/match_api.dart';
 
@@ -158,11 +159,11 @@ class _ExplorePageState extends State<ExplorePage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Explore',
+                'Browse',
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
               IconButton(
-                tooltip: 'How Explore works',
+                tooltip: 'How Browse works',
                 icon: Icon(
                   CupertinoIcons.question_circle,
                   color: textTheme,
@@ -224,7 +225,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
   Widget _buildContent(Color textTheme) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ExploreGridSkeleton();
     }
     if (_error != null) return _buildErrorState(textTheme);
     if (_roots.isEmpty) return _buildEmptyState(textTheme);
@@ -400,11 +401,11 @@ class _ExploreInfoDialog extends StatefulWidget {
 }
 
 class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
-  static const _titles = ['Explore', 'Heads up'];
+  static const _titles = ['Browse', 'Heads up'];
 
   static const _messages = [
     'Browse categories to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a category and swipe through people who are teaching or learning in it.',
-    'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Explore is for discovering something new, so keep an open mind.',
+    'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Browse is for discovering something new, so keep an open mind.',
   ];
 
   static const _icons = [CupertinoIcons.compass, CupertinoIcons.lightbulb];

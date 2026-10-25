@@ -6,6 +6,7 @@ import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/showcase_media.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 enum PersonRole { learner, mentor }
@@ -53,6 +54,8 @@ class PersonCardOverlay extends StatefulWidget {
   final VoidCallback? onBlock;
   final VoidCallback? onReport;
   final VoidCallback? onUnmatch;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onWhyMatch;
   final String skipLabel;
   final String addLabel;
   final bool showActions;
@@ -66,6 +69,8 @@ class PersonCardOverlay extends StatefulWidget {
     this.onBlock,
     this.onReport,
     this.onUnmatch,
+    this.onOpenProfile,
+    this.onWhyMatch,
     this.skipLabel = 'Skip',
     this.addLabel = 'Add',
     this.showActions = true,
@@ -221,42 +226,84 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          if (widget.onOpenProfile != null)
+            Positioned.fill(
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'Open ${widget.person.name} profile',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onOpenProfile,
+                ),
+              ),
+            ),
           currentPhoto != null
-              ? Image.network(
-                currentPhoto,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => _CardFallback(name: widget.person.name),
+              ? ShowcaseMedia(
+                url: currentPhoto,
+                fallback: _CardFallback(name: widget.person.name),
               )
               : _CardFallback(name: widget.person.name),
-          Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  container: true,
-                  button: true,
-                  label: 'Previous photo',
-                  child: GestureDetector(
-                    key: const ValueKey('card-previous'),
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _previousPhoto,
-                  ),
-                ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 64,
+            child: Semantics(
+              container: true,
+              button: true,
+              label: 'Previous photo',
+              child: GestureDetector(
+                key: const ValueKey('card-previous'),
+                behavior: HitTestBehavior.translucent,
+                onTap: _previousPhoto,
               ),
-              Expanded(
-                child: Semantics(
-                  container: true,
-                  button: true,
-                  label: 'Next photo',
-                  child: GestureDetector(
-                    key: const ValueKey('card-next'),
-                    behavior: HitTestBehavior.translucent,
-                    onTap: _nextPhoto,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 64,
+            child: Semantics(
+              container: true,
+              button: true,
+              label: 'Next photo',
+              child: GestureDetector(
+                key: const ValueKey('card-next'),
+                behavior: HitTestBehavior.translucent,
+                onTap: _nextPhoto,
+              ),
+            ),
+          ),
+          if (photoUrls.length > 1) ...[
+            Positioned(
+              left: 6,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: _PhotoChevron(
+                    icon: Icons.chevron_left,
+                    visible: _photoIndex > 0,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 6,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: _PhotoChevron(
+                    icon: Icons.chevron_right,
+                    visible: _photoIndex < photoUrls.length - 1,
+                  ),
+                ),
+              ),
+            ),
+          ],
           IgnorePointer(
             child: Container(
               decoration: BoxDecoration(
@@ -272,6 +319,36 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
           ),
+          if (widget.person.compatibility != null ||
+              widget.onOpenProfile != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.person.compatibility != null)
+                    _GlassPill(
+                      onTap: widget.onWhyMatch,
+                      icon: Icons.auto_awesome,
+                      label:
+                          '${(widget.person.compatibility! * 100).round()}% match',
+                      semanticsLabel:
+                          '${(widget.person.compatibility! * 100).round()} percent reciprocal match. Why this match?',
+                    ),
+                  if (widget.person.compatibility != null &&
+                      widget.onOpenProfile != null)
+                    const SizedBox(height: 6),
+                  if (widget.onOpenProfile != null)
+                    _GlassPill(
+                      onTap: widget.onOpenProfile,
+                      icon: Icons.person_outline,
+                      label: 'View profile',
+                      semanticsLabel: 'View ${widget.person.name} profile',
+                    ),
+                ],
+              ),
+            ),
           if (widget.showMenu)
             Positioned(
               top: 16,
@@ -302,7 +379,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                             children: [
                               const Icon(
                                 Icons.remove_circle_outline,
-                                color: Colors.red,
+                                color: AppColors.danger,
                                 size: 20,
                               ),
                               const SizedBox(width: 12),
@@ -322,7 +399,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           children: [
                             const Icon(
                               Icons.flag_outlined,
-                              color: Colors.red,
+                              color: AppColors.danger,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -341,7 +418,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           children: [
                             const Icon(
                               Icons.block,
-                              color: Colors.red,
+                              color: AppColors.danger,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -652,6 +729,85 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoChevron extends StatelessWidget {
+  final IconData icon;
+  final bool visible;
+
+  const _PhotoChevron({required this.icon, required this.visible});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: visible ? 1 : 0,
+      duration: const Duration(milliseconds: 160),
+      child: Container(
+        width: 28,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
+class _GlassPill extends StatelessWidget {
+  final VoidCallback? onTap;
+  final IconData icon;
+  final String label;
+  final String semanticsLabel;
+
+  const _GlassPill({
+    required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.semanticsLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return pill;
+
+    return Semantics(
+      container: true,
+      button: true,
+      label: semanticsLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: pill,
       ),
     );
   }

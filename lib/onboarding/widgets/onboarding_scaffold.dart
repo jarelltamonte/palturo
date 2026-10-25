@@ -43,49 +43,55 @@ class OnboardingScaffold extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: surface,
-      appBar: (showBackButton || progress > 0)
-          ? PreferredSize(
-              preferredSize: Size.fromHeight(adaptiveHeight),
-              child: AppBar(
-                toolbarHeight: adaptiveHeight,
-                backgroundColor: surface,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                automaticallyImplyLeading: false,
-                titleSpacing: 16,
-                title: Row(
-                  children: [
-                    if (showBackButton)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: GestureDetector(
-                          onTap: onBack ?? () => Navigator.maybePop(context),
-                          child: Icon(Icons.arrow_back_ios_new,
-                              size: 18, color: secondary),
-                        ),
-                      ),
-                    if (progress > 0)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 4,
-                              backgroundColor:
-                                  AppColors.primary.withValues(alpha: 0.15),
-                              valueColor: const AlwaysStoppedAnimation(
-                                  AppColors.primary),
+      appBar:
+          (showBackButton || progress > 0)
+              ? PreferredSize(
+                preferredSize: Size.fromHeight(adaptiveHeight),
+                child: AppBar(
+                  toolbarHeight: adaptiveHeight,
+                  backgroundColor: surface,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  automaticallyImplyLeading: false,
+                  titleSpacing: 16,
+                  title: Row(
+                    children: [
+                      if (showBackButton)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: GestureDetector(
+                            onTap: onBack ?? () => Navigator.maybePop(context),
+                            child: Icon(
+                              Icons.arrow_back_ios_new,
+                              size: 18,
+                              color: secondary,
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                      if (progress > 0)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 0),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 4,
+                                backgroundColor: AppColors.primary.withValues(
+                                  alpha: 0.15,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            )
-          : null,
+              )
+              : null,
       body: SafeArea(
         bottom: false,
         child: Padding(
@@ -102,8 +108,7 @@ class OnboardingScaffold extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   subtitle!,
-                  style:
-                      AppTextStyles.regularText.copyWith(color: secondary),
+                  style: AppTextStyles.regularText.copyWith(color: secondary),
                 ),
               ],
               const SizedBox(height: 24),
@@ -125,8 +130,9 @@ class OnboardingScaffold extends StatelessWidget {
                   onPressed: onPrimaryPressed,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    disabledBackgroundColor:
-                        AppColors.primary.withValues(alpha: 0.3),
+                    disabledBackgroundColor: AppColors.primary.withValues(
+                      alpha: 0.3,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     foregroundColor: AppColors.textSecondary,
@@ -143,8 +149,7 @@ class OnboardingScaffold extends StatelessWidget {
                   onPressed: onSkip,
                   child: Text(
                     'Do this later',
-                    style: AppTextStyles.regularText
-                        .copyWith(color: secondary),
+                    style: AppTextStyles.regularText.copyWith(color: secondary),
                   ),
                 ),
               ],
@@ -189,7 +194,8 @@ class _Title extends StatelessWidget {
             text: highlightWord,
             style: style.copyWith(color: AppColors.primary),
           ),
-          if (parts.length > 1) TextSpan(text: parts.sublist(1).join(highlightWord!)),
+          if (parts.length > 1)
+            TextSpan(text: parts.sublist(1).join(highlightWord!)),
         ],
       ),
     );

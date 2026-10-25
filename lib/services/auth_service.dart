@@ -3,12 +3,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/validators.dart';
 
-enum RegisterStatus {
-  success,
-  requiresConfirmation,
-  neutral,
-  failure,
-}
+enum RegisterStatus { success, requiresConfirmation, neutral, failure }
 
 class AuthRegisterResult {
   final RegisterStatus status;
@@ -22,32 +17,27 @@ class AuthRegisterResult {
   });
 
   factory AuthRegisterResult.success(AuthResponse response) =>
-      AuthRegisterResult._(
-        status: RegisterStatus.success,
-        response: response,
-      );
+      AuthRegisterResult._(status: RegisterStatus.success, response: response);
 
   factory AuthRegisterResult.requiresConfirmation(
     AuthResponse response, [
     String? message,
-  ]) =>
-      AuthRegisterResult._(
-        status: RegisterStatus.requiresConfirmation,
-        message: message ??
-            'Registration successful! Please check your email to confirm your account.',
-        response: response,
-      );
+  ]) => AuthRegisterResult._(
+    status: RegisterStatus.requiresConfirmation,
+    message:
+        message ??
+        'Registration successful! Please check your email to confirm your account.',
+    response: response,
+  );
 
   factory AuthRegisterResult.neutral() => const AuthRegisterResult._(
-        status: RegisterStatus.neutral,
-        message:
-            'If your account was created, log in to continue. If confirmation is enabled, check your email first.',
-      );
+    status: RegisterStatus.neutral,
+    message:
+        'If your account was created, log in to continue. If confirmation is enabled, check your email first.',
+  );
 
-  factory AuthRegisterResult.failure(String message) => AuthRegisterResult._(
-        status: RegisterStatus.failure,
-        message: message,
-      );
+  factory AuthRegisterResult.failure(String message) =>
+      AuthRegisterResult._(status: RegisterStatus.failure, message: message);
 
   bool get isSuccess =>
       status == RegisterStatus.success ||
@@ -75,9 +65,11 @@ class AuthService {
           .signInWithPassword(email: cleanEmail, password: password)
           .timeout(
             const Duration(seconds: 30),
-            onTimeout: () => throw Exception(
-              'Sign in timed out. Please check your connection.',
-            ),
+            onTimeout:
+                () =>
+                    throw Exception(
+                      'Sign in timed out. Please check your connection.',
+                    ),
           );
 
       final user = response.user;
@@ -93,8 +85,7 @@ class AuthService {
 
       return response;
     } on AuthException catch (e) {
-      if (e.code == 'invalid_credentials' ||
-          e.code == 'email_not_confirmed') {
+      if (e.code == 'invalid_credentials' || e.code == 'email_not_confirmed') {
         throw Exception('Invalid Email or Password');
       }
       throw Exception('Unable to login. Please try again.');
@@ -134,7 +125,10 @@ class AuthService {
     final cleanEmail = Validators.normalizeEmail(email);
 
     // Validation
-    final firstNameError = Validators.validateName(cleanFirstName, 'First name');
+    final firstNameError = Validators.validateName(
+      cleanFirstName,
+      'First name',
+    );
     if (firstNameError != null) {
       return AuthRegisterResult.failure(firstNameError);
     }
@@ -151,9 +145,10 @@ class AuthService {
 
     final passwordResult = Validators.checkPassword(password);
     if (!passwordResult.isValid) {
-      final reason = passwordResult.unmetRequirements.isNotEmpty
-          ? passwordResult.unmetRequirements.first
-          : 'Password does not meet security requirements.';
+      final reason =
+          passwordResult.unmetRequirements.isNotEmpty
+              ? passwordResult.unmetRequirements.first
+              : 'Password does not meet security requirements.';
       return AuthRegisterResult.failure(reason);
     }
 
@@ -198,8 +193,9 @@ class AuthService {
         return AuthRegisterResult.neutral();
       }
       if (e.code == 'over_request_rate_limit') {
-        _rateLimitCooldownUntil =
-            DateTime.now().add(const Duration(seconds: 30));
+        _rateLimitCooldownUntil = DateTime.now().add(
+          const Duration(seconds: 30),
+        );
       }
       final message = _mapAuthException(e);
       return AuthRegisterResult.failure(message);
@@ -274,11 +270,12 @@ class AuthService {
         );
       }
       final details = e.details;
-      final message = details is Map && details['error'] is String
-          ? details['error'] as String
-          : details is String && details.isNotEmpty
-          ? details
-          : 'Unable to delete your account. Please try again.';
+      final message =
+          details is Map && details['error'] is String
+              ? details['error'] as String
+              : details is String && details.isNotEmpty
+              ? details
+              : 'Unable to delete your account. Please try again.';
       throw Exception(message);
     } catch (_) {
       throw Exception(
@@ -340,7 +337,10 @@ class AuthService {
       );
     }
 
-    final confirmError = Validators.validateConfirmPassword(password, confirmPassword);
+    final confirmError = Validators.validateConfirmPassword(
+      password,
+      confirmPassword,
+    );
     if (confirmError != null) {
       throw Exception(confirmError);
     }
@@ -356,16 +356,24 @@ class AuthService {
         throw Exception('Password does not meet security requirements.');
       }
       if (e.code == 'over_request_rate_limit') {
-        throw Exception('Too many requests. Please wait a moment and try again.');
+        throw Exception(
+          'Too many requests. Please wait a moment and try again.',
+        );
       }
       throw Exception('Unable to reset password. Please try again.');
     } on SocketException catch (_) {
-      throw Exception('Unable to connect to server. Please check your internet connection and try again.');
+      throw Exception(
+        'Unable to connect to server. Please check your internet connection and try again.',
+      );
     } on TimeoutException catch (_) {
-      throw Exception('Connection timed out. Please check your internet connection and try again.');
+      throw Exception(
+        'Connection timed out. Please check your internet connection and try again.',
+      );
     } catch (e) {
       if (e is AuthRetryableFetchException) {
-        throw Exception('Network connection issue. Please check your internet connection and try again.');
+        throw Exception(
+          'Network connection issue. Please check your internet connection and try again.',
+        );
       }
       throw Exception(e.toString().replaceFirst('Exception: ', ''));
     }

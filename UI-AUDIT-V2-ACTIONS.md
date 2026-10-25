@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ c4acdb6`  
+**Branch:** `ui-features @ 28ec5ba`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**6 / 14 complete. Next: Case 07.**
+**7 / 14 complete. Next: Case 08.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -68,7 +68,7 @@ Each case contains:
 | 04 Edit Profile structure | **DONE** | PASS | PASS | PASS | `903634f` |
 | 05 Dark-mode edges | **DONE** | PASS | PASS | PASS | `1f773df` |
 | 06 Activity destination | **DONE** | PASS | PASS | PASS | `c4acdb6` |
-| 07 Chat state model | Not started | - | - | - | - |
+| 07 Chat state model | **DONE** | PASS | PASS | PASS | `28ec5ba` |
 | 08 Pals integrity | Not started | - | - | - | - |
 | 09 Requests after accept | Not started | - | - | - | - |
 | 10 Onboarding durability | Not started | - | - | - | - |
@@ -89,7 +89,7 @@ Each case contains:
 | 04 | Edit Profile structure and role safety | **DONE** | P1 |
 | 05 | Dark-mode edges | **DONE** | P1 |
 | 06 | Activity destination | **DONE** | P1 |
-| 07 | Chat state model | PARTIAL | P2 |
+| 07 | Chat state model | **DONE** | P2 |
 | 08 | Pals integrity | PARTIAL | P2 |
 | 09 | Requests after accept | PARTIAL | P2 |
 | 10 | Onboarding durability | PARTIAL | P2 |
@@ -936,8 +936,10 @@ Activity is a usable inbox: specific, actionable, and honest about read state.
 
 ## Case 07 — Chat state model
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `28ec5ba`  
 **PDF reference:** page 14
 
 ### Problem

@@ -5,8 +5,11 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
-import 'package:palturo/screen/explore_expand.dart';
+import 'package:palturo/screen/explore_category_page.dart';
+import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/services/profile_service.dart';
 
 enum ExploreRole { learner, mentor }
 
@@ -22,8 +25,8 @@ class _ExplorePageState extends State<ExplorePage> {
   bool _loading = true;
   String? _error;
 
-  // TODO: default to the user's primary role / last saved choice
-  // (e.g. read from shared_preferences in initState before loading).
+  static const _roleKey = 'browse_mentor_mode';
+
   ExploreRole _role = ExploreRole.learner;
 
   int _requestId = 0;
@@ -66,6 +69,20 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   void initState() {
     super.initState();
+    _loadSavedRole();
+  }
+
+  Future<void> _loadSavedRole() async {
+    var mentor = false;
+    try {
+      mentor = await PreferencesService.instance.getBool(_roleKey) ?? false;
+    } catch (_) {
+      // Preference failure falls back to the learner view.
+    }
+    if (!mounted) return;
+    setState(() {
+      _role = mentor ? ExploreRole.mentor : ExploreRole.learner;
+    });
     _loadTaxonomy();
   }
 
@@ -121,21 +138,51 @@ class _ExplorePageState extends State<ExplorePage> {
   void _onRoleChanged(ExploreRole role) {
     if (role == _role) return;
     setState(() => _role = role);
+    PreferencesService.instance.setBool(_roleKey, role == ExploreRole.mentor);
     _loadTaxonomy();
   }
 
   void _openCategory(Map<String, dynamic> root) {
+    final path = (root['path'] ?? '').toString();
+    final label = (root['name'] ?? '').toString();
+    if (path.isEmpty || label.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
-            (context) => ExploreExpand(
-              nodePath: (root['path'] ?? '') as String,
-              nodeLabel: (root['name'] ?? '') as String,
-              kind: _role == ExploreRole.learner ? 'teach' : 'learn',
+            (context) => ExploreCategoryPage(
+              nodePath: path,
+              nodeLabel: label,
+              description: _descriptionFor(root),
+              mentor: _role == ExploreRole.mentor,
+              onRoleChanged: (mentor) {
+                if (!mounted) return;
+                setState(() {
+                  _role = mentor ? ExploreRole.mentor : ExploreRole.learner;
+                });
+                _loadTaxonomy();
+              },
             ),
       ),
     );
+  }
+
+  Future<void> _openProfileEditor() async {
+    final profile = await ProfileService().getCurrentUserProfile();
+    if (!mounted) return;
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t load your profile. Please try again.'),
+        ),
+      );
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
+    );
+    if (mounted) _loadTaxonomy();
   }
 
   @override
@@ -205,8 +252,8 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildCaption(Color textTheme) {
-    return SizedBox(
-      height: 18,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 18),
       child: AnimatedSwitcher(
         duration: AppMotion.base,
         child: Text(
@@ -288,12 +335,24 @@ class _ExplorePageState extends State<ExplorePage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Text(
-          _role == ExploreRole.mentor
-              ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
-              : 'No categories available right now.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(color: textTheme),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _role == ExploreRole.mentor
+                  ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
+                  : 'No categories available right now.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+            ),
+            if (_role == ExploreRole.mentor) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _openProfileEditor,
+                child: const Text('Update your teaching skills'),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -338,19 +397,28 @@ class _RoleToggle extends StatelessWidget {
     Widget segment(String label, ExploreRole role) {
       final selected = value == role;
       return Expanded(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: '$label role',
+          excludeSemantics: true,
           onTap: () => onChanged(role),
-          child: Center(
-            child: AnimatedDefaultTextStyle(
-              duration: AppMotion.base,
-              style: AppTextStyles.regularText.copyWith(
-                fontSize: 14,
-                color:
-                    selected ? Colors.black : textColor.withValues(alpha: 0.7),
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          child: InkWell(
+            onTap: () => onChanged(role),
+            borderRadius: BorderRadius.circular(999),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: AppMotion.base,
+                style: AppTextStyles.regularText.copyWith(
+                  fontSize: 14,
+                  color:
+                      selected
+                          ? Colors.black
+                          : textColor.withValues(alpha: 0.7),
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+                child: Text(label),
               ),
-              child: Text(label),
             ),
           ),
         ),

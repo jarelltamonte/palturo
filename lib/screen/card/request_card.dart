@@ -123,52 +123,59 @@ class RequestCard extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_today_outlined,
-                              size: 13,
-                              color: textTheme,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              formatSchedule(schedule),
-                              style: AppTextStyles.regularText.copyWith(
+                        if (schedule.trim().isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 13,
                                 color: textTheme,
-                                fontSize: 12,
                               ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.translate, size: 13, color: textTheme),
-                            const SizedBox(width: 4),
-                            Text(
-                              language,
-                              style: AppTextStyles.regularText.copyWith(
+                              const SizedBox(width: 4),
+                              Text(
+                                formatSchedule(schedule),
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (language.trim().isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.translate, size: 13, color: textTheme),
+                              const SizedBox(width: 4),
+                              Text(
+                                language,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (learningStyle.trim().isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.psychology,
+                                size: 13,
                                 color: textTheme,
-                                fontSize: 12,
                               ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.psychology, size: 13, color: textTheme),
-                            const SizedBox(width: 4),
-                            Text(
-                              learningStyle,
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
+                              const SizedBox(width: 4),
+                              Text(
+                                learningStyle,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
                       ],
                     ),
                   ],
@@ -194,11 +201,7 @@ class RequestCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                width: 1,
-                height: 30,
-                color: AppColors.black.withValues(alpha: 0.2),
-              ),
+              Container(width: 1, height: 30, color: AppColors.border(context)),
               Expanded(
                 child: SizedBox(
                   height: 44,

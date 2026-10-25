@@ -207,23 +207,31 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     Color textColor,
     Color primaryColor,
   ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppMotion.micro,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: AppMotion.micro,
+          constraints: const BoxConstraints(minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color:
+                  isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: isSelected ? Colors.black : textColor,
-            fontSize: 13,
+          child: Text(
+            label,
+            style: AppTextStyles.regularText.copyWith(
+              color: isSelected ? Colors.black : textColor,
+              fontSize: 13,
+            ),
           ),
         ),
       ),

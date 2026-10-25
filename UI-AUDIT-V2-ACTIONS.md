@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ a961935`  
+**Branch:** `ui-features @ 36c8e3b`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**8 / 14 complete. Next: Case 09.**
+**9 / 14 complete. Next: Case 10.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -70,7 +70,7 @@ Each case contains:
 | 06 Activity destination | **DONE** | PASS | PASS | PASS | `c4acdb6` |
 | 07 Chat state model | **DONE** | PASS | PASS | PASS | `28ec5ba` |
 | 08 Pals integrity | **DONE** | PASS | PASS | PASS | `a961935` |
-| 09 Requests after accept | Not started | - | - | - | - |
+| 09 Requests after accept | **DONE** | PASS | PASS | PASS | `36c8e3b` |
 | 10 Onboarding durability | Not started | - | - | - | - |
 | 11 Copy and routing | Not started | - | - | - | - |
 | 12 System consistency | Not started | - | - | - | - |
@@ -91,7 +91,7 @@ Each case contains:
 | 06 | Activity destination | **DONE** | P1 |
 | 07 | Chat state model | **DONE** | P2 |
 | 08 | Pals integrity | **DONE** | P2 |
-| 09 | Requests after accept | PARTIAL | P2 |
+| 09 | Requests after accept | **DONE** | P2 |
 | 10 | Onboarding durability | PARTIAL | P2 |
 | 11 | Copy and routing clarity | NEW GAP | P2 |
 | 12 | System consistency | PARTIAL | P2 |
@@ -1083,8 +1083,10 @@ One accepted-connection source; every surface agrees.
 
 ## Case 09 — Requests after accept
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `36c8e3b`  
 **PDF reference:** page 15
 
 ### Problem

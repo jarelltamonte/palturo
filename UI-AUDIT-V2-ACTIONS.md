@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ d3d8bdb`  
+**Branch:** `ui-features @ 0a170d7`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**10 / 14 complete. Next: Case 11.**
+**11 / 14 complete. Next: Case 12.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -93,7 +93,7 @@ Each case contains:
 | 08 | Pals integrity | **DONE** | P2 |
 | 09 | Requests after accept | **DONE** | P2 |
 | 10 | Onboarding durability | **DONE** | P2 |
-| 11 | Copy and routing clarity | NEW GAP | P2 |
+| 11 | Copy and routing clarity | **DONE** | P2 |
 | 12 | System consistency | PARTIAL | P2 |
 | 13 | Feedback survey navigation | PARTIAL | P2 |
 | 14 | Auth and accessibility polish | PARTIAL | P2 |
@@ -1253,8 +1253,10 @@ A user can leave and return without losing progress, understands where they are,
 
 ## Case 11 — Copy and routing clarity
 
-**Status:** NEW GAP  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `0a170d7`  
 **PDF reference:** pages 7 and 15
 
 ### Problem

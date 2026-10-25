@@ -576,83 +576,86 @@ class _HomePageState extends State<HomePage> {
       builder:
           (context, constraints) => SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight:
-                    (constraints.maxHeight - 48)
-                        .clamp(0.0, double.infinity)
-                        .toDouble(),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Lottie.asset(
-                    'assets/lottie/empty.json',
-                    width: 220,
-                    height: 220,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'You have seen all the top results',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textColor.withValues(alpha: 0.7),
+            child: SizedBox(
+              width: double.infinity,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      (constraints.maxHeight - 48)
+                          .clamp(0.0, double.infinity)
+                          .toDouble(),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Lottie.asset(
+                      'assets/lottie/empty.json',
+                      width: 220,
+                      height: 220,
+                      fit: BoxFit.contain,
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _discovering ? null : _discoverRandom,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                    ),
-                    icon:
-                        _discovering
-                            ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.black,
-                              ),
-                            )
-                            : const Icon(Icons.explore),
-                    label: Text(
-                      _discovering ? 'Finding people…' : 'Discover more',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(text: 'Update your '),
-                        TextSpan(
-                          text: 'settings',
-                          recognizer: _settingsTap,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.accentText(context),
-                            decoration: TextDecoration.underline,
-                            decorationThickness: 1.5,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'You have seen all the top results',
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.regularText.copyWith(
                         color: textColor.withValues(alpha: 0.7),
                       ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _discovering ? null : _discoverRandom,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                      ),
+                      icon:
+                          _discovering
+                              ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.black,
+                                ),
+                              )
+                              : const Icon(Icons.explore),
+                      label: Text(
+                        _discovering ? 'Finding people…' : 'Discover more',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(text: 'Update your '),
+                          TextSpan(
+                            text: 'settings',
+                            recognizer: _settingsTap,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.accentText(context),
+                              decoration: TextDecoration.underline,
+                              decorationThickness: 1.5,
+                            ),
+                          ),
+                        ],
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

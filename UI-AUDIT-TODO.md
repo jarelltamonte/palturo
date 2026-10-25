@@ -60,3 +60,13 @@ audits all return `PASS`. The tracker is updated before the next case starts.
 | P2-08 | PASS | PASS | PASS | Person card null/broken media uses neutral gradient + shared initials; valid images/overlay/dots/actions unchanged; 26 tests. |
 | P2-09 | PASS | PASS | PASS | Counted 18px error-token unread badge, 99+ cap, singular/plural semantics; hidden at zero, live via ChatStateService. |
 | P2-10 | PASS | PASS | PASS | Centered 480px shell on wide surfaces; phones portrait/landscape pass through; dialogs/overlays constrained; 29 tests. |
+
+## Post-report alignment audit (25 Oct 2026)
+
+| Case | Area | Finding | Result |
+|---|---|---|---|
+| A1 | People empty state | Scroll child shrink-wrapped to 312px, shifting the illustration/text/actions left by 23px at 390 and 67px in the 478px desktop shell. | Fixed with full-width scroll child; content centers at 195 / 720. PASS. |
+| A2 | Explore header | Help action ended flush at the shell edge (right=959) while other header actions stop at 16px (right=943). | Fixed with 16px right padding; measured right=943. PASS. |
+
+Rechecked 1440x900, 390x844, and 360x640. No other header, card, list, empty-state, nav, or shell alignment issue found. flutter analyze clean; flutter test 29/29.
+

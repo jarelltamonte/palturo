@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 28ec5ba`  
+**Branch:** `ui-features @ a961935`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**7 / 14 complete. Next: Case 08.**
+**8 / 14 complete. Next: Case 09.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -69,7 +69,7 @@ Each case contains:
 | 05 Dark-mode edges | **DONE** | PASS | PASS | PASS | `1f773df` |
 | 06 Activity destination | **DONE** | PASS | PASS | PASS | `c4acdb6` |
 | 07 Chat state model | **DONE** | PASS | PASS | PASS | `28ec5ba` |
-| 08 Pals integrity | Not started | - | - | - | - |
+| 08 Pals integrity | **DONE** | PASS | PASS | PASS | `a961935` |
 | 09 Requests after accept | Not started | - | - | - | - |
 | 10 Onboarding durability | Not started | - | - | - | - |
 | 11 Copy and routing | Not started | - | - | - | - |
@@ -90,7 +90,7 @@ Each case contains:
 | 05 | Dark-mode edges | **DONE** | P1 |
 | 06 | Activity destination | **DONE** | P1 |
 | 07 | Chat state model | **DONE** | P2 |
-| 08 | Pals integrity | PARTIAL | P2 |
+| 08 | Pals integrity | **DONE** | P2 |
 | 09 | Requests after accept | PARTIAL | P2 |
 | 10 | Onboarding durability | PARTIAL | P2 |
 | 11 | Copy and routing clarity | NEW GAP | P2 |
@@ -1031,8 +1031,10 @@ Add to the overflow or row context:
 
 ## Case 08 — Pals integrity
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `a961935`  
 **PDF reference:** pages 10 and 15
 
 ### Problem

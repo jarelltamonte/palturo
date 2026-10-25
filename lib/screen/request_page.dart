@@ -13,6 +13,7 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -351,6 +352,7 @@ class _RequestPageState extends State<RequestPage> {
     if (!mounted) return;
     try {
       await MatchApi.blockUser(request.requesterId);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

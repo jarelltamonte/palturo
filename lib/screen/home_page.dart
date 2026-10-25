@@ -17,6 +17,7 @@ import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
@@ -728,6 +729,7 @@ class _HomePageState extends State<HomePage> {
     _actionInFlight = true;
     try {
       await MatchApi.blockUser(person.id);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
 
       if (!mounted) return;
 

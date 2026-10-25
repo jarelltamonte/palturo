@@ -8,7 +8,8 @@ import 'package:palturo/onboarding/onboarding_flow.dart'
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
-import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/pals_count.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
 import 'matches.dart';
 import 'profile_data.dart';
@@ -27,7 +28,9 @@ String _skillLabel(String id, List<OnboardingOption> options) {
 }
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final VoidCallback? onStartSwiping;
+
+  const ProfilePage({super.key, this.onStartSwiping});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -45,18 +48,32 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    ChatStateService.instance.addListener(_onPalsChanged);
+    _onPalsChanged();
+    ChatStateService.instance.loadConversations(showSpinner: false);
     _loadProfile();
-    _loadFriendCount();
   }
 
-  Future<void> _loadFriendCount() async {
-    try {
-      final convos = await MatchApi.getConversations();
-      final accepted = convos.where((c) => c.status == 'accepted').length;
-      if (mounted) setState(() => _friendCount = accepted);
-    } catch (_) {
-      /* keep null → renders plain label */
+  void _onPalsChanged() {
+    if (!mounted) return;
+    final service = ChatStateService.instance;
+    final count = service.hasLoaded ? service.conversations.length : null;
+    if (_friendCount != count) {
+      setState(() => _friendCount = count);
     }
+  }
+
+  @override
+  void dispose() {
+    ChatStateService.instance.removeListener(_onPalsChanged);
+    super.dispose();
+  }
+
+  Future<void> _refreshProfileAndPals() async {
+    await Future.wait([
+      _loadProfile(showSpinner: false),
+      ChatStateService.instance.loadConversations(showSpinner: false),
+    ]);
   }
 
   Future<void> _loadProfile({bool showSpinner = true}) async {
@@ -260,7 +277,7 @@ class _ProfilePageState extends State<ProfilePage> {
               : _profile == null
               ? _buildErrorState(textTheme)
               : RefreshIndicator(
-                onRefresh: () => _loadProfile(showSpinner: false),
+                onRefresh: _refreshProfileAndPals,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
@@ -291,12 +308,18 @@ class _ProfilePageState extends State<ProfilePage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const Matches(),
+                                      builder:
+                                          (context) => Matches(
+                                            onStartSwiping:
+                                                widget.onStartSwiping,
+                                          ),
                                     ),
                                   );
                                 },
                                 child: Container(
-                                  height: 56,
+                                  constraints: const BoxConstraints(
+                                    minHeight: 56,
+                                  ),
                                   alignment: Alignment.center,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -322,27 +345,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: Row(
                                     children: [
                                       Expanded(
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              'Pals',
-                                              style: AppTextStyles.boldText
-                                                  .copyWith(color: textTheme),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              _friendCount == null
-                                                  ? ''
-                                                  : '$_friendCount',
-                                              style: AppTextStyles.regularText
-                                                  .copyWith(
-                                                    color: AppColors.mutedText(
-                                                      context,
-                                                    ),
-                                                    fontSize: 12,
-                                                  ),
-                                            ),
-                                          ],
+                                        child: Text(
+                                          _friendCount == null
+                                              ? 'Pals'
+                                              : palCountLabel(_friendCount!),
+                                          style: AppTextStyles.boldText
+                                              .copyWith(color: textTheme),
                                         ),
                                       ),
                                       Icon(

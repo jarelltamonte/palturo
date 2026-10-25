@@ -291,6 +291,7 @@ class _ChatRoomState extends State<ChatRoom> {
       ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
       return;
     }
+    await ChatStateService.instance.loadConversations(showSpinner: false);
     _leaveChat('You blocked ${widget.name}');
   }
 

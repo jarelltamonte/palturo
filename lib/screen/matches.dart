@@ -9,9 +9,11 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/pals_count.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 enum RoleFilter { all, learner, mentor }
@@ -71,51 +73,65 @@ class _MatchesState extends State<Matches> {
   @override
   void initState() {
     super.initState();
+    ChatStateService.instance.addListener(_onPalsChanged);
     _loadPals();
   }
 
-  /// Live data: accepted connections as an alphabetical "Your Pals" list.
+  /// Single source of truth: ChatStateService accepted conversations.
   Future<void> _loadPals() async {
     setState(() {
       _loadingPals = true;
       _palsError = null;
     });
-    try {
-      final convos = await MatchApi.getConversations();
-      final pals =
-          convos
-              .where((c) => c.status == 'accepted')
-              .map(
-                (c) => MatchedUser(
-                  id: '${c.connectionId}|${c.otherUserId}',
-                  name: c.otherName,
-                  role:
-                      c.otherRole == 'learner'
-                          ? PersonRole.learner
-                          : PersonRole.mentor,
-                  skillName: c.otherSkill ?? '',
-                  category: SkillCategory.everydayPractical,
-                  schedule: '',
-                  language: '',
-                  learningStyle: '',
-                  avatarUrl: c.otherAvatar,
-                  connectionId: c.connectionId,
-                  otherUserId: c.otherUserId,
-                ),
-              )
-              .toList();
-      if (!mounted) return;
+    await ChatStateService.instance.loadConversations(showSpinner: false);
+    if (!mounted) return;
+    if (ChatStateService.instance.error != null) {
       setState(() {
-        _pals = pals;
+        _palsError = ChatStateService.instance.error;
         _loadingPals = false;
       });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _palsError = e.toString();
-        _loadingPals = false;
-      });
+      return;
     }
+    _applyConversations(ChatStateService.instance.conversations);
+  }
+
+  void _onPalsChanged() {
+    if (!mounted) return;
+    if (ChatStateService.instance.loading) {
+      setState(() => _loadingPals = true);
+      return;
+    }
+    _applyConversations(ChatStateService.instance.conversations);
+  }
+
+  void _applyConversations(List<ConversationLite> conversations) {
+    final pals =
+        conversations
+            .where((c) => c.status == 'accepted')
+            .map(
+              (c) => MatchedUser(
+                id: '${c.connectionId}|${c.otherUserId}',
+                name: c.otherName,
+                role:
+                    c.otherRole == 'learner'
+                        ? PersonRole.learner
+                        : PersonRole.mentor,
+                skillName: c.otherSkill ?? '',
+                category: SkillCategory.everydayPractical,
+                schedule: '',
+                language: '',
+                learningStyle: '',
+                avatarUrl: c.otherAvatar,
+                connectionId: c.connectionId,
+                otherUserId: c.otherUserId,
+              ),
+            )
+            .toList();
+    setState(() {
+      _pals = pals;
+      _loadingPals = false;
+      _palsError = null;
+    });
   }
 
   late final TapGestureRecognizer _swipeTap =
@@ -124,11 +140,20 @@ class _MatchesState extends State<Matches> {
   void _startSwiping() {
     final callback = widget.onStartSwiping;
     Navigator.of(context).popUntil((route) => route.isFirst);
-    callback?.call();
+    if (!mounted) return;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
   }
 
   @override
   void dispose() {
+    ChatStateService.instance.removeListener(_onPalsChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -260,6 +285,7 @@ class _MatchesState extends State<Matches> {
       ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
       return;
     }
+    await ChatStateService.instance.loadConversations(showSpinner: false);
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
     ScaffoldMessenger.of(
@@ -621,60 +647,70 @@ class _MatchesState extends State<Matches> {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final letterHeight = (constraints.maxHeight / _alphabet.length).clamp(
-          12.0,
-          20.0,
+        const laneHeight = 28.0;
+        final maxRows = (constraints.maxHeight / laneHeight).floor().clamp(
+          1,
+          _alphabet.length,
         );
-        final totalHeight = letterHeight * _alphabet.length;
+        final columnCount = (_alphabet.length / maxRows).ceil();
+        final usedRows = (_alphabet.length / columnCount).ceil();
 
-        void handleOffset(double dy) {
-          final index = (dy / letterHeight).floor().clamp(
-            0,
-            _alphabet.length - 1,
+        Widget letterTile(String letter) {
+          final hasItems = grouped.containsKey(letter);
+          final isActive = _activeLetter == letter;
+          return Semantics(
+            button: true,
+            label: 'Jump to $letter',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _jumpToLetter(letter, grouped);
+                Future<void>.delayed(const Duration(milliseconds: 700), () {
+                  if (mounted && _activeLetter == letter) {
+                    setState(() => _activeLetter = null);
+                  }
+                });
+              },
+              child: SizedBox(
+                width: 44,
+                height: laneHeight,
+                child: Center(
+                  child: Text(
+                    letter,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                      color:
+                          isActive
+                              ? AppColors.accentText(context)
+                              : textTheme.withValues(
+                                alpha: hasItems ? 0.9 : 0.5,
+                              ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           );
-          _jumpToLetter(_alphabet[index], grouped);
         }
 
         return Center(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (details) => handleOffset(details.localPosition.dy),
-            onVerticalDragStart:
-                (details) => handleOffset(details.localPosition.dy),
-            onVerticalDragUpdate:
-                (details) => handleOffset(details.localPosition.dy),
-            onTapUp: (_) => setState(() => _activeLetter = null),
-            onVerticalDragEnd: (_) => setState(() => _activeLetter = null),
-            onVerticalDragCancel: () => setState(() => _activeLetter = null),
-            child: SizedBox(
-              width: 28,
-              height: totalHeight,
-              child: Column(
-                children:
-                    _alphabet.map((letter) {
-                      final hasItems = grouped.containsKey(letter);
-                      final isActive = _activeLetter == letter;
-                      return SizedBox(
-                        height: letterHeight,
-                        child: Center(
-                          child: Text(
-                            letter,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight:
-                                  isActive ? FontWeight.w800 : FontWeight.w600,
-                              color:
-                                  isActive
-                                      ? AppColors.accentText(context)
-                                      : textTheme.withValues(
-                                        alpha: hasItems ? 0.9 : 0.3,
-                                      ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-              ),
+          child: SizedBox(
+            width: columnCount * 44,
+            height: usedRows * laneHeight,
+            child: Column(
+              children: [
+                for (var row = 0; row < usedRows; row++)
+                  Row(
+                    children: [
+                      for (var col = 0; col < columnCount; col++)
+                        if (row * columnCount + col < _alphabet.length)
+                          letterTile(_alphabet[row * columnCount + col])
+                        else
+                          const SizedBox(width: 44, height: laneHeight),
+                    ],
+                  ),
+              ],
             ),
           ),
         );
@@ -697,26 +733,25 @@ class _MatchesState extends State<Matches> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.7),
-                  ),
-                  children: [
-                    const TextSpan(text: 'Start '),
-                    TextSpan(
-                      text: 'Swiping',
-                      recognizer: _swipeTap,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.accentText(context),
-                        decoration: TextDecoration.underline,
-                        decorationThickness: 1.5,
-                      ),
-                    ),
-                  ],
+              Text(
+                'No pals yet',
+                style: AppTextStyles.boldText.copyWith(
+                  color: textTheme,
+                  fontSize: 16,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Find someone who wants to exchange skills.',
                 textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: _startSwiping,
+                child: const Text('Find people'),
               ),
             ],
           ),
@@ -739,10 +774,23 @@ class _MatchesState extends State<Matches> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No pals found',
+              'No pals match your filters',
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme.withValues(alpha: 0.6),
               ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                _searchController.clear();
+                _searchFocus.unfocus();
+                setState(() {
+                  _query = '';
+                  _roleFilter = RoleFilter.all;
+                  _isSearching = false;
+                });
+              },
+              child: const Text('Clear filters'),
             ),
           ],
         ),
@@ -971,7 +1019,11 @@ class _MatchesState extends State<Matches> {
                                 top: 4,
                               ),
                               child: Text(
-                                '${filtered.length} pals',
+                                (_hasActiveFilter ||
+                                            _query.trim().isNotEmpty) &&
+                                        filtered.length != _pals.length
+                                    ? '${filtered.length} of ${_pals.length} pals'
+                                    : palCountLabel(filtered.length),
                                 style: AppTextStyles.regularText.copyWith(
                                   color: textTheme.withValues(alpha: 0.6),
                                 ),

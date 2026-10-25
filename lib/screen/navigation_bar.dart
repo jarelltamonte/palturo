@@ -60,7 +60,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
     ),
     ChatsPage(onStartSwiping: () => _onItemTapped(0)),
     RequestPage(refreshSignal: _requestsRefresh),
-    const ProfilePage(),
+    ProfilePage(onStartSwiping: () => _onItemTapped(0)),
   ];
 
   void _onItemTapped(int index) {

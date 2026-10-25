@@ -14,6 +14,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   bool _initialized = false;
   List<ConversationLite> _conversations = [];
   bool _loading = false;
+  bool _hasLoaded = false;
   String? _error;
   String? _activeConnectionId;
   AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
@@ -24,6 +25,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
   List<ConversationLite> get conversations => _conversations;
   bool get loading => _loading;
+  bool get hasLoaded => _hasLoaded;
   String? get error => _error;
   String? get activeConnectionId => _activeConnectionId;
   AppLifecycleState get lifecycleState => _lifecycleState;
@@ -81,6 +83,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       _sortConversations(accepted);
       _conversations = accepted;
       _loading = false;
+      _hasLoaded = true;
       _error = null;
       notifyListeners();
     } catch (e) {
@@ -239,6 +242,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _conversations = [];
     _activeConnectionId = null;
     _loading = false;
+    _hasLoaded = false;
     _error = null;
     notifyListeners();
   }

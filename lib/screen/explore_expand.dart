@@ -9,6 +9,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
 
 class ExploreExpand extends StatefulWidget {
   final String nodePath;
@@ -233,6 +234,7 @@ class _ExploreExpandState extends State<ExploreExpand>
     _actionInFlight = true;
     try {
       await MatchApi.blockUser(person.id);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
 
       if (!mounted) return;
 

@@ -722,14 +722,20 @@ class _ChatRoomState extends State<ChatRoom> {
                       ),
                     ),
                   ],
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  shape: BoxShape.circle,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: const BoxDecoration(
+                      color: Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.more_horiz, color: textTheme, size: 22),
+                  ),
                 ),
-                child: Icon(Icons.more_horiz, color: textTheme, size: 22),
               ),
             ),
           ],

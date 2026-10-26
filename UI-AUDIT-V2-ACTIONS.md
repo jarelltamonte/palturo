@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 0a170d7`  
+**Branch:** `ui-features @ 617b4b1`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**11 / 14 complete. Next: Case 12.**
+**12 / 14 complete. Next: Case 13.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -73,7 +73,7 @@ Each case contains:
 | 09 Requests after accept | **DONE** | PASS | PASS | PASS | `36c8e3b` |
 | 10 Onboarding durability | **DONE** | PASS | PASS | PASS | `d3d8bdb` |
 | 11 Copy and routing | Not started | - | - | - | - |
-| 12 System consistency | Not started | - | - | - | - |
+| 12 System consistency | **DONE** | PASS | PASS | PASS | `617b4b1` |
 | 13 Feedback survey navigation | Not started | - | - | - | - |
 | 14 Auth and accessibility | Not started | - | - | - | - |
 
@@ -94,7 +94,7 @@ Each case contains:
 | 09 | Requests after accept | **DONE** | P2 |
 | 10 | Onboarding durability | **DONE** | P2 |
 | 11 | Copy and routing clarity | **DONE** | P2 |
-| 12 | System consistency | PARTIAL | P2 |
+| 12 | System consistency | **DONE** | P2 |
 | 13 | Feedback survey navigation | PARTIAL | P2 |
 | 14 | Auth and accessibility polish | PARTIAL | P2 |
 
@@ -1308,8 +1308,10 @@ Several visible controls do not match their destination or meaning.
 
 ## Case 12 — System consistency
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `617b4b1`  
 **PDF reference:** pages 6, 14, 18
 
 ### Problem

@@ -334,11 +334,12 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                 ),
 
                 _section('DANGER ZONE'),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withValues(alpha: 0.07),
+                Material(
+                  color: AppColors.danger.withValues(alpha: 0.07),
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
+                    side: BorderSide(
                       color: AppColors.danger.withValues(alpha: 0.18),
                     ),
                   ),

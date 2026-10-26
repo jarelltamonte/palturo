@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 617b4b1`  
+**Branch:** `ui-features @ 3dbd18a`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**12 / 14 complete. Next: Case 13.**
+**13 / 14 complete. Next: Case 14.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -74,7 +74,7 @@ Each case contains:
 | 10 Onboarding durability | **DONE** | PASS | PASS | PASS | `d3d8bdb` |
 | 11 Copy and routing | Not started | - | - | - | - |
 | 12 System consistency | **DONE** | PASS | PASS | PASS | `617b4b1` |
-| 13 Feedback survey navigation | Not started | - | - | - | - |
+| 13 Feedback survey navigation | **DONE** | PASS | PASS | PASS | `3dbd18a` |
 | 14 Auth and accessibility | Not started | - | - | - | - |
 
 **Last updated:** 25 October 2026 - flutter analyze clean - flutter test 37/37 - release web build current.
@@ -95,7 +95,7 @@ Each case contains:
 | 10 | Onboarding durability | **DONE** | P2 |
 | 11 | Copy and routing clarity | **DONE** | P2 |
 | 12 | System consistency | **DONE** | P2 |
-| 13 | Feedback survey navigation | PARTIAL | P2 |
+| 13 | Feedback survey navigation | **DONE** | P2 |
 | 14 | Auth and accessibility polish | PARTIAL | P2 |
 
 ---
@@ -1362,8 +1362,10 @@ The app feels assembled from two systems: a polished main shell and older subrou
 
 ## Case 13 — Feedback survey navigation
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `3dbd18a`  
 **PDF reference:** page 16
 
 ### Problem

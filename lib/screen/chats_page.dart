@@ -336,7 +336,12 @@ class _ChatsPageState extends State<ChatsPage> {
 
   Widget _buildNoMatchesState(Color textTheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 0, 32, 110),
+      padding: EdgeInsets.fromLTRB(
+        32,
+        0,
+        32,
+        MediaQuery.textScalerOf(context).scale(12) > 16 ? 124 : 110,
+      ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -651,7 +656,14 @@ class _ChatsPageState extends State<ChatsPage> {
             else ...[
               if (nothingFound)
                 SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
-              const SliverToBoxAdapter(child: SizedBox(height: 110)),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height:
+                      MediaQuery.textScalerOf(context).scale(12) > 16
+                          ? 124
+                          : 110,
+                ),
+              ),
             ],
           ],
         ),

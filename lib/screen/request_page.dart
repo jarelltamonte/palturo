@@ -676,7 +676,12 @@ class _RequestPageState extends State<RequestPage> {
     if (_loadError != null) return _buildLoadError(textTheme);
     if (requests.isEmpty) return _buildEmptyState(textTheme);
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
+      ),
       itemCount: requests.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -817,7 +822,12 @@ class _RequestPageState extends State<RequestPage> {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
+      ),
       itemCount: requests.length + 1,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {

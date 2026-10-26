@@ -18,6 +18,7 @@ class TopLabeledField extends StatefulWidget {
   final Iterable<String>? autofillHints;
   final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   const TopLabeledField({
     super.key,
@@ -34,6 +35,7 @@ class TopLabeledField extends StatefulWidget {
     this.autofillHints,
     this.focusNode,
     this.onChanged,
+    this.onSubmitted,
   });
 
   @override
@@ -124,6 +126,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     inputFormatters: widget.inputFormatters,
                     autofillHints: widget.autofillHints,
                     onChanged: widget.onChanged,
+                    onSubmitted: widget.onSubmitted,
                     minLines: 1,
                     maxLines: widget.obscureText ? 1 : widget.maxLines,
                     maxLength: widget.maxLength,

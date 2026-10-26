@@ -7,6 +7,7 @@ import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
 import '../services/auth_service.dart';
+import '../utils/validators.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -31,6 +32,20 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   bool _isLoggingIn = false;
+  String? _emailError;
+  String? _passwordError;
+
+  void _submit() {
+    final emailError = Validators.validateEmail(_emailController.text.trim());
+    final passwordError =
+        _passwordController.text.isEmpty ? 'Password is required.' : null;
+    setState(() {
+      _emailError = emailError;
+      _passwordError = passwordError;
+    });
+    if (emailError != null || passwordError != null) return;
+    _login();
+  }
 
   Future<void> _login() async {
     if (_isLoggingIn) return;
@@ -171,13 +186,45 @@ class _LoginPageState extends State<LoginPage> {
                       TopLabeledField(
                         label: 'Email',
                         controller: _emailController,
+                        autofillHints: const [AutofillHints.email],
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) {
+                          if (_emailError != null) {
+                            setState(() => _emailError = null);
+                          }
+                        },
                       ),
+                      if (_emailError != null)
+                        Semantics(
+                          liveRegion: true,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                _emailError!,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
 
                       TopLabeledField(
                         label: 'Password',
                         controller: _passwordController,
                         obscureText: _isObscured,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(),
+                        onChanged: (_) {
+                          if (_passwordError != null) {
+                            setState(() => _passwordError = null);
+                          }
+                        },
                         suffixIcon: IconButton(
                           tooltip:
                               _isObscured ? 'Show password' : 'Hide password',
@@ -194,17 +241,29 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                       ),
+                      if (_passwordError != null)
+                        Semantics(
+                          liveRegion: true,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                _passwordError!,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
 
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed:
-                              _isLoggingIn
-                                  ? null
-                                  : () {
-                                    _login();
-                                  },
+                          onPressed: _isLoggingIn ? null : _submit,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -229,8 +288,8 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 10),
                       Center(
-                        child: GestureDetector(
-                          onTap: () {
+                        child: TextButton(
+                          onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -238,6 +297,10 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             );
                           },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                          ),
                           child: Text(
                             'Forgot Password?',
                             textAlign: TextAlign.center,

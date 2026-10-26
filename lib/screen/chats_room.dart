@@ -749,42 +749,45 @@ class _ChatRoomState extends State<ChatRoom> {
                     ? _buildLoadError(textTheme)
                     : !hasMessages && !showProfileInAppBar
                     ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          GestureDetector(
-                            onTap: _showProfile,
-                            child: UserAvatar(
-                              name: widget.name,
-                              image: widget.avatarImage,
-                              size: 100,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            widget.name,
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textTheme,
-                              fontSize: 18,
-                            ),
-                          ),
-                          if (widget.skillName != null &&
-                              widget.skillName!.trim().isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              'You matched on',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme.withValues(alpha: 0.6),
-                                fontSize: 13,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: _showProfile,
+                              child: UserAvatar(
+                                name: widget.name,
+                                image: widget.avatarImage,
+                                size: 100,
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            SkillTag(
-                              skillName: widget.skillName!,
-                              role: widget.role,
+                            const SizedBox(height: 12),
+                            Text(
+                              widget.name,
+                              style: AppTextStyles.boldText.copyWith(
+                                color: textTheme,
+                                fontSize: 18,
+                              ),
                             ),
+                            if (widget.skillName != null &&
+                                widget.skillName!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                'You matched on',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme.withValues(alpha: 0.6),
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              SkillTag(
+                                skillName: widget.skillName!,
+                                role: widget.role,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     )
                     : _buildMessageList(textTheme),

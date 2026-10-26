@@ -176,8 +176,9 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
         final badgesEnabled = PreferencesService.instance.notificationsEnabled;
         final requestUnread =
             badgesEnabled ? ActivityService.instance.unread : 0;
+        final largeText = MediaQuery.textScalerOf(context).scale(12) > 16;
         return Container(
-          height: 60,
+          height: largeText ? 74 : 60,
           margin: const EdgeInsets.only(right: 16, left: 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
@@ -413,6 +414,8 @@ class _NavItemState extends State<_NavItem>
               const SizedBox(height: 2),
               Text(
                 widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontFamily: 'Inter',
                   color: widget.color,

@@ -534,6 +534,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     Expanded(
                       child: Text(
                         widget.person.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.boldText.copyWith(
                           color: Colors.white,
                           fontSize: 22,
@@ -554,17 +556,22 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         color: Colors.white,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        scheduleText,
-                        style: AppTextStyles.regularText.copyWith(
-                          color: Colors.white,
-                          fontSize: 14,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 6,
-                            ),
-                          ],
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 150),
+                        child: Text(
+                          scheduleText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.regularText.copyWith(
+                            color: Colors.white,
+                            fontSize: 14,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -585,17 +592,23 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                               color: Colors.white70,
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              language,
-                              style: AppTextStyles.regularText.copyWith(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    blurRadius: 6,
-                                  ),
-                                ],
+                            Flexible(
+                              child: Text(
+                                language,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],

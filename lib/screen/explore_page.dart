@@ -312,7 +312,12 @@ class _ExplorePageState extends State<ExplorePage> {
   Widget _buildGridAuto(Color textTheme) {
     return GridView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+      ),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 16,

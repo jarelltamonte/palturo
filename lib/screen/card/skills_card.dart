@@ -506,21 +506,24 @@ class _SkillsCardState extends State<SkillsCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(fontSize: 16, color: textColor),
-                  children: [
-                    const TextSpan(text: 'Skills to '),
-                    TextSpan(
-                      text: widget.labelSuffix,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 16, color: textColor),
+                    children: [
+                      const TextSpan(text: 'Skills to '),
+                      TextSpan(
+                        text: widget.labelSuffix,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: accentColor,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+              if (widget.isEditing && canAddMore) const SizedBox(width: 4),
               if (widget.isEditing && canAddMore)
                 Semantics(
                   container: true,

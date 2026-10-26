@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/chip_selector.dart';
 import 'package:palturo/onboarding/widgets/onboarding_scaffold.dart';
+import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/theme/theme.dart';
 
 void main() {
@@ -51,5 +52,50 @@ void main() {
         isEnabled: false,
       ),
     );
+  });
+
+  testWidgets('role cards and onboarding back expose selected/44px semantics', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: OnboardingScaffold(
+          title: 'Role',
+          stepLabel: 'Step 1 of 4 - Role',
+          showBackButton: true,
+          onBack: () {},
+          child: RoleCardGroup(
+            options: const [
+              RoleOption(
+                OnboardingRole.learn,
+                'assets/icons/rlearner.svg',
+                'I want to\nlearn',
+              ),
+              RoleOption(
+                OnboardingRole.teach,
+                'assets/icons/rmentor.svg',
+                'I want to\nteach',
+              ),
+            ],
+            selected: OnboardingRole.learn,
+            onSelect: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('I want to learn')),
+      matchesSemantics(
+        label: 'I want to learn',
+        isButton: true,
+        isSelected: true,
+        hasSelectedState: true,
+        hasTapAction: true,
+      ),
+    );
+    final back = tester.getSize(find.byTooltip('Back'));
+    expect(back.width, greaterThanOrEqualTo(44));
+    expect(back.height, greaterThanOrEqualTo(44));
   });
 }

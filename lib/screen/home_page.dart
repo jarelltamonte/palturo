@@ -908,7 +908,12 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+        ),
         child:
             _loading
                 ? const PersonCardSkeleton()

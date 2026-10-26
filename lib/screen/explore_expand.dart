@@ -582,7 +582,12 @@ class _ExploreExpandState extends State<ExploreExpand>
               ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+                ),
                 child:
                     _loading
                         ? const PersonCardSkeleton()

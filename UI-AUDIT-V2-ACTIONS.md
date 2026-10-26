@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 41f5e98`  
+**Branch:** `ui-features @ 9504570`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -77,7 +77,7 @@ Each case contains:
 | 13 Feedback survey navigation | **DONE** | PASS | PASS | PASS | `3dbd18a` |
 | 14 Auth and accessibility | **DONE** | PASS | PASS | PASS | `41f5e98` |
 
-**Last updated:** 25 October 2026 - flutter analyze clean - flutter test 37/37 - release web build current.
+**Last updated:** 25 October 2026 - flutter analyze clean - flutter test 72/72 - release web build current - 360/390/1440 and 200% verification complete.
 
 ### Case index
 
@@ -378,14 +378,14 @@ Delete account            Permanently remove profile, Pals, chats
 
 ### Acceptance criteria
 
-- [ ] Settings has four visible groups: Preferences, Account & Security, Support, Legal & About.
-- [ ] Account identity is visible without opening a subpage.
-- [ ] Blocked Users is no longer in the Preferences group.
-- [ ] Legal/Support are reachable from Settings.
-- [ ] Delete Account is not on the Settings root.
-- [ ] Log Out is in Account & Security, not Preferences.
-- [ ] Every row has one clear destination.
-- [ ] No new tab is added.
+- [x] Settings has four visible groups: Preferences, Account & Security, Support, Legal & About.
+- [x] Account identity is visible without opening a subpage.
+- [x] Blocked Users is no longer in the Preferences group.
+- [x] Legal/Support are reachable from Settings.
+- [x] Delete Account is not on the Settings root.
+- [x] Log Out is in Account & Security, not Preferences.
+- [x] Every row has one clear destination.
+- [x] No new tab is added.
 
 ### Tests
 
@@ -504,13 +504,13 @@ Keep the current grid, but add:
 
 ### Acceptance criteria
 
-- [ ] Category tap opens a category detail screen, not directly a deck.
-- [ ] Child skills appear when the taxonomy has children.
-- [ ] Counts are visible and role-aware.
-- [ ] Search exists at least within a category.
-- [ ] Role persists across entry.
-- [ ] Empty/error/loading states exist.
-- [ ] No duplicate root “cards” become dead ends.
+- [x] Category tap opens a category detail screen, not directly a deck.
+- [x] Child skills appear when the taxonomy has children.
+- [x] Counts are visible and role-aware.
+- [x] Search exists at least within a category.
+- [x] Role persists across entry.
+- [x] Empty/error/loading states exist.
+- [x] No duplicate root “cards” become dead ends.
 
 ### Tests
 
@@ -620,12 +620,12 @@ Compatibility is optional. If Browse is intentionally unscored, label the deck �
 
 ### Acceptance criteria
 
-- [ ] Category cards have profile access.
-- [ ] No “No learning styles set” placeholder.
-- [ ] Schedule/language/style shown when available.
-- [ ] No fake 0% match.
-- [ ] Card layout remains stable at 360/390/1440.
-- [ ] Category cards use the same interaction language as For You.
+- [x] Category cards have profile access.
+- [x] No “No learning styles set” placeholder.
+- [x] Schedule/language/style shown when available.
+- [x] No fake 0% match.
+- [x] Card layout remains stable at 360/390/1440.
+- [x] Category cards use the same interaction language as For You.
 
 ### Tests
 
@@ -765,14 +765,14 @@ The current profile prompt promises a showcase. Choose one:
 
 ### Acceptance criteria
 
-- [ ] Sections are visible: Photos, About you, Role, Skills, Showcase.
-- [ ] Main photo is labeled.
-- [ ] Role change does not silently delete hidden skills.
-- [ ] Empty photo slots use theme surfaces.
-- [ ] Discard dialog uses “Discard” / “Keep editing.”
-- [ ] Save disabled when clean.
-- [ ] Showcase promise has a real destination or is removed.
-- [ ] Public preview is available or explicitly deferred.
+- [x] Sections are visible: Photos, About you, Role, Skills, Showcase.
+- [x] Main photo is labeled.
+- [x] Role change does not silently delete hidden skills.
+- [x] Empty photo slots use theme surfaces.
+- [x] Discard dialog uses “Discard” / “Keep editing.”
+- [x] Save disabled when clean.
+- [x] Showcase promise has a real destination or is removed.
+- [x] Public preview is available or explicitly deferred.
 
 ### Tests
 
@@ -831,11 +831,11 @@ Both surfaces use the same semantic surface/muted/accent roles as the rest of th
 
 ### Acceptance criteria
 
-- [ ] Inactive dots visible in dark at 390 and 360.
-- [ ] Empty photo slots use dark surface and remain readable.
-- [ ] Light mode unchanged.
-- [ ] Contrast ≥3:1 for non-text UI and ≥4.5:1 for text.
-- [ ] No raw white/charcoal placeholders in dark.
+- [x] Inactive dots visible in dark at 390 and 360.
+- [x] Empty photo slots use dark surface and remain readable.
+- [x] Light mode unchanged.
+- [x] Contrast ≥3:1 for non-text UI and ≥4.5:1 for text.
+- [x] No raw white/charcoal placeholders in dark.
 
 ### Tests
 
@@ -918,12 +918,12 @@ Activity is a usable inbox: specific, actionable, and honest about read state.
 
 ### Acceptance criteria
 
-- [ ] Each row names the actor and context when available.
-- [ ] Rows are tappable and route correctly.
-- [ ] Failed load does not clear unread state.
-- [ ] Per-item or explicit mark-read behavior is clear.
-- [ ] Empty/error/loading states exist.
-- [ ] No dead-end row for a deleted request/chat; show a friendly fallback.
+- [x] Each row names the actor and context when available.
+- [x] Rows are tappable and route correctly.
+- [x] Failed load does not clear unread state.
+- [x] Per-item or explicit mark-read behavior is clear.
+- [x] Empty/error/loading states exist.
+- [x] No dead-end row for a deleted request/chat; show a friendly fallback.
 
 ### Tests
 
@@ -1012,13 +1012,13 @@ Add to the overflow or row context:
 
 ### Acceptance criteria
 
-- [ ] Turning off notifications does not change unread filter results.
-- [ ] Sending shows an immediate bubble.
-- [ ] Failed messages can retry.
-- [ ] Mute/archive/mark unread exist or are explicitly deferred.
-- [ ] Feedback card does not crowd a new chat.
-- [ ] Pals strip and Messages have a clear distinction.
-- [ ] No regression to realtime stream/send.
+- [x] Turning off notifications does not change unread filter results.
+- [x] Sending shows an immediate bubble.
+- [x] Failed messages can retry.
+- [x] Mute/archive/mark unread exist or are explicitly deferred.
+- [x] Feedback card does not crowd a new chat.
+- [x] Pals strip and Messages have a clear distinction.
+- [x] No regression to realtime stream/send.
 
 ### Tests
 
@@ -1067,11 +1067,11 @@ One accepted-connection source; every surface agrees.
 
 ### Acceptance criteria
 
-- [ ] Profile count updates after unmatch/block.
-- [ ] Count and list agree across Chats, Pals, Profile.
-- [ ] “1 pal” is correct.
-- [ ] Alphabet index is usable at 360 and with screen reader.
-- [ ] Empty and filtered-empty states have actions.
+- [x] Profile count updates after unmatch/block.
+- [x] Count and list agree across Chats, Pals, Profile.
+- [x] “1 pal” is correct.
+- [x] Alphabet index is usable at 360 and with screen reader.
+- [x] Empty and filtered-empty states have actions.
 
 ### Tests
 
@@ -1154,12 +1154,12 @@ Include accepted history if the backend can return it; otherwise label Sent as �
 
 ### Acceptance criteria
 
-- [ ] Accept shows a match confirmation with Say hello.
-- [ ] Request is removed only after success.
-- [ ] Decline is confirmed or undoable.
-- [ ] Sent has status/date filter.
-- [ ] Accepted history is visible or explicitly excluded.
-- [ ] Copy matches the action.
+- [x] Accept shows a match confirmation with Say hello.
+- [x] Request is removed only after success.
+- [x] Decline is confirmed or undoable.
+- [x] Sent has status/date filter.
+- [x] Accepted history is visible or explicitly excluded.
+- [x] Copy matches the action.
 
 ### Tests
 
@@ -1231,13 +1231,13 @@ A user can leave and return without losing progress, understands where they are,
 
 ### Acceptance criteria
 
-- [ ] Draft survives app restart.
-- [ ] Step labels exist.
-- [ ] Review screen exists.
-- [ ] Skip copy explains consequences.
-- [ ] Role/chips announce selection.
-- [ ] Dark dots visible.
-- [ ] Existing save path unchanged.
+- [x] Draft survives app restart.
+- [x] Step labels exist.
+- [x] Review screen exists.
+- [x] Skip copy explains consequences.
+- [x] Role/chips announce selection.
+- [x] Dark dots visible.
+- [x] Existing save path unchanged.
 
 ### Tests
 
@@ -1290,13 +1290,13 @@ Several visible controls do not match their destination or meaning.
 
 ### Acceptance criteria
 
-- [ ] No “All” label unless it returns all roles.
-- [ ] Empty-state link goes where it says.
-- [ ] Add/Connect/Send request is consistent across decks.
-- [ ] “Like back” removed.
-- [ ] Count grammar fixed.
-- [ ] Discard dialog explicit.
-- [ ] Delete support copy points to a real route.
+- [x] No “All” label unless it returns all roles.
+- [x] Empty-state link goes where it says.
+- [x] Add/Connect/Send request is consistent across decks.
+- [x] “Like back” removed.
+- [x] Count grammar fixed.
+- [x] Discard dialog explicit.
+- [x] Delete support copy points to a real route.
 
 ### Tests
 
@@ -1346,12 +1346,12 @@ The app feels assembled from two systems: a polished main shell and older subrou
 
 ### Acceptance criteria
 
-- [ ] All data-heavy routes have skeletons.
-- [ ] Subpage titles use one scale.
-- [ ] Matches uses the shared filter component.
-- [ ] Error messages distinguish connection vs validation/server.
-- [ ] Back buttons have consistent 44px targets and glyphs.
-- [ ] No layout jumps when loading completes.
+- [x] All data-heavy routes have skeletons.
+- [x] Subpage titles use one scale.
+- [x] Matches uses the shared filter component.
+- [x] Error messages distinguish connection vs validation/server.
+- [x] Back buttons have consistent 44px targets and glyphs.
+- [x] No layout jumps when loading completes.
 
 ### Tests
 
@@ -1397,12 +1397,12 @@ A long survey feels irreversible. Users may abandon it because they cannot corre
 
 ### Acceptance criteria
 
-- [ ] Back works and preserves previous answer.
-- [ ] Current step and total shown.
-- [ ] Cancel confirms loss.
-- [ ] Submit still writes one payload.
-- [ ] iOS and Android dialogs both support Back.
-- [ ] Keyboard does not hide the actions.
+- [x] Back works and preserves previous answer.
+- [x] Current step and total shown.
+- [x] Cancel confirms loss.
+- [x] Submit still writes one payload.
+- [x] iOS and Android dialogs both support Back.
+- [x] Keyboard does not hide the actions.
 
 ### Tests
 
@@ -1467,13 +1467,13 @@ Auth and onboarding are as accessible as the main shell.
 
 ### Acceptance criteria
 
-- [ ] Empty login shows inline validation.
-- [ ] Forgot link is 44px.
-- [ ] Legal links are 44px.
-- [ ] Onboarding back target 44px.
-- [ ] Role/chips announce selected.
-- [ ] 200% text passes on card, settings, chat header, edit.
-- [ ] No content hidden behind the floating nav.
+- [x] Empty login shows inline validation.
+- [x] Forgot link is 44px.
+- [x] Legal links are 44px.
+- [x] Onboarding back target 44px.
+- [x] Role/chips announce selected.
+- [x] 200% text passes on card, settings, chat header, edit.
+- [x] No content hidden behind the floating nav.
 
 ### Tests
 
@@ -1546,16 +1546,16 @@ Auth and onboarding are as accessible as the main shell.
 
 ### Definition of done for every case
 
-- [ ] Default, loading, empty, error, dark states reviewed.
-- [ ] 360×640 and 390×844 checked.
-- [ ] 1440×900 shell checked for layout regressions.
-- [ ] 200% text checked on text-heavy screens.
-- [ ] Every tappable element ≥44×44.
-- [ ] Semantics labels and selected states verified.
-- [ ] No regression to C01–C15.
-- [ ] Copy reviewed against Section 2.6.
-- [ ] No dead-end action.
-- [ ] No false success state.
+- [x] Default, loading, empty, error, dark states reviewed.
+- [x] 360×640 and 390×844 checked.
+- [x] 1440×900 shell checked for layout regressions.
+- [x] 200% text checked on text-heavy screens.
+- [x] Every tappable element ≥44×44.
+- [x] Semantics labels and selected states verified.
+- [x] No regression to C01–C15.
+- [x] Copy reviewed against Section 2.6.
+- [x] No dead-end action.
+- [x] No false success state.
 
 ---
 

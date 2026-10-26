@@ -72,10 +72,10 @@ Each case contains:
 | 08 Pals integrity | **DONE** | PASS | PASS | PASS | `a961935` |
 | 09 Requests after accept | **DONE** | PASS | PASS | PASS | `36c8e3b` |
 | 10 Onboarding durability | **DONE** | PASS | PASS | PASS | `d3d8bdb` |
-| 11 Copy and routing | Not started | - | - | - | - |
+| 11 Copy and routing | **DONE** | PASS | PASS | PASS | `0a170d7` |
 | 12 System consistency | **DONE** | PASS | PASS | PASS | `617b4b1` |
 | 13 Feedback survey navigation | **DONE** | PASS | PASS | PASS | `3dbd18a` |
-| 14 Auth and accessibility | Not started | - | - | - | - |
+| 14 Auth and accessibility | **DONE** | PASS | PASS | PASS | `41f5e98` |
 
 **Last updated:** 25 October 2026 - flutter analyze clean - flutter test 37/37 - release web build current.
 

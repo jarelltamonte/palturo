@@ -11,6 +11,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:palturo/authentication/legal_dialogs.dart';
 import 'package:palturo/screen/account/account_settings_page.dart';
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -155,12 +156,16 @@ class _SettingsState extends State<Settings> {
   void _showFeedbackDialog() {
     int currentStep = 0;
     final Map<int, int> ratings = {};
+    final Set<int> preferNot = {};
+    final ScrollController surveyScroll = ScrollController();
+    final GlobalKey commentFieldKey = GlobalKey();
     var submitting = false;
 
     _feedbackController.clear();
 
     showAdaptiveDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) {
         final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -171,7 +176,9 @@ class _SettingsState extends State<Settings> {
             final bool isCommentStep =
                 currentStep == _feedbackStatements.length;
             final int selectedRating = ratings[currentStep] ?? 0;
-            final bool canAdvance = isCommentStep || selectedRating > 0;
+            final bool preferNotSelected = preferNot.contains(currentStep);
+            final bool canAdvance =
+                isCommentStep || selectedRating > 0 || preferNotSelected;
 
             Widget buildOption(int index) {
               final int value = index + 1;
@@ -203,6 +210,7 @@ class _SettingsState extends State<Settings> {
                     onTap: () {
                       setDialogState(() {
                         ratings[currentStep] = value;
+                        preferNot.remove(currentStep);
                       });
                     },
                     child: Padding(
@@ -235,13 +243,64 @@ class _SettingsState extends State<Settings> {
               );
             }
 
+            var confirming = false;
+
+            void previousStep() {
+              if (submitting || currentStep == 0) return;
+              if (surveyScroll.hasClients) surveyScroll.jumpTo(0);
+              setDialogState(() => currentStep--);
+            }
+
+            Future<void> confirmCancel() async {
+              if (submitting || confirming) return;
+              confirming = true;
+              final discard = await showConfirmDialog(
+                dialogContext,
+                title: 'Discard feedback?',
+                message: 'Your answers will be lost.',
+                confirmLabel: 'Discard',
+                cancelLabel: 'Keep writing',
+              );
+              confirming = false;
+              if (discard && dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+            }
+
+            Widget guard(Widget child) {
+              return PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (!didPop) confirmCancel();
+                },
+                child: child,
+              );
+            }
+
             final Widget ratingContent = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (currentStep > 0)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: submitting ? null : previousStep,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: Text(
+                        'Back',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.accentText(context),
+                        ),
+                      ),
+                    ),
+                  ),
                 Text(
                   'Step ${currentStep + 1} of ${_feedbackStatements.length + 1}',
                   style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.5),
+                    color: AppColors.mutedText(context),
                     fontSize: 12,
                   ),
                 ),
@@ -262,8 +321,8 @@ class _SettingsState extends State<Settings> {
                   'Responses are stored securely with your PalTuro account.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.55),
-                    fontSize: 11,
+                    color: AppColors.mutedText(context),
+                    fontSize: 12,
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -276,7 +335,35 @@ class _SettingsState extends State<Settings> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () {
+                      setDialogState(() {
+                        if (preferNot.contains(currentStep)) {
+                          preferNot.remove(currentStep);
+                        } else {
+                          preferNot.add(currentStep);
+                          ratings.remove(currentStep);
+                        }
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                    ),
+                    child: Text(
+                      'Prefer not to answer',
+                      style: AppTextStyles.regularText.copyWith(
+                        color:
+                            preferNotSelected
+                                ? AppColors.accentText(context)
+                                : AppColors.mutedText(context),
+                        decoration:
+                            preferNotSelected
+                                ? TextDecoration.underline
+                                : TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   for (int i = 0; i < _agreementLabels.length; i++)
                     buildOption(i),
                 ] else ...[
@@ -288,22 +375,31 @@ class _SettingsState extends State<Settings> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tell us about your experience or how we can improve.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textTheme.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextField(
+                    key: commentFieldKey,
                     controller: _feedbackController,
-                    minLines: 4,
-                    maxLines: 6,
+                    minLines: 1,
+                    maxLines: 3,
                     keyboardType: TextInputType.multiline,
                     textInputAction: TextInputAction.newline,
+                    scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 180),
+                    onTap: () {
+                      Future<void>.delayed(
+                        const Duration(milliseconds: 250),
+                        () {
+                          final target = commentFieldKey.currentContext;
+                          if (target != null && target.mounted) {
+                            Scrollable.ensureVisible(
+                              target,
+                              alignment: 0.15,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        },
+                      );
+                    },
                     style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
                       fontSize: 14,
@@ -311,7 +407,7 @@ class _SettingsState extends State<Settings> {
                     decoration: InputDecoration(
                       hintText: 'Write your feedback here...',
                       hintStyle: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.45),
+                        color: AppColors.mutedText(context),
                         fontSize: 14,
                       ),
                       filled: true,
@@ -338,6 +434,15 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tell us about your experience or how we can improve.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ],
             );
@@ -345,6 +450,7 @@ class _SettingsState extends State<Settings> {
             Future<void> nextOrSubmit() async {
               if (submitting) return;
               if (!isCommentStep) {
+                if (surveyScroll.hasClients) surveyScroll.jumpTo(0);
                 setDialogState(() {
                   currentStep++;
                 });
@@ -354,7 +460,8 @@ class _SettingsState extends State<Settings> {
               final Map<String, dynamic> feedbackData = {
                 'ratings': {
                   for (int i = 0; i < _feedbackStatements.length; i++)
-                    _feedbackStatements[i]: ratings[i],
+                    _feedbackStatements[i]:
+                        preferNot.contains(i) ? null : ratings[i],
                 },
                 'comment': _feedbackController.text.trim(),
                 'submitted_at': DateTime.now().toIso8601String(),
@@ -385,8 +492,69 @@ class _SettingsState extends State<Settings> {
               );
             }
 
-            if (isIOS) {
-              return CupertinoAlertDialog(
+            if (isIOS && MediaQuery.viewInsetsOf(context).bottom == 0) {
+              return guard(
+                CupertinoTheme(
+                  data: CupertinoThemeData(
+                    brightness: Theme.of(context).brightness,
+                  ),
+                  child: CupertinoAlertDialog(
+                    scrollController: surveyScroll,
+                    title: Center(
+                      child: Text(
+                        'Send Feedback',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    content: Material(
+                      color: Colors.transparent,
+                      child: ratingContent,
+                    ),
+                    actions: [
+                      CupertinoDialogAction(
+                        onPressed: submitting ? null : confirmCancel,
+                        child: Text(
+                          'Cancel',
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                submitting
+                                    ? textTheme.withValues(alpha: 0.38)
+                                    : textTheme,
+                          ),
+                        ),
+                      ),
+                      CupertinoDialogAction(
+                        onPressed:
+                            submitting || !canAdvance ? null : nextOrSubmit,
+                        child: Text(
+                          submitting
+                              ? 'Sending...'
+                              : isCommentStep
+                              ? 'Submit'
+                              : 'Next',
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                canAdvance
+                                    ? AppColors.accentText(context)
+                                    : textTheme.withValues(alpha: 0.38),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return guard(
+              AlertDialog(
+                backgroundColor: AppColors.elevatedSurface(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 title: Center(
                   child: Text(
                     'Send Feedback',
@@ -396,30 +564,30 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ),
-                content: Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Material(
-                    color: Colors.transparent,
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    controller: surveyScroll,
                     child: ratingContent,
                   ),
                 ),
                 actions: [
-                  CupertinoDialogAction(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                    },
+                  TextButton(
+                    style: _noSplashButtonStyle,
+                    onPressed: submitting ? null : confirmCancel,
                     child: Text(
                       'Cancel',
                       style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
+                        color:
+                            submitting
+                                ? textTheme.withValues(alpha: 0.38)
+                                : textTheme,
                       ),
                     ),
                   ),
-                  CupertinoDialogAction(
-                    onPressed:
-                        submitting || (!isCommentStep && selectedRating == 0)
-                            ? null
-                            : nextOrSubmit,
+                  TextButton(
+                    style: _noSplashButtonStyle,
+                    onPressed: submitting || !canAdvance ? null : nextOrSubmit,
                     child: Text(
                       submitting
                           ? 'Sending...'
@@ -435,64 +603,12 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ],
-              );
-            }
-
-            return AlertDialog(
-              backgroundColor: AppColors.elevatedSurface(context),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
               ),
-              title: Center(
-                child: Text(
-                  'Send Feedback',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(child: ratingContent),
-              ),
-              actions: [
-                TextButton(
-                  style: _noSplashButtonStyle,
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
-                  child: Text(
-                    'Cancel',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                ),
-                TextButton(
-                  style: _noSplashButtonStyle,
-                  onPressed:
-                      submitting || (!isCommentStep && selectedRating == 0)
-                          ? null
-                          : nextOrSubmit,
-                  child: Text(
-                    submitting
-                        ? 'Sending...'
-                        : isCommentStep
-                        ? 'Submit'
-                        : 'Next',
-                    style: AppTextStyles.regularText.copyWith(
-                      color:
-                          canAdvance
-                              ? AppColors.accentText(context)
-                              : textTheme.withValues(alpha: 0.38),
-                    ),
-                  ),
-                ),
-              ],
             );
           },
         );
       },
-    );
+    ).whenComplete(surveyScroll.dispose);
   }
 
   Future<void> _showReportDialog() async {

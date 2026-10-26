@@ -17,6 +17,7 @@ import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/activity_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -279,11 +280,14 @@ class _RequestPageState extends State<RequestPage> {
         _loading = false;
         _loadError = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = 'Couldn’t load requests.\nPlease check your connection.';
+        _loadError = friendlyError(
+          e,
+          fallback: "Couldn't load requests. Please try again.",
+        );
       });
     }
   }
@@ -300,12 +304,14 @@ class _RequestPageState extends State<RequestPage> {
         _outgoing = sent;
         _loadingOutgoing = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadingOutgoing = false;
-        _outgoingError =
-            'Couldn’t load sent requests.\nPlease check your connection.';
+        _outgoingError = friendlyError(
+          e,
+          fallback: "Couldn't load sent requests. Please try again.",
+        );
       });
     }
   }

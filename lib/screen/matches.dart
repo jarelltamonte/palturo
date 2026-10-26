@@ -14,6 +14,9 @@ import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/pals_count.dart';
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 enum RoleFilter { all, learner, mentor }
@@ -87,7 +90,10 @@ class _MatchesState extends State<Matches> {
     if (!mounted) return;
     if (ChatStateService.instance.error != null) {
       setState(() {
-        _palsError = ChatStateService.instance.error;
+        _palsError = friendlyError(
+          ChatStateService.instance.error ?? '',
+          fallback: "Couldn't load your pals. Please try again.",
+        );
         _loadingPals = false;
       });
       return;
@@ -374,155 +380,28 @@ class _MatchesState extends State<Matches> {
     );
   }
 
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor.withValues(alpha: 0.6),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool selected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? primaryColor : textColor.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: selected ? Colors.black : textColor,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showFilterSheet() {
-    final bgColor = AppColors.elevatedSurface(context);
-    final textColor = Theme.of(context).colorScheme.secondary;
-    RoleFilter draftRole = _roleFilter;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: bgColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed:
-                              () => setModalState(
-                                () => draftRole = RoleFilter.all,
-                              ),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _sheetSectionLabel('Role', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRole == RoleFilter.all,
-                          () => setModalState(() => draftRole = RoleFilter.all),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Learner',
-                          draftRole == RoleFilter.learner,
-                          () => setModalState(
-                            () => draftRole = RoleFilter.learner,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Mentor',
-                          draftRole == RoleFilter.mentor,
-                          () => setModalState(
-                            () => draftRole = RoleFilter.mentor,
-                          ),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() => _roleFilter = draftRole);
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
+    FilterBottomSheet.show(
+      context,
+      sections: const [
+        FilterSection(
+          key: 'role',
+          title: 'Role',
+          options: [
+            FilterOption('All', 'all'),
+            FilterOption('Learner', 'learner'),
+            FilterOption('Mentor', 'mentor'),
+          ],
+        ),
+      ],
+      selected: {'role': _roleFilter.name},
+      onApply: (result) {
+        setState(() {
+          _roleFilter = RoleFilter.values.firstWhere(
+            (r) => r.name == result['role'],
+            orElse: () => RoleFilter.all,
+          );
+        });
       },
     );
   }
@@ -880,29 +759,37 @@ class _MatchesState extends State<Matches> {
                     ],
                   ),
                 )
-                : Align(
-                  alignment: Alignment.centerLeft,
-                  child: Semantics(
-                    container: true,
-                    button: true,
-                    label: 'Back',
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => Navigator.pop(context),
-                      child: SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 24),
-                          child: Icon(
-                            Icons.arrow_back_ios_new,
-                            color: textTheme,
-                            size: 16,
+                : Row(
+                  children: [
+                    Semantics(
+                      container: true,
+                      button: true,
+                      label: 'Back',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => Navigator.pop(context),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Center(
+                            child: Icon(
+                              Icons.arrow_back_ios_new,
+                              color: textTheme,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Pals',
+                      style: AppTextStyles.headingText.copyWith(
+                        color: textTheme,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
                 ),
         actions: [
           Padding(
@@ -964,14 +851,14 @@ class _MatchesState extends State<Matches> {
       ),
       body:
           _loadingPals
-              ? const Center(child: CircularProgressIndicator())
+              ? const MatchesSkeleton()
               : _palsError != null
               ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Couldn’t load your pals.\nPlease check your connection.',
+                      _palsError!,
                       style: AppTextStyles.regularText.copyWith(
                         color: textTheme,
                       ),

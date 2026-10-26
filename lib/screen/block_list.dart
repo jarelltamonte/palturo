@@ -6,6 +6,8 @@ import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 /// Live blocked list from the `blocks` table (FR-15).
 class BlockListPage extends StatefulWidget {
@@ -41,7 +43,10 @@ class _BlockListPageState extends State<BlockListPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback: "Couldn't load blocked users. Please try again.",
+        );
         _loading = false;
       });
     }
@@ -86,15 +91,15 @@ class _BlockListPageState extends State<BlockListPage> {
         ),
         title: Text(
           'Blocked Users',
-          style: AppTextStyles.regularText.copyWith(
+          style: AppTextStyles.headingText.copyWith(
             color: textTheme,
-            fontSize: 16,
+            fontSize: 20,
           ),
         ),
       ),
       body:
           _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const BlockedListSkeleton()
               : _error != null
               ? _buildErrorState(textTheme)
               : _blocked.isEmpty
@@ -135,7 +140,7 @@ class _BlockListPageState extends State<BlockListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Couldn’t load blocked users.',
+              _error!,
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor.withValues(alpha: 0.7),

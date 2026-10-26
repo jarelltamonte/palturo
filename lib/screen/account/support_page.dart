@@ -14,6 +14,11 @@ class SupportPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Back',
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.arrow_back_ios_new, size: 16, color: textColor),
+        ),
         title: Text(
           'Support',
           style: AppTextStyles.headingText.copyWith(

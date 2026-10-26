@@ -5,6 +5,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/screen/explore_category_page.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/match_api.dart';
@@ -129,7 +130,10 @@ class _ExplorePageState extends State<ExplorePage> {
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback: "Couldn't load categories. Please try again.",
+        );
         _loading = false;
       });
     }
@@ -364,7 +368,7 @@ class _ExplorePageState extends State<ExplorePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Couldn\'t load categories.\nPlease check your connection.',
+            _error ?? "Couldn't load categories. Please try again.",
             style: AppTextStyles.regularText.copyWith(color: textTheme),
             textAlign: TextAlign.center,
           ),

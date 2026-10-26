@@ -18,6 +18,7 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/utils/chat_unread.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
@@ -426,7 +427,10 @@ class _ChatsPageState extends State<ChatsPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Couldn’t load your chats.\nPlease check your connection.',
+                friendlyError(
+                  _chatsError ?? '',
+                  fallback: "Couldn't load your chats. Please try again.",
+                ),
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
                 textAlign: TextAlign.center,
               ),

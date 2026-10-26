@@ -13,6 +13,8 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/chat_pending_message.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 class ChatRoom extends StatefulWidget {
   final String? connectionId;
@@ -113,15 +115,17 @@ class _ChatRoomState extends State<ChatRoom> {
         _loadingMessages = false;
       });
       _scrollToBottom();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadingMessages = false;
         // Realtime may already have delivered the thread; do not cover it
         // with an error from a slower REST call.
         if (_messages.isEmpty) {
-          _loadError =
-              'Couldn’t load this conversation.\nPlease check your connection.';
+          _loadError = friendlyError(
+            e,
+            fallback: "Couldn't load this conversation. Please try again.",
+          );
         }
       });
     }
@@ -570,7 +574,7 @@ class _ChatRoomState extends State<ChatRoom> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+              icon: const Icon(Icons.arrow_back_ios_new, size: 16),
             ),
             if (showProfileInAppBar) ...[
               const SizedBox(width: 4),
@@ -740,7 +744,7 @@ class _ChatRoomState extends State<ChatRoom> {
           Expanded(
             child:
                 _loadingMessages
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const ChatRoomMessageSkeleton()
                     : _loadError != null && _messages.isEmpty
                     ? _buildLoadError(textTheme)
                     : !hasMessages && !showProfileInAppBar

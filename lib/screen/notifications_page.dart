@@ -9,6 +9,7 @@ import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -67,11 +68,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _incomingLoaded = incomingLoaded;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Couldn’t load activity.\nPlease check your connection.';
+        _error = friendlyError(
+          e,
+          fallback: "Couldn't load activity. Please try again.",
+        );
       });
     }
   }
@@ -229,7 +233,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
       body:
           _loading
-              ? const ListRowsSkeleton(count: 6, rowHeight: 92)
+              ? const ActivitySkeleton()
               : _error != null
               ? Center(
                 child: Padding(

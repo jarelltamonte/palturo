@@ -20,6 +20,7 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -106,7 +107,10 @@ class _HomePageState extends State<HomePage> {
       if (!mounted || generation != _deckGeneration) return;
 
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback: "Couldn't load recommendations. Please try again.",
+        );
         _loading = false;
       });
     }
@@ -921,9 +925,7 @@ class _HomePageState extends State<HomePage> {
     final raw =
         (_error ?? '').replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
     final message =
-        raw.contains('Too many deck requests')
-            ? raw
-            : 'Couldn’t load recommendations.\nPlease check your connection.';
+        raw.isEmpty ? "Couldn't load recommendations. Please try again." : raw;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),

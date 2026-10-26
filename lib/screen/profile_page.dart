@@ -42,7 +42,7 @@ class _ProfilePageState extends State<ProfilePage> {
   ProfileData? _profile;
   bool _isLoading = true;
   static const String _loadError =
-      'Couldn’t load your profile.\nPlease check your connection.';
+      "Couldn't load your profile. Please try again.";
   int? _friendCount;
   bool _openingEditor = false;
   bool _hasSkipped = false;

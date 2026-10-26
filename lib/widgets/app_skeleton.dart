@@ -81,8 +81,14 @@ class ExploreGridSkeleton extends StatelessWidget {
 class ListRowsSkeleton extends StatelessWidget {
   final int count;
   final double rowHeight;
+  final double avatarSize;
 
-  const ListRowsSkeleton({super.key, this.count = 6, this.rowHeight = 72});
+  const ListRowsSkeleton({
+    super.key,
+    this.count = 6,
+    this.rowHeight = 72,
+    this.avatarSize = 56,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +103,11 @@ class ListRowsSkeleton extends StatelessWidget {
               height: rowHeight,
               child: Row(
                 children: [
-                  const SkeletonBox(width: 56, height: 56, radius: 28),
+                  SkeletonBox(
+                    width: avatarSize,
+                    height: avatarSize,
+                    radius: avatarSize / 2,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -221,6 +231,111 @@ class ProfileSkeleton extends StatelessWidget {
           const SizedBox(height: 24),
           const SkeletonBox(height: 220, radius: 24),
         ],
+      ),
+    );
+  }
+}
+
+class BlockedListSkeleton extends StatelessWidget {
+  const BlockedListSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ListRowsSkeleton(count: 5, rowHeight: 64, avatarSize: 48);
+  }
+}
+
+class ActivitySkeleton extends StatelessWidget {
+  const ActivitySkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ListRowsSkeleton(count: 6, rowHeight: 84, avatarSize: 38);
+  }
+}
+
+class MatchesSkeleton extends StatelessWidget {
+  const MatchesSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Loading pals',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        children: [
+          const SkeletonBox(width: 140, height: 22),
+          const SizedBox(height: 8),
+          const SkeletonBox(width: 60, height: 12),
+          const SizedBox(height: 14),
+          for (var i = 0; i < 7; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: const [
+                  SkeletonBox(width: 48, height: 48, radius: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonBox(width: 140, height: 12),
+                        SizedBox(height: 8),
+                        SkeletonBox(width: 100, height: 10),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class ChatRoomMessageSkeleton extends StatelessWidget {
+  const ChatRoomMessageSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Loading messages',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SkeletonBox(width: 180, height: 44, radius: 16),
+                    ),
+                    SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SkeletonBox(width: 220, height: 44, radius: 16),
+                    ),
+                    SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SkeletonBox(width: 150, height: 44, radius: 16),
+                    ),
+                    SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SkeletonBox(width: 190, height: 44, radius: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

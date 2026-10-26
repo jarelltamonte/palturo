@@ -10,6 +10,8 @@ import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 class ExploreExpand extends StatefulWidget {
   final String nodePath;
@@ -107,7 +109,12 @@ class _ExploreExpandState extends State<ExploreExpand>
       if (!mounted) return;
 
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback:
+              _error ??
+              "Couldn't load users for ${widget.nodeLabel}. Please try again.",
+        );
         _loading = false;
       });
     }
@@ -531,7 +538,7 @@ class _ExploreExpandState extends State<ExploreExpand>
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.headingText.copyWith(
                   color: textTheme,
-                  fontSize: 18,
+                  fontSize: 20,
                 ),
               ),
             ),
@@ -578,7 +585,7 @@ class _ExploreExpandState extends State<ExploreExpand>
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
                 child:
                     _loading
-                        ? const Center(child: CircularProgressIndicator())
+                        ? const PersonCardSkeleton()
                         : _error != null
                         ? _buildErrorState(textTheme)
                         : hasMore
@@ -598,7 +605,8 @@ class _ExploreExpandState extends State<ExploreExpand>
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Couldn’t load users for ${widget.nodeLabel}.\nPlease check your connection.',
+            _error ??
+                "Couldn't load users for ${widget.nodeLabel}. Please try again.",
             style: AppTextStyles.regularText.copyWith(color: textTheme2),
             textAlign: TextAlign.center,
           ),

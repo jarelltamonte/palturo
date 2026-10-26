@@ -1,7 +1,7 @@
 # PalTuro — Design & Feature Audit v2
 ## Action, recommendation, and design specification
 
-**Branch:** `ui-features @ 3dbd18a`  
+**Branch:** `ui-features @ 41f5e98`  
 **Date:** 25 October 2026  
 **Baseline:** 15/15 implementation cases PASS · 37 tests · release web build verified  
 **Companion PDF:** `PalTuro-Design-Feature-Audit-v2-2026-10-25.pdf`  
@@ -58,7 +58,7 @@ Each case contains:
 
 ### Implementation progress
 
-**13 / 14 complete. Next: Case 14.**
+**14 / 14 complete. All approved cases implemented.**
 
 | Case | State | Functionality | Quality | Regression | Commit |
 |---|---|---|---|---|---|
@@ -96,7 +96,7 @@ Each case contains:
 | 11 | Copy and routing clarity | **DONE** | P2 |
 | 12 | System consistency | **DONE** | P2 |
 | 13 | Feedback survey navigation | **DONE** | P2 |
-| 14 | Auth and accessibility polish | PARTIAL | P2 |
+| 14 | Auth and accessibility polish | **DONE** | P2 |
 
 ---
 
@@ -1414,8 +1414,10 @@ A long survey feels irreversible. Users may abandon it because they cannot corre
 
 ## Case 14 — Auth and accessibility polish
 
-**Status:** PARTIAL  
+**Status:** DONE
 **Priority:** P2  
+**Audits:** Functionality PASS | Quality PASS | Regression PASS  
+**Commit:** `41f5e98`  
 **PDF reference:** pages 17–18
 
 ### Problem

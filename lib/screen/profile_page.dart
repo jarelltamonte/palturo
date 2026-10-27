@@ -776,7 +776,7 @@ class _RoleChip extends StatelessWidget {
               svgAsset!,
               width: 16,
               height: 16,
-              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+              colorFilter: ColorFilter.mode(AppColors.black, BlendMode.srcIn),
             )
           else
             Icon(icon, size: 16, color: iconColor),
@@ -784,7 +784,7 @@ class _RoleChip extends StatelessWidget {
           Text(
             label,
             style: AppTextStyles.boldText.copyWith(
-              color: Theme.of(context).colorScheme.secondary,
+              color: AppColors.black,
               fontSize: 13,
             ),
           ),

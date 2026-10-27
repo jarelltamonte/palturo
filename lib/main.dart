@@ -67,7 +67,7 @@ void main() async {
   runApp(
     MyApp(
       isOnboardingDone: isOnboardingDone ?? false,
-      initialDarkMode: darkMode ?? false,
+      initialDarkMode: darkMode,
     ),
   );
 }
@@ -127,14 +127,10 @@ mixin MyAppThemeController on State<MyApp> {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({
-    super.key,
-    required this.isOnboardingDone,
-    this.initialDarkMode = false,
-  });
+  const MyApp({super.key, required this.isOnboardingDone, this.initialDarkMode});
 
   final bool isOnboardingDone;
-  final bool initialDarkMode;
+  final bool? initialDarkMode;
 
   static MyAppThemeController of(BuildContext context) {
     return context.findAncestorStateOfType<_MyAppState>()!;
@@ -145,7 +141,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with MyAppThemeController {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void setThemeMode(bool isDark) {
@@ -195,7 +191,11 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   @override
   void initState() {
     super.initState();
-    _themeMode = widget.initialDarkMode ? ThemeMode.dark : ThemeMode.light;
+    _themeMode = switch (widget.initialDarkMode) {
+      true => ThemeMode.dark,
+      false => ThemeMode.light,
+      null => ThemeMode.system,
+    };
 
     // Keep the native splash only until Flutter paints its first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {

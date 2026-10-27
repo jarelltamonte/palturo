@@ -12,6 +12,7 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/screen/utils/pals_count.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
@@ -388,12 +389,40 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: Row(
                                     children: [
                                       Expanded(
-                                        child: Text(
-                                          _friendCount == null
-                                              ? 'Pals'
-                                              : palCountLabel(_friendCount!),
-                                          style: AppTextStyles.boldText
-                                              .copyWith(color: textTheme),
+                                        child: Semantics(
+                                          label:
+                                              _friendCount == null
+                                                  ? 'Pals'
+                                                  : palCountLabel(
+                                                    _friendCount!,
+                                                  ),
+                                          excludeSemantics: true,
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                (_friendCount ?? 0) > 1
+                                                    ? 'Pals'
+                                                    : 'Pal',
+                                                style: AppTextStyles.boldText
+                                                    .copyWith(color: textTheme),
+                                              ),
+                                              if (_friendCount != null) ...[
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  '$_friendCount',
+                                                  style: AppTextStyles
+                                                      .regularText
+                                                      .copyWith(
+                                                        color:
+                                                            AppColors.mutedText(
+                                                              context,
+                                                            ),
+                                                        fontSize: 14,
+                                                      ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
                                         ),
                                       ),
                                       Icon(
@@ -701,7 +730,7 @@ class _RoleSummary extends StatelessWidget {
     if (role == OnboardingRole.learn || role == OnboardingRole.both) {
       chips.add(
         _RoleChip(
-          icon: Icons.menu_book_outlined,
+          svgAsset: 'assets/icons/rlearner.svg',
           label: role == OnboardingRole.both ? 'Learner' : 'I want to learn',
         ),
       );
@@ -709,7 +738,7 @@ class _RoleSummary extends StatelessWidget {
     if (role == OnboardingRole.teach || role == OnboardingRole.both) {
       chips.add(
         _RoleChip(
-          icon: Icons.workspace_premium_outlined,
+          svgAsset: 'assets/icons/rmentor.svg',
           label: role == OnboardingRole.both ? 'Mentor' : 'I want to teach',
         ),
       );
@@ -722,31 +751,41 @@ class _RoleSummary extends StatelessWidget {
 }
 
 class _RoleChip extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String label;
 
-  const _RoleChip({required this.icon, required this.label});
+  const _RoleChip({this.icon, this.svgAsset, required this.label})
+    : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = AppColors.accentText(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.16),
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.accentText(context)),
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 16,
+              height: 16,
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+            )
+          else
+            Icon(icon, size: 16, color: iconColor),
           const SizedBox(width: 6),
           Text(
             label,
-            style: AppTextStyles.regularText.copyWith(
+            style: AppTextStyles.boldText.copyWith(
               color: Theme.of(context).colorScheme.secondary,
               fontSize: 13,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],

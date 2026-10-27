@@ -39,11 +39,11 @@ flutter_native_splash:
 
   color: "#FFFFFF"
   image: "assets/images/slogo_black.png"
-  branding: "assets/images/hlogo_black.png"
+  branding: "assets/images/sbrand.png"
 
   color_dark: "#262626"
   image_dark: "assets/images/slogo_white.png"
-  branding_dark: "assets/images/hlogo_white.png"
+  branding_dark: "assets/images/sbrand.png"
 
   fullscreen: false
   branding_mode: bottom
@@ -53,8 +53,8 @@ flutter_native_splash:
       color_dark: "#262626"
       image: "assets/images/slogo_black.png"
       image_dark: "assets/images/slogo_white.png"
-      branding: "assets/images/hlogo_black.png"
-      branding_dark: "assets/images/hlogo_white.png"
+      branding: "assets/images/sbrand.png"
+      branding_dark: "assets/images/sbrand.png"
 
 flutter_launcher_icons:
   android: "launcher_icon"

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final _confirmPasswordFocusNode = FocusNode();
 
   final AuthService _authService = AuthService();
+
+  late final TapGestureRecognizer _termsTap =
+      TapGestureRecognizer()
+        ..onTap = () => LegalDialogs.showTermsOfService(context);
+  late final TapGestureRecognizer _dataTap =
+      TapGestureRecognizer()
+        ..onTap = () => LegalDialogs.showDataPolicy(context);
+  late final TapGestureRecognizer _cookiesTap =
+      TapGestureRecognizer()
+        ..onTap = () => LegalDialogs.showCookiesPolicy(context);
 
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
@@ -82,6 +93,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    _termsTap.dispose();
+    _dataTap.dispose();
+    _cookiesTap.dispose();
+
     _firstNameFocusNode.dispose();
     _lastNameFocusNode.dispose();
     _emailFocusNode.dispose();
@@ -396,6 +411,12 @@ class _RegisterPageState extends State<RegisterPage> {
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
         !_passwordResult.isValid;
 
+    final legalLinkStyle = AppTextStyles.boldText.copyWith(
+      color: textTheme,
+      fontSize: 12,
+      height: 1.6,
+    );
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -663,71 +684,41 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                       const SizedBox(height: 10),
-                      Text(
-                        'By signing up, you agree to our',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: textTheme.withAlpha((0.7 * 255).round()),
-                          fontSize: 12,
-                          height: 1.4,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text.rich(
+                          textAlign: TextAlign.center,
+                          TextSpan(
+                            style: TextStyle(
+                              color: textTheme.withAlpha((0.7 * 255).round()),
+                              fontSize: 12,
+                              height: 1.6,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'By signing up, you agree to our\n',
+                              ),
+                              TextSpan(
+                                text: 'Terms of Service',
+                                style: legalLinkStyle,
+                                recognizer: _termsTap,
+                              ),
+                              const TextSpan(text: ', '),
+                              TextSpan(
+                                text: 'Data Policy',
+                                style: legalLinkStyle,
+                                recognizer: _dataTap,
+                              ),
+                              const TextSpan(text: ', and '),
+                              TextSpan(
+                                text: 'Cookies Policy',
+                                style: legalLinkStyle,
+                                recognizer: _cookiesTap,
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
+                          ),
                         ),
-                      ),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 2,
-                        children: [
-                          TextButton(
-                            onPressed:
-                                () => LegalDialogs.showTermsOfService(context),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                            ),
-                            child: Text(
-                              'Terms of Service',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed:
-                                () => LegalDialogs.showDataPolicy(context),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                            ),
-                            child: Text(
-                              'Data Policy',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed:
-                                () => LegalDialogs.showCookiesPolicy(context),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                            ),
-                            child: Text(
-                              'Cookies Policy',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -739,7 +730,7 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

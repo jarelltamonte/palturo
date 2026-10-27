@@ -324,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
             16.0,
             0.0,
             16.0,
-            MediaQuery.sizeOf(context).height < 760 ? 16.0 : 32.0,
+            16.0,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -358,12 +358,9 @@ class _LoginPageState extends State<LoginPage> {
                   child: const Text('Create new account'),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               Center(
-                child: Image.asset(
-                  isDarkMode
-                      ? 'assets/images/hlogo_white.png'
-                      : 'assets/images/hlogo_black.png',
+                child: Image.asset('assets/images/brand.png',
                   width: 132,
                 ),
               ),

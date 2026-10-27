@@ -685,6 +685,13 @@ class _MatchesState extends State<Matches> {
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     final filtered = _filteredPals();
     final grouped = _groupedPals(filtered);
+    final isFiltered =
+        (_hasActiveFilter || _query.trim().isNotEmpty) &&
+        filtered.length != _pals.length;
+    final countText =
+        isFiltered
+            ? '${filtered.length} of ${_pals.length}'
+            : '${filtered.length}';
 
     return Scaffold(
       backgroundColor: bgTheme,
@@ -694,69 +701,73 @@ class _MatchesState extends State<Matches> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: 0,
         title:
             _isSearching
-                ? Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: textTheme.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        CupertinoIcons.search,
-                        size: 18,
-                        color: textTheme.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          focusNode: _searchFocus,
-                          onChanged: (value) => setState(() => _query = value),
-                          textInputAction: TextInputAction.search,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: textTheme,
-                          ),
-                          cursorColor: AppColors.accentText(context),
-                          decoration: InputDecoration(
-                            hintText: 'Search pals',
-                            hintStyle: AppTextStyles.regularText.copyWith(
-                              color: textTheme.withValues(alpha: 0.4),
+                ? Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: textTheme.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.search,
+                          size: 18,
+                          color: textTheme.withValues(alpha: 0.6),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            onChanged:
+                                (value) => setState(() => _query = value),
+                            textInputAction: TextInputAction.search,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
                             ),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
+                            cursorColor: AppColors.accentText(context),
+                            decoration: InputDecoration(
+                              hintText: 'Search pals',
+                              hintStyle: AppTextStyles.regularText.copyWith(
+                                color: textTheme.withValues(alpha: 0.4),
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                         ),
-                      ),
-                      if (_query.isNotEmpty)
-                        Semantics(
-                          container: true,
-                          button: true,
-                          label: 'Clear search',
-                          child: GestureDetector(
-                            onTap: () {
-                              _searchController.clear();
-                              setState(() => _query = '');
-                            },
-                            child: SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: Center(
-                                child: Icon(
-                                  Icons.cancel,
-                                  size: 18,
-                                  color: textTheme.withValues(alpha: 0.5),
+                        if (_query.isNotEmpty)
+                          Semantics(
+                            container: true,
+                            button: true,
+                            label: 'Clear search',
+                            child: GestureDetector(
+                              onTap: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              child: SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.cancel,
+                                    size: 18,
+                                    color: textTheme.withValues(alpha: 0.5),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 )
                 : Row(
@@ -781,7 +792,6 @@ class _MatchesState extends State<Matches> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
                     Text(
                       'Pals',
                       style: AppTextStyles.headingText.copyWith(
@@ -893,30 +903,38 @@ class _MatchesState extends State<Matches> {
                           children: [
                             Padding(
                               padding: const EdgeInsets.only(left: 16.0),
-                              child: Text(
-                                'Your Pals',
-                                style: AppTextStyles.headingText.copyWith(
-                                  color: textTheme,
+                              child: Semantics(
+                                label:
+                                    isFiltered
+                                        ? '${filtered.length} of ${palCountLabel(_pals.length)}'
+                                        : palCountLabel(filtered.length),
+                                excludeSemantics: true,
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      _pals.length > 1
+                                          ? 'Your Pals'
+                                          : 'Your Pal',
+                                      style: AppTextStyles.headingText.copyWith(
+                                        color: textTheme,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      countText,
+                                      style: AppTextStyles.regularText.copyWith(
+                                        color: AppColors.mutedText(context),
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 16.0,
-                                top: 4,
-                              ),
-                              child: Text(
-                                (_hasActiveFilter ||
-                                            _query.trim().isNotEmpty) &&
-                                        filtered.length != _pals.length
-                                    ? '${filtered.length} of ${palCountLabel(_pals.length)}'
-                                    : palCountLabel(filtered.length),
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             if (filtered.isEmpty) _buildEmptyState(textTheme),
                             for (final entry in grouped.entries) ...[
                               Padding(

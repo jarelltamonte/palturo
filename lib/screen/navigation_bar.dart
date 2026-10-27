@@ -29,18 +29,18 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   final ValueNotifier<int> _requestsRefresh = ValueNotifier<int>(0);
 
   final List<IconData> _navigationIcons = [
-    CupertinoIcons.person_2,
+    CupertinoIcons.arrowtriangle_left,
     CupertinoIcons.compass,
     CupertinoIcons.chat_bubble,
-    CupertinoIcons.tray,
+    CupertinoIcons.heart,
     CupertinoIcons.person,
   ];
 
   final List<IconData> _selectedIcons = [
-    CupertinoIcons.person_2_fill,
+    CupertinoIcons.arrowtriangle_left_fill,
     CupertinoIcons.compass_fill,
     CupertinoIcons.chat_bubble_fill,
-    CupertinoIcons.tray_fill,
+    CupertinoIcons.heart_fill,
     CupertinoIcons.person_fill,
   ];
 
@@ -196,7 +196,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navigationIcons.length, (index) {
               final isSelected = _selectedIndex == index;
-              final activeColor = AppColors.accentText(context);
+              final activeColor = AppColors.primary;
               final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
               final isRequests = index == 3;
@@ -385,15 +385,15 @@ class _NavItemState extends State<_NavItem>
                   ),
                   if (showBadge)
                     Positioned(
-                      top: -8,
-                      right: -12,
+                      top: -6,
+                      right: -10,
                       child: Container(
-                        constraints: const BoxConstraints(minWidth: 18),
-                        height: 18,
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        constraints: const BoxConstraints(minWidth: 16),
+                        height: 16,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.error,
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         alignment: Alignment.center,
                         child: Text(
@@ -422,19 +422,6 @@ class _NavItemState extends State<_NavItem>
                   fontSize: 12,
                   fontWeight:
                       widget.selected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-              const SizedBox(height: 3),
-              AnimatedContainer(
-                duration:
-                    MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : AppMotion.micro,
-                width: widget.selected ? 5 : 0,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: AppColors.accentText(context),
-                  shape: BoxShape.circle,
                 ),
               ),
             ],

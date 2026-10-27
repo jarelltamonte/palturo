@@ -915,11 +915,14 @@ class _SettingsState extends State<Settings> {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
-        leadingWidth: 56,
+        titleSpacing: 0,
+        leadingWidth: 46,
         leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
+          padding: const EdgeInsets.only(left: 2),
           child: IconButton(
             tooltip: 'Back',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () => Navigator.pop(context),
             icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
           ),
@@ -939,6 +942,7 @@ class _SettingsState extends State<Settings> {
           children: [
             _sectionLabel('Preferences'),
             SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
               title: Text(
                 'Notifications',
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
@@ -964,6 +968,7 @@ class _SettingsState extends State<Settings> {
               },
             ),
             SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
               title: Text(
                 'Sound',
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
@@ -985,6 +990,7 @@ class _SettingsState extends State<Settings> {
               },
             ),
             SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
               title: Text(
                 'Vibration',
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
@@ -1010,6 +1016,7 @@ class _SettingsState extends State<Settings> {
               },
             ),
             SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
               title: Text(
                 'Dark Mode',
                 style: AppTextStyles.regularText.copyWith(color: textTheme),

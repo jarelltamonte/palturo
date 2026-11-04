@@ -25,6 +25,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   bool _loading = false;
   bool _initialized = false;
   bool _resubscribing = false;
+  bool _channelSubscribed = false;
   int _resubscribeAttempts = 0;
   Timer? _resubscribeTimer;
   String? _error;
@@ -63,7 +64,9 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
         unawaited(refresh(showSpinner: _items.isEmpty));
       } else if (data.event == AuthChangeEvent.tokenRefreshed) {
         // The realtime client pushes the refreshed token to joined channels.
-        // Only refresh data here; a channel error schedules a backoff retry.
+        // If the channel never joined (cold-start refresh failure or exhausted
+        // backoff), this is the recovery point.
+        if (!_channelSubscribed) unawaited(_resubscribe());
         unawaited(refresh(showSpinner: _items.isEmpty));
       }
     });
@@ -204,7 +207,8 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _ensureRealtime() async {
     final session = Supabase.instance.client.auth.currentSession;
     if (session == null) return;
-    if (_channel == null || session.isExpired) {
+    if (_channel == null || !_channelSubscribed || session.isExpired) {
+      _resubscribeAttempts = 0;
       await _resubscribe();
     }
   }
@@ -213,6 +217,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     _resubscribeTimer?.cancel();
     _resubscribeTimer = null;
     _resubscribeAttempts = 0;
+    _channelSubscribed = false;
     final channel = _channel;
     _channel = null;
     if (channel != null) {
@@ -233,6 +238,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     if (user == null) {
       return;
     }
+    _channelSubscribed = false;
 
     _channel = client
         .channel('notifications:${user.id}')
@@ -249,7 +255,11 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
         )
         .subscribe((status, error) {
           if (status == RealtimeSubscribeStatus.subscribed) {
+            _channelSubscribed = true;
             _resubscribeAttempts = 0;
+          } else if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.closed) {
+            _channelSubscribed = false;
           }
           if (status == RealtimeSubscribeStatus.channelError &&
               (error?.toString().toLowerCase().contains('jwt') ?? false)) {
@@ -315,6 +325,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     _authSubscription?.cancel();
     _resubscribeTimer?.cancel();
+    _channelSubscribed = false;
     final channel = _channel;
     if (channel != null) {
       unawaited(Supabase.instance.client.removeChannel(channel));

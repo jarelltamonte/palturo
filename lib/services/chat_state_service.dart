@@ -14,6 +14,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
   bool _initialized = false;
   bool _resubscribing = false;
+  bool _realtimeSubscribed = false;
   List<ConversationLite> _conversations = [];
   bool _loading = false;
   bool _hasLoaded = false;
@@ -68,7 +69,9 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
         loadConversations();
         unawaited(_resubscribeRealtime());
       } else if (event == AuthChangeEvent.tokenRefreshed) {
-        // Realtime pushes the refreshed token to joined channels.
+        // Realtime pushes the refreshed token to joined channels. If the
+        // channel never joined, recover here.
+        if (!_realtimeSubscribed) unawaited(_resubscribeRealtime());
         loadConversations(showSpinner: false);
       } else if (event == AuthChangeEvent.signedOut) {
         reset();
@@ -159,6 +162,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     final currentUser = client.auth.currentUser;
     if (currentUser == null) return;
 
+    _realtimeSubscribed = false;
     _realtimeChannel = client
         .channel('chat_state_global_messages')
         .onPostgresChanges(
@@ -169,7 +173,11 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
         )
         .subscribe((status, error) {
           if (status == RealtimeSubscribeStatus.subscribed) {
+            _realtimeSubscribed = true;
             _resubscribeAttempts = 0;
+          } else if (status == RealtimeSubscribeStatus.channelError ||
+              status == RealtimeSubscribeStatus.closed) {
+            _realtimeSubscribed = false;
           }
           if (status == RealtimeSubscribeStatus.channelError &&
               (error?.toString().toLowerCase().contains('jwt') ?? false)) {
@@ -321,7 +329,10 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
         MatchApi.markMessagesRead(_activeConnectionId!);
       }
       final session = Supabase.instance.client.auth.currentSession;
-      if (_realtimeChannel == null || (session?.isExpired ?? false)) {
+      if (_realtimeChannel == null ||
+          !_realtimeSubscribed ||
+          (session?.isExpired ?? false)) {
+        _resubscribeAttempts = 0;
         unawaited(_resubscribeRealtime());
       }
       loadConversations(showSpinner: false);
@@ -348,6 +359,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _resubscribeTimer?.cancel();
     _resubscribeTimer = null;
     _resubscribeAttempts = 0;
+    _realtimeSubscribed = false;
     if (_realtimeChannel != null) {
       Supabase.instance.client.removeChannel(_realtimeChannel!);
       _realtimeChannel = null;
@@ -378,6 +390,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _authSubscription?.cancel();
     _midnightTimer?.cancel();
     _resubscribeTimer?.cancel();
+    _realtimeSubscribed = false;
     _messageEvents.close();
     if (_realtimeChannel != null) {
       Supabase.instance.client.removeChannel(_realtimeChannel!);

@@ -31,6 +31,31 @@ void main() {
     expect(find.textContaining('You are offline'), findsNothing);
   });
 
+  testWidgets('offline strip announces its message once', (tester) async {
+    final handle = tester.ensureSemantics();
+    ConnectivityService.instance.debugSetOnline(false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: const OfflineBannerHost(child: Scaffold(body: Text('content'))),
+      ),
+    );
+    await tester.pump();
+
+    final node = tester.getSemantics(
+      find.bySemanticsLabel(
+        'You are offline. Changes will sync when you reconnect.',
+      ),
+    );
+    expect(
+      node.label,
+      'You are offline. Changes will sync when you reconnect.',
+    );
+
+    handle.dispose();
+  });
+
   testWidgets('offline strip does not cover the app bar', (tester) async {
     ConnectivityService.instance.debugSetOnline(false);
     var tapped = 0;

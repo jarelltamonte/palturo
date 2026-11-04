@@ -109,7 +109,8 @@ class _ChatRoomState extends State<ChatRoom> {
     _messageStream?.cancel();
     _draftTimer?.cancel();
     final connectionId = widget.connectionId;
-    if (connectionId != null) {
+    if (connectionId != null &&
+        Supabase.instance.client.auth.currentUser != null) {
       unawaited(
         DraftService.instance.saveDraft(connectionId, _messageController.text),
       );

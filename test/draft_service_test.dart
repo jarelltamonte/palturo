@@ -40,12 +40,25 @@ void main() {
     expect(drafts.hasDraft('c1'), isFalse);
   });
 
-  test('drafts persist across a fresh load', () async {
+  test('drafts reload from storage', () async {
     await DraftService.instance.saveDraft('c1', 'Saved draft');
 
-    // Re-initialization is idempotent in-process; read the persisted JSON and
-    // confirm the value is stored under the shared key.
+    DraftService.instance.debugResetForTest();
+    expect(DraftService.instance.hasDraft('c1'), isFalse);
+
+    await DraftService.instance.init();
+    expect(DraftService.instance.draftFor('c1'), 'Saved draft');
+  });
+
+  test('clearAll removes every draft and the stored blob', () async {
+    await DraftService.instance.saveDraft('c1', 'one');
+    await DraftService.instance.saveDraft('c2', 'two');
+
+    await DraftService.instance.clearAll();
+
+    expect(DraftService.instance.hasDraft('c1'), isFalse);
+    expect(DraftService.instance.hasDraft('c2'), isFalse);
     final raw = await PreferencesService.instance.getString('chat_drafts');
-    expect(raw, contains('Saved draft'));
+    expect(raw, '{}');
   });
 }

@@ -333,10 +333,11 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     _loadOutgoing();
   }
 
-  Future<void> _loadRequests() async {
+  Future<void> _loadRequests({bool notifyFailure = false}) async {
+    final hadData = _requests.isNotEmpty;
     setState(() {
-      _loading = true;
-      _loadError = null;
+      _loading = !hadData;
+      if (!hadData) _loadError = null;
     });
     try {
       final incoming = await MatchApi.getIncomingRequests();
@@ -349,20 +350,25 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       });
     } catch (e) {
       if (!mounted) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load requests. Please try again.",
+      );
       setState(() {
         _loading = false;
-        _loadError = friendlyError(
-          e,
-          fallback: "Couldn't load requests. Please try again.",
-        );
+        if (!hadData) _loadError = message;
       });
+      if (notifyFailure && hadData) showAppError(context, message);
     }
   }
 
-  Future<void> _loadOutgoing() async {
+  Future<void> _refreshRequests() => _loadRequests(notifyFailure: true);
+
+  Future<void> _loadOutgoing({bool notifyFailure = false}) async {
+    final hadData = _outgoing.isNotEmpty;
     setState(() {
-      _loadingOutgoing = true;
-      _outgoingError = null;
+      _loadingOutgoing = !hadData;
+      if (!hadData) _outgoingError = null;
     });
     try {
       final sent = await MatchApi.getOutgoingRequests();
@@ -370,18 +376,23 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       setState(() {
         _outgoing = sent;
         _loadingOutgoing = false;
+        _outgoingError = null;
       });
     } catch (e) {
       if (!mounted) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load sent requests. Please try again.",
+      );
       setState(() {
         _loadingOutgoing = false;
-        _outgoingError = friendlyError(
-          e,
-          fallback: "Couldn't load sent requests. Please try again.",
-        );
+        if (!hadData) _outgoingError = message;
       });
+      if (notifyFailure && hadData) showAppError(context, message);
     }
   }
+
+  Future<void> _refreshOutgoing() => _loadOutgoing(notifyFailure: true);
 
   Future<void> _cancelOutgoing(OutgoingRequestLite request) async {
     if (_cancelling) return;
@@ -718,7 +729,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     if (_loadError != null) return _buildLoadError(textTheme);
     if (requests.isEmpty) return _buildEmptyState(textTheme);
     return RefreshIndicator(
-      onRefresh: _loadRequests,
+      onRefresh: _refreshRequests,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
@@ -875,7 +886,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadOutgoing,
+      onRefresh: _refreshOutgoing,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(

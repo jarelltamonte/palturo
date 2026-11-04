@@ -33,6 +33,7 @@ class OfflineBannerHost extends StatelessWidget {
             Semantics(
               liveRegion: true,
               container: true,
+              excludeSemantics: true,
               label: 'You are offline. Changes will sync when you reconnect.',
               child: ColoredBox(
                 color: Theme.of(context).colorScheme.surface,

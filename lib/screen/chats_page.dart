@@ -20,6 +20,7 @@ import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/utils/chat_unread.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
@@ -120,9 +121,16 @@ class _ChatsPageState extends State<ChatsPage> {
     }
   }
 
-  Future<void> _loadChats() async {
-    await ChatStateService.instance.loadConversations();
+  Future<void> _loadChats({bool notifyFailure = false}) async {
+    final hadData = ChatStateService.instance.conversations.isNotEmpty;
+    final ok = await ChatStateService.instance.loadConversations(
+      showSpinner: !hadData,
+    );
+    if (!mounted || !notifyFailure || ok || !hadData) return;
+    showAppError(context, "Couldn't refresh chats. Please try again.");
   }
+
+  Future<void> _refreshChats() => _loadChats(notifyFailure: true);
 
   @override
   void dispose() {
@@ -566,7 +574,7 @@ class _ChatsPageState extends State<ChatsPage> {
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: _loadChats,
+          onRefresh: _refreshChats,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,

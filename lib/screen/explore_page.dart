@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/screen/explore_category_page.dart';
@@ -111,12 +112,15 @@ class _ExplorePageState extends State<ExplorePage> {
     }).toList();
   }
 
-  Future<void> _loadTaxonomy() async {
+  Future<void> _loadTaxonomy({bool notifyFailure = false}) async {
     final requestId = ++_requestId;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    final hadData = _roots.isNotEmpty;
+    if (!hadData) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final nodes = await MatchApi.taxonomyVisible();
       final roots =
@@ -129,15 +133,19 @@ class _ExplorePageState extends State<ExplorePage> {
       });
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load categories. Please try again.",
+      );
       setState(() {
-        _error = friendlyError(
-          e,
-          fallback: "Couldn't load categories. Please try again.",
-        );
         _loading = false;
+        if (!hadData) _error = message;
       });
+      if (notifyFailure && hadData) showAppError(context, message);
     }
   }
+
+  Future<void> _refreshTaxonomy() => _loadTaxonomy(notifyFailure: true);
 
   void _onRoleChanged(ExploreRole role) {
     if (role == _role) return;
@@ -294,7 +302,7 @@ class _ExplorePageState extends State<ExplorePage> {
         final itemHeight =
             (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
         return RefreshIndicator(
-          onRefresh: _loadTaxonomy,
+          onRefresh: _refreshTaxonomy,
           child: GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
@@ -314,7 +322,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
   Widget _buildGridAuto(Color textTheme) {
     return RefreshIndicator(
-      onRefresh: _loadTaxonomy,
+      onRefresh: _refreshTaxonomy,
       child: GridView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(

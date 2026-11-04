@@ -127,7 +127,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Loads conversations from backend and sorts them with most recent on top.
-  Future<void> loadConversations({bool showSpinner = true}) async {
+  Future<bool> loadConversations({bool showSpinner = true}) async {
     if (showSpinner && _conversations.isEmpty) {
       _loading = true;
       _error = null;
@@ -143,10 +143,16 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       _hasLoaded = true;
       _error = null;
       notifyListeners();
+      return true;
     } catch (e) {
       _loading = false;
-      _error = e.toString();
+      // Keep whatever is already on screen; the full error scaffold is only
+      // for a first load with no data.
+      if (_conversations.isEmpty) {
+        _error = e.toString();
+      }
       notifyListeners();
+      return false;
     }
   }
 

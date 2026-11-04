@@ -14,6 +14,7 @@ class AppBadgeService {
 
   bool _initialized = false;
   int _last = -1;
+  Future<void> _writeQueue = Future.value();
 
   void init() {
     if (_initialized) return;
@@ -39,11 +40,15 @@ class AppBadgeService {
     final safe = count < 0 ? 0 : count;
     if (safe == _last) return;
     _last = safe;
-    try {
-      await AppBadgePlus.updateBadge(safe);
-    } catch (_) {
-      // Desktop/web/unsupported launchers simply ignore the badge.
-    }
+    // Serialize writes so rapid unread changes cannot complete out of order.
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        await AppBadgePlus.updateBadge(safe);
+      } catch (_) {
+        // Desktop/web/unsupported launchers simply ignore the badge.
+      }
+    });
+    await _writeQueue;
   }
 
   void reset() {

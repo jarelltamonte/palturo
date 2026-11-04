@@ -72,6 +72,12 @@ class DraftService extends ChangeNotifier {
     await _persist();
   }
 
+  @visibleForTesting
+  void debugResetForTest() {
+    _loaded = false;
+    _drafts.clear();
+  }
+
   Future<void> _persist() {
     return PreferencesService.instance.setString(_key, jsonEncode(_drafts));
   }

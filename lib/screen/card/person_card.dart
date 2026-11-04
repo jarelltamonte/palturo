@@ -18,6 +18,7 @@ class Person {
   final String language;
   final String learningStyle;
   final String skillName;
+  final String skillPath;
   final PersonRole role;
   final String bio;
 
@@ -42,6 +43,7 @@ class Person {
     required this.language,
     required this.learningStyle,
     required this.skillName,
+    this.skillPath = '',
     required this.role,
     this.bio = '',
     this.skillNote = '',

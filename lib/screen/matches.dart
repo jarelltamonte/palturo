@@ -408,7 +408,7 @@ class _MatchesState extends State<Matches> {
 
   Widget _buildPalTile(MatchedUser pal, Color textTheme) {
     return InkWell(
-      onTap: () => _openChatRoom(pal),
+      onTap: () => _openProfile(pal),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -440,6 +440,19 @@ class _MatchesState extends State<Matches> {
                   const SizedBox(height: 2),
                   SkillTag(skillName: pal.skillName, role: pal.role),
                 ],
+              ),
+            ),
+            Semantics(
+              button: true,
+              label: 'Chat with ${pal.name}',
+              child: IconButton(
+                tooltip: 'Chat with ${pal.name}',
+                onPressed: () => _openChatRoom(pal),
+                icon: Icon(
+                  Icons.chat_bubble_outline,
+                  color: textTheme,
+                  size: 22,
+                ),
               ),
             ),
             SizedBox(

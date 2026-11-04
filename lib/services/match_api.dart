@@ -113,33 +113,52 @@ class RequestLite {
   final String connectionId;
   final String requesterId;
   final String requesterName;
+  final PersonRole role;
   final String? avatarUrl;
   final List<String> skills; // title-cased skill names
+  final String? requestedSkillName;
+  final String? skillPath;
+  final bool? inDeclaredDomain;
   final DateTime createdAt;
   const RequestLite({
     required this.connectionId,
     required this.requesterId,
     required this.requesterName,
+    required this.role,
     this.avatarUrl,
     required this.skills,
+    this.requestedSkillName,
+    this.skillPath,
+    this.inDeclaredDomain,
     required this.createdAt,
   });
 
   ConnectionRequest toConnectionRequest() {
-    final skill = skills.isNotEmpty ? skills.first : 'Skill sharing';
+    final skill =
+        (requestedSkillName?.trim().isNotEmpty ?? false)
+            ? requestedSkillName!.trim()
+            : (skills.isNotEmpty ? skills.first : 'Skill sharing');
     return ConnectionRequest(
       id: connectionId,
       requesterId: requesterId,
       skillName: skill,
+      skillPath: skillPath,
+      inDeclaredDomain: inDeclaredDomain,
       requesterName: requesterName,
       schedule: '',
       language: '',
       learningStyle: '',
       bio: '',
       requestedAt: createdAt,
-      iconAsset: 'assets/icons/rlearner.svg',
-      seekingLabel: 'Wants to connect in',
-      role: PersonRole.mentor,
+      iconAsset:
+          role == PersonRole.learner
+              ? 'assets/icons/rlearner.svg'
+              : 'assets/icons/rmentor.svg',
+      seekingLabel:
+          role == PersonRole.learner
+              ? 'Seeking a mentor in'
+              : 'Seeking a learner in',
+      role: role,
       photoUrls: [avatarUrl],
     );
   }
@@ -261,11 +280,13 @@ class MatchApi {
     final skillEntries = preferred.isNotEmpty ? preferred : fallback;
 
     String skill = '';
+    String skillPath = '';
     String skillNote = '';
     if (skillEntries.isNotEmpty) {
       final entry = skillEntries.first as Map;
       // leaf name only (short-form template) - full chain lives in the profile dialog
       final raw = ((entry['path'] ?? '') as String);
+      skillPath = raw;
       skill =
           raw.isEmpty
               ? ((entry['skill'] ?? '') as String)
@@ -288,6 +309,7 @@ class MatchApi {
       language: (p['p_languages'] ?? '') as String,
       learningStyle: (p['p_styles'] ?? '') as String,
       skillName: skill,
+      skillPath: skillPath,
       role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
       skillNote: skillNote,
@@ -374,6 +396,7 @@ class MatchApi {
           language: person.language,
           learningStyle: person.learningStyle,
           skillName: person.skillName,
+          skillPath: person.skillPath,
           role: person.role,
           bio: person.bio,
           skillNote: person.skillNote,
@@ -559,8 +582,15 @@ class MatchApi {
         connectionId: r['connection_id'] as String,
         requesterId: r['requester_id'] as String,
         requesterName: _displayName(r['requester_name']),
+        role:
+            (r['requester_role'] == 'learner')
+                ? PersonRole.learner
+                : PersonRole.mentor,
         avatarUrl: r['avatar_url'] as String?,
         skills: skills,
+        requestedSkillName: r['requested_skill_name'] as String?,
+        skillPath: r['requested_skill_path'] as String?,
+        inDeclaredDomain: r['in_declared_domain'] as bool?,
         createdAt:
             DateTime.tryParse(r['created_at']?.toString() ?? '') ??
             DateTime.now(),
@@ -575,6 +605,13 @@ class MatchApi {
     );
   }
 
+  static Future<void> undoDecline(String connectionId) async {
+    await _Client.c.rpc(
+      'undo_decline_connection',
+      params: {'p_connection': connectionId},
+    );
+  }
+
   /// Deletes an accepted connection. The RPC verifies the caller is one of the
   /// two participants before removing it and its messages/feedback.
   static Future<void> unmatch(String connectionId) async {
@@ -584,10 +621,18 @@ class MatchApi {
     );
   }
 
-  static Future<String?> sendConnectionRequest(String userId) async {
+  static Future<String?> sendConnectionRequest(
+    String userId, {
+    String? skillName,
+    String? skillPath,
+  }) async {
     final id = await _Client.c.rpc(
       'send_connection_request',
-      params: {'p_recipient': userId},
+      params: {
+        'p_recipient': userId,
+        'p_skill_name': skillName,
+        'p_skill_path': skillPath,
+      },
     );
     return id?.toString();
   }
@@ -721,6 +766,7 @@ class MatchApi {
         language: languages.join(', '),
         learningStyle: learningStyles.join(', '),
         skillName: (r['skill_name'] ?? '').toString(),
+        skillPath: (r['skill_path'] ?? '').toString(),
         // The card is shown in a teaching or learning deck, so reflect the
         // placement being browsed rather than the profile's global role.
         role: kind == 'learn' ? PersonRole.learner : PersonRole.mentor,

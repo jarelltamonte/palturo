@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
-import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
 class FilterOption {
@@ -171,21 +170,17 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             ),
           )
         else
-          Column(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               for (final option in section.options)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: _filterChip(
-                      option.label,
-                      _draft[section.key] == option.value,
-                      () => setState(() => _draft[section.key] = option.value),
-                      textColor,
-                      primaryColor,
-                    ),
-                  ),
+                _filterChip(
+                  option.label,
+                  _draft[section.key] == option.value,
+                  () => setState(() => _draft[section.key] = option.value),
+                  textColor,
+                  primaryColor,
                 ),
             ],
           ),
@@ -215,27 +210,25 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       button: true,
       selected: isSelected,
       label: label,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: AppMotion.micro,
-          constraints: const BoxConstraints(minHeight: 44),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color:
-                  isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
-            ),
+      onTap: onTap,
+      excludeSemantics: true,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          backgroundColor: isSelected ? primaryColor : Colors.transparent,
+          side: BorderSide(
+            color: isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
           ),
-          child: Text(
-            label,
-            style: AppTextStyles.regularText.copyWith(
-              color: isSelected ? Colors.black : textColor,
-              fontSize: 13,
-            ),
+          shape: const StadiumBorder(),
+          elevation: 0,
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.regularText.copyWith(
+            color: isSelected ? Colors.black : textColor,
+            fontSize: 13,
           ),
         ),
       ),

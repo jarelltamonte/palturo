@@ -8,6 +8,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
@@ -35,19 +36,8 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
 
-  static const List<FilterSection> _filterSections = [
-    FilterSection(
-      key: 'role',
-      title: 'Show',
-      options: [
-        FilterOption('All roles', 'all'),
-        FilterOption('Learners', 'learner'),
-        FilterOption('Mentors', 'mentor'),
-      ],
-    ),
-  ];
-
   RoleFilter _roleFilter = RoleFilter.all;
+  String _skillFilter = 'all';
   int _currentIndex = 0;
   final List<int> _history = [];
   final List<bool> _historyRight = [];
@@ -98,6 +88,10 @@ class _HomePageState extends State<HomePage> {
         _historyRight.clear();
         _historyConnectionIds.clear();
         _undoActive = false;
+        if (_skillFilter != 'all' &&
+            !deck.any((person) => person.skillName == _skillFilter)) {
+          _skillFilter = 'all';
+        }
       });
     } catch (e, st) {
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
@@ -208,33 +202,71 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
+  bool get _hasActiveFilter =>
+      _roleFilter != RoleFilter.all || _skillFilter != 'all';
 
-  List<Person> get _filteredPeople => _people;
+  List<Person> get _filteredPeople {
+    if (_skillFilter == 'all') return _people;
+    return _people
+        .where((person) => person.skillName == _skillFilter)
+        .toList(growable: false);
+  }
+
+  List<FilterSection> get _filterSections {
+    final skills =
+        _people
+            .map((person) => person.skillName.trim())
+            .where((skill) => skill.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    return [
+      const FilterSection(
+        key: 'role',
+        title: 'Show',
+        options: [
+          FilterOption('All roles', 'all'),
+          FilterOption('Learners', 'learner'),
+          FilterOption('Mentors', 'mentor'),
+        ],
+      ),
+      if (skills.isNotEmpty)
+        FilterSection(
+          key: 'skill',
+          title: 'Skill',
+          options: [
+            const FilterOption('All skills', 'all'),
+            for (final skill in skills) FilterOption(toTitleCase(skill), skill),
+          ],
+        ),
+    ];
+  }
 
   void _openFilterSheet() {
     FilterBottomSheet.show(
       context,
       sections: _filterSections,
-      selected: {'role': _roleFilter.name},
+      selected: {'role': _roleFilter.name, 'skill': _skillFilter},
       onApply: (result) {
         final newRole = RoleFilter.values.firstWhere(
           (r) => r.name == result['role'],
           orElse: () => RoleFilter.all,
         );
+        final newSkill = result['skill'] ?? 'all';
+        final roleChanged = newRole != _roleFilter;
 
-        if (newRole != _roleFilter) {
-          setState(() {
-            _roleFilter = newRole;
-            _currentIndex = 0;
-            _history.clear();
-            _historyRight.clear();
-            _historyConnectionIds.clear();
-            _undoActive = false;
-          });
+        setState(() {
+          _roleFilter = newRole;
+          _skillFilter = newSkill;
+          _currentIndex = 0;
+          _history.clear();
+          _historyRight.clear();
+          _historyConnectionIds.clear();
+          _undoActive = false;
+        });
 
-          _loadDeck();
-        }
+        if (roleChanged) _loadDeck();
       },
     );
   }
@@ -277,7 +309,11 @@ class _HomePageState extends State<HomePage> {
     _actionInFlight = true;
     setState(() => _sendingRequest = true);
     try {
-      final connectionId = await MatchApi.sendConnectionRequest(person.id);
+      final connectionId = await MatchApi.sendConnectionRequest(
+        person.id,
+        skillName: person.skillName,
+        skillPath: person.skillPath,
+      );
       if (!mounted) return;
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');
@@ -550,9 +586,12 @@ class _HomePageState extends State<HomePage> {
       }
 
       setState(() {
-        final start = _people.length;
         _people = [..._people, ...fresh];
-        _currentIndex = start;
+        final freshIds = fresh.map((person) => person.id).toSet();
+        final nextIndex = _filteredPeople.indexWhere(
+          (person) => freshIds.contains(person.id),
+        );
+        _currentIndex = nextIndex < 0 ? 0 : nextIndex;
         _undoActive = false;
         _discovering = false;
       });
@@ -851,6 +890,24 @@ class _HomePageState extends State<HomePage> {
                         _discovering ? 'Finding matches…' : 'Discover more',
                       ),
                     ),
+                    if (_hasActiveFilter) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = RoleFilter.all;
+                            _skillFilter = 'all';
+                            _currentIndex = 0;
+                            _history.clear();
+                            _historyRight.clear();
+                            _historyConnectionIds.clear();
+                            _undoActive = false;
+                          });
+                          _loadDeck();
+                        },
+                        child: const Text('Clear filters'),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     ProfileUpdateLink(onTap: _openSettings),
                   ],

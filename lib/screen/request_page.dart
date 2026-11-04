@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
-import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/request_card.dart';
@@ -26,6 +25,8 @@ class ConnectionRequest {
   final String id;
   final String requesterId;
   final String skillName;
+  final String? skillPath;
+  final bool? inDeclaredDomain;
   final String requesterName;
   final String schedule;
   final String language;
@@ -41,6 +42,8 @@ class ConnectionRequest {
     required this.id,
     this.requesterId = '',
     required this.skillName,
+    this.skillPath,
+    this.inDeclaredDomain,
     required this.requesterName,
     required this.schedule,
     required this.language,
@@ -151,41 +154,71 @@ class _RequestPageState extends State<RequestPage> {
   DateFilter _dateFilter = DateFilter.all;
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
+  String _skillFilter = 'all';
+  String _domainFilter = 'all';
   RequestView _view = RequestView.incoming;
 
-  static const List<FilterSection> _filterSections = [
-    FilterSection(
-      key: 'date',
-      title: 'Date',
-      options: [
-        FilterOption('All', 'all'),
-        FilterOption('Today', 'today'),
-        FilterOption('This Week', 'thisWeek'),
-        FilterOption('This Month', 'thisMonth'),
-        FilterOption('This Year', 'thisYear'),
-      ],
-    ),
-    FilterSection(
-      key: 'role',
-      title: 'Role',
-      options: [
-        FilterOption('All', 'all'),
-        FilterOption('Learner', 'learner'),
-        FilterOption('Mentor', 'mentor'),
-      ],
-    ),
-    FilterSection(
-      key: 'sort',
-      title: 'Sort by',
-      defaultValue: 'newest',
-      options: [
-        FilterOption('Newest', 'newest'),
-        FilterOption('Oldest', 'oldest'),
-        FilterOption('Ascending (A-Z)', 'ascending'),
-        FilterOption('Descending (Z-A)', 'descending'),
-      ],
-    ),
-  ];
+  List<FilterSection> get _filterSections {
+    final skills =
+        _requests
+            .map((request) => request.skillName.trim())
+            .where((skill) => skill.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    return [
+      const FilterSection(
+        key: 'date',
+        title: 'Date',
+        options: [
+          FilterOption('All', 'all'),
+          FilterOption('Today', 'today'),
+          FilterOption('This Week', 'thisWeek'),
+          FilterOption('This Month', 'thisMonth'),
+          FilterOption('This Year', 'thisYear'),
+        ],
+      ),
+      const FilterSection(
+        key: 'role',
+        title: 'Role',
+        options: [
+          FilterOption('All', 'all'),
+          FilterOption('Learner', 'learner'),
+          FilterOption('Mentor', 'mentor'),
+        ],
+      ),
+      if (skills.isNotEmpty)
+        FilterSection(
+          key: 'skill',
+          title: 'Skill',
+          options: [
+            const FilterOption('All skills', 'all'),
+            for (final skill in skills) FilterOption(skill, skill),
+          ],
+        ),
+      const FilterSection(
+        key: 'domain',
+        title: 'Declared skill domain',
+        options: [
+          FilterOption('All requests', 'all'),
+          FilterOption('In my declared skills', 'inside'),
+          FilterOption('Outside my declared skills', 'outside'),
+        ],
+      ),
+      const FilterSection(
+        key: 'sort',
+        title: 'Sort by',
+        defaultValue: 'newest',
+        options: [
+          FilterOption('Newest', 'newest'),
+          FilterOption('Oldest', 'oldest'),
+          FilterOption('Ascending (A-Z)', 'ascending'),
+          FilterOption('Descending (Z-A)', 'descending'),
+        ],
+      ),
+    ];
+  }
 
   static const List<FilterSection> _sentFilterSections = [
     FilterSection(
@@ -220,6 +253,8 @@ class _RequestPageState extends State<RequestPage> {
   bool get _hasActiveFilter =>
       _dateFilter != DateFilter.all ||
       _roleFilter != RoleFilter.all ||
+      _skillFilter != 'all' ||
+      _domainFilter != 'all' ||
       _sortFilter != SortFilter.newest;
 
   String _sentStatusFilter = 'all';
@@ -239,6 +274,7 @@ class _RequestPageState extends State<RequestPage> {
   String? _outgoingError;
   bool _responding = false;
   bool _cancelling = false;
+  final Set<String> _declinedIds = {};
 
   @override
   void initState() {
@@ -277,6 +313,7 @@ class _RequestPageState extends State<RequestPage> {
       if (!mounted) return;
       setState(() {
         _requests = incoming.map((r) => r.toConnectionRequest()).toList();
+        _declinedIds.clear();
         _loading = false;
         _loadError = null;
       });
@@ -370,7 +407,13 @@ class _RequestPageState extends State<RequestPage> {
               (_roleFilter == RoleFilter.learner &&
                   r.role == PersonRole.learner) ||
               (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
-          return matchesDate && matchesRole;
+          final matchesSkill =
+              _skillFilter == 'all' || r.skillName == _skillFilter;
+          final matchesDomain =
+              _domainFilter == 'all' ||
+              (_domainFilter == 'inside' && r.inDeclaredDomain == true) ||
+              (_domainFilter == 'outside' && r.inDeclaredDomain == false);
+          return matchesDate && matchesRole && matchesSkill && matchesDomain;
         }).toList();
 
     switch (_sortFilter) {
@@ -456,10 +499,10 @@ class _RequestPageState extends State<RequestPage> {
     }
   }
 
-  Future<void> _confirmDecline(ConnectionRequest request) async {
-    if (_responding) return;
+  Future<bool> _confirmDecline(ConnectionRequest request) async {
+    if (_responding) return false;
     await Future<void>.delayed(Duration.zero);
-    if (!mounted) return;
+    if (!mounted) return false;
     final confirmed = await showConfirmDialog(
       context,
       title: 'Decline request?',
@@ -467,8 +510,8 @@ class _RequestPageState extends State<RequestPage> {
           'Decline ${request.requesterName}? They will not become a Pal and cannot message you.',
       confirmLabel: 'Decline',
     );
-    if (!confirmed || !mounted) return;
-    await _respond(request, false);
+    if (!confirmed || !mounted) return false;
+    return _respond(request, false);
   }
 
   ImageProvider? _requestAvatar(ConnectionRequest request) {
@@ -478,26 +521,34 @@ class _RequestPageState extends State<RequestPage> {
     return NetworkImage(url);
   }
 
-  Future<void> _respond(ConnectionRequest request, bool accept) async {
-    if (_responding) return;
+  Future<bool> _respond(ConnectionRequest request, bool accept) async {
+    if (_responding) return false;
     _responding = true;
 
     try {
       await MatchApi.respondToRequest(request.id, accept);
       await ChatStateService.instance.loadConversations(showSpinner: false);
-      if (!mounted) return;
+      if (!mounted) return false;
 
       ActivityService.instance.refresh();
-      _removeRequest(request.id);
 
       if (!accept) {
+        setState(() => _declinedIds.add(request.id));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(seconds: 3),
             content: Text('Request from ${request.requesterName} declined.'),
           ),
         );
-        return;
+        Future<void>.delayed(const Duration(seconds: 5), () {
+          if (!mounted || !_declinedIds.contains(request.id)) return;
+          setState(() => _declinedIds.remove(request.id));
+          _removeRequest(request.id);
+        });
+        return true;
       }
+
+      _removeRequest(request.id);
 
       final action = await showRequestMatchSheet(
         context,
@@ -505,7 +556,7 @@ class _RequestPageState extends State<RequestPage> {
         skillName: request.skillName,
         avatarImage: _requestAvatar(request),
       );
-      if (!mounted || action != RequestMatchAction.sayHello) return;
+      if (!mounted || action != RequestMatchAction.sayHello) return true;
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -520,13 +571,42 @@ class _RequestPageState extends State<RequestPage> {
               ),
         ),
       );
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
+      return false;
     } finally {
       _responding = false;
+    }
+  }
+
+  Future<void> _undoDecline(ConnectionRequest request) async {
+    if (!_declinedIds.contains(request.id)) return;
+    try {
+      await MatchApi.undoDecline(request.id);
+      if (!mounted) return;
+      setState(() => _declinedIds.remove(request.id));
+      ActivityService.instance.refresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Request from ${request.requesterName} restored.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not restore the request. Please try again.',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -581,6 +661,8 @@ class _RequestPageState extends State<RequestPage> {
       selected: {
         'date': _dateFilter.name,
         'role': _roleFilter.name,
+        'skill': _skillFilter,
+        'domain': _domainFilter,
         'sort': _sortFilter.name,
       },
       onApply: (result) {
@@ -593,6 +675,8 @@ class _RequestPageState extends State<RequestPage> {
             (r) => r.name == result['role'],
             orElse: () => RoleFilter.all,
           );
+          _skillFilter = result['skill'] ?? 'all';
+          _domainFilter = result['domain'] ?? 'all';
           _sortFilter = SortFilter.values.firstWhere(
             (s) => s.name == result['sort'],
             orElse: () => SortFilter.newest,
@@ -608,66 +692,6 @@ class _RequestPageState extends State<RequestPage> {
       _sentDateFilter = DateFilter.all;
       _sentSortFilter = SortFilter.newest;
     });
-  }
-
-  Widget _buildViewToggle(Color textTheme) {
-    Widget segment(String label, RequestView value) {
-      final selected = _view == value;
-      return Expanded(
-        child: Semantics(
-          button: true,
-          selected: selected,
-          label: label,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              if (_view == value) {
-                if (value == RequestView.sent) _loadOutgoing();
-                return;
-              }
-              setState(() => _view = value);
-              if (value == RequestView.sent) _loadOutgoing();
-            },
-            child: AnimatedContainer(
-              duration: AppMotion.base,
-              curve: Curves.easeOut,
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: AppTextStyles.regularText.copyWith(
-                  color:
-                      selected
-                          ? Colors.black
-                          : textTheme.withValues(alpha: 0.65),
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      height: 44,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: textTheme.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: [
-          segment('Incoming', RequestView.incoming),
-          segment('Sent', RequestView.sent),
-        ],
-      ),
-    );
   }
 
   Widget _buildIncoming(Color textTheme) {
@@ -702,6 +726,7 @@ class _RequestPageState extends State<RequestPage> {
           child: GestureDetector(
             onTap: () => _openDetail(request),
             child: RequestCard(
+              key: ValueKey(request.id),
               skillName: request.skillName,
               requesterName: request.requesterName,
               schedule: request.schedule,
@@ -715,7 +740,9 @@ class _RequestPageState extends State<RequestPage> {
               person: request.toPerson(),
               role: request.role,
               onAccept: () => _respond(request, true),
-              onDecline: () => _confirmDecline(request),
+              onDecline: () {},
+              onConfirmDecline: () => _confirmDecline(request),
+              onUndo: () => _undoDecline(request),
             ),
           ),
         );
@@ -937,6 +964,8 @@ class _RequestPageState extends State<RequestPage> {
                   setState(() {
                     _dateFilter = DateFilter.all;
                     _roleFilter = RoleFilter.all;
+                    _skillFilter = 'all';
+                    _domainFilter = 'all';
                     _sortFilter = SortFilter.newest;
                   });
                 },
@@ -955,11 +984,15 @@ class _RequestPageState extends State<RequestPage> {
 
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final toolbarHeight =
+        (MediaQuery.textScalerOf(context).scale(20) + 24)
+            .clamp(adaptiveHeight, 96.0)
+            .toDouble();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
+        toolbarHeight: toolbarHeight,
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         elevation: 0,
@@ -981,11 +1014,14 @@ class _RequestPageState extends State<RequestPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              Text(
-                'Requests',
-                style: AppTextStyles.headingText.copyWith(color: textTheme),
+              Expanded(
+                child: Text(
+                  _view == RequestView.sent ? 'Sent requests' : 'Requests',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.headingText.copyWith(color: textTheme),
+                ),
               ),
-              const Spacer(),
               IconButton(
                 tooltip: 'Activity',
                 onPressed:
@@ -1066,7 +1102,37 @@ class _RequestPageState extends State<RequestPage> {
       ),
       body: Column(
         children: [
-          _buildViewToggle(textTheme),
+          if (_view == RequestView.incoming)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => const RequestPage(
+                                initialView: RequestView.sent,
+                              ),
+                        ),
+                      ),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text(
+                    'View sent requests',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.accentText(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child:
                 _view == RequestView.incoming

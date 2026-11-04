@@ -27,6 +27,7 @@ class RequestCard extends StatefulWidget {
   final PersonRole? role;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final Future<bool> Function()? onConfirmDecline;
   final VoidCallback? onUndo;
   final VoidCallback? onStartChatting;
 
@@ -46,6 +47,7 @@ class RequestCard extends StatefulWidget {
     this.role,
     required this.onAccept,
     required this.onDecline,
+    this.onConfirmDecline,
     this.onUndo,
     this.onStartChatting,
   });
@@ -92,12 +94,26 @@ class _RequestCardState extends State<RequestCard>
     widget.onAccept();
   }
 
-  void _handleDecline() {
+  Future<void> _handleDecline() async {
     if (_controller.isAnimating || _outcome != _RequestOutcome.none) return;
     HapticFeedback.lightImpact();
+
+    final confirm = widget.onConfirmDecline;
+    if (confirm != null) {
+      final confirmed = await confirm();
+      if (!confirmed ||
+          !mounted ||
+          _controller.isAnimating ||
+          _outcome != _RequestOutcome.none) {
+        return;
+      }
+    } else {
+      widget.onDecline();
+    }
+
+    if (!mounted) return;
     setState(() => _outcome = _RequestOutcome.declined);
     _controller.forward();
-    widget.onDecline();
   }
 
   void _handleUndo() {

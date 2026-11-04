@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/activity_presentation.dart';
+import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
 
 void main() {
@@ -13,6 +14,7 @@ void main() {
         connectionId: 'c1',
         requesterId: 'u1',
         requesterName: 'RJ Castillano',
+        role: PersonRole.mentor,
         skills: const ['Barong Embroidery'],
         createdAt: DateTime(2026),
       ),

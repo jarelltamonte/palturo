@@ -20,6 +20,9 @@ class Person {
   final String skillName;
   final PersonRole role;
   final String bio;
+
+  /// Approved, role-specific note for the skill shown on the card.
+  final String skillNote;
   final List<String?> photoUrls;
 
   /// FR-5 short-form showcase media (image/video thumbnails) — shown first on
@@ -41,6 +44,7 @@ class Person {
     required this.skillName,
     required this.role,
     this.bio = '',
+    this.skillNote = '',
     this.photoUrls = const [null],
     this.showcaseUrls = const [],
     this.compatibility,
@@ -64,6 +68,9 @@ class PersonCardOverlay extends StatefulWidget {
   final String addLabel;
   final bool showActions;
   final bool showMenu;
+  final bool showProfilePill;
+  final bool showShadow;
+  final bool showSkillNote;
 
   const PersonCardOverlay({
     super.key,
@@ -79,6 +86,9 @@ class PersonCardOverlay extends StatefulWidget {
     this.addLabel = 'Send request',
     this.showActions = true,
     this.showMenu = true,
+    this.showProfilePill = true,
+    this.showShadow = true,
+    this.showSkillNote = false,
   });
 
   @override
@@ -211,23 +221,28 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         widget.person.role == PersonRole.learner
             ? 'Wants to learn'
             : 'Wants to teach';
-    final bio = widget.person.bio.trim();
+    final bodyText =
+        (widget.showSkillNote ? widget.person.skillNote : widget.person.bio)
+            .trim();
     final language = widget.person.language.trim();
     final learningStyle = widget.person.learningStyle.trim();
     final scheduleText = formatSchedule(widget.person.schedule);
 
-    return Container(
+    final card = Container(
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow:
+            widget.showShadow
+                ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ]
+                : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -359,9 +374,10 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ),
                   if (widget.person.compatibility != null &&
                       widget.onWhyMatch != null &&
-                      widget.onOpenProfile != null)
+                      widget.onOpenProfile != null &&
+                      widget.showProfilePill)
                     const SizedBox(height: 6),
-                  if (widget.onOpenProfile != null)
+                  if (widget.onOpenProfile != null && widget.showProfilePill)
                     _GlassPill(
                       onTap: widget.onOpenProfile,
                       icon: Icons.person_outline,
@@ -646,9 +662,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ],
                   ),
                 ],
-                if (bio.isNotEmpty) ...[
+                if (bodyText.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  _buildBio(context, bio),
+                  _buildBio(context, bodyText),
                 ],
               ],
             ),
@@ -769,6 +785,16 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             ),
         ],
       ),
+    );
+
+    final openProfile = widget.onOpenProfile;
+    if (openProfile == null) return card;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTap: openProfile,
+      child: card,
     );
   }
 }

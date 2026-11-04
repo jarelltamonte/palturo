@@ -243,26 +243,36 @@ class MatchApi {
   static Future<Person?> getPersonFromPublicProfile(String userId) async {
     final p = await getPublicProfile(userId);
     if (p == null) return null;
+    return personFromPublicProfileMap(p, userId);
+  }
+
+  /// Pure mapping used by deck enrichment and tests.
+  static Person personFromPublicProfileMap(
+    Map<String, dynamic> p,
+    String userId,
+  ) {
     String name = ((p['p_name'] ?? '') as String).trim();
     if (name.isEmpty) name = 'Community member';
-    String skill = '';
+    final isLearner = p['p_role'] == 'learner';
     final teaching = (p['p_teaching'] as List?) ?? [];
     final learning = (p['p_learning'] as List?) ?? [];
-    if (teaching.isNotEmpty) {
-      final t = teaching.first as Map;
-      // leaf name only (short-form template) — full chain lives in the profile dialog
-      final raw = ((t['path'] ?? '') as String);
+    final preferred = isLearner ? learning : teaching;
+    final fallback = isLearner ? teaching : learning;
+    final skillEntries = preferred.isNotEmpty ? preferred : fallback;
+
+    String skill = '';
+    String skillNote = '';
+    if (skillEntries.isNotEmpty) {
+      final entry = skillEntries.first as Map;
+      // leaf name only (short-form template) - full chain lives in the profile dialog
+      final raw = ((entry['path'] ?? '') as String);
       skill =
           raw.isEmpty
-              ? ((t['skill'] ?? '') as String)
+              ? ((entry['skill'] ?? '') as String)
               : raw.split('.').last.replaceAll('_', ' ').trim();
-    } else if (learning.isNotEmpty) {
-      final l = learning.first as Map;
-      final raw = ((l['path'] ?? '') as String);
-      skill =
-          raw.isEmpty
-              ? ((l['skill'] ?? '') as String)
-              : raw.split('.').last.replaceAll('_', ' ').trim();
+      if (preferred.isNotEmpty) {
+        skillNote = ((entry['note'] as String?) ?? '').trim();
+      }
     }
     final showcases =
         ((p['p_showcases'] as List?) ?? [])
@@ -280,6 +290,7 @@ class MatchApi {
       skillName: skill,
       role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
+      skillNote: skillNote,
       photoUrls: [(p['p_avatar'] as String?)],
       showcaseUrls: showcases,
     );
@@ -365,6 +376,7 @@ class MatchApi {
           skillName: person.skillName,
           role: person.role,
           bio: person.bio,
+          skillNote: person.skillNote,
           photoUrls: person.photoUrls,
           showcaseUrls: person.showcaseUrls,
           compatibility: compat,

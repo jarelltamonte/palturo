@@ -8,8 +8,6 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
-import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
-import 'package:palturo/screen/utils/schedule_format.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
@@ -288,11 +286,8 @@ class _HomePageState extends State<HomePage> {
       Haptics.success();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
+          duration: const Duration(seconds: 3),
           content: Text('Connection request sent to ${person.name}'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () => _undoRequest(connectionId),
-          ),
         ),
       );
     } catch (e) {
@@ -327,19 +322,6 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     state.dismiss(right: right);
-  }
-
-  Future<void> _undoRequest(String connectionId) async {
-    if (_historyConnectionIds.isEmpty ||
-        _historyConnectionIds.last != connectionId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('That request is no longer the latest action.'),
-        ),
-      );
-      return;
-    }
-    await _undo();
   }
 
   Future<void> _undo() async {
@@ -428,8 +410,9 @@ class _HomePageState extends State<HomePage> {
           onBlock: () => _confirmBlock(person),
           onReport: () => _confirmReport(person),
           onOpenProfile: () => _openProfile(person),
-          onWhyMatch:
-              person.compatibility == null ? null : () => _showWhyMatch(person),
+          showProfilePill: false,
+          showShadow: false,
+          showSkillNote: true,
         ),
       ),
     );
@@ -468,6 +451,8 @@ class _HomePageState extends State<HomePage> {
                             person: next,
                             showActions: false,
                             showMenu: false,
+                            showShadow: false,
+                            showSkillNote: true,
                           ),
                         ),
                       ),
@@ -483,40 +468,6 @@ class _HomePageState extends State<HomePage> {
           ),
           child: _buildDeckCard(current),
         ),
-        if (next != null)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 3,
-            child: IgnorePointer(
-              child: Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 210),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.elevatedSurface(
-                      context,
-                    ).withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AppColors.border(context)),
-                  ),
-                  child: Text(
-                    'Up next · ${next.name}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         if (_sendingRequest)
           Positioned.fill(
             child: IgnorePointer(
@@ -568,126 +519,6 @@ class _HomePageState extends State<HomePage> {
       person,
       onBlock: () => _confirmBlock(person),
       onReport: (reason) => _confirmReport(person),
-    );
-  }
-
-  Future<void> _showWhyMatch(Person person) async {
-    final score = (((person.compatibility ?? 0) * 100).clamp(0, 100)).round();
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.elevatedSurface(context),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder:
-          (sheetContext) => SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.auto_awesome,
-                            size: 20,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Why this match?',
-                            style: AppTextStyles.headingText.copyWith(
-                              color: Theme.of(context).colorScheme.secondary,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '$score%',
-                          style: AppTextStyles.headingText.copyWith(
-                            color: AppColors.accentText(context),
-                            fontSize: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      person.pipeline == 'basic_bi'
-                          ? 'This result uses basic profile similarity because the full reciprocal reranker was unavailable. Treat it as a lighter signal, not a two-way guarantee.'
-                          : 'PalTuro compares your learning and teaching profiles in both directions, then weighs the fit. A reciprocal score rewards mutual alignment, not just a one-sided interest.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
-                        fontSize: 14,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    _MatchFactor(
-                      icon: Icons.school_outlined,
-                      label: 'Skill',
-                      value:
-                          person.skillName.trim().isEmpty
-                              ? 'Shared skill interest'
-                              : toTitleCase(person.skillName),
-                    ),
-                    _MatchFactor(
-                      icon: Icons.translate,
-                      label: 'Language',
-                      value:
-                          person.language.trim().isEmpty
-                              ? 'Not specified'
-                              : person.language,
-                    ),
-                    _MatchFactor(
-                      icon: Icons.calendar_today_outlined,
-                      label: 'Availability',
-                      value:
-                          person.schedule.trim().isEmpty
-                              ? 'Not specified'
-                              : formatSchedule(person.schedule),
-                    ),
-                    _MatchFactor(
-                      icon: Icons.psychology_outlined,
-                      label: 'Learning style',
-                      value:
-                          person.learningStyle.trim().isEmpty
-                              ? 'Not specified'
-                              : person.learningStyle,
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                        child: const Text('Got it'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
     );
   }
 
@@ -1027,53 +858,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-    );
-  }
-}
-
-class _MatchFactor extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _MatchFactor({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: AppColors.accentText(context)),
-          const SizedBox(width: 10),
-          SizedBox(
-            width: 86,
-            child: Text(
-              label,
-              style: AppTextStyles.regularText.copyWith(
-                color: AppColors.mutedText(context),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTextStyles.regularText.copyWith(
-                color: textColor,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

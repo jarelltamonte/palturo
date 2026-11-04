@@ -77,6 +77,7 @@ class NotificationPresenter {
 
   void _onNotification(AppNotification item) {
     if (Supabase.instance.client.auth.currentUser == null) return;
+    if (!NotificationService.instance.isForeground) return;
     if (!PreferencesService.instance.notificationsEnabled) {
       return;
     }
@@ -322,7 +323,6 @@ class NotificationPresenter {
   }
 }
 
-@visibleForTesting
 bool notificationKindEnabled(AppNotificationKind kind) {
   switch (kind) {
     case AppNotificationKind.connectionRequest:

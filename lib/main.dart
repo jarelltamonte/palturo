@@ -6,6 +6,7 @@ import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
 import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/local_notification_service.dart';
 import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
@@ -52,6 +53,7 @@ void main() async {
   ChatStateService.instance.init();
   NotificationService.instance.init();
   NotificationPresenter.instance.init();
+  unawaited(LocalNotificationService.instance.init());
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );
@@ -226,6 +228,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
           _latestDeepLinkAt = null;
           _lastHandledLink = null;
           NotificationPresenter.instance.reset();
+          LocalNotificationService.instance.cancelAll();
           AppShellState.instance.reset();
           return;
         }

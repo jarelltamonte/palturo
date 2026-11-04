@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/local_notification_service.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/sound_service.dart';
@@ -30,7 +31,10 @@ class NotificationPreferencesPage extends StatelessWidget {
         ),
       ),
       body: AnimatedBuilder(
-        animation: PreferencesService.instance,
+        animation: Listenable.merge([
+          PreferencesService.instance,
+          LocalNotificationService.instance,
+        ]),
         builder: (context, _) {
           final prefs = PreferencesService.instance;
           final master = prefs.notificationsEnabled;
@@ -61,10 +65,25 @@ class NotificationPreferencesPage extends StatelessWidget {
                 onChanged: (value) async {
                   Haptics.selection();
                   await prefs.setNotificationsEnabled(value);
+                  if (value) {
+                    final granted =
+                        await LocalNotificationService.instance
+                            .requestPermission();
+                    if (!granted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'System notifications are off. PalTuro will still show in-app banners.',
+                          ),
+                        ),
+                      );
+                    }
+                  }
                   NotificationService.instance.refresh();
                   NotificationService.instance.notifyPreferenceChanged();
                 },
               ),
+              _permissionRow(context),
               const SizedBox(height: 8),
               _sectionLabel(context, 'Notify me about'),
               _categorySwitch(
@@ -230,6 +249,59 @@ class NotificationPreferencesPage extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Widget _permissionRow(BuildContext context) {
+    final service = LocalNotificationService.instance;
+    final status = service.permissionStatus;
+    final String subtitle;
+    final Widget? trailing;
+    switch (status) {
+      case NotificationPermissionStatus.granted:
+        subtitle = 'On. PalTuro can show system alerts.';
+        trailing = Icon(
+          Icons.check_circle_outline,
+          size: 18,
+          color: AppColors.accentText(context),
+        );
+      case NotificationPermissionStatus.denied:
+        subtitle = 'Blocked in device settings. In-app banners still work.';
+        trailing = TextButton(
+          onPressed: () async {
+            await service.requestPermission();
+          },
+          child: const Text('Request'),
+        );
+      case NotificationPermissionStatus.unknown:
+        subtitle = 'Not requested yet. In-app banners work without it.';
+        trailing = TextButton(
+          onPressed: () async {
+            await service.requestPermission();
+          },
+          child: const Text('Allow'),
+        );
+      case NotificationPermissionStatus.unsupported:
+        subtitle = 'System notifications are not available on this device.';
+        trailing = null;
+    }
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        'System permission',
+        style: AppTextStyles.regularText.copyWith(
+          color: Theme.of(context).colorScheme.secondary,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: AppTextStyles.regularText.copyWith(
+          color: AppColors.mutedText(context),
+          fontSize: 12,
+        ),
+      ),
+      trailing: trailing,
     );
   }
 

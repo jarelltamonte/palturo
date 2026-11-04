@@ -5,6 +5,7 @@ import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/local_notification_service.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -963,6 +964,9 @@ class _SettingsState extends State<Settings> {
                   ),
                   onTap: () async {
                     Haptics.selection();
+                    await LocalNotificationService.instance
+                        .refreshPermissionStatus();
+                    if (!context.mounted) return;
                     await Navigator.push(
                       context,
                       MaterialPageRoute(

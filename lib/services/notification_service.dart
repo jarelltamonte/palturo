@@ -185,6 +185,23 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Removes already-read items from Activity and the server.
+  Future<void> clearRead() async {
+    final remaining = _items
+        .where((item) => item.isUnread)
+        .toList(growable: false);
+    if (remaining.length == _items.length) return;
+    final previous = _items;
+    _items = remaining;
+    notifyListeners();
+    try {
+      await MatchApi.clearReadNotifications();
+    } catch (_) {
+      _items = previous;
+      notifyListeners();
+    }
+  }
+
   /// Backwards-compatible alias for the old ActivityService API.
   Future<void> markRead() => markAllRead();
 

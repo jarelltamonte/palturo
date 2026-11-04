@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:palturo/models/app_notification.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/activity_presentation.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart';
@@ -15,6 +16,7 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -234,15 +236,154 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
   }
 
   void _showFallback(String message) {
-    ScaffoldMessenger.of(
+    showAppSnackBar(context, message);
+  }
+
+  ActivityFilter _filter = ActivityFilter.all;
+
+  bool _matchesFilter(AppNotification item, ActivityFilter filter) {
+    switch (filter) {
+      case ActivityFilter.all:
+        return true;
+      case ActivityFilter.unread:
+        return item.isUnread;
+      case ActivityFilter.requests:
+        return item.kind.isRequest || item.kind.isMatch || item.kind.isDecline;
+      case ActivityFilter.updates:
+        return item.kind.isFeedback ||
+            item.kind == AppNotificationKind.skillModeration ||
+            item.kind == AppNotificationKind.unknown;
+    }
+  }
+
+  List<AppNotification> get _filteredItems => _items
+      .where((item) => _matchesFilter(item, _filter))
+      .toList(growable: false);
+
+  int _countFor(ActivityFilter filter) {
+    if (filter == ActivityFilter.all) return _items.length;
+    return _items.where((item) => _matchesFilter(item, filter)).length;
+  }
+
+  Future<void> _clearRead() async {
+    final readCount = _items.where((item) => !item.isUnread).length;
+    if (readCount == 0) return;
+    final confirmed = await showConfirmDialog(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      title: 'Clear read activity',
+      message:
+          'Remove $readCount read update${readCount == 1 ? '' : 's'}? Unread updates stay.',
+      confirmLabel: 'Clear',
+    );
+    if (!confirmed || !mounted) return;
+    await NotificationService.instance.clearRead();
+    if (!mounted) return;
+    showAppSuccess(context, 'Read activity cleared');
+  }
+
+  Widget _filterBar(Color textColor) {
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+        itemCount: ActivityFilter.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = ActivityFilter.values[index];
+          final selected = filter == _filter;
+          return ChoiceChip(
+            label: Text('${filter.label} ${_countFor(filter)}'),
+            selected: selected,
+            showCheckmark: false,
+            selectedColor: AppColors.primary,
+            backgroundColor: AppColors.elevatedSurface(context),
+            side: BorderSide(color: AppColors.border(context)),
+            labelStyle: AppTextStyles.regularText.copyWith(
+              fontSize: 12,
+              color: selected ? Colors.black : textColor,
+            ),
+            onSelected: (_) => setState(() => _filter = filter),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _dayHeader(DateTime day, Color textColor) {
+    final label = activityDayLabel(day);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+      child: Text(
+        label,
+        style: AppTextStyles.regularText.copyWith(
+          color: AppColors.mutedText(context),
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildRows(List<AppNotification> items, Color textColor) {
+    final children = <Widget>[];
+    DateTime? lastDay;
+    for (final item in items) {
+      final local = item.createdAt.toLocal();
+      final day = DateTime(local.year, local.month, local.day);
+      if (lastDay != day) {
+        children.add(_dayHeader(day, textColor));
+        lastDay = day;
+      }
+      final connectionId = item.connectionId;
+      final conversation =
+          connectionId == null ? null : _conversations[connectionId];
+      final incoming = connectionId == null ? null : _incoming[connectionId];
+      final view = presentActivity(
+        item.toRow(),
+        incoming: incoming,
+        conversation: conversation,
+      );
+      final timeLabel = ChatTimeFormatter.formatChatListTime(item.createdAt);
+      children.add(
+        Dismissible(
+          key: ValueKey('activity:${item.id}'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(
+              Icons.mark_email_read_outlined,
+              color: AppColors.accentText(context),
+            ),
+          ),
+          confirmDismiss: (_) async {
+            if (item.isUnread) await _markItemRead(item);
+            return false;
+          },
+          child: _ActivityRow(
+            view: view,
+            unread: item.isUnread,
+            timeLabel: timeLabel,
+            onTap: () => _openItem(item),
+          ),
+        ),
+      );
+      children.add(const SizedBox(height: 8));
+    }
+    return children;
   }
 
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final items = _items;
+    final all = _items;
+    final items = _filteredItems;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -263,12 +404,22 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
               onPressed: _markingAll ? null : _markAllRead,
               child: Text(_markingAll ? 'Marking...' : 'Mark all read'),
             ),
+          if (!_loading && _error == null && all.any((item) => !item.isUnread))
+            IconButton(
+              tooltip: 'Clear read notifications',
+              onPressed: _clearRead,
+              icon: Icon(
+                Icons.delete_sweep_outlined,
+                size: 20,
+                color: textColor,
+              ),
+            ),
         ],
       ),
       body:
-          _loading && items.isEmpty
+          _loading && all.isEmpty
               ? const ActivitySkeleton()
-              : _error != null && items.isEmpty
+              : _error != null && all.isEmpty
               ? Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -291,63 +442,124 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
                   ),
                 ),
               )
-              : items.isEmpty
-              ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'No activity yet',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed:
-                          () => AppRouter.openRequests(
-                            view: RequestView.incoming,
-                          ),
-                      child: const Text('View requests'),
-                    ),
-                  ],
-                ),
-              )
-              : RefreshIndicator(
-                onRefresh: _load,
-                child: ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final connectionId = item.connectionId;
-                    final conversation =
-                        connectionId == null
-                            ? null
-                            : _conversations[connectionId];
-                    final incoming =
-                        connectionId == null ? null : _incoming[connectionId];
-                    final view = presentActivity(
-                      item.toRow(),
-                      incoming: incoming,
-                      conversation: conversation,
-                    );
-                    final timeLabel = ChatTimeFormatter.formatChatListTime(
-                      item.createdAt,
-                    );
-                    return _ActivityRow(
-                      view: view,
-                      unread: item.isUnread,
-                      timeLabel: timeLabel,
-                      onTap: () => _openItem(item),
-                    );
-                  },
-                ),
+              : Column(
+                children: [
+                  if (all.isNotEmpty) _filterBar(textColor),
+                  Expanded(
+                    child:
+                        all.isEmpty
+                            ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'No activity yet',
+                                    style: AppTextStyles.regularText.copyWith(
+                                      color: AppColors.mutedText(context),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed:
+                                        () => AppRouter.openRequests(
+                                          view: RequestView.incoming,
+                                        ),
+                                    child: const Text('View requests'),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : items.isEmpty
+                            ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'No ${_filter.label.toLowerCase()} activity.',
+                                    style: AppTextStyles.regularText.copyWith(
+                                      color: AppColors.mutedText(context),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed:
+                                        () => setState(
+                                          () => _filter = ActivityFilter.all,
+                                        ),
+                                    child: const Text('Show all'),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : RefreshIndicator(
+                              onRefresh: _load,
+                              child: ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  100,
+                                ),
+                                children: _buildRows(items, textColor),
+                              ),
+                            ),
+                  ),
+                ],
               ),
     );
   }
+}
+
+@visibleForTesting
+bool activityMatchesFilter(AppNotification item, ActivityFilter filter) {
+  switch (filter) {
+    case ActivityFilter.all:
+      return true;
+    case ActivityFilter.unread:
+      return item.isUnread;
+    case ActivityFilter.requests:
+      return item.kind.isRequest || item.kind.isMatch || item.kind.isDecline;
+    case ActivityFilter.updates:
+      return item.kind.isFeedback ||
+          item.kind == AppNotificationKind.skillModeration ||
+          item.kind == AppNotificationKind.unknown;
+  }
+}
+
+@visibleForTesting
+String activityDayLabel(DateTime day, {DateTime? now}) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final current = now ?? DateTime.now();
+  final today = DateTime(current.year, current.month, current.day);
+  final diff = today.difference(day).inDays;
+  if (diff == 0) return 'Today';
+  if (diff == 1) return 'Yesterday';
+  return '${months[day.month - 1]} ${day.day}';
+}
+
+enum ActivityFilter {
+  all('All'),
+  unread('Unread'),
+  requests('Requests'),
+  updates('Updates');
+
+  const ActivityFilter(this.label);
+
+  final String label;
 }
 
 class _ActivityRow extends StatelessWidget {

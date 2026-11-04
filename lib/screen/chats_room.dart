@@ -19,6 +19,7 @@ import 'package:palturo/screen/chat_pending_message.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/chat_menu_row.dart';
+import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/chat_search_sheet.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/app_feedback.dart';
@@ -752,65 +753,7 @@ class _ChatRoomState extends State<ChatRoom> {
   Future<void> _showMuteSheet() async {
     final connectionId = widget.connectionId;
     if (connectionId == null) return;
-    final muted = ChatStateService.instance.isMuted(connectionId);
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.elevatedSurface(context),
-      builder: (sheetContext) {
-        final sheetText = Theme.of(sheetContext).colorScheme.secondary;
-        Widget row(String value, String label, IconData icon) {
-          return ListTile(
-            leading: Icon(icon, size: 20, color: sheetText),
-            title: Text(
-              label,
-              style: AppTextStyles.regularText.copyWith(color: sheetText),
-            ),
-            onTap: () => Navigator.pop(sheetContext, value),
-          );
-        }
-
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (muted)
-                row('off', 'Unmute', Icons.notifications_active_outlined)
-              else ...[
-                row('1h', 'Mute for 1 hour', Icons.schedule),
-                row('8h', 'Mute for 8 hours', Icons.schedule),
-                row('1d', 'Mute for 1 day', Icons.schedule),
-                row('1w', 'Mute for 1 week', Icons.schedule),
-                row('always', 'Mute until I turn it back on', Icons.schedule),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-    if (choice == null || !mounted) return;
-
-    DateTime? until;
-    switch (choice) {
-      case '1h':
-        until = DateTime.now().add(const Duration(hours: 1));
-      case '8h':
-        until = DateTime.now().add(const Duration(hours: 8));
-      case '1d':
-        until = DateTime.now().add(const Duration(days: 1));
-      case '1w':
-        until = DateTime.now().add(const Duration(days: 7));
-      case 'always':
-        until = DateTime(9999);
-      case 'off':
-        until = null;
-    }
-    await ChatStateService.instance.setMuted(connectionId, until);
-    if (!mounted) return;
-    unawaited(Haptics.selection());
-    showAppSnackBar(
-      context,
-      until == null ? 'Notifications unmuted' : 'Chat muted',
-    );
+    await showChatMuteSheet(context, connectionId);
   }
 
   Future<void> _markUnreadAndLeave() async {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -143,5 +145,24 @@ class PreferencesService extends ChangeNotifier {
 
   Future<String?> getString(String key) async {
     return await _prefs.getString(key);
+  }
+
+  /// Small string-map store for saved screen filters.
+  Future<Map<String, String>?> getFilterMap(String key) async {
+    try {
+      final raw = await getString(key);
+      if (raw == null || raw.trim().isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return decoded.map(
+        (mapKey, value) => MapEntry(mapKey.toString(), value.toString()),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setFilterMap(String key, Map<String, String> filters) {
+    return setString(key, jsonEncode(filters));
   }
 }

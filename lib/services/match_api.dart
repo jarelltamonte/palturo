@@ -819,6 +819,11 @@ class MatchApi {
     return (res as num?)?.toInt() ?? 0;
   }
 
+  static Future<int> clearReadNotifications() async {
+    final res = await _Client.c.rpc('clear_read_notifications');
+    return (res as num?)?.toInt() ?? 0;
+  }
+
   static Future<void> markNotificationsRead() =>
       _Client.c.rpc('mark_notifications_read');
 

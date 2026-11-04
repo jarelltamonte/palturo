@@ -8,6 +8,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
@@ -15,12 +16,14 @@ import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/draft_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/utils/chat_unread.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
@@ -106,6 +109,7 @@ class _ChatsPageState extends State<ChatsPage> {
     ChatStateService.instance.addListener(_onChatStateChanged);
     NotificationService.instance.addListener(_onChatStateChanged);
     DraftService.instance.addListener(_onChatStateChanged);
+    _restoreFilters();
     _loadChats();
   }
 
@@ -200,6 +204,136 @@ class _ChatsPageState extends State<ChatsPage> {
     }).toList();
   }
 
+  Future<void> _showChatActions(MatchedUser chat) async {
+    final connectionId = chat.connectionId;
+    if (connectionId == null) return;
+    final muted = ChatStateService.instance.isMuted(connectionId);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.elevatedSurface(context),
+      builder: (sheetContext) {
+        final text = Theme.of(sheetContext).colorScheme.secondary;
+        Widget row(String value, String label, IconData icon, {Color? color}) {
+          final tint = color ?? text;
+          return ListTile(
+            leading: Icon(icon, size: 20, color: tint),
+            title: Text(
+              label,
+              style: AppTextStyles.regularText.copyWith(color: tint),
+            ),
+            onTap: () => Navigator.pop(sheetContext, value),
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              row('profile', 'View profile', Icons.person_outline),
+              row(
+                'mute',
+                muted ? 'Unmute notifications' : 'Mute notifications',
+                muted
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
+              ),
+              row('unread', 'Mark as unread', Icons.mark_chat_unread_outlined),
+              row(
+                'report',
+                'Report',
+                Icons.flag_outlined,
+                color: AppColors.dangerText(sheetContext),
+              ),
+              row(
+                'block',
+                'Block',
+                Icons.block,
+                color: AppColors.dangerText(sheetContext),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (action == null || !mounted) return;
+
+    switch (action) {
+      case 'profile':
+        showPersonProfileDialog(
+          context,
+          chat.toPerson(),
+          onUnmatch: null,
+          onBlock: () => _blockChat(chat),
+          onReport: (reason) => _reportChat(chat, reason),
+        );
+      case 'mute':
+        await showChatMuteSheet(context, connectionId);
+      case 'unread':
+        await ChatStateService.instance.setMarkedUnread(connectionId, true);
+        if (mounted) showAppSnackBar(context, 'Marked as unread');
+      case 'report':
+        final reason = await showReportReasonDialog(context, name: chat.name);
+        if (reason == null) return;
+        await _reportChat(chat, reason);
+      case 'block':
+        final confirmed = await showConfirmDialog(
+          context,
+          title: 'Block',
+          message:
+              '${chat.name} won\'t be able to find or message you, and will be removed from your Pals. You can unblock them anytime in Settings.',
+          confirmLabel: 'Block',
+        );
+        if (!confirmed) return;
+        await _blockChat(chat);
+    }
+  }
+
+  Future<void> _blockChat(MatchedUser chat) async {
+    final target = chat.otherUserId;
+    if (target == null || target.isEmpty) {
+      showAppSnackBar(context, 'This profile is unavailable right now.');
+      return;
+    }
+    try {
+      await MatchApi.blockUser(target);
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
+        ),
+      );
+      return;
+    }
+    await ChatStateService.instance.loadConversations(showSpinner: false);
+    if (!mounted) return;
+    showAppSuccess(context, 'You blocked ${chat.name}');
+  }
+
+  Future<void> _reportChat(MatchedUser chat, String reason) async {
+    final target = chat.otherUserId;
+    if (target == null || target.isEmpty) {
+      showAppSnackBar(context, 'This profile is unavailable right now.');
+      return;
+    }
+    try {
+      await MatchApi.reportUser(target, reason);
+      if (!mounted) return;
+      showAppSuccess(context, 'Thanks for your report.');
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
+        ),
+      );
+    }
+  }
+
   void _startSearch() {
     setState(() => _isSearching = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -250,12 +384,28 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
+  Future<void> _restoreFilters() async {
+    final saved = await PreferencesService.instance.getFilterMap(
+      'chat_filters_v1',
+    );
+    if (!mounted || saved == null) return;
+    setState(() {
+      _filters = {
+        'role': saved['role'] ?? 'all',
+        'status': saved['status'] ?? 'all',
+      };
+    });
+  }
+
   void _openFilterSheet() {
     FilterBottomSheet.show(
       context,
       sections: _filterSections,
       selected: _filters,
-      onApply: (result) => setState(() => _filters = result),
+      onApply: (result) {
+        setState(() => _filters = result);
+        PreferencesService.instance.setFilterMap('chat_filters_v1', result);
+      },
     );
   }
 
@@ -651,6 +801,7 @@ class _ChatsPageState extends State<ChatsPage> {
                           PreferencesService.instance.notificationsEnabled,
                       skillName: chat.skillName,
                       role: chat.role,
+                      onLongPress: () => _showChatActions(chat),
                       muted: ChatStateService.instance.isMuted(
                         chat.connectionId ?? '',
                       ),
@@ -808,6 +959,7 @@ class ChatListItem extends StatelessWidget {
   final bool muted;
   final ImageProvider? avatarImage;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   const ChatListItem({
     super.key,
@@ -820,6 +972,7 @@ class ChatListItem extends StatelessWidget {
     this.muted = false,
     this.avatarImage,
     this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -828,6 +981,7 @@ class ChatListItem extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Row(

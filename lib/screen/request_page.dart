@@ -287,6 +287,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   void initState() {
     super.initState();
     _view = widget.initialView;
+    _restoreFilters();
     widget.refreshSignal?.addListener(_refreshFromShell);
     NotificationService.instance.addListener(_onActivityChanged);
     _loadRequests();
@@ -680,6 +681,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
               orElse: () => SortFilter.newest,
             );
           });
+          _persistFilters();
         },
       );
       return;
@@ -711,8 +713,63 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
             orElse: () => SortFilter.newest,
           );
         });
+        _persistFilters();
       },
     );
+  }
+
+  Future<void> _restoreFilters() async {
+    final incoming = await PreferencesService.instance.getFilterMap(
+      'request_filters_incoming_v1',
+    );
+    final sent = await PreferencesService.instance.getFilterMap(
+      'request_filters_sent_v1',
+    );
+    if (!mounted) return;
+    setState(() {
+      if (incoming != null) {
+        _dateFilter = DateFilter.values.firstWhere(
+          (value) => value.name == incoming['date'],
+          orElse: () => DateFilter.all,
+        );
+        _roleFilter = RoleFilter.values.firstWhere(
+          (value) => value.name == incoming['role'],
+          orElse: () => RoleFilter.all,
+        );
+        _sortFilter = SortFilter.values.firstWhere(
+          (value) => value.name == incoming['sort'],
+          orElse: () => SortFilter.newest,
+        );
+        _skillFilter = incoming['skill'] ?? 'all';
+        _domainFilter = incoming['domain'] ?? 'all';
+      }
+      if (sent != null) {
+        _sentStatusFilter = sent['status'] ?? 'all';
+        _sentDateFilter = DateFilter.values.firstWhere(
+          (value) => value.name == sent['date'],
+          orElse: () => DateFilter.all,
+        );
+        _sentSortFilter = SortFilter.values.firstWhere(
+          (value) => value.name == sent['sort'],
+          orElse: () => SortFilter.newest,
+        );
+      }
+    });
+  }
+
+  void _persistFilters() {
+    PreferencesService.instance.setFilterMap('request_filters_incoming_v1', {
+      'date': _dateFilter.name,
+      'role': _roleFilter.name,
+      'skill': _skillFilter,
+      'domain': _domainFilter,
+      'sort': _sortFilter.name,
+    });
+    PreferencesService.instance.setFilterMap('request_filters_sent_v1', {
+      'status': _sentStatusFilter,
+      'date': _sentDateFilter.name,
+      'sort': _sentSortFilter.name,
+    });
   }
 
   void _clearSentFilters() {
@@ -721,6 +778,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       _sentDateFilter = DateFilter.all;
       _sentSortFilter = SortFilter.newest;
     });
+    _persistFilters();
   }
 
   Widget _buildIncoming(Color textTheme) {
@@ -1006,6 +1064,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                     _domainFilter = 'all';
                     _sortFilter = SortFilter.newest;
                   });
+                  _persistFilters();
                 },
                 child: const Text('Clear filters'),
               ),

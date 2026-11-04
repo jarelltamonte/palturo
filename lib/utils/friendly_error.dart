@@ -5,12 +5,27 @@ String friendlyError(
   final raw =
       error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
   final lower = raw.toLowerCase();
+  // Technical driver/SQL text must never reach a snackbar, even when it
+  // contains words like "password" or "character".
+  if (lower.contains('postgrest') ||
+      lower.contains('sqlexception') ||
+      lower.contains('varying(') ||
+      lower.contains('password authentication') ||
+      lower.contains('permission denied for table') ||
+      lower.contains('relation "') ||
+      lower.contains('column "') ||
+      lower.contains('invalid input syntax') ||
+      lower.contains('stack trace') ||
+      lower.contains('user "')) {
+    return fallback;
+  }
   if (lower.contains('socket') ||
       lower.contains('network') ||
       lower.contains('timeout') ||
       lower.contains('failed host') ||
       lower.contains('connection refused') ||
       lower.contains('connection reset') ||
+      lower.contains('internet connection') ||
       lower.contains('check your connection')) {
     return 'Please check your connection and try again.';
   }
@@ -31,6 +46,8 @@ String friendlyError(
       lower.contains('uppercase') ||
       lower.contains('lowercase') ||
       lower.contains('special') ||
+      lower.contains('number') ||
+      lower.contains('digit') ||
       lower.contains('same as') ||
       lower.contains('does not meet') ||
       lower.contains('delete your account') ||

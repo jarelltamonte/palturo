@@ -9,9 +9,10 @@ String? presenceLabel(
 }) {
   if (!enabled || lastSeen == null) return null;
   final current = now ?? DateTime.now();
+  if (presenceIsOnline(lastSeen, enabled: enabled, now: current)) {
+    return 'Online';
+  }
   final diff = current.difference(lastSeen);
-  if (diff.isNegative) return 'Online';
-  if (diff.inMinutes < 2) return 'Online';
   if (diff.inHours < 1) {
     final minutes = diff.inMinutes < 1 ? 1 : diff.inMinutes;
     return 'Active ${minutes}m ago';
@@ -28,6 +29,5 @@ bool presenceIsOnline(
 }) {
   if (!enabled || lastSeen == null) return false;
   final current = now ?? DateTime.now();
-  return !lastSeen.isAfter(current) &&
-      current.difference(lastSeen).inMinutes < 2;
+  return current.difference(lastSeen).inMinutes < 2;
 }

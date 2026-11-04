@@ -12,28 +12,43 @@ class ChatPrivacyService extends ChangeNotifier {
   bool readReceiptsEnabled = true;
   bool _loaded = false;
   bool _loading = false;
+  bool _loadFailed = false;
+  int _generation = 0;
 
   bool get loaded => _loaded;
+  bool get loading => _loading;
+  bool get loadFailed => _loadFailed;
 
   Future<void> loadIfNeeded() async {
     if (_loaded || _loading) return;
     await load();
   }
 
-  Future<void> load() async {
-    if (_loading) return;
+  Future<bool> load() async {
+    if (_loading) return _loaded;
+    final generation = _generation;
     _loading = true;
+    _loadFailed = false;
+    notifyListeners();
     try {
       final data = await MatchApi.getChatPrivacy();
+      if (generation != _generation) return false;
       presenceEnabled = data['presence_enabled'] != false;
       typingEnabled = data['typing_enabled'] != false;
       readReceiptsEnabled = data['read_receipts_enabled'] != false;
       _loaded = true;
-      notifyListeners();
+      _loadFailed = false;
+      return true;
     } catch (_) {
-      // Keep the permissive defaults; the chat surfaces remain usable.
+      if (generation != _generation) return false;
+      // Stay unloaded so the page cannot save stale defaults.
+      _loadFailed = true;
+      return false;
     } finally {
-      _loading = false;
+      if (generation == _generation) {
+        _loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -64,10 +79,29 @@ class ChatPrivacyService extends ChangeNotifier {
     }
   }
 
+  @visibleForTesting
+  void debugSetLoaded({
+    bool presence = true,
+    bool typing = true,
+    bool readReceipts = true,
+  }) {
+    presenceEnabled = presence;
+    typingEnabled = typing;
+    readReceiptsEnabled = readReceipts;
+    _loaded = true;
+    _loading = false;
+    _loadFailed = false;
+    notifyListeners();
+  }
+
   void reset() {
+    _generation++;
     presenceEnabled = true;
     typingEnabled = true;
     readReceiptsEnabled = true;
     _loaded = false;
+    _loading = false;
+    _loadFailed = false;
+    notifyListeners();
   }
 }

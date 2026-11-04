@@ -92,6 +92,7 @@ void main() {
   });
 
   testWidgets('chat privacy page renders all controls at 200%', (tester) async {
+    ChatPrivacyService.instance.debugSetLoaded();
     await tester.binding.setSurfaceSize(const Size(360, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -122,5 +123,17 @@ void main() {
     );
     expect(find.text('Who can see my status: Pals only'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('page blocks editing until privacy state loads', (tester) async {
+    ChatPrivacyService.instance.reset();
+
+    await tester.pumpWidget(
+      MaterialApp(theme: lightMode, home: const ChatPrivacyPage()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.byType(Switch), findsNothing);
   });
 }

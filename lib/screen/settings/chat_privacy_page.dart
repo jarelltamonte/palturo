@@ -14,11 +14,28 @@ class ChatPrivacyPage extends StatefulWidget {
 
 class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
   bool _saving = false;
+  bool _loading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    ChatPrivacyService.instance.loadIfNeeded();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final service = ChatPrivacyService.instance;
+    if (service.loaded) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final ok = await service.load();
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _error = ok ? null : "Couldn't load chat privacy. Please try again.";
+    });
   }
 
   Future<void> _save({bool? presence, bool? typing, bool? readReceipts}) async {
@@ -59,6 +76,33 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
         animation: ChatPrivacyService.instance,
         builder: (context, _) {
           final service = ChatPrivacyService.instance;
+          if (_loading || service.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (_error != null || !service.loaded) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _error ?? "Couldn't load chat privacy. Please try again.",
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _load,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
             children: [
@@ -66,7 +110,7 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
                 context,
                 title: 'Show when I am online',
                 subtitle:
-                    'Pals can see an online dot and your last active time.',
+                    'When off, Pals cannot see when you are online or were last active.',
                 value: service.presenceEnabled,
                 onChanged: (value) {
                   Haptics.selection();
@@ -76,8 +120,7 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
               _switch(
                 context,
                 title: 'Typing indicators',
-                subtitle:
-                    'Let Pals see when you are typing. Turning this off also hides their typing.',
+                subtitle: 'When off, you do not send typing status to Pals.',
                 value: service.typingEnabled,
                 onChanged: (value) {
                   Haptics.selection();
@@ -88,7 +131,7 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
                 context,
                 title: 'Show read receipts',
                 subtitle:
-                    'Let Pals see when you have read their messages. Turning this off also hides their receipts.',
+                    'When off, Pals cannot see when you have read their messages.',
                 value: service.readReceiptsEnabled,
                 onChanged: (value) {
                   Haptics.selection();

@@ -57,6 +57,8 @@ class ConversationLite {
   final int unread;
   final String? otherAvatar;
   final String? otherSkill;
+  final DateTime? mutedUntil;
+  final bool markedUnread;
   const ConversationLite({
     required this.connectionId,
     required this.status,
@@ -68,6 +70,8 @@ class ConversationLite {
     required this.unread,
     this.otherAvatar,
     this.otherSkill,
+    this.mutedUntil,
+    this.markedUnread = false,
   });
 
   ConversationLite copyWith({
@@ -81,6 +85,9 @@ class ConversationLite {
     int? unread,
     String? otherAvatar,
     String? otherSkill,
+    DateTime? mutedUntil,
+    bool clearMutedUntil = false,
+    bool? markedUnread,
   }) {
     return ConversationLite(
       connectionId: connectionId ?? this.connectionId,
@@ -93,6 +100,8 @@ class ConversationLite {
       unread: unread ?? this.unread,
       otherAvatar: otherAvatar ?? this.otherAvatar,
       otherSkill: otherSkill ?? this.otherSkill,
+      mutedUntil: clearMutedUntil ? null : (mutedUntil ?? this.mutedUntil),
+      markedUnread: markedUnread ?? this.markedUnread,
     );
   }
 
@@ -485,9 +494,37 @@ class MatchApi {
             otherAvatar: r['other_avatar'] as String?,
             otherSkill:
                 (r['other_skill'] ?? r['skill_name'] ?? r['skill']) as String?,
+            mutedUntil:
+                DateTime.tryParse(
+                  r['muted_until']?.toString() ?? '',
+                )?.toLocal(),
+            markedUnread: r['marked_unread'] == true,
           ),
         )
         .toList();
+  }
+
+  static Future<void> setConnectionMute(
+    String connectionId,
+    DateTime? mutedUntil,
+  ) async {
+    await _Client.c.rpc(
+      'set_connection_mute',
+      params: {
+        'p_connection_id': connectionId,
+        'p_muted_until': mutedUntil?.toUtc().toIso8601String(),
+      },
+    );
+  }
+
+  static Future<void> setConnectionUnread(
+    String connectionId,
+    bool unread,
+  ) async {
+    await _Client.c.rpc(
+      'set_connection_unread',
+      params: {'p_connection_id': connectionId, 'p_unread': unread},
+    );
   }
 
   /// Messages in one room (renders in ChatRoom). Keeps created_at so the

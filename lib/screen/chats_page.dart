@@ -651,6 +651,9 @@ class _ChatsPageState extends State<ChatsPage> {
                           PreferencesService.instance.notificationsEnabled,
                       skillName: chat.skillName,
                       role: chat.role,
+                      muted: ChatStateService.instance.isMuted(
+                        chat.connectionId ?? '',
+                      ),
                       avatarImage: avatarImage,
                       onTap:
                           () => _openChatRoom(
@@ -802,6 +805,7 @@ class ChatListItem extends StatelessWidget {
   final bool hasUnread;
   final String? skillName;
   final PersonRole? role;
+  final bool muted;
   final ImageProvider? avatarImage;
   final VoidCallback? onTap;
 
@@ -813,6 +817,7 @@ class ChatListItem extends StatelessWidget {
     this.hasUnread = true,
     this.skillName,
     this.role,
+    this.muted = false,
     this.avatarImage,
     this.onTap,
   });
@@ -879,6 +884,17 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (muted) ...[
+                        const SizedBox(width: 6),
+                        Semantics(
+                          label: 'Muted',
+                          child: Icon(
+                            Icons.notifications_off_outlined,
+                            size: 14,
+                            color: AppColors.mutedText(context),
+                          ),
+                        ),
+                      ],
                       if (time.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Text(

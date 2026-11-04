@@ -550,6 +550,16 @@ class _ChatRoomState extends State<ChatRoom> {
       return;
     }
 
+    if (action == 'mute') {
+      await _showMuteSheet();
+      return;
+    }
+
+    if (action == 'unread') {
+      await _markUnreadAndLeave();
+      return;
+    }
+
     final peerId = widget.person?.id;
     if (peerId == null || !_uuidPattern.hasMatch(peerId)) {
       _showPeerUnavailable();
@@ -571,6 +581,79 @@ class _ChatRoomState extends State<ChatRoom> {
       if (!confirmed) return;
       _block();
     }
+  }
+
+  Future<void> _showMuteSheet() async {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    final muted = ChatStateService.instance.isMuted(connectionId);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.elevatedSurface(context),
+      builder: (sheetContext) {
+        final sheetText = Theme.of(sheetContext).colorScheme.secondary;
+        Widget row(String value, String label, IconData icon) {
+          return ListTile(
+            leading: Icon(icon, size: 20, color: sheetText),
+            title: Text(
+              label,
+              style: AppTextStyles.regularText.copyWith(color: sheetText),
+            ),
+            onTap: () => Navigator.pop(sheetContext, value),
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (muted)
+                row('off', 'Unmute', Icons.notifications_active_outlined)
+              else ...[
+                row('1h', 'Mute for 1 hour', Icons.schedule),
+                row('8h', 'Mute for 8 hours', Icons.schedule),
+                row('1d', 'Mute for 1 day', Icons.schedule),
+                row('1w', 'Mute for 1 week', Icons.schedule),
+                row('always', 'Mute until I turn it back on', Icons.schedule),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+    if (choice == null || !mounted) return;
+
+    DateTime? until;
+    switch (choice) {
+      case '1h':
+        until = DateTime.now().add(const Duration(hours: 1));
+      case '8h':
+        until = DateTime.now().add(const Duration(hours: 8));
+      case '1d':
+        until = DateTime.now().add(const Duration(days: 1));
+      case '1w':
+        until = DateTime.now().add(const Duration(days: 7));
+      case 'always':
+        until = DateTime(9999);
+      case 'off':
+        until = null;
+    }
+    await ChatStateService.instance.setMuted(connectionId, until);
+    if (!mounted) return;
+    unawaited(Haptics.selection());
+    showAppSnackBar(
+      context,
+      until == null ? 'Notifications unmuted' : 'Chat muted',
+    );
+  }
+
+  Future<void> _markUnreadAndLeave() async {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    await ChatStateService.instance.setMarkedUnread(connectionId, true);
+    if (!mounted) return;
+    unawaited(Haptics.selection());
+    Navigator.pop(context);
   }
 
   @override
@@ -707,11 +790,50 @@ class _ChatRoomState extends State<ChatRoom> {
                           ],
                         ),
                       ),
-                    const PopupMenuItem<String>(
-                      enabled: false,
-                      child: Text(
-                        'Mute, archive, mark unread coming soon',
-                        style: TextStyle(fontSize: 12),
+                    PopupMenuItem<String>(
+                      value: 'mute',
+                      child: Row(
+                        children: [
+                          Icon(
+                            ChatStateService.instance.isMuted(
+                                  widget.connectionId ?? '',
+                                )
+                                ? Icons.notifications_active_outlined
+                                : Icons.notifications_off_outlined,
+                            color: textTheme,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            ChatStateService.instance.isMuted(
+                                  widget.connectionId ?? '',
+                                )
+                                ? 'Unmute notifications'
+                                : 'Mute notifications',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'unread',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.mark_chat_unread_outlined,
+                            color: textTheme,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Mark as unread',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     PopupMenuItem<String>(

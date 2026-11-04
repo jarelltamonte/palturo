@@ -7,6 +7,12 @@ import 'package:palturo/services/match_api.dart';
 
 /// Single source of truth for chat conversations, live preview/ordering,
 /// and unread message indicators across navigation bar, chats page, and chat room.
+@visibleForTesting
+bool isMuteActive(DateTime? mutedUntil, {DateTime? now}) {
+  if (mutedUntil == null) return false;
+  return mutedUntil.isAfter(now ?? DateTime.now());
+}
+
 class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   static final ChatStateService instance = ChatStateService._();
 
@@ -306,16 +312,75 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Called when user opens ChatRoom. Clears unread immediately and marks read on server.
+  bool isMuted(String connectionId) {
+    return isMuteActive(mutedUntilFor(connectionId));
+  }
+
+  DateTime? mutedUntilFor(String connectionId) {
+    final index = _conversations.indexWhere(
+      (c) => c.connectionId == connectionId,
+    );
+    return index == -1 ? null : _conversations[index].mutedUntil;
+  }
+
+  bool isMarkedUnread(String connectionId) {
+    final index = _conversations.indexWhere(
+      (c) => c.connectionId == connectionId,
+    );
+    return index == -1 ? false : _conversations[index].markedUnread;
+  }
+
+  Future<void> setMuted(String connectionId, DateTime? until) async {
+    final index = _conversations.indexWhere(
+      (c) => c.connectionId == connectionId,
+    );
+    if (index != -1) {
+      _conversations[index] = _conversations[index].copyWith(
+        mutedUntil: until,
+        clearMutedUntil: until == null,
+      );
+      notifyListeners();
+    }
+    try {
+      await MatchApi.setConnectionMute(connectionId, until);
+    } catch (_) {
+      // Revert to the server truth on failure.
+      unawaited(loadConversations(showSpinner: false));
+    }
+  }
+
+  Future<void> setMarkedUnread(String connectionId, bool unread) async {
+    final index = _conversations.indexWhere(
+      (c) => c.connectionId == connectionId,
+    );
+    if (index != -1) {
+      _conversations[index] = _conversations[index].copyWith(
+        markedUnread: unread,
+      );
+      notifyListeners();
+    }
+    try {
+      await MatchApi.setConnectionUnread(connectionId, unread);
+    } catch (_) {
+      unawaited(loadConversations(showSpinner: false));
+    }
+  }
+
   Future<void> enterRoom(String connectionId) async {
     _activeConnectionId = connectionId;
 
     final index = _conversations.indexWhere(
       (c) => c.connectionId == connectionId,
     );
-    if (index != -1 && _conversations[index].unread > 0) {
+    if (index != -1) {
       final old = _conversations[index];
-      _conversations[index] = old.copyWith(unread: 0);
-      notifyListeners();
+      if (old.unread > 0 || old.markedUnread) {
+        _conversations[index] = old.copyWith(unread: 0, markedUnread: false);
+        notifyListeners();
+      }
+      if (old.markedUnread) {
+        unawaited(setMarkedUnread(connectionId, false));
+      }
     }
 
     await MatchApi.markMessagesRead(connectionId);

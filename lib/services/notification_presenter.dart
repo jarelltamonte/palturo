@@ -213,6 +213,7 @@ class NotificationPresenter {
     if (ChatStateService.instance.activeConnectionId == event.connectionId) {
       return;
     }
+    if (ChatStateService.instance.isMuted(event.connectionId)) return;
 
     if (notificationFeedbackAllowed()) {
       unawaited(Haptics.tap());

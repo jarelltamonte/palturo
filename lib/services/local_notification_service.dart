@@ -288,6 +288,7 @@ class LocalNotificationService extends ChangeNotifier
     if (NotificationService.instance.isForeground) return;
     if (!PreferencesService.instance.notificationsEnabled) return;
     if (!PreferencesService.instance.messageNotificationsEnabled) return;
+    if (ChatStateService.instance.isMuted(event.connectionId)) return;
 
     final quiet = PreferencesService.instance.isQuietHoursNow;
     final sound = PreferencesService.instance.soundEnabled && !quiet;

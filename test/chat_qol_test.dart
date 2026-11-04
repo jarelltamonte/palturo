@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/utils/chat_unread.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/match_api.dart';
@@ -31,6 +32,13 @@ void main() {
     expect(conversationHasUnread(conversation()), isFalse);
     expect(conversationHasUnread(conversation(unread: 2)), isTrue);
     expect(conversationHasUnread(conversation(markedUnread: true)), isTrue);
+  });
+
+  test('unread divider lands before the first unread message', () {
+    expect(unreadDividerIndex(length: 10, unreadAtOpen: 3), 7);
+    expect(unreadDividerIndex(length: 2, unreadAtOpen: 5), 0);
+    expect(unreadDividerIndex(length: 10, unreadAtOpen: 0), isNull);
+    expect(unreadDividerIndex(length: 0, unreadAtOpen: 3), isNull);
   });
 
   test('conversation copyWith updates mute and unread state', () {

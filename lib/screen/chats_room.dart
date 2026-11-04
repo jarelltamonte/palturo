@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -10,6 +11,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/connectivity_service.dart';
 import 'package:palturo/services/draft_service.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
@@ -18,6 +20,12 @@ import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/app_feedback.dart';
+
+@visibleForTesting
+int? unreadDividerIndex({required int length, required int unreadAtOpen}) {
+  if (unreadAtOpen <= 0 || length == 0) return null;
+  return (length - unreadAtOpen).clamp(0, length - 1);
+}
 
 class ChatRoom extends StatefulWidget {
   final String? connectionId;
@@ -62,12 +70,24 @@ class _ChatRoomState extends State<ChatRoom> {
   final List<PendingChatMessage> _pending = [];
   int _pendingSequence = 0;
   Timer? _draftTimer;
+  bool _isScrolledUp = false;
+  int _newWhileScrolled = 0;
+  int _unreadAtOpen = 0;
+  int? _unreadDividerIndex;
+  String? _highlightedMessageKey;
+  Timer? _highlightTimer;
 
   @override
   void initState() {
     super.initState();
     final connectionId = widget.connectionId;
     if (connectionId != null) {
+      for (final conversation in ChatStateService.instance.conversations) {
+        if (conversation.connectionId == connectionId) {
+          _unreadAtOpen = conversation.unread;
+          break;
+        }
+      }
       ChatStateService.instance.enterRoom(connectionId);
       final draft = DraftService.instance.draftFor(connectionId);
       if (draft != null) {
@@ -81,9 +101,36 @@ class _ChatRoomState extends State<ChatRoom> {
       setState(() {});
       _queueDraftSave();
     });
+    _scrollController.addListener(_onScrollChanged);
+    ConnectivityService.instance.addListener(_onConnectivityChanged);
     _loadMessages();
     _subscribeRealtime();
     _refreshFeedbackStatus();
+  }
+
+  void _onConnectivityChanged() {
+    if (!ConnectivityService.instance.online) return;
+    unawaited(_retryAllFailed());
+  }
+
+  bool get _isNearBottom {
+    if (!_scrollController.hasClients) return true;
+    final position = _scrollController.position;
+    return position.maxScrollExtent - position.pixels < 64;
+  }
+
+  void _onScrollChanged() {
+    final atBottom = _isNearBottom;
+    if (atBottom) {
+      if (_isScrolledUp || _newWhileScrolled > 0) {
+        setState(() {
+          _isScrolledUp = false;
+          _newWhileScrolled = 0;
+        });
+      }
+    } else if (!_isScrolledUp) {
+      setState(() => _isScrolledUp = true);
+    }
   }
 
   Future<void> _refreshFeedbackStatus() async {
@@ -108,6 +155,9 @@ class _ChatRoomState extends State<ChatRoom> {
     }
     _messageStream?.cancel();
     _draftTimer?.cancel();
+    _highlightTimer?.cancel();
+    _scrollController.removeListener(_onScrollChanged);
+    ConnectivityService.instance.removeListener(_onConnectivityChanged);
     final connectionId = widget.connectionId;
     if (connectionId != null &&
         Supabase.instance.client.auth.currentUser != null) {
@@ -144,6 +194,7 @@ class _ChatRoomState extends State<ChatRoom> {
       if (!mounted) return;
       setState(() {
         _messages = _sortMessages(msgs);
+        _placeUnreadDivider(_messages.length);
         _loadingMessages = false;
       });
       _scrollToBottom();
@@ -171,11 +222,20 @@ class _ChatRoomState extends State<ChatRoom> {
         .eq('connection_id', widget.connectionId!)
         .listen((rows) {
           if (!mounted) return;
+          final wasAtBottom = _isNearBottom;
+          final previousCount = _messages.length;
           setState(() {
             _messages = _sortMessages(rows);
+            _placeUnreadDivider(_messages.length);
             if (rows.isNotEmpty) _loadError = null;
           });
-          _scrollToBottom();
+          if (wasAtBottom) {
+            _scrollToBottom();
+          } else if (rows.length > previousCount) {
+            setState(() {
+              _newWhileScrolled += rows.length - previousCount;
+            });
+          }
         });
   }
 
@@ -204,6 +264,27 @@ class _ChatRoomState extends State<ChatRoom> {
       }
     });
   }
+
+  void _scrollToBottomAnimated() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _placeUnreadDivider(int length) {
+    if (_unreadDividerIndex != null) return;
+    _unreadDividerIndex = unreadDividerIndex(
+      length: length,
+      unreadAtOpen: _unreadAtOpen,
+    );
+  }
+
+  String _messageKey(Map<String, dynamic> message) =>
+      message['id']?.toString() ??
+      '${message['created_at']}-${message['sender_id']}-${message['body']}';
 
   Future<void> _sendMessage() async {
     if (_sendingMessage) return;
@@ -296,6 +377,177 @@ class _ChatRoomState extends State<ChatRoom> {
     } catch (_) {
       // Realtime will reconcile; the optimistic bubble already cleared.
     }
+  }
+
+  Future<void> _retryAllFailed() async {
+    if (_sendingMessage) return;
+    final failed = _pending
+        .where((item) => item.status == PendingMessageStatus.failed)
+        .toList(growable: false);
+    if (failed.isEmpty) return;
+    for (final item in failed) {
+      if (!mounted) return;
+      final stillQueued = _pending.any(
+        (entry) =>
+            entry.localId == item.localId &&
+            entry.status == PendingMessageStatus.failed,
+      );
+      if (!stillQueued) continue;
+      await _retryPending(item);
+      final failedAgain = _pending.any(
+        (entry) =>
+            entry.localId == item.localId &&
+            entry.status == PendingMessageStatus.failed,
+      );
+      if (failedAgain) break;
+    }
+  }
+
+  Future<void> _copyMessage(String body) async {
+    if (body.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: body));
+    if (!mounted) return;
+    unawaited(Haptics.selection());
+    showAppSnackBar(context, 'Message copied');
+  }
+
+  void _highlightMessage(String key) {
+    _highlightTimer?.cancel();
+    setState(() => _highlightedMessageKey = key);
+    _highlightTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() => _highlightedMessageKey = null);
+    });
+  }
+
+  Future<void> _showSearch() async {
+    final queryController = TextEditingController();
+    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.elevatedSurface(context),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final query = queryController.text.trim().toLowerCase();
+            final matches =
+                query.isEmpty
+                    ? const <Map<String, dynamic>>[]
+                    : _messages
+                        .where((message) {
+                          final body =
+                              (message['body'] ?? '').toString().toLowerCase();
+                          return body.contains(query);
+                        })
+                        .toList(growable: false);
+            final textColor = Theme.of(sheetContext).colorScheme.secondary;
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 12,
+                  bottom: 12 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+                ),
+                child: SizedBox(
+                  height: MediaQuery.sizeOf(sheetContext).height * 0.6,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: queryController,
+                        autofocus: true,
+                        onChanged: (_) => setSheetState(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Search this chat',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          filled: true,
+                          fillColor: AppColors.mutedSurface(sheetContext),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (query.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Type to search messages.',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: AppColors.mutedText(sheetContext),
+                            ),
+                          ),
+                        )
+                      else if (matches.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'No messages found.',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: AppColors.mutedText(sheetContext),
+                            ),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: matches.length,
+                            itemBuilder: (context, index) {
+                              final message = matches[index];
+                              return ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  (message['body'] ?? '').toString(),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: textColor,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  _formatSearchTime(message),
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: AppColors.mutedText(sheetContext),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                onTap:
+                                    () => Navigator.pop(sheetContext, message),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    queryController.dispose();
+    if (selected == null || !mounted) return;
+    final index = _messages.indexWhere(
+      (message) => _messageKey(message) == _messageKey(selected),
+    );
+    _highlightMessage(_messageKey(selected));
+    if (index != -1 && _scrollController.hasClients && _messages.length > 1) {
+      final ratio = index / (_messages.length - 1);
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent * ratio,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  String _formatSearchTime(Map<String, dynamic> message) {
+    final time = DateTime.tryParse(message['created_at']?.toString() ?? '');
+    if (time == null) return '';
+    return ChatTimeFormatter.formatChatListTime(time);
   }
 
   void _leaveChat(String message) {
@@ -557,6 +809,16 @@ class _ChatRoomState extends State<ChatRoom> {
 
     if (action == 'unread') {
       await _markUnreadAndLeave();
+      return;
+    }
+
+    if (action == 'search') {
+      await _showSearch();
+      return;
+    }
+
+    if (action == 'retry_failed') {
+      await _retryAllFailed();
       return;
     }
 
@@ -837,6 +1099,39 @@ class _ChatRoomState extends State<ChatRoom> {
                       ),
                     ),
                     PopupMenuItem<String>(
+                      value: 'search',
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, color: textTheme, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Search in chat',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_pending.any(
+                      (item) => item.status == PendingMessageStatus.failed,
+                    ))
+                      PopupMenuItem<String>(
+                        value: 'retry_failed',
+                        child: Row(
+                          children: [
+                            Icon(Icons.refresh, color: textTheme, size: 20),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Retry failed messages',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    PopupMenuItem<String>(
                       value: 'report',
                       child: Row(
                         children: [
@@ -949,7 +1244,17 @@ class _ChatRoomState extends State<ChatRoom> {
                         ),
                       ),
                     )
-                    : _buildMessageList(textTheme),
+                    : Stack(
+                      children: [
+                        _buildMessageList(textTheme),
+                        if (_isScrolledUp)
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: _buildScrollToBottomFab(),
+                          ),
+                      ],
+                    ),
           ),
           SafeArea(
             top: false,
@@ -1218,6 +1523,105 @@ class _ChatRoomState extends State<ChatRoom> {
     );
   }
 
+  Widget _buildUnreadDivider(Color textTheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Divider(
+              color: AppColors.accentText(context).withValues(alpha: 0.5),
+              thickness: 1,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              'Unread messages',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.accentText(context),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Divider(
+              color: AppColors.accentText(context).withValues(alpha: 0.5),
+              thickness: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScrollToBottomFab() {
+    return Semantics(
+      button: true,
+      label:
+          _newWhileScrolled > 0
+              ? 'Scroll to latest, $_newWhileScrolled new'
+              : 'Scroll to latest',
+      child: Material(
+        color: AppColors.elevatedSurface(context),
+        shape: const CircleBorder(),
+        elevation: 3,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {
+            _scrollToBottomAnimated();
+            setState(() {
+              _isScrolledUp = false;
+              _newWhileScrolled = 0;
+            });
+          },
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 24,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+                if (_newWhileScrolled > 0)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 18),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _newWhileScrolled > 99 ? '99+' : '$_newWhileScrolled',
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageList(Color textTheme) {
     final myId = Supabase.instance.client.auth.currentUser?.id;
     return NotificationListener<ScrollNotification>(
@@ -1261,15 +1665,14 @@ class _ChatRoomState extends State<ChatRoom> {
           final showHeader =
               currTime != null &&
               ChatTimeFormatter.shouldShowMessengerHeader(prevTime, currTime);
-          final messageKey =
-              msg['id']?.toString() ??
-              '${msg['created_at']}-${msg['sender_id']}-${msg['body']}';
+          final messageKey = _messageKey(msg);
           final isSelected = _expandedTimestamps.contains(messageKey);
 
           return Column(
             crossAxisAlignment:
                 mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
+              if (i == _unreadDividerIndex) _buildUnreadDivider(textTheme),
               if (showHeader)
                 Center(
                   child: Padding(
@@ -1294,6 +1697,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     }
                   });
                 },
+                onLongPress: () => _copyMessage((msg['body'] ?? '').toString()),
                 child: Container(
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   padding: const EdgeInsets.symmetric(
@@ -1309,6 +1713,13 @@ class _ChatRoomState extends State<ChatRoom> {
                             ? AppColors.primary.withValues(alpha: 0.9)
                             : Colors.grey.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(16),
+                    border:
+                        _highlightedMessageKey == messageKey
+                            ? Border.all(
+                              color: AppColors.accentText(context),
+                              width: 2,
+                            )
+                            : null,
                   ),
                   child: Text(
                     (msg['body'] ?? '').toString(),

@@ -3,6 +3,104 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/validators.dart';
 
+enum LoginFailureKind {
+  invalidCredentials,
+  emailNotVerified,
+  accountNotFound,
+  rateLimited,
+  network,
+  invalidEmail,
+  generic,
+}
+
+/// A user-facing login failure. The UI should show [message] and use
+/// [canResendVerification] to offer a confirmation-email action.
+class LoginFailure implements Exception {
+  const LoginFailure(
+    this.kind,
+    this.message, {
+    this.canResendVerification = false,
+  });
+
+  final LoginFailureKind kind;
+  final String message;
+  final bool canResendVerification;
+
+  String get title {
+    switch (kind) {
+      case LoginFailureKind.invalidCredentials:
+        return 'Email or password incorrect';
+      case LoginFailureKind.emailNotVerified:
+        return 'Email not verified';
+      case LoginFailureKind.accountNotFound:
+        return 'Account not found';
+      case LoginFailureKind.rateLimited:
+        return 'Too many attempts';
+      case LoginFailureKind.network:
+        return 'Connection problem';
+      case LoginFailureKind.invalidEmail:
+        return 'Check your email';
+      case LoginFailureKind.generic:
+        return 'Login failed';
+    }
+  }
+
+  static LoginFailure fromAuthException(AuthException error) {
+    if (error is AuthRetryableFetchException) {
+      return network();
+    }
+    switch (error.code) {
+      case 'invalid_credentials':
+        return const LoginFailure(
+          LoginFailureKind.invalidCredentials,
+          'The email or password does not match a PalTuro account. Check your details, or reset your password if you have forgotten it.',
+        );
+      case 'email_not_confirmed':
+        return const LoginFailure(
+          LoginFailureKind.emailNotVerified,
+          'Your email address has not been verified yet. Open the confirmation link we sent you, then try signing in again.',
+          canResendVerification: true,
+        );
+      case 'user_not_found':
+        return const LoginFailure(
+          LoginFailureKind.accountNotFound,
+          'No PalTuro account uses this email. Check the address or create a new account.',
+        );
+      case 'invalid_email':
+      case 'validation_failed':
+        return const LoginFailure(
+          LoginFailureKind.invalidEmail,
+          'That email address does not look valid. Check it and try again.',
+        );
+      case 'over_request_rate_limit':
+      case 'too_many_requests':
+        return const LoginFailure(
+          LoginFailureKind.rateLimited,
+          'Too many sign-in attempts. Wait a moment and try again.',
+        );
+      case 'email_provider_disabled':
+      case 'signup_disabled':
+        return const LoginFailure(
+          LoginFailureKind.generic,
+          'Email sign-in is not available right now. Please contact support.',
+        );
+      default:
+        return const LoginFailure(
+          LoginFailureKind.generic,
+          'We could not sign you in. Check your details and try again.',
+        );
+    }
+  }
+
+  static LoginFailure network() => const LoginFailure(
+    LoginFailureKind.network,
+    'We could not reach PalTuro. Check your connection and try again.',
+  );
+
+  @override
+  String toString() => message;
+}
+
 enum RegisterStatus { success, requiresConfirmation, neutral, failure }
 
 class AuthRegisterResult {
@@ -57,40 +155,80 @@ class AuthService {
   Future<AuthResponse> login(String email, String password) async {
     final cleanEmail = Validators.normalizeEmail(email);
     if (cleanEmail.isEmpty || password.isEmpty) {
-      throw Exception('Email and Password are required');
+      throw const LoginFailure(
+        LoginFailureKind.invalidCredentials,
+        'Enter your email address and password to sign in.',
+      );
     }
 
     try {
       final response = await _supabase.auth
           .signInWithPassword(email: cleanEmail, password: password)
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout:
-                () =>
-                    throw Exception(
-                      'Sign in timed out. Please check your connection.',
-                    ),
-          );
+          .timeout(const Duration(seconds: 30));
 
       final user = response.user;
 
       if (user == null) {
-        throw Exception('Unable to login. Please try again.');
+        throw const LoginFailure(
+          LoginFailureKind.generic,
+          'We could not sign you in. Check your details and try again.',
+        );
       }
 
       if (user.emailConfirmedAt == null) {
         await _supabase.auth.signOut();
-        throw Exception('Invalid Email or Password');
+        throw const LoginFailure(
+          LoginFailureKind.emailNotVerified,
+          'Your email address has not been verified yet. Open the confirmation link we sent you, then try signing in again.',
+          canResendVerification: true,
+        );
       }
 
       return response;
+    } on LoginFailure {
+      rethrow;
     } on AuthException catch (e) {
-      if (e.code == 'invalid_credentials' || e.code == 'email_not_confirmed') {
-        throw Exception('Invalid Email or Password');
+      throw LoginFailure.fromAuthException(e);
+    } on TimeoutException {
+      throw LoginFailure.network();
+    } on SocketException {
+      throw LoginFailure.network();
+    } catch (_) {
+      throw const LoginFailure(
+        LoginFailureKind.generic,
+        'We could not sign you in. Check your details and try again.',
+      );
+    }
+  }
+
+  Future<void> resendVerificationEmail(String email) async {
+    final cleanEmail = Validators.normalizeEmail(email);
+    if (cleanEmail.isEmpty) {
+      throw const LoginFailure(
+        LoginFailureKind.invalidEmail,
+        'Enter a valid email address before requesting another confirmation link.',
+      );
+    }
+    try {
+      await _supabase.auth
+          .resend(
+            email: cleanEmail,
+            type: OtpType.signup,
+            emailRedirectTo: 'palturo://auth/callback',
+          )
+          .timeout(const Duration(seconds: 30));
+    } on AuthException catch (e) {
+      if (e.code == 'over_email_send_rate_limit') {
+        throw const LoginFailure(
+          LoginFailureKind.rateLimited,
+          'A confirmation email was requested too recently. Wait a moment, then try again.',
+        );
       }
-      throw Exception('Unable to login. Please try again.');
-    } catch (e) {
-      throw Exception(e.toString().replaceFirst('Exception: ', ''));
+      throw LoginFailure.fromAuthException(e);
+    } on TimeoutException {
+      throw LoginFailure.network();
+    } on SocketException {
+      throw LoginFailure.network();
     }
   }
 

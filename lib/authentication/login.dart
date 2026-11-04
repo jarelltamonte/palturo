@@ -62,23 +62,28 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoggingIn = false);
-      await _showLoginFailedDialog(
-        e.toString().replaceFirst('Exception: ', ''),
-      );
+      final failure =
+          e is LoginFailure
+              ? e
+              : const LoginFailure(
+                LoginFailureKind.generic,
+                'We could not sign you in. Check your details and try again.',
+              );
+      await _showLoginFailedDialog(failure);
     }
   }
 
-  Future<void> _showLoginFailedDialog(String message) {
+  Future<void> _showLoginFailedDialog(LoginFailure failure) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
-
-    return showAdaptiveDialog(
+    final resend = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) {
         final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
         final title = Center(
           child: Text(
-            'Login Failed',
+            failure.title,
+            textAlign: TextAlign.center,
             style: AppTextStyles.regularText.copyWith(
               color: textTheme,
               fontSize: 18,
@@ -87,11 +92,12 @@ class _LoginPageState extends State<LoginPage> {
         );
 
         final body = Text(
-          message,
+          failure.message,
           textAlign: TextAlign.center,
           style: AppTextStyles.regularText.copyWith(
             color: textTheme,
             fontSize: 14,
+            height: 1.4,
           ),
         );
 
@@ -104,14 +110,25 @@ class _LoginPageState extends State<LoginPage> {
             ),
             actions: [
               CupertinoDialogAction(
-                onPressed: () => Navigator.pop(dialogContext),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: Text(
-                  'OK',
+                  'Close',
                   style: AppTextStyles.regularText.copyWith(
                     color: AppColors.accentText(context),
                   ),
                 ),
               ),
+              if (failure.canResendVerification)
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(
+                    'Resend email',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: AppColors.accentText(context),
+                    ),
+                  ),
+                ),
             ],
           );
         }
@@ -125,18 +142,57 @@ class _LoginPageState extends State<LoginPage> {
           content: SizedBox(width: double.maxFinite, child: body),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'OK',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.accentText(context),
-                ),
-              ),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Close'),
             ),
+            if (failure.canResendVerification)
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Resend email'),
+              ),
           ],
         );
       },
     );
+
+    if (resend == true && mounted) {
+      await _resendVerificationEmail();
+    }
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        duration: Duration(seconds: 30),
+        content: Text('Sending a new confirmation email...'),
+      ),
+    );
+    try {
+      await _authService.resendVerificationEmail(_emailController.text.trim());
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Confirmation email sent. Check your inbox, then try signing in again.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final failure =
+          e is LoginFailure
+              ? e
+              : const LoginFailure(
+                LoginFailureKind.generic,
+                'Could not resend the confirmation email. Please try again.',
+              );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+    }
   }
 
   @override
@@ -320,12 +376,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            16.0,
-            0.0,
-            16.0,
-            16.0,
-          ),
+          padding: EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -359,11 +410,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              Center(
-                child: Image.asset('assets/images/brand.png',
-                  width: 132,
-                ),
-              ),
+              Center(child: Image.asset('assets/images/brand.png', width: 132)),
             ],
           ),
         ),

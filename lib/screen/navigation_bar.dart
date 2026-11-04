@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
-import 'package:palturo/services/activity_service.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -170,12 +170,12 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
     return ListenableBuilder(
       listenable: Listenable.merge([
         ChatStateService.instance,
-        ActivityService.instance,
+        NotificationService.instance,
       ]),
       builder: (context, _) {
         final badgesEnabled = PreferencesService.instance.notificationsEnabled;
         final requestUnread =
-            badgesEnabled ? ActivityService.instance.unread : 0;
+            badgesEnabled ? NotificationService.instance.unread : 0;
         final largeText = MediaQuery.textScalerOf(context).scale(12) > 16;
         return Container(
           height: largeText ? 74 : 60,

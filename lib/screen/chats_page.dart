@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+﻿import 'package:flutter/cupertino.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -13,7 +13,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
-import 'package:palturo/services/activity_service.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
@@ -98,7 +98,7 @@ class _ChatsPageState extends State<ChatsPage> {
   void initState() {
     super.initState();
     ChatStateService.instance.addListener(_onChatStateChanged);
-    ActivityService.instance.addListener(_onChatStateChanged);
+    NotificationService.instance.addListener(_onChatStateChanged);
     _loadChats();
   }
 
@@ -121,7 +121,7 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   void dispose() {
     ChatStateService.instance.removeListener(_onChatStateChanged);
-    ActivityService.instance.removeListener(_onChatStateChanged);
+    NotificationService.instance.removeListener(_onChatStateChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();

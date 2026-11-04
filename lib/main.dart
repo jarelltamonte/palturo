@@ -6,7 +6,8 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
-import 'package:palturo/services/activity_service.dart';
+import 'package:palturo/services/notification_service.dart';
+import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
@@ -15,8 +16,6 @@ import 'package:palturo/authentication/scratch.dart';
 import 'package:palturo/root_gate.dart';
 import 'package:palturo/authentication/forgot_password_3.dart';
 import 'package:palturo/widgets/responsive_shell.dart';
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // Compile-time configuration. Pass these with
 //   flutter run --dart-define-from-file=.env
@@ -57,7 +56,7 @@ void main() async {
     playSplashSound();
   }
   ChatStateService.instance.init();
-  ActivityService.instance.init();
+  NotificationService.instance.init();
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );
@@ -127,7 +126,11 @@ mixin MyAppThemeController on State<MyApp> {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({super.key, required this.isOnboardingDone, this.initialDarkMode});
+  const MyApp({
+    super.key,
+    required this.isOnboardingDone,
+    this.initialDarkMode,
+  });
 
   final bool isOnboardingDone;
   final bool? initialDarkMode;

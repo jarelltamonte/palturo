@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -13,7 +13,7 @@ import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/request_match_sheet.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
-import 'package:palturo/services/activity_service.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/utils/friendly_error.dart';
@@ -281,7 +281,7 @@ class _RequestPageState extends State<RequestPage> {
     super.initState();
     _view = widget.initialView;
     widget.refreshSignal?.addListener(_refreshFromShell);
-    ActivityService.instance.addListener(_onActivityChanged);
+    NotificationService.instance.addListener(_onActivityChanged);
     _loadRequests();
     _loadOutgoing();
   }
@@ -289,7 +289,7 @@ class _RequestPageState extends State<RequestPage> {
   @override
   void dispose() {
     widget.refreshSignal?.removeListener(_refreshFromShell);
-    ActivityService.instance.removeListener(_onActivityChanged);
+    NotificationService.instance.removeListener(_onActivityChanged);
     super.dispose();
   }
 
@@ -374,7 +374,7 @@ class _RequestPageState extends State<RequestPage> {
                 .where((item) => item.connectionId != request.connectionId)
                 .toList();
       });
-      ActivityService.instance.refresh();
+      NotificationService.instance.refresh();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Request to ${request.recipientName} withdrawn'),
@@ -530,7 +530,7 @@ class _RequestPageState extends State<RequestPage> {
       await ChatStateService.instance.loadConversations(showSpinner: false);
       if (!mounted) return false;
 
-      ActivityService.instance.refresh();
+      NotificationService.instance.refresh();
 
       if (!accept) {
         setState(() => _declinedIds.add(request.id));
@@ -589,7 +589,7 @@ class _RequestPageState extends State<RequestPage> {
       await MatchApi.undoDecline(request.id);
       if (!mounted) return;
       setState(() => _declinedIds.remove(request.id));
-      ActivityService.instance.refresh();
+      NotificationService.instance.refresh();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Request from ${request.requesterName} restored.'),
@@ -1040,7 +1040,7 @@ class _RequestPageState extends State<RequestPage> {
                       size: 24,
                     ),
                     if (PreferencesService.instance.notificationsEnabled &&
-                        ActivityService.instance.unread > 0)
+                        NotificationService.instance.unread > 0)
                       Positioned(
                         right: -1,
                         top: -1,

@@ -1,15 +1,19 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:palturo/models/app_notification.dart';
 import 'package:palturo/screen/activity_presentation.dart';
-import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart';
-import 'package:palturo/services/activity_service.dart';
-import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
+import 'package:palturo/services/app_navigation.dart';
+import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
-import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -19,7 +23,6 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  List<Map<String, dynamic>> _items = const [];
   Map<String, ConversationLite> _conversations = const {};
   Map<String, RequestLite> _incoming = const {};
   bool _loading = true;
@@ -28,10 +31,31 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _incomingLoaded = false;
   String? _error;
 
+  List<AppNotification> get _items => NotificationService.instance.items;
+
   @override
   void initState() {
     super.initState();
+    NotificationService.instance.addListener(_onServiceChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    NotificationService.instance.removeListener(_onServiceChanged);
+    super.dispose();
+  }
+
+  void _onServiceChanged() {
+    if (!mounted) return;
+    final scheduler = SchedulerBinding.instance;
+    if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      scheduler.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _load() async {
@@ -39,110 +63,63 @@ class _NotificationsPageState extends State<NotificationsPage> {
       _loading = true;
       _error = null;
     });
-    try {
-      final items = await MatchApi.listNotifications(limit: 50);
-      var conversations = <String, ConversationLite>{};
-      var incoming = <String, RequestLite>{};
-      var conversationsLoaded = false;
-      var incomingLoaded = false;
-      try {
-        final rows = await MatchApi.getConversations();
-        conversations = {for (final row in rows) row.connectionId: row};
-        conversationsLoaded = true;
-      } catch (_) {
-        // Enrichment is optional; absence must not imply deletion.
-      }
-      try {
-        final rows = await MatchApi.getIncomingRequests();
-        incoming = {for (final row in rows) row.connectionId: row};
-        incomingLoaded = true;
-      } catch (_) {
-        // Enrichment is optional; absence must not imply deletion.
-      }
-      if (!mounted) return;
-      setState(() {
-        _items = items;
-        _conversations = conversations;
-        _incoming = incoming;
-        _conversationsLoaded = conversationsLoaded;
-        _incomingLoaded = incomingLoaded;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = friendlyError(
-          e,
-          fallback: "Couldn't load activity. Please try again.",
-        );
-      });
-    }
-  }
 
-  bool get _hasUnread =>
-      _items.any((item) => (item['read_at']?.toString().trim() ?? '').isEmpty);
+    await NotificationService.instance.refresh();
 
-  Future<void> _markItemRead(Map<String, dynamic> item) async {
-    final id = item['id']?.toString();
-    if (id == null || id.isEmpty) return;
+    var conversations = <String, ConversationLite>{};
+    var incoming = <String, RequestLite>{};
+    var conversationsLoaded = false;
+    var incomingLoaded = false;
     try {
-      await MatchApi.markNotificationRead(id);
+      final rows = await MatchApi.getConversations();
+      conversations = {for (final row in rows) row.connectionId: row};
+      conversationsLoaded = true;
     } catch (_) {
-      if (mounted) {
-        _showFallback('Couldn’t mark this update as read.');
-      }
-      return;
+      // Enrichment is optional; absence must not imply deletion.
     }
+    try {
+      final rows = await MatchApi.getIncomingRequests();
+      incoming = {for (final row in rows) row.connectionId: row};
+      incomingLoaded = true;
+    } catch (_) {
+      // Enrichment is optional; absence must not imply deletion.
+    }
+
     if (!mounted) return;
     setState(() {
-      _items =
-          _items
-              .map(
-                (row) =>
-                    row['id'] == item['id']
-                        ? {
-                          ...row,
-                          'read_at': DateTime.now().toUtc().toIso8601String(),
-                        }
-                        : row,
-              )
-              .toList();
+      _conversations = conversations;
+      _incoming = incoming;
+      _conversationsLoaded = conversationsLoaded;
+      _incomingLoaded = incomingLoaded;
+      _loading = false;
+      if (_items.isEmpty && NotificationService.instance.error != null) {
+        _error = friendlyError(
+          NotificationService.instance.error ?? '',
+          fallback: "Couldn't load activity. Please try again.",
+        );
+      }
     });
-    await ActivityService.instance.refresh();
   }
+
+  bool get _hasUnread => _items.any((item) => item.isUnread);
+
+  Future<void> _markItemRead(AppNotification item) =>
+      NotificationService.instance.markItemRead(item.id);
 
   Future<void> _markAllRead() async {
     if (_markingAll) return;
     setState(() => _markingAll = true);
-    try {
-      await MatchApi.markNotificationsRead();
-    } catch (_) {
-      if (mounted) {
-        setState(() => _markingAll = false);
-        _showFallback('Couldn’t mark all activity as read.');
-      }
-      return;
-    }
-    if (!mounted) return;
-    final now = DateTime.now().toUtc().toIso8601String();
-    setState(() {
-      _items = _items.map((row) => {...row, 'read_at': now}).toList();
-      _markingAll = false;
-    });
-    await ActivityService.instance.refresh();
+    await NotificationService.instance.markAllRead();
+    if (mounted) setState(() => _markingAll = false);
   }
 
-  Future<void> _openItem(Map<String, dynamic> item) async {
-    final connectionId =
-        item['payload'] is Map
-            ? (item['payload'] as Map)['connection_id']?.toString()
-            : null;
+  Future<void> _openItem(AppNotification item) async {
+    final connectionId = item.connectionId;
     final conversation =
         connectionId == null ? null : _conversations[connectionId];
     final incoming = connectionId == null ? null : _incoming[connectionId];
     final view = presentActivity(
-      item,
+      item.toRow(),
       incoming: incoming,
       conversation: conversation,
     );
@@ -154,23 +131,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
           return;
         }
         unawaited(_markItemRead(item));
-        if (!mounted) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (_) => const RequestPage(initialView: RequestView.incoming),
-          ),
-        );
+        await AppRouter.openRequests(view: RequestView.incoming);
       case ActivityDestination.sentRequests:
         unawaited(_markItemRead(item));
-        if (!mounted) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const RequestPage(initialView: RequestView.sent),
-          ),
-        );
+        await AppRouter.openRequests(view: RequestView.sent);
       case ActivityDestination.chat:
         if (view.connectionId == null ||
             (_conversationsLoaded && conversation == null)) {
@@ -178,25 +142,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
           return;
         }
         unawaited(_markItemRead(item));
-        if (!mounted) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (_) => ChatRoom(
-                  connectionId: view.connectionId,
-                  name: view.actorName ?? 'Pal',
-                  skillName: view.skillName,
-                ),
-          ),
+        await AppRouter.openChat(
+          connectionId: view.connectionId!,
+          name: view.actorName ?? 'Pal',
+          skillName: view.skillName,
+          role: _roleFrom(conversation?.otherRole),
+          avatarUrl: conversation?.otherAvatar,
         );
       case ActivityDestination.none:
-        final kind = item['kind']?.toString();
         _showFallback(
-          kind == 'skill_moderation'
+          item.kind == AppNotificationKind.skillModeration
               ? 'Open Profile to review this skill update.'
               : 'This update is no longer available.',
         );
+    }
+  }
+
+  PersonRole? _roleFrom(String? role) {
+    switch (role?.trim().toLowerCase()) {
+      case 'learner':
+        return PersonRole.learner;
+      case 'mentor':
+        return PersonRole.mentor;
+      default:
+        return null;
     }
   }
 
@@ -209,6 +178,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
+    final items = _items;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -227,14 +197,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
           if (!_loading && _error == null && _hasUnread)
             TextButton(
               onPressed: _markingAll ? null : _markAllRead,
-              child: Text(_markingAll ? 'Marking…' : 'Mark all read'),
+              child: Text(_markingAll ? 'Marking...' : 'Mark all read'),
             ),
         ],
       ),
       body:
-          _loading
+          _loading && items.isEmpty
               ? const ActivitySkeleton()
-              : _error != null
+              : _error != null && items.isEmpty
               ? Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -257,7 +227,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   ),
                 ),
               )
-              : _items.isEmpty
+              : items.isEmpty
               ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -271,14 +241,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed:
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => const RequestPage(
-                                    initialView: RequestView.incoming,
-                                  ),
-                            ),
+                          () => AppRouter.openRequests(
+                            view: RequestView.incoming,
                           ),
                       child: const Text('View requests'),
                     ),
@@ -287,15 +251,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
               )
               : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                itemCount: _items.length,
+                itemCount: items.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final item = _items[index];
-                  final connectionId =
-                      item['payload'] is Map
-                          ? (item['payload'] as Map)['connection_id']
-                              ?.toString()
-                          : null;
+                  final item = items[index];
+                  final connectionId = item.connectionId;
                   final conversation =
                       connectionId == null
                           ? null
@@ -303,22 +263,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   final incoming =
                       connectionId == null ? null : _incoming[connectionId];
                   final view = presentActivity(
-                    item,
+                    item.toRow(),
                     incoming: incoming,
                     conversation: conversation,
                   );
-                  final created = DateTime.tryParse(
-                    item['created_at']?.toString() ?? '',
+                  final timeLabel = ChatTimeFormatter.formatChatListTime(
+                    item.createdAt,
                   );
-                  final unread =
-                      (item['read_at']?.toString().trim() ?? '').isEmpty;
                   return _ActivityRow(
                     view: view,
-                    unread: unread,
-                    timeLabel:
-                        created == null
-                            ? null
-                            : ChatTimeFormatter.formatChatListTime(created),
+                    unread: item.isUnread,
+                    timeLabel: timeLabel,
                     onTap: () => _openItem(item),
                   );
                 },

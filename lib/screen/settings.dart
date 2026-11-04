@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
-import 'package:palturo/services/activity_service.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -33,7 +33,7 @@ class _SettingsState extends State<Settings> {
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _userChangedSettings = false;
-  String _version = '…';
+  String _version = 'â€¦';
   ProfileData? _profile;
   String? _email;
   String? _authName;
@@ -129,8 +129,8 @@ class _SettingsState extends State<Settings> {
     switch (key) {
       case _notificationsKey:
         PreferencesService.instance.setNotificationsEnabled(value);
-        ActivityService.instance.refresh();
-        ActivityService.instance.notifyPreferenceChanged();
+        NotificationService.instance.refresh();
+        NotificationService.instance.notifyPreferenceChanged();
         break;
       case _soundKey:
         PreferencesService.instance.setSoundEnabled(value);

@@ -14,6 +14,7 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/match_banner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Decides which surface a live event uses and suppresses noise for the screen
 /// the user is already on.
@@ -46,6 +47,8 @@ class NotificationPresenter {
     required String name,
     String? skillName,
     String? avatarUrl,
+    Person? person,
+    PersonRole? role,
   }) {
     if (!_markCelebrated(connectionId)) return;
     final data = buildMatchBanner(
@@ -59,12 +62,15 @@ class NotificationPresenter {
             name: name,
             skillName: skillName,
             avatarUrl: avatarUrl,
+            person: person,
+            role: role,
           ),
     );
     AppBannerController.instance.show(data, preempt: true);
   }
 
   void _onNotification(AppNotification item) {
+    if (Supabase.instance.client.auth.currentUser == null) return;
     if (!PreferencesService.instance.notificationsEnabled) {
       return;
     }
@@ -75,7 +81,8 @@ class NotificationPresenter {
 
     final view = presentActivity(item.toRow());
     if (item.kind == AppNotificationKind.connectionRequest &&
-        AppShellState.instance.selectedTab == 3) {
+        (AppShellState.instance.selectedTab == 3 ||
+            AppShellState.instance.requestsOpen)) {
       return;
     }
 
@@ -89,11 +96,20 @@ class NotificationPresenter {
         _markCelebrated(connectionId);
         return;
       }
+      final role = _roleFrom(item.role);
       showMatch(
         connectionId: connectionId,
         name: view.actorName ?? 'your Pal',
         skillName: view.skillName,
         avatarUrl: item.actorAvatar,
+        role: role,
+        person: _personFor(
+          id: item.actorId,
+          name: view.actorName ?? 'Pal',
+          skillName: view.skillName,
+          avatarUrl: item.actorAvatar,
+          role: role,
+        ),
       );
       return;
     }
@@ -108,12 +124,18 @@ class NotificationPresenter {
 
   void _showStandard(AppNotification item, ActivityItemView view) {
     final onTap = _tapFor(item, view);
-    final actionLabel =
-        item.kind == AppNotificationKind.skillModeration
-            ? 'Review'
-            : view.actionLabel.isEmpty
-            ? null
-            : view.actionLabel;
+    final String? actionLabel;
+    final VoidCallback? onAction;
+    if (item.kind == AppNotificationKind.skillModeration) {
+      actionLabel = 'Review';
+      onAction = () => AppRouter.openProfile();
+    } else if (onTap != null && view.actionLabel.isNotEmpty) {
+      actionLabel = view.actionLabel;
+      onAction = onTap;
+    } else {
+      actionLabel = null;
+      onAction = null;
+    }
     AppBannerController.instance.show(
       AppBannerData(
         id: item.id,
@@ -127,10 +149,7 @@ class NotificationPresenter {
         actorName: item.actorName,
         actionLabel: actionLabel,
         onTap: onTap,
-        onAction:
-            item.kind == AppNotificationKind.skillModeration
-                ? () => AppRouter.openProfile()
-                : null,
+        onAction: onAction,
       ),
     );
   }
@@ -150,6 +169,13 @@ class NotificationPresenter {
           skillName: view.skillName,
           role: _roleFrom(item.role),
           avatarUrl: item.actorAvatar,
+          person: _personFor(
+            id: item.actorId,
+            name: view.actorName ?? 'Pal',
+            skillName: view.skillName,
+            avatarUrl: item.actorAvatar,
+            role: _roleFrom(item.role),
+          ),
         );
       case ActivityDestination.none:
         if (item.kind == AppNotificationKind.skillModeration) {
@@ -160,12 +186,14 @@ class NotificationPresenter {
   }
 
   void _onMessage(IncomingMessageEvent event) {
+    if (Supabase.instance.client.auth.currentUser == null) return;
     if (!PreferencesService.instance.notificationsEnabled) return;
     if (!NotificationService.instance.isForeground) return;
     if (ChatStateService.instance.activeConnectionId == event.connectionId) {
       return;
     }
 
+    final role = _roleFrom(event.role);
     AppBannerController.instance.showOrUpdate(
       AppBannerData(
         id:
@@ -182,11 +210,45 @@ class NotificationPresenter {
               connectionId: event.connectionId,
               name: event.senderName,
               skillName: event.skillName,
-              role: _roleFrom(event.role),
+              role: role,
               avatarUrl: event.avatarUrl,
+              person: _personFor(
+                id: event.peerUserId,
+                name: event.senderName,
+                skillName: event.skillName,
+                avatarUrl: event.avatarUrl,
+                role: role,
+              ),
             ),
       ),
     );
+  }
+
+  Person? _personFor({
+    required String? id,
+    required String name,
+    String? skillName,
+    String? avatarUrl,
+    PersonRole? role,
+  }) {
+    final userId = id?.trim();
+    if (userId == null || userId.isEmpty) return null;
+    return Person(
+      id: userId,
+      name: name,
+      schedule: '',
+      language: '',
+      learningStyle: '',
+      skillName: skillName ?? '',
+      role: role ?? PersonRole.mentor,
+      photoUrls: [avatarUrl],
+    );
+  }
+
+  /// Clears transient UI state on sign-out. Celebrations are account-scoped.
+  void reset() {
+    AppBannerController.instance.clear();
+    _celebrated.clear();
   }
 
   PersonRole? _roleFrom(String? role) {

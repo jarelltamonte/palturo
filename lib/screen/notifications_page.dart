@@ -8,6 +8,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/services/app_navigation.dart';
+import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/notification_service.dart';
@@ -23,7 +24,8 @@ class NotificationsPage extends StatefulWidget {
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsPageState extends State<NotificationsPage> {
+class _NotificationsPageState extends State<NotificationsPage>
+    with RouteAware {
   Map<String, ConversationLite> _conversations = const {};
   Map<String, RequestLite> _incoming = const {};
   bool _loading = true;
@@ -44,7 +46,23 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() => AppShellState.instance.setActivityOpen(false);
+
+  @override
+  void didPopNext() => AppShellState.instance.setActivityOpen(true);
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
     AppShellState.instance.setActivityOpen(false);
     NotificationService.instance.removeListener(_onServiceChanged);
     super.dispose();

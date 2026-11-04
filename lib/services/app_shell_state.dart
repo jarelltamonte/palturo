@@ -9,10 +9,13 @@ class AppShellState extends ChangeNotifier {
 
   int _selectedTab = 0;
   bool _activityOpen = false;
+  bool _requestsOpen = false;
 
   int get selectedTab => _selectedTab;
 
   bool get activityOpen => _activityOpen;
+
+  bool get requestsOpen => _requestsOpen;
 
   void setSelectedTab(int index) {
     if (_selectedTab == index) return;
@@ -26,9 +29,16 @@ class AppShellState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRequestsOpen(bool value) {
+    if (_requestsOpen == value) return;
+    _requestsOpen = value;
+    notifyListeners();
+  }
+
   void reset() {
     _selectedTab = 0;
     _activityOpen = false;
+    _requestsOpen = false;
     notifyListeners();
   }
 }

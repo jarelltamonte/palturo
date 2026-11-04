@@ -2,6 +2,7 @@
 class IncomingMessageEvent {
   const IncomingMessageEvent({
     required this.connectionId,
+    this.peerUserId,
     required this.senderName,
     required this.body,
     required this.createdAt,
@@ -11,6 +12,7 @@ class IncomingMessageEvent {
   });
 
   final String connectionId;
+  final String? peerUserId;
   final String senderName;
   final String body;
   final DateTime createdAt;

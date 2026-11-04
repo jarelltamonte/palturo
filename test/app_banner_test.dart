@@ -44,6 +44,34 @@ void main() {
     expect(AppBannerController.instance.current.value, isNull);
   });
 
+  testWidgets('standard banner action runs its callback', (tester) async {
+    var acted = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: AppBannerHost(child: const Scaffold(body: Text('content'))),
+      ),
+    );
+
+    AppBannerController.instance.show(
+      AppBannerData(
+        id: 'n-action',
+        title: 'New request',
+        body: 'RJ wants to exchange Barong with you.',
+        icon: Icons.person_add_alt_1,
+        actionLabel: 'View request',
+        onAction: () => acted = true,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('View request'));
+    await tester.pumpAndSettle();
+
+    expect(acted, isTrue);
+    expect(AppBannerController.instance.current.value, isNull);
+  });
+
   testWidgets('banner uses the dark surface in dark theme', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

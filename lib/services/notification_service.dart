@@ -25,6 +25,8 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   bool _loading = false;
   bool _initialized = false;
   bool _resubscribing = false;
+  int _resubscribeAttempts = 0;
+  Timer? _resubscribeTimer;
   String? _error;
   RealtimeChannel? _channel;
   StreamSubscription<AuthState>? _authSubscription;
@@ -56,9 +58,12 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
         reset();
         return;
       }
-      if (data.event == AuthChangeEvent.signedIn ||
-          data.event == AuthChangeEvent.tokenRefreshed) {
+      if (data.event == AuthChangeEvent.signedIn) {
         unawaited(_resubscribe());
+        unawaited(refresh(showSpinner: _items.isEmpty));
+      } else if (data.event == AuthChangeEvent.tokenRefreshed) {
+        // The realtime client pushes the refreshed token to joined channels.
+        // Only refresh data here; a channel error schedules a backoff retry.
         unawaited(refresh(showSpinner: _items.isEmpty));
       }
     });
@@ -100,6 +105,16 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     } finally {
       _resubscribing = false;
     }
+  }
+
+  void _scheduleResubscribe() {
+    if (_resubscribeTimer != null || _resubscribeAttempts >= 3) return;
+    final seconds = 2 << _resubscribeAttempts;
+    _resubscribeAttempts++;
+    _resubscribeTimer = Timer(Duration(seconds: seconds), () {
+      _resubscribeTimer = null;
+      unawaited(_resubscribe());
+    });
   }
 
   /// Reloads the list and unread count. Failure keeps the last known state.
@@ -195,6 +210,9 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void reset() {
+    _resubscribeTimer?.cancel();
+    _resubscribeTimer = null;
+    _resubscribeAttempts = 0;
     final channel = _channel;
     _channel = null;
     if (channel != null) {
@@ -202,6 +220,8 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     }
     _items = const [];
     _unread = 0;
+    _loading = false;
+    _error = null;
     _seenIds.clear();
     notifyListeners();
   }
@@ -228,9 +248,12 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
           callback: _handleInsert,
         )
         .subscribe((status, error) {
+          if (status == RealtimeSubscribeStatus.subscribed) {
+            _resubscribeAttempts = 0;
+          }
           if (status == RealtimeSubscribeStatus.channelError &&
               (error?.toString().toLowerCase().contains('jwt') ?? false)) {
-            unawaited(_resubscribe());
+            _scheduleResubscribe();
           }
         });
   }
@@ -238,6 +261,10 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   void _handleInsert(PostgresChangePayload payload) {
     final record = payload.newRecord;
     if (record.isEmpty) return;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    final recordUserId = record['user_id']?.toString();
+    if (recordUserId != null && recordUserId != userId) return;
     final item = AppNotification.fromRow(record);
     if (item.id.isEmpty || _seenIds.contains(item.id)) return;
     _seenIds.add(item.id);
@@ -252,6 +279,8 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   /// Realtime rows only contain the base table columns. Fetch the enriched
   /// row once so banners can name the actor and skill, with a safe fallback.
   Future<void> _emitEnriched(AppNotification fallback) async {
+    final authUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (authUserId == null) return;
     var event = fallback;
     try {
       final rows = await MatchApi.listNotifications(limit: 10);
@@ -268,6 +297,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     } catch (_) {
       // Fall back to the raw row; the banner still opens the right screen.
     }
+    if (Supabase.instance.client.auth.currentUser?.id != authUserId) return;
     _events.add(event);
   }
 
@@ -284,6 +314,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _resubscribeTimer?.cancel();
     final channel = _channel;
     if (channel != null) {
       unawaited(Supabase.instance.client.removeChannel(channel));

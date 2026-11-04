@@ -24,6 +24,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   RealtimeChannel? _realtimeChannel;
   StreamSubscription<AuthState>? _authSubscription;
   Timer? _midnightTimer;
+  Timer? _resubscribeTimer;
+  int _resubscribeAttempts = 0;
   final StreamController<IncomingMessageEvent> _messageEvents =
       StreamController<IncomingMessageEvent>.broadcast();
 
@@ -62,10 +64,12 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       data,
     ) {
       final event = data.event;
-      if (event == AuthChangeEvent.signedIn ||
-          event == AuthChangeEvent.tokenRefreshed) {
+      if (event == AuthChangeEvent.signedIn) {
         loadConversations();
         unawaited(_resubscribeRealtime());
+      } else if (event == AuthChangeEvent.tokenRefreshed) {
+        // Realtime pushes the refreshed token to joined channels.
+        loadConversations(showSpinner: false);
       } else if (event == AuthChangeEvent.signedOut) {
         reset();
       }
@@ -104,6 +108,16 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     } finally {
       _resubscribing = false;
     }
+  }
+
+  void _scheduleRealtimeResubscribe() {
+    if (_resubscribeTimer != null || _resubscribeAttempts >= 3) return;
+    final seconds = 2 << _resubscribeAttempts;
+    _resubscribeAttempts++;
+    _resubscribeTimer = Timer(Duration(seconds: seconds), () {
+      _resubscribeTimer = null;
+      unawaited(_resubscribeRealtime());
+    });
   }
 
   /// Loads conversations from backend and sorts them with most recent on top.
@@ -154,9 +168,12 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
           callback: _handleRealtimeMessage,
         )
         .subscribe((status, error) {
+          if (status == RealtimeSubscribeStatus.subscribed) {
+            _resubscribeAttempts = 0;
+          }
           if (status == RealtimeSubscribeStatus.channelError &&
               (error?.toString().toLowerCase().contains('jwt') ?? false)) {
-            unawaited(_resubscribeRealtime());
+            _scheduleRealtimeResubscribe();
           }
         });
   }
@@ -260,6 +277,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _messageEvents.add(
       IncomingMessageEvent(
         connectionId: conversation.connectionId,
+        peerUserId: conversation.otherUserId,
         senderName: conversation.otherName,
         body: body,
         createdAt: createdAt,
@@ -327,6 +345,9 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   /// Resets state on logout and unsubscribes from Realtime.
   void reset() {
     MatchApi.clearCaches();
+    _resubscribeTimer?.cancel();
+    _resubscribeTimer = null;
+    _resubscribeAttempts = 0;
     if (_realtimeChannel != null) {
       Supabase.instance.client.removeChannel(_realtimeChannel!);
       _realtimeChannel = null;
@@ -356,6 +377,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     _midnightTimer?.cancel();
+    _resubscribeTimer?.cancel();
     _messageEvents.close();
     if (_realtimeChannel != null) {
       Supabase.instance.client.removeChannel(_realtimeChannel!);

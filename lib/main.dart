@@ -6,6 +6,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/app_navigator.dart';
@@ -233,6 +234,8 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
           _latestDeepLink = null;
           _latestDeepLinkAt = null;
           _lastHandledLink = null;
+          NotificationPresenter.instance.reset();
+          AppShellState.instance.reset();
           return;
         }
 
@@ -366,6 +369,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
+      navigatorObservers: [appRouteObserver],
       title: 'PalTuro',
       debugShowCheckedModeBanner: false,
       theme: lightMode,

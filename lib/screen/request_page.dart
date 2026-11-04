@@ -11,6 +11,8 @@ import 'package:palturo/screen/notifications_page.dart';
 import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/app_navigator.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/match_api.dart';
@@ -149,7 +151,9 @@ class RequestPage extends StatefulWidget {
   State<RequestPage> createState() => _RequestPageState();
 }
 
-class _RequestPageState extends State<RequestPage> {
+class _RequestPageState extends State<RequestPage> with RouteAware {
+  bool _isPushedRequests = false;
+
   DateFilter _dateFilter = DateFilter.all;
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
@@ -286,7 +290,30 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
+      _isPushedRequests = !route.isFirst;
+      AppShellState.instance.setRequestsOpen(_isPushedRequests);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    if (_isPushedRequests) AppShellState.instance.setRequestsOpen(false);
+  }
+
+  @override
+  void didPopNext() {
+    if (_isPushedRequests) AppShellState.instance.setRequestsOpen(true);
+  }
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
+    if (_isPushedRequests) AppShellState.instance.setRequestsOpen(false);
     widget.refreshSignal?.removeListener(_refreshFromShell);
     NotificationService.instance.removeListener(_onActivityChanged);
     super.dispose();
@@ -554,6 +581,8 @@ class _RequestPageState extends State<RequestPage> {
         name: request.requesterName,
         skillName: request.skillName,
         avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
+        role: request.role,
+        person: request.toPerson(),
       );
       return true;
     } catch (e) {

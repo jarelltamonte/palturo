@@ -30,4 +30,35 @@ void main() {
 
     expect(find.textContaining('You are offline'), findsNothing);
   });
+
+  testWidgets('offline strip does not cover the app bar', (tester) async {
+    ConnectivityService.instance.debugSetOnline(false);
+    var tapped = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: OfflineBannerHost(
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Chats'),
+              actions: [
+                IconButton(
+                  tooltip: 'Search',
+                  onPressed: () => tapped++,
+                  icon: const Icon(Icons.search),
+                ),
+              ],
+            ),
+            body: const Text('content'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Chats'), findsOneWidget);
+    await tester.tap(find.byTooltip('Search'));
+    expect(tapped, 1);
+  });
 }

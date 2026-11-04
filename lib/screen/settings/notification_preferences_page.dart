@@ -175,7 +175,7 @@ class NotificationPreferencesPage extends StatelessWidget {
                 ),
                 subtitle: Text(
                   master
-                      ? 'Silence sounds and haptics during this window. Banners still appear.'
+                      ? 'Silence notification sounds and haptics during this window. Banners still appear.'
                       : 'Turn on notifications to use this.',
                   style: AppTextStyles.regularText.copyWith(
                     color: AppColors.mutedText(context),

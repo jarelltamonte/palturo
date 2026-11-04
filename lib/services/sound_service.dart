@@ -40,7 +40,6 @@ class SoundService {
 
   Future<void> play(AppSound sound) async {
     if (!PreferencesService.instance.soundEnabled) return;
-    if (PreferencesService.instance.isQuietHoursNow) return;
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
       return;

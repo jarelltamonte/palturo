@@ -42,8 +42,6 @@ class PreferencesService extends ChangeNotifier {
       quietHoursEnabled = await _prefs.getBool('quiet_hours_enabled') ?? false;
       quietStartMinutes = await _prefs.getInt('quiet_start_minutes') ?? 22 * 60;
       quietEndMinutes = await _prefs.getInt('quiet_end_minutes') ?? 7 * 60;
-      notificationPermissionAsked =
-          await _prefs.getBool('notification_permission_asked') ?? false;
     } catch (_) {
       // Defaults keep the app usable if the platform preference store is
       // unavailable (for example during a cold web boot).
@@ -115,12 +113,6 @@ class PreferencesService extends ChangeNotifier {
     quietEndMinutes = endMinutes.clamp(0, (24 * 60) - 1);
     await setInt('quiet_start_minutes', quietStartMinutes);
     await setInt('quiet_end_minutes', quietEndMinutes);
-    notifyListeners();
-  }
-
-  Future<void> setNotificationPermissionAsked(bool value) async {
-    notificationPermissionAsked = value;
-    await setBool('notification_permission_asked', value);
     notifyListeners();
   }
 

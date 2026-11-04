@@ -116,15 +116,6 @@ void main() {
     expect(notificationFeedbackAllowed(now: DateTime(2026, 11, 4, 12)), isTrue);
   });
 
-  test('permission asked flag persists', () async {
-    final prefs = PreferencesService.instance;
-
-    await prefs.setNotificationPermissionAsked(true);
-
-    expect(prefs.notificationPermissionAsked, isTrue);
-    expect(await prefs.getBool('notification_permission_asked'), isTrue);
-  });
-
   testWidgets('page exposes categories and master gating', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));

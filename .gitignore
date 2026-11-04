@@ -51,3 +51,10 @@ app.*.map.json
 
 # Supabase CLI machine-local state
 supabase/.temp/
+
+# Local audit reports, session notes, and PDFs
+*.pdf
+UI-AUDIT*.md
+UI-FEATURE-AUDIT*.md
+*SESSION*.md
+*session*.md

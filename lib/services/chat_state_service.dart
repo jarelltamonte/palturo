@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/models/incoming_message_event.dart';
+import 'package:palturo/services/chat_privacy_service.dart';
 import 'package:palturo/services/match_api.dart';
 
 /// Single source of truth for chat conversations, live preview/ordering,
@@ -33,6 +34,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _midnightTimer;
   Timer? _resubscribeTimer;
   int _resubscribeAttempts = 0;
+  DateTime? _lastHeartbeat;
   final StreamController<IncomingMessageEvent> _messageEvents =
       StreamController<IncomingMessageEvent>.broadcast();
 
@@ -72,6 +74,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     ) {
       final event = data.event;
       if (event == AuthChangeEvent.signedIn) {
+        unawaited(ChatPrivacyService.instance.load());
         loadConversations();
         unawaited(_resubscribeRealtime());
       } else if (event == AuthChangeEvent.tokenRefreshed) {
@@ -85,10 +88,42 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       }
     });
 
+    ChatPrivacyService.instance.addListener(_onPrivacyChanged);
     if (Supabase.instance.client.auth.currentUser != null) {
+      unawaited(ChatPrivacyService.instance.loadIfNeeded());
       loadConversations();
+      _heartbeat(force: true);
       unawaited(_prepareRealtime());
     }
+  }
+
+  /// Foreground heartbeat; throttled and skipped when the user opted out.
+  void _onPrivacyChanged() {
+    if (ChatPrivacyService.instance.loaded &&
+        ChatPrivacyService.instance.presenceEnabled) {
+      _heartbeat(force: true);
+    }
+  }
+
+  void _heartbeat({bool force = false}) {
+    if (!ChatPrivacyService.instance.loaded) return;
+    if (!ChatPrivacyService.instance.presenceEnabled) return;
+    if (Supabase.instance.client.auth.currentUser == null) return;
+    final now = DateTime.now();
+    if (!force &&
+        _lastHeartbeat != null &&
+        now.difference(_lastHeartbeat!) < const Duration(seconds: 60)) {
+      return;
+    }
+    _lastHeartbeat = now;
+    unawaited(MatchApi.touchLastSeen());
+  }
+
+  ConversationLite? conversationFor(String connectionId) {
+    for (final conversation in _conversations) {
+      if (conversation.connectionId == connectionId) return conversation;
+    }
+    return null;
   }
 
   Future<void> _prepareRealtime() async {
@@ -402,6 +437,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _lifecycleState = state;
     if (state == AppLifecycleState.resumed) {
+      _heartbeat();
+      unawaited(ChatPrivacyService.instance.loadIfNeeded());
       // Re-sync unread & conversations from backend
       if (_activeConnectionId != null) {
         MatchApi.markMessagesRead(_activeConnectionId!);
@@ -415,6 +452,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       }
       loadConversations(showSpinner: false);
       _scheduleMidnightTimer();
+    } else if (state == AppLifecycleState.paused) {
+      _heartbeat(force: true);
     }
   }
 
@@ -468,6 +507,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _authSubscription?.cancel();
     _midnightTimer?.cancel();
     _resubscribeTimer?.cancel();
+    ChatPrivacyService.instance.removeListener(_onPrivacyChanged);
     _realtimeSubscribed = false;
     _messageEvents.close();
     if (_realtimeChannel != null) {

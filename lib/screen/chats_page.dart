@@ -21,6 +21,7 @@ import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/utils/chat_unread.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/utils/presence_label.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
@@ -72,6 +73,10 @@ class _ChatsPageState extends State<ChatsPage> {
         final draft = DraftService.instance.draftFor(c.connectionId);
         return MatchedUser(
           id: '${c.connectionId}|${c.otherUserId}',
+          presence: presenceLabel(
+            c.otherLastSeenAt,
+            enabled: c.otherPresenceEnabled,
+          ),
           name: c.otherName,
           role:
               c.otherRole == 'learner' ? PersonRole.learner : PersonRole.mentor,
@@ -811,6 +816,7 @@ class _ChatsPageState extends State<ChatsPage> {
                       name: chat.name,
                       message: chat.lastMessage!,
                       time: chat.lastMessageTime ?? '',
+                      presence: chat.presence,
                       hasUnread:
                           chat.hasUnread &&
                           PreferencesService.instance.notificationsEnabled,
@@ -968,6 +974,7 @@ class ChatListItem extends StatelessWidget {
   final String name;
   final String message;
   final String time;
+  final String? presence;
   final bool hasUnread;
   final String? skillName;
   final PersonRole? role;
@@ -981,6 +988,7 @@ class ChatListItem extends StatelessWidget {
     this.name = 'Random Name',
     this.message = 'Random chat message goes here',
     this.time = 'Just now',
+    this.presence,
     this.hasUnread = true,
     this.skillName,
     this.role,
@@ -1064,7 +1072,23 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (time.isNotEmpty) ...[
+                      if (presence != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          presence!,
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                presence == 'Online'
+                                    ? AppColors.accentText(context)
+                                    : textTheme.withValues(alpha: 0.55),
+                            fontSize: 11,
+                            fontWeight:
+                                presence == 'Online'
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                          ),
+                        ),
+                      ] else if (time.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Text(
                           time,

@@ -10,6 +10,7 @@ import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/services/chat_privacy_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/connectivity_service.dart';
 import 'package:palturo/services/draft_service.dart';
@@ -22,6 +23,7 @@ import 'package:palturo/widgets/chat_menu_row.dart';
 import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/chat_search_sheet.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/utils/presence_label.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 
 @visibleForTesting
@@ -79,6 +81,8 @@ class _ChatRoomState extends State<ChatRoom> {
   int? _unreadDividerIndex;
   String? _highlightedMessageKey;
   Timer? _highlightTimer;
+  RealtimeChannel? _presenceChannel;
+  bool _peerOnlineFromChannel = false;
 
   @override
   void initState() {
@@ -106,9 +110,71 @@ class _ChatRoomState extends State<ChatRoom> {
     });
     _scrollController.addListener(_onScrollChanged);
     ConnectivityService.instance.addListener(_onConnectivityChanged);
+    ChatPrivacyService.instance.addListener(_onPrivacyChanged);
+    _subscribePresenceChannel();
     _loadMessages();
     _subscribeRealtime();
     _refreshFeedbackStatus();
+  }
+
+  void _onPrivacyChanged() {
+    final enabled = ChatPrivacyService.instance.presenceEnabled;
+    if (enabled && _presenceChannel == null) {
+      _subscribePresenceChannel();
+    } else if (!enabled) {
+      final channel = _presenceChannel;
+      _presenceChannel = null;
+      if (channel != null) {
+        unawaited(Supabase.instance.client.removeChannel(channel));
+      }
+      if (_peerOnlineFromChannel && mounted) {
+        setState(() => _peerOnlineFromChannel = false);
+      }
+    }
+  }
+
+  void _subscribePresenceChannel() {
+    final connectionId = widget.connectionId;
+    if (connectionId == null || _presenceChannel != null) return;
+    if (!ChatPrivacyService.instance.presenceEnabled) return;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+
+    final channel = Supabase.instance.client.channel(
+      'chat:$connectionId',
+      opts: const RealtimeChannelConfig(self: true),
+    );
+    channel.onPresenceSync((_) {
+      final states = channel.presenceState();
+      final peerOnline = states.any(
+        (state) => state.presences.any(
+          (presence) => presence.payload['user_id']?.toString() != uid,
+        ),
+      );
+      if (mounted && peerOnline != _peerOnlineFromChannel) {
+        setState(() => _peerOnlineFromChannel = peerOnline);
+      }
+    });
+    channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        unawaited(channel.track({'user_id': uid}));
+      }
+    });
+    _presenceChannel = channel;
+  }
+
+  String? get _peerPresenceText {
+    if (_peerOnlineFromChannel) return 'Online';
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return null;
+    final conversation = ChatStateService.instance.conversationFor(
+      connectionId,
+    );
+    if (conversation == null) return null;
+    return presenceLabel(
+      conversation.otherLastSeenAt,
+      enabled: conversation.otherPresenceEnabled,
+    );
   }
 
   void _onConnectivityChanged() {
@@ -161,6 +227,12 @@ class _ChatRoomState extends State<ChatRoom> {
     _highlightTimer?.cancel();
     _scrollController.removeListener(_onScrollChanged);
     ConnectivityService.instance.removeListener(_onConnectivityChanged);
+    ChatPrivacyService.instance.removeListener(_onPrivacyChanged);
+    final presence = _presenceChannel;
+    _presenceChannel = null;
+    if (presence != null) {
+      unawaited(Supabase.instance.client.removeChannel(presence));
+    }
     final connectionId = widget.connectionId;
     if (connectionId != null &&
         Supabase.instance.client.auth.currentUser != null) {
@@ -787,13 +859,17 @@ class _ChatRoomState extends State<ChatRoom> {
     final hasMessages = _messages.isNotEmpty || _pending.isNotEmpty;
 
     final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
+    final presenceText = _peerPresenceText;
     final bgColor = AppColors.mutedSurface(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
 
       appBar: AppBar(
-        toolbarHeight: adaptiveHeight + (widget.skillName != null ? 8 : 0),
+        toolbarHeight:
+            adaptiveHeight +
+            (widget.skillName != null ? 8 : 0) +
+            (presenceText != null ? 10 : 0),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -846,6 +922,44 @@ class _ChatRoomState extends State<ChatRoom> {
                                   skillName: widget.skillName!,
                                   role: widget.role,
                                 ),
+                              ),
+                            ],
+                            if (presenceText != null) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          presenceText == 'Online'
+                                              ? AppColors.primary
+                                              : AppColors.mutedText(context),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      presenceText,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.regularText.copyWith(
+                                        color:
+                                            presenceText == 'Online'
+                                                ? AppColors.accentText(context)
+                                                : AppColors.mutedText(context),
+                                        fontSize: 10.5,
+                                        fontWeight:
+                                            presenceText == 'Online'
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ],

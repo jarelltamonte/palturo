@@ -34,6 +34,7 @@ class MatchedUser {
   final String? lastMessage;
   final String? lastMessageTime;
   final bool hasUnread;
+  final String? presence;
 
   /// Live-data extras: the connection row + counterpart profile id (null for
   /// the static dump catalog).
@@ -54,6 +55,7 @@ class MatchedUser {
     this.lastMessage,
     this.lastMessageTime,
     this.hasUnread = false,
+    this.presence,
     this.connectionId,
     this.otherUserId,
   });

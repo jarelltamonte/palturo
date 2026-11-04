@@ -53,7 +53,7 @@ class NotificationPresenter {
     PersonRole? role,
   }) {
     if (!_markCelebrated(connectionId)) return;
-    if (!PreferencesService.instance.isQuietHoursNow) {
+    if (notificationFeedbackAllowed()) {
       unawaited(Haptics.match());
       unawaited(SoundService.instance.play(AppSound.match));
     }
@@ -84,7 +84,7 @@ class NotificationPresenter {
       return;
     }
     if (item.kind == AppNotificationKind.unknown) return;
-    if (!_kindEnabled(item.kind)) return;
+    if (!notificationKindEnabled(item.kind)) return;
 
     final view = presentActivity(item.toRow());
     if (item.kind == AppNotificationKind.connectionRequest &&
@@ -130,7 +130,7 @@ class NotificationPresenter {
   }
 
   void _showStandard(AppNotification item, ActivityItemView view) {
-    if (!PreferencesService.instance.isQuietHoursNow) {
+    if (notificationFeedbackAllowed()) {
       if (item.kind == AppNotificationKind.connectionRequest) {
         unawaited(Haptics.impact());
       } else if (item.kind == AppNotificationKind.requestDeclined) {
@@ -213,14 +213,11 @@ class NotificationPresenter {
       return;
     }
 
-    if (!PreferencesService.instance.isQuietHoursNow) {
+    if (notificationFeedbackAllowed()) {
       unawaited(Haptics.tap());
       unawaited(SoundService.instance.play(AppSound.message));
     }
-    final body =
-        PreferencesService.instance.messagePreviewsEnabled
-            ? event.preview
-            : 'New message';
+    final body = messageBannerBody(event);
     final role = _roleFrom(event.role);
     AppBannerController.instance.showOrUpdate(
       AppBannerData(
@@ -279,20 +276,6 @@ class NotificationPresenter {
     _celebrated.clear();
   }
 
-  bool _kindEnabled(AppNotificationKind kind) {
-    switch (kind) {
-      case AppNotificationKind.connectionRequest:
-      case AppNotificationKind.requestAccepted:
-      case AppNotificationKind.requestDeclined:
-        return PreferencesService.instance.requestNotificationsEnabled;
-      case AppNotificationKind.feedbackReady:
-      case AppNotificationKind.skillModeration:
-        return PreferencesService.instance.activityNotificationsEnabled;
-      case AppNotificationKind.unknown:
-        return false;
-    }
-  }
-
   PersonRole? _roleFrom(String? role) {
     switch (role?.trim().toLowerCase()) {
       case 'learner':
@@ -337,4 +320,31 @@ class NotificationPresenter {
     _messageSub?.cancel();
     AppBannerController.instance.clear();
   }
+}
+
+@visibleForTesting
+bool notificationKindEnabled(AppNotificationKind kind) {
+  switch (kind) {
+    case AppNotificationKind.connectionRequest:
+    case AppNotificationKind.requestAccepted:
+    case AppNotificationKind.requestDeclined:
+      return PreferencesService.instance.requestNotificationsEnabled;
+    case AppNotificationKind.feedbackReady:
+    case AppNotificationKind.skillModeration:
+      return PreferencesService.instance.activityNotificationsEnabled;
+    case AppNotificationKind.unknown:
+      return false;
+  }
+}
+
+@visibleForTesting
+String messageBannerBody(IncomingMessageEvent event) {
+  return PreferencesService.instance.messagePreviewsEnabled
+      ? event.preview
+      : 'New message';
+}
+
+@visibleForTesting
+bool notificationFeedbackAllowed({DateTime? now}) {
+  return !PreferencesService.instance.isQuietHours(now ?? DateTime.now());
 }

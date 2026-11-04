@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/models/app_notification.dart';
+import 'package:palturo/models/incoming_message_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/settings/notification_preferences_page.dart';
+import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -61,6 +64,58 @@ void main() {
     expect(prefs.isQuietHours(DateTime(2026, 1, 1, 10)), isFalse);
   });
 
+  test(
+    'presenter category mapping follows request and activity flags',
+    () async {
+      final prefs = PreferencesService.instance;
+
+      await prefs.setRequestNotificationsEnabled(false);
+      expect(
+        notificationKindEnabled(AppNotificationKind.connectionRequest),
+        isFalse,
+      );
+      expect(
+        notificationKindEnabled(AppNotificationKind.requestAccepted),
+        isFalse,
+      );
+      expect(
+        notificationKindEnabled(AppNotificationKind.feedbackReady),
+        isTrue,
+      );
+
+      await prefs.setActivityNotificationsEnabled(false);
+      expect(
+        notificationKindEnabled(AppNotificationKind.feedbackReady),
+        isFalse,
+      );
+      expect(notificationKindEnabled(AppNotificationKind.unknown), isFalse);
+    },
+  );
+
+  test('message preview privacy and quiet-hours feedback rules', () async {
+    final prefs = PreferencesService.instance;
+    final event = IncomingMessageEvent(
+      connectionId: 'c1',
+      peerUserId: 'u1',
+      senderName: 'Grace',
+      body: 'Private message text',
+      createdAt: DateTime.utc(2026, 11, 4),
+    );
+
+    await prefs.setMessagePreviewsEnabled(false);
+    expect(messageBannerBody(event), 'New message');
+    await prefs.setMessagePreviewsEnabled(true);
+    expect(messageBannerBody(event), 'Private message text');
+
+    await prefs.setQuietWindow(startMinutes: 22 * 60, endMinutes: 7 * 60);
+    await prefs.setQuietHoursEnabled(true);
+    expect(
+      notificationFeedbackAllowed(now: DateTime(2026, 11, 4, 23)),
+      isFalse,
+    );
+    expect(notificationFeedbackAllowed(now: DateTime(2026, 11, 4, 12)), isTrue);
+  });
+
   test('permission asked flag persists', () async {
     final prefs = PreferencesService.instance;
 
@@ -90,7 +145,7 @@ void main() {
     await tester.tap(find.byType(SwitchListTile).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Turn on notifications to use this.'), findsNWidgets(3));
+    expect(find.text('Turn on notifications to use this.'), findsNWidgets(5));
   });
 
   testWidgets('page survives 360px at 200% text', (tester) async {

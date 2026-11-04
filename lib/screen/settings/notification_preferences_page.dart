@@ -65,27 +65,6 @@ class NotificationPreferencesPage extends StatelessWidget {
                   NotificationService.instance.notifyPreferenceChanged();
                 },
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  'System permission',
-                  style: AppTextStyles.regularText.copyWith(color: textColor),
-                ),
-                subtitle: Text(
-                  prefs.notificationPermissionAsked
-                      ? 'Requested. Manage it in your device settings.'
-                      : 'You will be asked when you enable notifications.',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.mutedText(context),
-                    fontSize: 12,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.info_outline,
-                  size: 18,
-                  color: AppColors.mutedText(context),
-                ),
-              ),
               const SizedBox(height: 8),
               _sectionLabel(context, 'Notify me about'),
               _categorySwitch(
@@ -130,7 +109,9 @@ class NotificationPreferencesPage extends StatelessWidget {
                   style: AppTextStyles.regularText.copyWith(color: textColor),
                 ),
                 subtitle: Text(
-                  'When off, banners and lock-screen alerts show only the sender.',
+                  master
+                      ? 'When off, banners show only the sender.'
+                      : 'Turn on notifications to use this.',
                   style: AppTextStyles.regularText.copyWith(
                     color: AppColors.mutedText(context),
                     fontSize: 12,
@@ -141,12 +122,19 @@ class NotificationPreferencesPage extends StatelessWidget {
                 inactiveTrackColor: AppColors.switchOffTrack(context),
                 inactiveThumbColor: AppColors.white,
                 value: prefs.messagePreviewsEnabled,
-                onChanged: (value) async {
-                  Haptics.selection();
-                  await prefs.setMessagePreviewsEnabled(value);
-                },
+                onChanged:
+                    master
+                        ? (value) async {
+                          Haptics.selection();
+                          await prefs.setMessagePreviewsEnabled(value);
+                        }
+                        : null,
               ),
-              _previewExample(context, prefs.messagePreviewsEnabled),
+              _previewExample(
+                context,
+                enabled: master,
+                showText: prefs.messagePreviewsEnabled,
+              ),
               const SizedBox(height: 8),
               _sectionLabel(context, 'Sound & vibration'),
               _feedbackTile(
@@ -186,7 +174,9 @@ class NotificationPreferencesPage extends StatelessWidget {
                   style: AppTextStyles.regularText.copyWith(color: textColor),
                 ),
                 subtitle: Text(
-                  'Silence sounds and system alerts during this window. Banners still appear.',
+                  master
+                      ? 'Silence sounds and haptics during this window. Banners still appear.'
+                      : 'Turn on notifications to use this.',
                   style: AppTextStyles.regularText.copyWith(
                     color: AppColors.mutedText(context),
                     fontSize: 12,
@@ -197,12 +187,15 @@ class NotificationPreferencesPage extends StatelessWidget {
                 inactiveTrackColor: AppColors.switchOffTrack(context),
                 inactiveThumbColor: AppColors.white,
                 value: prefs.quietHoursEnabled,
-                onChanged: (value) async {
-                  Haptics.selection();
-                  await prefs.setQuietHoursEnabled(value);
-                },
+                onChanged:
+                    master
+                        ? (value) async {
+                          Haptics.selection();
+                          await prefs.setQuietHoursEnabled(value);
+                        }
+                        : null,
               ),
-              if (prefs.quietHoursEnabled) ...[
+              if (master && prefs.quietHoursEnabled) ...[
                 _timeRow(
                   context,
                   label: 'From',
@@ -226,7 +219,7 @@ class NotificationPreferencesPage extends StatelessWidget {
               ],
               const SizedBox(height: 12),
               Text(
-                'Changes apply immediately. Per-chat mute is available in each chat menu.',
+                'Changes apply immediately.',
                 style: AppTextStyles.regularText.copyWith(
                   color: AppColors.mutedText(context),
                   fontSize: 11,
@@ -410,7 +403,11 @@ class NotificationPreferencesPage extends StatelessWidget {
     }
   }
 
-  Widget _previewExample(BuildContext context, bool showText) {
+  Widget _previewExample(
+    BuildContext context, {
+    required bool enabled,
+    required bool showText,
+  }) {
     return Container(
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(12),
@@ -445,7 +442,9 @@ class NotificationPreferencesPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  showText
+                  !enabled
+                      ? 'Notifications are off'
+                      : showText
                       ? 'Kumusta! Gusto mo bang mag-exchange ng adobo recipe?'
                       : 'New message',
                   style: AppTextStyles.regularText.copyWith(

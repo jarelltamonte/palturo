@@ -933,9 +933,16 @@ class _SettingsState extends State<Settings> {
               listenable: PreferencesService.instance,
               builder: (context, _) {
                 final prefs = PreferencesService.instance;
+                final active = <String>[
+                  if (prefs.messageNotificationsEnabled) 'messages',
+                  if (prefs.requestNotificationsEnabled) 'requests',
+                  if (prefs.activityNotificationsEnabled) 'activity',
+                ];
                 final summary =
                     prefs.notificationsEnabled
-                        ? 'On ? Messages, requests, activity'
+                        ? (active.isEmpty
+                            ? 'On - no categories selected'
+                            : 'On - ${active.join(', ')}')
                         : 'Off';
                 return ListTile(
                   contentPadding: EdgeInsets.zero,

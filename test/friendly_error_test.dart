@@ -43,5 +43,20 @@ void main() {
       ),
       'Account deletion is temporarily unavailable. Please try again.',
     );
+    expect(friendlyError(Exception('Add a number')), 'Add a number');
+
+    for (final technical in [
+      'value too long for type character varying(120)',
+      'password authentication failed for user "postgres"',
+      'permission denied for table profiles',
+      'invalid input syntax for type uuid: "abc"',
+      'PostgrestException(message: boom, code: 42P01)',
+    ]) {
+      expect(
+        friendlyError(Exception(technical)),
+        'Something went wrong. Please try again.',
+        reason: technical,
+      );
+    }
   });
 }

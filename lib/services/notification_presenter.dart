@@ -53,8 +53,10 @@ class NotificationPresenter {
     PersonRole? role,
   }) {
     if (!_markCelebrated(connectionId)) return;
-    unawaited(Haptics.match());
-    unawaited(SoundService.instance.play(AppSound.match));
+    if (!PreferencesService.instance.isQuietHoursNow) {
+      unawaited(Haptics.match());
+      unawaited(SoundService.instance.play(AppSound.match));
+    }
     final data = buildMatchBanner(
       id: 'match:$connectionId',
       name: name.trim().isEmpty ? 'your Pal' : name,
@@ -82,6 +84,7 @@ class NotificationPresenter {
       return;
     }
     if (item.kind == AppNotificationKind.unknown) return;
+    if (!_kindEnabled(item.kind)) return;
 
     final view = presentActivity(item.toRow());
     if (item.kind == AppNotificationKind.connectionRequest &&
@@ -127,15 +130,17 @@ class NotificationPresenter {
   }
 
   void _showStandard(AppNotification item, ActivityItemView view) {
-    if (item.kind == AppNotificationKind.connectionRequest) {
-      unawaited(Haptics.impact());
-    } else if (item.kind == AppNotificationKind.requestDeclined) {
-      unawaited(Haptics.warning());
-    } else if (item.kind == AppNotificationKind.feedbackReady) {
-      unawaited(Haptics.success());
-      unawaited(SoundService.instance.play(AppSound.success));
-    } else if (item.kind == AppNotificationKind.skillModeration) {
-      unawaited(Haptics.selection());
+    if (!PreferencesService.instance.isQuietHoursNow) {
+      if (item.kind == AppNotificationKind.connectionRequest) {
+        unawaited(Haptics.impact());
+      } else if (item.kind == AppNotificationKind.requestDeclined) {
+        unawaited(Haptics.warning());
+      } else if (item.kind == AppNotificationKind.feedbackReady) {
+        unawaited(Haptics.success());
+        unawaited(SoundService.instance.play(AppSound.success));
+      } else if (item.kind == AppNotificationKind.skillModeration) {
+        unawaited(Haptics.selection());
+      }
     }
     final onTap = _tapFor(item, view);
     final String? actionLabel;
@@ -202,13 +207,20 @@ class NotificationPresenter {
   void _onMessage(IncomingMessageEvent event) {
     if (Supabase.instance.client.auth.currentUser == null) return;
     if (!PreferencesService.instance.notificationsEnabled) return;
+    if (!PreferencesService.instance.messageNotificationsEnabled) return;
     if (!NotificationService.instance.isForeground) return;
     if (ChatStateService.instance.activeConnectionId == event.connectionId) {
       return;
     }
 
-    unawaited(Haptics.tap());
-    unawaited(SoundService.instance.play(AppSound.message));
+    if (!PreferencesService.instance.isQuietHoursNow) {
+      unawaited(Haptics.tap());
+      unawaited(SoundService.instance.play(AppSound.message));
+    }
+    final body =
+        PreferencesService.instance.messagePreviewsEnabled
+            ? event.preview
+            : 'New message';
     final role = _roleFrom(event.role);
     AppBannerController.instance.showOrUpdate(
       AppBannerData(
@@ -217,7 +229,7 @@ class NotificationPresenter {
             '${event.createdAt.millisecondsSinceEpoch}',
         groupKey: 'chat:${event.connectionId}',
         title: event.senderName,
-        body: event.preview,
+        body: body,
         icon: CupertinoIcons.chat_bubble,
         avatarUrl: event.avatarUrl,
         actorName: event.senderName,
@@ -265,6 +277,20 @@ class NotificationPresenter {
   void reset() {
     AppBannerController.instance.clear();
     _celebrated.clear();
+  }
+
+  bool _kindEnabled(AppNotificationKind kind) {
+    switch (kind) {
+      case AppNotificationKind.connectionRequest:
+      case AppNotificationKind.requestAccepted:
+      case AppNotificationKind.requestDeclined:
+        return PreferencesService.instance.requestNotificationsEnabled;
+      case AppNotificationKind.feedbackReady:
+      case AppNotificationKind.skillModeration:
+        return PreferencesService.instance.activityNotificationsEnabled;
+      case AppNotificationKind.unknown:
+        return false;
+    }
   }
 
   PersonRole? _roleFrom(String? role) {

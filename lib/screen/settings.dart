@@ -5,15 +5,14 @@ import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/haptics.dart';
-import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:palturo/authentication/legal_dialogs.dart';
 import 'package:palturo/screen/account/account_settings_page.dart';
+import 'package:palturo/screen/settings/notification_preferences_page.dart';
 import 'package:palturo/services/profile_service.dart';
-import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -31,19 +30,11 @@ class Settings extends StatefulWidget {
 }
 
 class _SettingsState extends State<Settings> {
-  bool _notificationsEnabled = true;
-  bool _soundEnabled = true;
-  bool _vibrationEnabled = true;
-  bool _userChangedSettings = false;
   String _version = '...';
   ProfileData? _profile;
   String? _email;
   String? _authName;
   bool _loggingOut = false;
-
-  static const _notificationsKey = 'notifications_enabled';
-  static const _soundKey = 'sound_enabled';
-  static const _vibrationKey = 'vibration_enabled';
 
   final TextEditingController _reportController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
@@ -72,7 +63,6 @@ class _SettingsState extends State<Settings> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
     _loadVersion();
     _loadAccountSummary();
   }
@@ -110,42 +100,6 @@ class _SettingsState extends State<Settings> {
     }
     if (!mounted) return;
     setState(() => _profile = profile);
-  }
-
-  Future<void> _loadSettings() async {
-    final prefs = PreferencesService.instance;
-    final notifications = await prefs.getBool(_notificationsKey);
-    final sound = await prefs.getBool(_soundKey);
-    final vibration = await prefs.getBool(_vibrationKey);
-    if (!mounted || _userChangedSettings) return;
-    setState(() {
-      _notificationsEnabled = notifications ?? true;
-      _soundEnabled = sound ?? true;
-      _vibrationEnabled = vibration ?? true;
-    });
-  }
-
-  void _setToggle(String key, bool value, VoidCallback apply) {
-    _userChangedSettings = true;
-    Haptics.selection();
-    setState(apply);
-    switch (key) {
-      case _notificationsKey:
-        PreferencesService.instance.setNotificationsEnabled(value);
-        NotificationService.instance.refresh();
-        NotificationService.instance.notifyPreferenceChanged();
-        break;
-      case _soundKey:
-        PreferencesService.instance.setSoundEnabled(value);
-        if (value) SoundService.instance.preview();
-        break;
-      case _vibrationKey:
-        PreferencesService.instance.setVibrationEnabled(value);
-        if (value) Haptics.preview();
-        break;
-      default:
-        PreferencesService.instance.setBool(key, value);
-    }
   }
 
   String _deliveryError(Object error) {
@@ -975,77 +929,41 @@ class _SettingsState extends State<Settings> {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
           children: [
             _sectionLabel('Preferences'),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                'Notifications',
-                style: AppTextStyles.regularText.copyWith(color: textTheme),
-              ),
-              subtitle: Text(
-                'Show activity badges for requests and messages.',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.mutedText(context),
-                  fontSize: 12,
-                ),
-              ),
-              activeTrackColor: AppColors.primary,
-              activeThumbColor: AppColors.white,
-              inactiveTrackColor: AppColors.switchOffTrack(context),
-              inactiveThumbColor: AppColors.white,
-              value: _notificationsEnabled,
-              onChanged: (bool value) {
-                _setToggle(
-                  _notificationsKey,
-                  value,
-                  () => _notificationsEnabled = value,
-                );
-              },
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                'Sound',
-                style: AppTextStyles.regularText.copyWith(color: textTheme),
-              ),
-              subtitle: Text(
-                'Play confirmation sounds on launch and setup.',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.mutedText(context),
-                  fontSize: 12,
-                ),
-              ),
-              activeTrackColor: AppColors.primary,
-              activeThumbColor: AppColors.white,
-              inactiveTrackColor: AppColors.switchOffTrack(context),
-              inactiveThumbColor: AppColors.white,
-              value: _soundEnabled,
-              onChanged: (bool value) {
-                _setToggle(_soundKey, value, () => _soundEnabled = value);
-              },
-            ),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                'Vibration',
-                style: AppTextStyles.regularText.copyWith(color: textTheme),
-              ),
-              subtitle: Text(
-                'Use haptic feedback for swipes and confirms.',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.mutedText(context),
-                  fontSize: 12,
-                ),
-              ),
-              activeTrackColor: AppColors.primary,
-              activeThumbColor: AppColors.white,
-              inactiveTrackColor: AppColors.switchOffTrack(context),
-              inactiveThumbColor: AppColors.white,
-              value: _vibrationEnabled,
-              onChanged: (bool value) {
-                _setToggle(
-                  _vibrationKey,
-                  value,
-                  () => _vibrationEnabled = value,
+            ListenableBuilder(
+              listenable: PreferencesService.instance,
+              builder: (context, _) {
+                final prefs = PreferencesService.instance;
+                final summary =
+                    prefs.notificationsEnabled
+                        ? 'On ? Messages, requests, activity'
+                        : 'Off';
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Notifications',
+                    style: AppTextStyles.regularText.copyWith(color: textTheme),
+                  ),
+                  subtitle: Text(
+                    summary,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: AppColors.mutedText(context),
+                  ),
+                  onTap: () async {
+                    Haptics.selection();
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationPreferencesPage(),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
                 );
               },
             ),

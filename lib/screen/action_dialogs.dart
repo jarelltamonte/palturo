@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
@@ -94,7 +95,10 @@ class _ConfirmDialog extends StatelessWidget {
         ),
         actions: [
           CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () {
+              Haptics.selection();
+              Navigator.pop(context, false);
+            },
             child: Text(
               cancelLabel,
               style: AppTextStyles.regularText.copyWith(color: textTheme),
@@ -102,7 +106,12 @@ class _ConfirmDialog extends StatelessWidget {
           ),
           CupertinoDialogAction(
             isDestructiveAction: destructive,
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              Haptics.fire(
+                destructive ? HapticIntent.warning : HapticIntent.selection,
+              );
+              Navigator.pop(context, true);
+            },
             child: Text(
               confirmLabel,
               style: AppTextStyles.regularText.copyWith(color: confirmColor),
@@ -119,14 +128,22 @@ class _ConfirmDialog extends StatelessWidget {
       content: SizedBox(width: double.maxFinite, child: body),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () {
+            Haptics.selection();
+            Navigator.pop(context, false);
+          },
           child: Text(
             cancelLabel,
             style: AppTextStyles.regularText.copyWith(color: textTheme),
           ),
         ),
         TextButton(
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () {
+            Haptics.fire(
+              destructive ? HapticIntent.warning : HapticIntent.selection,
+            );
+            Navigator.pop(context, true);
+          },
           style:
               destructive
                   ? TextButton.styleFrom(

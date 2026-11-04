@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
@@ -13,6 +15,7 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/match_api.dart';
@@ -559,6 +562,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       NotificationService.instance.refresh();
 
       if (!accept) {
+        unawaited(Haptics.warning());
         setState(() => _declinedIds.add(request.id));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -587,6 +591,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       return true;
     } catch (e) {
       if (!mounted) return false;
+      unawaited(Haptics.error());
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
@@ -601,6 +606,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     try {
       await MatchApi.undoDecline(request.id);
       if (!mounted) return;
+      unawaited(Haptics.selection());
       setState(() => _declinedIds.remove(request.id));
       NotificationService.instance.refresh();
       ScaffoldMessenger.of(context).showSnackBar(

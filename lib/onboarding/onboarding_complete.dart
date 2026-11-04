@@ -1,7 +1,6 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-import '../services/preferences_service.dart';
+import '../services/sound_service.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_colors.dart';
 
@@ -17,7 +16,6 @@ class OnboardingComplete extends StatefulWidget {
 class _OnboardingCompleteState extends State<OnboardingComplete>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  final AudioPlayer _player = AudioPlayer();
 
   @override
   void initState() {
@@ -30,23 +28,16 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
         _playSound();
       }
     });
-
-    _player.setReleaseMode(ReleaseMode.stop);
   }
 
   Future<void> _playSound() async {
-    if (!mounted || !PreferencesService.instance.soundEnabled) return;
-
-    try {
-      await _player.stop();
-      await _player.play(AssetSource('sounds/newmatch.wav'));
-    } catch (_) {}
+    if (!mounted) return;
+    await SoundService.instance.play(AppSound.match);
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _player.dispose();
     super.dispose();
   }
 

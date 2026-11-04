@@ -10,6 +10,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/chat_pending_message.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -187,6 +188,7 @@ class _ChatRoomState extends State<ChatRoom> {
       return;
     }
 
+    unawaited(Haptics.tap());
     final pending = PendingChatMessage(
       localId:
           'pending-${DateTime.now().microsecondsSinceEpoch}-${_pendingSequence++}',
@@ -221,6 +223,7 @@ class _ChatRoomState extends State<ChatRoom> {
       );
     } catch (_) {
       if (!mounted) return;
+      unawaited(Haptics.error());
       setState(() {
         final index = _pending.indexWhere(
           (item) => item.localId == pending.localId,

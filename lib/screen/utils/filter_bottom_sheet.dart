@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
@@ -178,7 +179,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 _filterChip(
                   option.label,
                   _draft[section.key] == option.value,
-                  () => setState(() => _draft[section.key] = option.value),
+                  () {
+                    Haptics.selection();
+                    setState(() => _draft[section.key] = option.value);
+                  },
                   textColor,
                   primaryColor,
                 ),

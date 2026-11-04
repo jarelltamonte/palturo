@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_room.dart';
@@ -5,6 +7,7 @@ import 'package:palturo/screen/notifications_page.dart';
 import 'package:palturo/screen/profile_page.dart';
 import 'package:palturo/screen/request_page.dart';
 import 'package:palturo/services/app_navigator.dart';
+import 'package:palturo/services/sound_service.dart';
 
 /// Routes opened from notifications, banners, and deep links.
 ///
@@ -16,6 +19,7 @@ class AppRouter {
   static NavigatorState? get _navigator => navigatorKey.currentState;
 
   static Future<void> _push(WidgetBuilder builder) async {
+    unawaited(SoundService.instance.stop());
     final navigator = _navigator;
     if (navigator == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

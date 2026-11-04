@@ -10,8 +10,10 @@ import 'package:palturo/screen/request_page.dart';
 import 'package:palturo/services/app_navigation.dart';
 import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/match_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -51,6 +53,8 @@ class NotificationPresenter {
     PersonRole? role,
   }) {
     if (!_markCelebrated(connectionId)) return;
+    unawaited(Haptics.match());
+    unawaited(SoundService.instance.play(AppSound.match));
     final data = buildMatchBanner(
       id: 'match:$connectionId',
       name: name.trim().isEmpty ? 'your Pal' : name,
@@ -123,6 +127,16 @@ class NotificationPresenter {
   }
 
   void _showStandard(AppNotification item, ActivityItemView view) {
+    if (item.kind == AppNotificationKind.connectionRequest) {
+      unawaited(Haptics.impact());
+    } else if (item.kind == AppNotificationKind.requestDeclined) {
+      unawaited(Haptics.warning());
+    } else if (item.kind == AppNotificationKind.feedbackReady) {
+      unawaited(Haptics.success());
+      unawaited(SoundService.instance.play(AppSound.success));
+    } else if (item.kind == AppNotificationKind.skillModeration) {
+      unawaited(Haptics.selection());
+    }
     final onTap = _tapFor(item, view);
     final String? actionLabel;
     final VoidCallback? onAction;
@@ -193,6 +207,8 @@ class NotificationPresenter {
       return;
     }
 
+    unawaited(Haptics.tap());
+    unawaited(SoundService.instance.play(AppSound.message));
     final role = _roleFrom(event.role);
     AppBannerController.instance.showOrUpdate(
       AppBannerData(

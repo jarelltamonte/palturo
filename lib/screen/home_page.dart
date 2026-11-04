@@ -331,6 +331,7 @@ class _HomePageState extends State<HomePage> {
       );
     } catch (e) {
       if (!mounted) return;
+      Haptics.error();
       _resetCard();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not send request: ${_cleanError(e)}')),
@@ -393,6 +394,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (!mounted) return;
+    Haptics.selection();
     setState(() {
       _history.removeLast();
       _historyRight.removeLast();

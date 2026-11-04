@@ -10,7 +10,9 @@ import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show kLearningStyleOptions, kDayOptions, kLanguageOptions;
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
@@ -573,8 +575,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         newPhotoLocalPaths: _photos,
         teachingSkillImages: teachingSkillImages,
       );
-      if (mounted) Navigator.pop(context, savedProfile);
+      if (mounted) {
+        Haptics.success();
+        SoundService.instance.play(AppSound.success);
+        Navigator.pop(context, savedProfile);
+      }
     } catch (e) {
+      Haptics.error();
       debugPrint('[ProfileEdit] save failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

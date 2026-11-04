@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/match_api.dart';
@@ -12,6 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:palturo/authentication/legal_dialogs.dart';
 import 'package:palturo/screen/account/account_settings_page.dart';
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -125,6 +127,7 @@ class _SettingsState extends State<Settings> {
 
   void _setToggle(String key, bool value, VoidCallback apply) {
     _userChangedSettings = true;
+    Haptics.selection();
     setState(apply);
     switch (key) {
       case _notificationsKey:
@@ -134,9 +137,11 @@ class _SettingsState extends State<Settings> {
         break;
       case _soundKey:
         PreferencesService.instance.setSoundEnabled(value);
+        if (value) SoundService.instance.preview();
         break;
       case _vibrationKey:
         PreferencesService.instance.setVibrationEnabled(value);
+        if (value) Haptics.preview();
         break;
       default:
         PreferencesService.instance.setBool(key, value);

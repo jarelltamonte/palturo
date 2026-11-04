@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
 import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/app_navigator.dart';
@@ -28,16 +28,6 @@ const String kSupabasePublishableKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
 );
 
-Future<void> playSplashSound() async {
-  final player = AudioPlayer();
-  try {
-    player.onPlayerComplete.listen((_) => player.dispose());
-    await player.play(AssetSource('sounds/splash.wav'));
-  } catch (_) {
-    await player.dispose();
-  }
-}
-
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
@@ -55,8 +45,9 @@ void main() async {
   );
 
   await PreferencesService.instance.init();
+  unawaited(SoundService.instance.init());
   if (PreferencesService.instance.soundEnabled) {
-    playSplashSound();
+    unawaited(SoundService.instance.play(AppSound.success));
   }
   ChatStateService.instance.init();
   NotificationService.instance.init();

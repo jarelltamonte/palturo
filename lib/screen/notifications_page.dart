@@ -266,13 +266,12 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
   }
 
   Future<void> _clearRead() async {
-    final readCount = _items.where((item) => !item.isUnread).length;
-    if (readCount == 0) return;
+    final hasRead = _items.any((item) => !item.isUnread);
+    if (!hasRead) return;
     final confirmed = await showConfirmDialog(
       context,
       title: 'Clear read activity',
-      message:
-          'Remove $readCount read update${readCount == 1 ? '' : 's'}? Unread updates stay.',
+      message: 'Remove read updates? Unread updates stay.',
       confirmLabel: 'Clear',
     );
     if (!confirmed || !mounted) return;
@@ -286,30 +285,30 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
   }
 
   Widget _filterBar(Color textColor) {
-    return SizedBox(
-      height: 52,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-        itemCount: ActivityFilter.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final filter = ActivityFilter.values[index];
-          final selected = filter == _filter;
-          return ChoiceChip(
-            label: Text('${filter.label} ${_countFor(filter)}'),
-            selected: selected,
-            showCheckmark: false,
-            selectedColor: AppColors.primary,
-            backgroundColor: AppColors.elevatedSurface(context),
-            side: BorderSide(color: AppColors.border(context)),
-            labelStyle: AppTextStyles.regularText.copyWith(
-              fontSize: 12,
-              color: selected ? Colors.black : textColor,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        children: [
+          for (final filter in ActivityFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text('${filter.label} ${_countFor(filter)}'),
+                selected: filter == _filter,
+                showCheckmark: false,
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+                selectedColor: AppColors.primary,
+                backgroundColor: AppColors.elevatedSurface(context),
+                side: BorderSide(color: AppColors.border(context)),
+                labelStyle: AppTextStyles.regularText.copyWith(
+                  fontSize: 12,
+                  color: filter == _filter ? Colors.black : textColor,
+                ),
+                onSelected: (_) => setState(() => _filter = filter),
+              ),
             ),
-            onSelected: (_) => setState(() => _filter = filter),
-          );
-        },
+        ],
       ),
     );
   }
@@ -350,33 +349,36 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
         conversation: conversation,
       );
       final timeLabel = ChatTimeFormatter.formatChatListTime(item.createdAt);
+      final row = _ActivityRow(
+        view: view,
+        unread: item.isUnread,
+        timeLabel: timeLabel,
+        onTap: () => _openItem(item),
+      );
       children.add(
-        Dismissible(
-          key: ValueKey('activity:${item.id}'),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(
-              Icons.mark_email_read_outlined,
-              color: AppColors.accentText(context),
-            ),
-          ),
-          confirmDismiss: (_) async {
-            if (item.isUnread) await _markItemRead(item);
-            return false;
-          },
-          child: _ActivityRow(
-            view: view,
-            unread: item.isUnread,
-            timeLabel: timeLabel,
-            onTap: () => _openItem(item),
-          ),
-        ),
+        item.isUnread
+            ? Dismissible(
+              key: ValueKey('activity:${item.id}'),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(
+                  Icons.mark_email_read_outlined,
+                  color: AppColors.accentText(context),
+                ),
+              ),
+              confirmDismiss: (_) async {
+                await _markItemRead(item);
+                return false;
+              },
+              child: row,
+            )
+            : row,
       );
       children.add(const SizedBox(height: 8));
     }
@@ -404,9 +406,17 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
         ),
         actions: [
           if (!_loading && _error == null && _hasUnread)
-            TextButton(
+            IconButton(
+              tooltip: 'Mark all read',
               onPressed: _markingAll ? null : _markAllRead,
-              child: Text(_markingAll ? 'Marking...' : 'Mark all read'),
+              icon:
+                  _markingAll
+                      ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : Icon(Icons.done_all, size: 20, color: textColor),
             ),
           if (!_loading && _error == null && all.any((item) => !item.isUnread))
             IconButton(

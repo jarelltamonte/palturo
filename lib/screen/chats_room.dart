@@ -10,6 +10,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/draft_service.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/chat_pending_message.dart';
@@ -60,15 +61,25 @@ class _ChatRoomState extends State<ChatRoom> {
   bool _feedbackCollapsed = false;
   final List<PendingChatMessage> _pending = [];
   int _pendingSequence = 0;
+  Timer? _draftTimer;
 
   @override
   void initState() {
     super.initState();
-    if (widget.connectionId != null) {
-      ChatStateService.instance.enterRoom(widget.connectionId!);
+    final connectionId = widget.connectionId;
+    if (connectionId != null) {
+      ChatStateService.instance.enterRoom(connectionId);
+      final draft = DraftService.instance.draftFor(connectionId);
+      if (draft != null) {
+        _messageController.text = draft;
+        _messageController.selection = TextSelection.collapsed(
+          offset: draft.length,
+        );
+      }
     }
     _messageController.addListener(() {
       setState(() {});
+      _queueDraftSave();
     });
     _loadMessages();
     _subscribeRealtime();
@@ -96,12 +107,30 @@ class _ChatRoomState extends State<ChatRoom> {
       ChatStateService.instance.leaveRoom(widget.connectionId!);
     }
     _messageStream?.cancel();
+    _draftTimer?.cancel();
+    final connectionId = widget.connectionId;
+    if (connectionId != null) {
+      unawaited(
+        DraftService.instance.saveDraft(connectionId, _messageController.text),
+      );
+    }
     _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
   }
 
   SupabaseClient get _client => Supabase.instance.client;
+
+  void _queueDraftSave() {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 350), () {
+      unawaited(
+        DraftService.instance.saveDraft(connectionId, _messageController.text),
+      );
+    });
+  }
 
   Future<void> _loadMessages() async {
     if (widget.connectionId == null) return;
@@ -193,6 +222,8 @@ class _ChatRoomState extends State<ChatRoom> {
       createdAt: DateTime.now(),
     );
     _messageController.clear();
+    _draftTimer?.cancel();
+    unawaited(DraftService.instance.clearDraft(widget.connectionId!));
     setState(() {
       _pending.add(pending);
       _sendingMessage = true;

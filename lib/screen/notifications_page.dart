@@ -313,34 +313,38 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
                   ],
                 ),
               )
-              : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final connectionId = item.connectionId;
-                  final conversation =
-                      connectionId == null
-                          ? null
-                          : _conversations[connectionId];
-                  final incoming =
-                      connectionId == null ? null : _incoming[connectionId];
-                  final view = presentActivity(
-                    item.toRow(),
-                    incoming: incoming,
-                    conversation: conversation,
-                  );
-                  final timeLabel = ChatTimeFormatter.formatChatListTime(
-                    item.createdAt,
-                  );
-                  return _ActivityRow(
-                    view: view,
-                    unread: item.isUnread,
-                    timeLabel: timeLabel,
-                    onTap: () => _openItem(item),
-                  );
-                },
+              : RefreshIndicator(
+                onRefresh: _load,
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final connectionId = item.connectionId;
+                    final conversation =
+                        connectionId == null
+                            ? null
+                            : _conversations[connectionId];
+                    final incoming =
+                        connectionId == null ? null : _incoming[connectionId];
+                    final view = presentActivity(
+                      item.toRow(),
+                      incoming: incoming,
+                      conversation: conversation,
+                    );
+                    final timeLabel = ChatTimeFormatter.formatChatListTime(
+                      item.createdAt,
+                    );
+                    return _ActivityRow(
+                      view: view,
+                      unread: item.isUnread,
+                      timeLabel: timeLabel,
+                      onTap: () => _openItem(item),
+                    );
+                  },
+                ),
               ),
     );
   }

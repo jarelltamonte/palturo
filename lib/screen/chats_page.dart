@@ -15,6 +15,7 @@ import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/draft_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/utils/chat_unread.dart';
@@ -64,29 +65,33 @@ class _ChatsPageState extends State<ChatsPage> {
   static const int _maxMatchCards = 8;
 
   List<MatchedUser> get _chats =>
-      ChatStateService.instance.conversations
-          .map(
-            (c) => MatchedUser(
-              id: '${c.connectionId}|${c.otherUserId}',
-              name: c.otherName,
-              role:
-                  c.otherRole == 'learner'
-                      ? PersonRole.learner
-                      : PersonRole.mentor,
-              skillName: c.otherSkill ?? '',
-              category: SkillCategory.everydayPractical,
-              schedule: '',
-              language: '',
-              learningStyle: '',
-              lastMessage: c.lastMessage,
-              lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
-              hasUnread: conversationHasUnread(c),
-              avatarUrl: c.otherAvatar,
-              connectionId: c.connectionId,
-              otherUserId: c.otherUserId,
-            ),
-          )
-          .toList();
+      ChatStateService.instance.conversations.map((c) {
+        final draft = DraftService.instance.draftFor(c.connectionId);
+        return MatchedUser(
+          id: '${c.connectionId}|${c.otherUserId}',
+          name: c.otherName,
+          role:
+              c.otherRole == 'learner' ? PersonRole.learner : PersonRole.mentor,
+          skillName: c.otherSkill ?? '',
+          category: SkillCategory.everydayPractical,
+          schedule: '',
+          language: '',
+          learningStyle: '',
+          lastMessage:
+              draft != null ? 'Draft: ${_draftPreview(draft)}' : c.lastMessage,
+          lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
+          hasUnread: conversationHasUnread(c),
+          avatarUrl: c.otherAvatar,
+          connectionId: c.connectionId,
+          otherUserId: c.otherUserId,
+        );
+      }).toList();
+
+  String _draftPreview(String draft) {
+    final collapsed = draft.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (collapsed.length <= 48) return collapsed;
+    return '${collapsed.substring(0, 45)}...';
+  }
 
   bool get _loadingChats => ChatStateService.instance.loading;
   String? get _chatsError => ChatStateService.instance.error;
@@ -99,6 +104,7 @@ class _ChatsPageState extends State<ChatsPage> {
     super.initState();
     ChatStateService.instance.addListener(_onChatStateChanged);
     NotificationService.instance.addListener(_onChatStateChanged);
+    DraftService.instance.addListener(_onChatStateChanged);
     _loadChats();
   }
 
@@ -122,6 +128,7 @@ class _ChatsPageState extends State<ChatsPage> {
   void dispose() {
     ChatStateService.instance.removeListener(_onChatStateChanged);
     NotificationService.instance.removeListener(_onChatStateChanged);
+    DraftService.instance.removeListener(_onChatStateChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -558,114 +565,118 @@ class _ChatsPageState extends State<ChatsPage> {
       ),
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          slivers: [
-            if (showMatchesSection) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16.0),
-                  child: Text(
-                    'Quick access to Pals',
-                    style: AppTextStyles.boldText.copyWith(color: textTheme),
+        child: RefreshIndicator(
+          onRefresh: _loadChats,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              if (showMatchesSection) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16.0),
+                    child: Text(
+                      'Quick access to Pals',
+                      style: AppTextStyles.boldText.copyWith(color: textTheme),
+                    ),
                   ),
                 ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 160,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    itemCount: visibleMatches.length + (showShortcut ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (showShortcut && index == 0) {
-                        return MatchesShortcutItem(
-                          onTap: () => _openMatches(context),
-                        );
-                      }
-                      final chat =
-                          visibleMatches[showShortcut ? index - 1 : index];
-                      final ImageProvider? avatarImage = chat.avatarImage;
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 160,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      itemCount: visibleMatches.length + (showShortcut ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (showShortcut && index == 0) {
+                          return MatchesShortcutItem(
+                            onTap: () => _openMatches(context),
+                          );
+                        }
+                        final chat =
+                            visibleMatches[showShortcut ? index - 1 : index];
+                        final ImageProvider? avatarImage = chat.avatarImage;
 
-                      return ChatProfileItem(
-                        name: chat.name,
-                        avatarImage: avatarImage,
-                        onTap:
-                            () => _openChatRoom(
-                              context,
-                              name: chat.name,
-                              avatarImage: avatarImage,
-                              skillName: chat.skillName,
-                              role: chat.role,
-                              person: chat.toPerson(),
-                              connectionId: chat.connectionId,
-                            ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-            if (messages.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16.0, bottom: 8),
-                  child: Text(
-                    'Messages',
-                    style: AppTextStyles.boldText.copyWith(color: textTheme),
-                  ),
-                ),
-              ),
-              SliverList.builder(
-                itemCount: messages.length,
-                itemBuilder: (context, index) {
-                  final chat = messages[index];
-                  final ImageProvider? avatarImage = chat.avatarImage;
-
-                  return ChatListItem(
-                    name: chat.name,
-                    message: chat.lastMessage!,
-                    time: chat.lastMessageTime ?? '',
-                    hasUnread:
-                        chat.hasUnread &&
-                        PreferencesService.instance.notificationsEnabled,
-                    skillName: chat.skillName,
-                    role: chat.role,
-                    avatarImage: avatarImage,
-                    onTap:
-                        () => _openChatRoom(
-                          context,
+                        return ChatProfileItem(
                           name: chat.name,
                           avatarImage: avatarImage,
-                          skillName: chat.skillName,
-                          role: chat.role,
-                          person: chat.toPerson(),
-                          connectionId: chat.connectionId,
-                        ),
-                  );
-                },
-              ),
-            ],
-            if (hasNoChats)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _buildNoMatchesState(textTheme),
-              )
-            else ...[
-              if (nothingFound)
-                SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height:
-                      MediaQuery.textScalerOf(context).scale(12) > 16
-                          ? 124
-                          : 110,
+                          onTap:
+                              () => _openChatRoom(
+                                context,
+                                name: chat.name,
+                                avatarImage: avatarImage,
+                                skillName: chat.skillName,
+                                role: chat.role,
+                                person: chat.toPerson(),
+                                connectionId: chat.connectionId,
+                              ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ),
+              ],
+              if (messages.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16.0, bottom: 8),
+                    child: Text(
+                      'Messages',
+                      style: AppTextStyles.boldText.copyWith(color: textTheme),
+                    ),
+                  ),
+                ),
+                SliverList.builder(
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final chat = messages[index];
+                    final ImageProvider? avatarImage = chat.avatarImage;
+
+                    return ChatListItem(
+                      name: chat.name,
+                      message: chat.lastMessage!,
+                      time: chat.lastMessageTime ?? '',
+                      hasUnread:
+                          chat.hasUnread &&
+                          PreferencesService.instance.notificationsEnabled,
+                      skillName: chat.skillName,
+                      role: chat.role,
+                      avatarImage: avatarImage,
+                      onTap:
+                          () => _openChatRoom(
+                            context,
+                            name: chat.name,
+                            avatarImage: avatarImage,
+                            skillName: chat.skillName,
+                            role: chat.role,
+                            person: chat.toPerson(),
+                            connectionId: chat.connectionId,
+                          ),
+                    );
+                  },
+                ),
+              ],
+              if (hasNoChats)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildNoMatchesState(textTheme),
+                )
+              else ...[
+                if (nothingFound)
+                  SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height:
+                        MediaQuery.textScalerOf(context).scale(12) > 16
+                            ? 124
+                            : 110,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

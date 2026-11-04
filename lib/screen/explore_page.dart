@@ -293,39 +293,45 @@ class _ExplorePageState extends State<ExplorePage> {
         const bottomInset = 90.0;
         final itemHeight =
             (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
-        return GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: spacing,
-            mainAxisSpacing: spacing,
-            mainAxisExtent: itemHeight,
+        return RefreshIndicator(
+          onRefresh: _loadTaxonomy,
+          child: GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              mainAxisExtent: itemHeight,
+            ),
+            itemCount: _roots.length,
+            itemBuilder: (context, index) => _buildCard(index),
           ),
-          itemCount: _roots.length,
-          itemBuilder: (context, index) => _buildCard(index),
         );
       },
     );
   }
 
   Widget _buildGridAuto(Color textTheme) {
-    return GridView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+    return RefreshIndicator(
+      onRefresh: _loadTaxonomy,
+      child: GridView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+        ),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          mainAxisExtent: 190,
+        ),
+        itemCount: _roots.length,
+        itemBuilder: (context, index) => _buildCard(index),
       ),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        mainAxisExtent: 190,
-      ),
-      itemCount: _roots.length,
-      itemBuilder: (context, index) => _buildCard(index),
     );
   }
 

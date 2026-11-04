@@ -717,54 +717,58 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     if (_loading) return const RequestCardsSkeleton();
     if (_loadError != null) return _buildLoadError(textTheme);
     if (requests.isEmpty) return _buildEmptyState(textTheme);
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
-      ),
-      itemCount: requests.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
+    return RefreshIndicator(
+      onRefresh: _loadRequests,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
+        ),
+        itemCount: requests.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'They want to connect with you. Accept to become Pals.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.7),
+                  fontSize: 14,
+                ),
+              ),
+            );
+          }
+          final request = requests[index - 1];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              'They want to connect with you. Accept to become Pals.',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme.withValues(alpha: 0.7),
-                fontSize: 14,
+            child: GestureDetector(
+              onTap: () => _openDetail(request),
+              child: RequestCard(
+                key: ValueKey(request.id),
+                skillName: request.skillName,
+                requesterName: request.requesterName,
+                schedule: request.schedule,
+                language: request.language,
+                learningStyle: request.learningStyle,
+                timeAgo: timeAgo(request.requestedAt),
+                iconAsset: request.iconAsset,
+                seekingLabel: request.seekingLabel,
+                connectionId: request.id,
+                avatarImage: _requestAvatar(request),
+                person: request.toPerson(),
+                role: request.role,
+                onAccept: () => _respond(request, true),
+                onDecline: () {},
+                onConfirmDecline: () => _confirmDecline(request),
+                onUndo: () => _undoDecline(request),
               ),
             ),
           );
-        }
-        final request = requests[index - 1];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: GestureDetector(
-            onTap: () => _openDetail(request),
-            child: RequestCard(
-              key: ValueKey(request.id),
-              skillName: request.skillName,
-              requesterName: request.requesterName,
-              schedule: request.schedule,
-              language: request.language,
-              learningStyle: request.learningStyle,
-              timeAgo: timeAgo(request.requestedAt),
-              iconAsset: request.iconAsset,
-              seekingLabel: request.seekingLabel,
-              connectionId: request.id,
-              avatarImage: _requestAvatar(request),
-              person: request.toPerson(),
-              role: request.role,
-              onAccept: () => _respond(request, true),
-              onDecline: () {},
-              onConfirmDecline: () => _confirmDecline(request),
-              onUndo: () => _undoDecline(request),
-            ),
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -870,55 +874,60 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       );
     }
 
-    return ListView.separated(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
-      ),
-      itemCount: requests.length + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pending and declined requests. Accepted requests move to Pals.',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.7),
-                    fontSize: 14,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const Matches()),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(44, 44),
-                      padding: EdgeInsets.zero,
+    return RefreshIndicator(
+      onRefresh: _loadOutgoing,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
+        ),
+        itemCount: requests.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pending and declined requests. Accepted requests move to Pals.',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme.withValues(alpha: 0.7),
+                      fontSize: 14,
                     ),
-                    child: const Text('View Pals'),
                   ),
-                ),
-              ],
-            ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const Matches()),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: const Text('View Pals'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final request = requests[index - 1];
+          return _SentRequestCard(
+            request: request,
+            onWithdraw:
+                request.isPending ? () => _cancelOutgoing(request) : null,
           );
-        }
-        final request = requests[index - 1];
-        return _SentRequestCard(
-          request: request,
-          onWithdraw: request.isPending ? () => _cancelOutgoing(request) : null,
-        );
-      },
+        },
+      ),
     );
   }
 

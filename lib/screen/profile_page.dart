@@ -1,10 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
-    show OnboardingFlow, kLearningOptions, kTeachingOptions;
+    show OnboardingFlow, kLearningOptions, kTeachingOptions, onboardingDraftKey;
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
@@ -18,7 +20,9 @@ import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/resume_setup_card.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
   final custom = CustomSkill.tryParse(id);
@@ -28,6 +32,13 @@ String _skillLabel(String id, List<OnboardingOption> options) {
   }
   return id;
 }
+
+@visibleForTesting
+bool shouldShowResumeCard({
+  required bool skipped,
+  required bool dismissed,
+  required bool hasDraft,
+}) => !dismissed && (skipped || hasDraft);
 
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
@@ -46,7 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
       "Couldn't load your profile. Please try again.";
   int? _friendCount;
   bool _openingEditor = false;
-  bool _hasSkipped = false;
+  bool _showResumeCard = false;
 
   @override
   void initState() {
@@ -54,15 +65,43 @@ class _ProfilePageState extends State<ProfilePage> {
     ChatStateService.instance.addListener(_onPalsChanged);
     _onPalsChanged();
     ChatStateService.instance.loadConversations(showSpinner: false);
-    _loadSkipped();
+    _loadResumeState();
     _loadProfile();
   }
 
-  Future<void> _loadSkipped() async {
-    final skipped =
-        await PreferencesService.instance.getBool('skipped_onboarding') ??
-        false;
-    if (mounted) setState(() => _hasSkipped = skipped);
+  Future<void> _loadResumeState() async {
+    final prefs = PreferencesService.instance;
+    final skipped = await prefs.getBool('skipped_onboarding') ?? false;
+    final dismissed =
+        await prefs.getBool('onboarding_resume_dismissed') ?? false;
+    var hasDraft = false;
+    try {
+      final raw = await prefs.getString(
+        onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id),
+      );
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        hasDraft = decoded is Map && decoded['role'] != null;
+      }
+    } catch (_) {
+      // A malformed draft must not surface a broken resume card.
+    }
+    if (!mounted) return;
+    setState(() {
+      _showResumeCard = shouldShowResumeCard(
+        skipped: skipped,
+        dismissed: dismissed,
+        hasDraft: hasDraft,
+      );
+    });
+  }
+
+  Future<void> _dismissResume() async {
+    setState(() => _showResumeCard = false);
+    await PreferencesService.instance.setBool(
+      'onboarding_resume_dismissed',
+      true,
+    );
   }
 
   Future<void> _openSetup() async {
@@ -78,7 +117,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
                 if (!mounted) return;
                 Navigator.of(context).pop();
-                setState(() => _hasSkipped = false);
+                setState(() => _showResumeCard = false);
+                await PreferencesService.instance.setBool(
+                  'onboarding_resume_dismissed',
+                  true,
+                );
                 _loadProfile();
               },
               onSkip: () async {
@@ -86,7 +129,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   'skipped_onboarding',
                   true,
                 );
-                if (mounted) Navigator.of(context).pop();
+                await PreferencesService.instance.setBool(
+                  'onboarding_resume_dismissed',
+                  false,
+                );
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                setState(() => _showResumeCard = true);
               },
             ),
       ),
@@ -334,10 +383,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: _ProfileTip(onEdit: _openEdit),
                         ),
-                      if (_hasSkipped)
+                      if (_showResumeCard)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                          child: _ContinueSetupCard(onTap: _openSetup),
+                          child: ResumeSetupCard(
+                            onTap: _openSetup,
+                            onDismiss: _dismissResume,
+                          ),
                         ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -613,66 +665,6 @@ class _ProfileSummaryCard extends StatelessWidget {
               ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ContinueSetupCard extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _ContinueSetupCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 64),
-          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-          decoration: BoxDecoration(
-            color: AppColors.elevatedSurface(context),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.border(context)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.play_circle_outline,
-                color: AppColors.accentText(context),
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Continue setup',
-                      style: AppTextStyles.boldText.copyWith(
-                        color: textColor,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Add the details that power better matches.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: AppColors.mutedText(context)),
-            ],
-          ),
         ),
       ),
     );

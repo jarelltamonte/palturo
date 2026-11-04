@@ -374,6 +374,12 @@ class _ExplorePageState extends State<ExplorePage> {
                 onPressed: _openProfileEditor,
                 child: const Text('Update your teaching skills'),
               ),
+            ] else ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _loadTaxonomy,
+                child: const Text('Refresh categories'),
+              ),
             ],
           ],
         ),

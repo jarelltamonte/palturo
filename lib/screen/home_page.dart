@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -39,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   bool _loading = true;
   String? _error;
   ProfileData? _myProfile;
+  bool _profileNudgeShown = false;
 
   RoleFilter _roleFilter = RoleFilter.all;
   String _skillFilter = 'all';
@@ -324,6 +326,7 @@ class _HomePageState extends State<HomePage> {
       _advanceFrom(person, right: true, connectionId: connectionId);
       Haptics.success();
       showAppSuccess(context, 'Connection request sent to ${person.name}');
+      unawaited(_maybeShowProfileNudge());
     } catch (e) {
       if (!mounted) return;
       Haptics.error();
@@ -339,6 +342,53 @@ class _HomePageState extends State<HomePage> {
       _actionInFlight = false;
       if (mounted) setState(() => _sendingRequest = false);
     }
+  }
+
+  Future<void> _maybeShowProfileNudge() async {
+    if (_profileNudgeShown) return;
+    final profile = _myProfile;
+    if (profile == null || profile.isProfileCompleted) return;
+    final dismissed =
+        await PreferencesService.instance.getBool('profile_nudge_dismissed') ??
+        false;
+    if (dismissed || !mounted) return;
+    _profileNudgeShown = true;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentMaterialBanner();
+    messenger.showMaterialBanner(
+      MaterialBanner(
+        leading: Icon(
+          Icons.auto_awesome_outlined,
+          color: AppColors.accentText(context),
+        ),
+        content: Text(
+          'Add a photo, bio, and languages so Pals can match with you.',
+          style: AppTextStyles.regularText.copyWith(
+            color: Theme.of(context).colorScheme.secondary,
+            fontSize: 13,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              messenger.hideCurrentMaterialBanner();
+              _openSettings();
+            },
+            child: const Text('Complete profile'),
+          ),
+          TextButton(
+            onPressed: () {
+              PreferencesService.instance.setBool(
+                'profile_nudge_dismissed',
+                true,
+              );
+              messenger.hideCurrentMaterialBanner();
+            },
+            child: const Text('Not now'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _resetCard() {

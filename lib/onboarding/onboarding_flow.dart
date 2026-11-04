@@ -74,6 +74,9 @@ List<String> resolveCategoriesForSkills(Iterable<String> skills) {
   return categories.toList();
 }
 
+String onboardingDraftKey(String? userId) =>
+    userId == null ? 'onboarding_draft' : 'onboarding_draft_$userId';
+
 class OnboardingFlow extends StatefulWidget {
   final VoidCallback onFinished;
   final VoidCallback onSkip;
@@ -114,10 +117,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     super.dispose();
   }
 
-  String get _draftKey {
-    final uid = Supabase.instance.client.auth.currentUser?.id;
-    return uid == null ? 'onboarding_draft' : 'onboarding_draft_$uid';
-  }
+  String get _draftKey =>
+      onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id);
 
   OnboardingOption _optionForId(String id) {
     return OnboardingOption(

@@ -38,6 +38,7 @@ class _OnboardingCompleteState extends State<OnboardingComplete>
   @override
   void dispose() {
     _controller.dispose();
+    SoundService.instance.stop();
     super.dispose();
   }
 

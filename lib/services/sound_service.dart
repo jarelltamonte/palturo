@@ -12,13 +12,20 @@ class SoundService {
   static final SoundService instance = SoundService._();
 
   AudioPlayer? _player;
-  bool _initialized = false;
+  Future<void>? _initFuture;
   AppSound? _lastSound;
   DateTime? _lastPlayed;
 
-  Future<void> init() async {
-    if (_initialized) return;
-    _initialized = true;
+  Future<void> init() {
+    final existing = _initFuture;
+    if (existing != null) return existing;
+    _player = AudioPlayer();
+    final future = _configurePlayer();
+    _initFuture = future;
+    return future;
+  }
+
+  Future<void> _configurePlayer() async {
     try {
       await AudioPlayer.global.setAudioContext(
         AudioContextConfig(respectSilence: true).build(),
@@ -26,9 +33,8 @@ class SoundService {
     } catch (_) {
       // Audio context is best-effort; playback still works on most surfaces.
     }
-    _player = AudioPlayer();
     try {
-      await _player!.setReleaseMode(ReleaseMode.stop);
+      await _player?.setReleaseMode(ReleaseMode.stop);
     } catch (_) {}
   }
 
@@ -38,6 +44,7 @@ class SoundService {
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
       return;
     }
+    await init();
 
     final now = DateTime.now();
     if (_lastSound == sound &&

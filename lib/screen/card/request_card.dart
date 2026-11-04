@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -88,7 +87,6 @@ class _RequestCardState extends State<RequestCard>
 
   void _handleAccept() {
     if (_controller.isAnimating || _outcome != _RequestOutcome.none) return;
-    HapticFeedback.lightImpact();
     setState(() => _outcome = _RequestOutcome.accepted);
     _controller.forward();
     widget.onAccept();
@@ -96,7 +94,6 @@ class _RequestCardState extends State<RequestCard>
 
   Future<void> _handleDecline() async {
     if (_controller.isAnimating || _outcome != _RequestOutcome.none) return;
-    HapticFeedback.lightImpact();
 
     final confirm = widget.onConfirmDecline;
     if (confirm != null) {
@@ -118,7 +115,6 @@ class _RequestCardState extends State<RequestCard>
 
   void _handleUndo() {
     if (_controller.isAnimating || _outcome == _RequestOutcome.none) return;
-    HapticFeedback.selectionClick();
     _controller.reverse();
     widget.onUndo?.call();
   }

@@ -46,8 +46,9 @@ void main() {
   });
 
   test('same intent is throttled inside the gap', () async {
-    await Haptics.selection();
-    await Haptics.selection();
+    final first = Haptics.selection();
+    final second = Haptics.selection();
+    await Future.wait([first, second]);
 
     expect(calls, hasLength(1));
   });

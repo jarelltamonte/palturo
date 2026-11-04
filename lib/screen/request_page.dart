@@ -562,7 +562,6 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       NotificationService.instance.refresh();
 
       if (!accept) {
-        unawaited(Haptics.warning());
         setState(() => _declinedIds.add(request.id));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

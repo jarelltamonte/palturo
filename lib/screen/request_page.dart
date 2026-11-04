@@ -1073,7 +1073,15 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
               TextButton(
                 onPressed:
                     _outgoing.isNotEmpty
-                        ? () => setState(() => _view = RequestView.sent)
+                        ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) => const RequestPage(
+                                  initialView: RequestView.sent,
+                                ),
+                          ),
+                        )
                         : _loadRequests,
                 child: Text(
                   _outgoing.isNotEmpty ? 'View sent requests' : 'Refresh',

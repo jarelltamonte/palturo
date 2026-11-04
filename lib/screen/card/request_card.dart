@@ -246,7 +246,6 @@ class _RequestCardState extends State<RequestCard>
 
   Widget _buildAcceptedBack(BuildContext context) {
     final surface = AppColors.elevatedSurface(context);
-    final accentColor = AppColors.accentText(context);
 
     return Container(
       width: double.infinity,

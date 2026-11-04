@@ -180,10 +180,9 @@ class _HomePageState extends State<HomePage> {
         final fetched = await ProfileService().getCurrentUserProfile();
         if (!mounted) return;
         if (fetched == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Couldn’t load your profile. Please try again.'),
-            ),
+          showAppError(
+            context,
+            'Couldn’t load your profile. Please try again.',
           );
           return;
         }
@@ -329,17 +328,18 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       Haptics.error();
       _resetCard();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not send request: ${_cleanError(e)}')),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this request. Please try again.',
+        ),
       );
     } finally {
       _actionInFlight = false;
       if (mounted) setState(() => _sendingRequest = false);
     }
   }
-
-  String _cleanError(Object error) =>
-      error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
 
   void _resetCard() {
     if (!mounted) return;
@@ -374,9 +374,11 @@ class _HomePageState extends State<HomePage> {
       } catch (e) {
         if (!mounted) return;
         _undoing = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not withdraw request: ${_cleanError(e)}'),
+        showAppError(
+          context,
+          friendlyError(
+            e,
+            fallback: 'Could not withdraw this request. Please try again.',
           ),
         );
         return;
@@ -576,11 +578,7 @@ class _HomePageState extends State<HomePage> {
 
       if (fresh.isEmpty) {
         setState(() => _discovering = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No more matches to discover right now.'),
-          ),
-        );
+        showAppSnackBar(context, 'No more matches to discover right now.');
         return;
       }
 
@@ -599,11 +597,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted || generation != _deckGeneration) return;
 
       setState(() => _discovering = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Couldn’t find more matches. Please try again.'),
-        ),
-      );
+      showAppError(context, 'Couldn’t find more matches. Please try again.');
     }
   }
 
@@ -627,21 +621,16 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
+      showAppSuccess(context, 'You blocked ${person.name}');
       _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not block this person. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
         ),
       );
     } finally {
@@ -662,21 +651,16 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      showAppSuccess(context, 'Thanks for your report.');
       _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not send this report. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
         ),
       );
     } finally {

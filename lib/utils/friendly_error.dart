@@ -24,7 +24,18 @@ String friendlyError(
       lower.contains('validation') ||
       lower.contains('not authenticated') ||
       lower.contains('permission') ||
-      lower.contains('unauthorized')) {
+      lower.contains('unauthorized') ||
+      lower.contains('password') ||
+      lower.contains('character') ||
+      lower.contains('letter') ||
+      lower.contains('uppercase') ||
+      lower.contains('lowercase') ||
+      lower.contains('special') ||
+      lower.contains('same as') ||
+      lower.contains('does not meet') ||
+      lower.contains('delete your account') ||
+      lower.contains('account deletion') ||
+      lower.contains('unable to delete')) {
     return raw.isEmpty ? fallback : raw;
   }
   return fallback;

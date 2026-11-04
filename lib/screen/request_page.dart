@@ -24,6 +24,7 @@ import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 
 class ConnectionRequest {
   final String id;
@@ -404,21 +405,14 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                 .toList();
       });
       NotificationService.instance.refresh();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Request to ${request.recipientName} withdrawn'),
-        ),
-      );
+      showAppSuccess(context, 'Request to ${request.recipientName} withdrawn');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not withdraw this request. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not withdraw this request. Please try again.',
         ),
       );
     } finally {
@@ -503,23 +497,18 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       await ChatStateService.instance.loadConversations(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not block this person. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
         ),
       );
       return;
     }
     if (!mounted) return;
     _removeRequest(request.id);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${request.requesterName}')),
-    );
+    showAppSuccess(context, 'You blocked ${request.requesterName}');
   }
 
   void _reportRequester(ConnectionRequest request, String reason) async {
@@ -527,19 +516,14 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     try {
       await MatchApi.reportUser(request.requesterId, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      showAppSuccess(context, 'Thanks for your report.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not send this report. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
         ),
       );
     }
@@ -580,11 +564,10 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
 
       if (!accept) {
         setState(() => _declinedIds.add(request.id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 3),
-            content: Text('Request from ${request.requesterName} declined.'),
-          ),
+        showAppSnackBar(
+          context,
+          'Request from ${request.requesterName} declined.',
+          duration: const Duration(seconds: 3),
         );
         Future<void>.delayed(const Duration(seconds: 5), () {
           if (!mounted || !_declinedIds.contains(request.id)) return;
@@ -608,14 +591,11 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     } catch (e) {
       if (!mounted) return false;
       unawaited(Haptics.error());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not respond to this request. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not respond to this request. Please try again.',
         ),
       );
       return false;
@@ -632,21 +612,17 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       unawaited(Haptics.selection());
       setState(() => _declinedIds.remove(request.id));
       NotificationService.instance.refresh();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Request from ${request.requesterName} restored.'),
-        ),
+      showAppSuccess(
+        context,
+        'Request from ${request.requesterName} restored.',
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not restore the request. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not restore the request. Please try again.',
         ),
       );
     }

@@ -18,6 +18,7 @@ import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -241,9 +242,7 @@ class _MatchesState extends State<Matches> {
 
     final connectionId = pal.connectionId;
     if (connectionId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This match isn’t available.')),
-      );
+      showAppSnackBar(context, 'This match isn’t available.');
       return;
     }
 
@@ -251,14 +250,11 @@ class _MatchesState extends State<Matches> {
       await MatchApi.unmatch(connectionId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not remove this Pal. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not remove this Pal. Please try again.',
         ),
       );
       return;
@@ -273,9 +269,7 @@ class _MatchesState extends State<Matches> {
 
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You removed ${pal.name} from your Pals')),
-    );
+    showAppSuccess(context, 'You removed ${pal.name} from your Pals');
   }
 
   Future<void> _blockPal(MatchedUser pal) async {
@@ -283,9 +277,7 @@ class _MatchesState extends State<Matches> {
 
     final target = pal.otherUserId;
     if (target == null || target.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This profile is unavailable right now.')),
-      );
+      showAppSnackBar(context, 'This profile is unavailable right now.');
       return;
     }
 
@@ -293,14 +285,11 @@ class _MatchesState extends State<Matches> {
       await MatchApi.blockUser(target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not block this person. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
         ),
       );
       return;
@@ -308,9 +297,7 @@ class _MatchesState extends State<Matches> {
     await ChatStateService.instance.loadConversations(showSpinner: false);
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('You blocked ${pal.name}')));
+    showAppSuccess(context, 'You blocked ${pal.name}');
   }
 
   Future<void> _reportPal(MatchedUser pal, String reason) async {
@@ -318,28 +305,21 @@ class _MatchesState extends State<Matches> {
 
     final target = pal.otherUserId;
     if (target == null || target.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This profile is unavailable right now.')),
-      );
+      showAppSnackBar(context, 'This profile is unavailable right now.');
       return;
     }
 
     try {
       await MatchApi.reportUser(target, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      showAppSuccess(context, 'Thanks for your report.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not send this report. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
         ),
       );
     }

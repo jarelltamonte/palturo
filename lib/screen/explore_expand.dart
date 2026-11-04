@@ -10,6 +10,7 @@ import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
@@ -142,11 +143,7 @@ class _ExploreExpandState extends State<ExploreExpand>
   Future<void> _undoRequest(String connectionId) async {
     if (_historyConnectionIds.isEmpty ||
         _historyConnectionIds.last != connectionId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('That request is no longer the latest action.'),
-        ),
-      );
+      showAppSnackBar(context, 'That request is no longer the latest action.');
       return;
     }
     await _undo();
@@ -164,14 +161,11 @@ class _ExploreExpandState extends State<ExploreExpand>
       } catch (e) {
         _undoing = false;
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              friendlyError(
-                e,
-                fallback: 'Could not withdraw this request. Please try again.',
-              ),
-            ),
+        showAppError(
+          context,
+          friendlyError(
+            e,
+            fallback: 'Could not withdraw this request. Please try again.',
           ),
         );
         return;
@@ -205,14 +199,11 @@ class _ExploreExpandState extends State<ExploreExpand>
       return connectionId;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              friendlyError(
-                e,
-                fallback: 'Could not send this request. Please try again.',
-              ),
-            ),
+        showAppError(
+          context,
+          friendlyError(
+            e,
+            fallback: 'Could not send this request. Please try again.',
           ),
         );
       }
@@ -228,14 +219,13 @@ class _ExploreExpandState extends State<ExploreExpand>
     if (!mounted || connectionId == null) return;
     await _animateAdvance(person, right: true, connectionId: connectionId);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Connection request sent to ${person.name}'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () => _undoRequest(connectionId),
-        ),
-      ),
+    showAppSnackBar(
+      context,
+      'Connection request sent to ${person.name}',
+      actionLabel: 'Undo',
+      onAction: () => _undoRequest(connectionId),
+      duration: const Duration(seconds: 5),
+      tone: AppFeedbackTone.success,
     );
   }
 
@@ -259,21 +249,16 @@ class _ExploreExpandState extends State<ExploreExpand>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
+      showAppSuccess(context, 'You blocked ${person.name}');
       await _animateAdvance(person);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not block this person. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
         ),
       );
     } finally {
@@ -294,21 +279,16 @@ class _ExploreExpandState extends State<ExploreExpand>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      showAppSuccess(context, 'Thanks for your report.');
       await _animateAdvance(person);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not send this report. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
         ),
       );
     } finally {
@@ -467,14 +447,13 @@ class _ExploreExpandState extends State<ExploreExpand>
         final connectionId = _pendingSwipeIds.remove(person.id);
         _advanceFrom(person, connectionId: connectionId);
         if (direction == DismissDirection.startToEnd) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Connection request sent to ${person.name}'),
-              action: SnackBarAction(
-                label: 'Undo',
-                onPressed: () => _undoRequest(connectionId ?? ''),
-              ),
-            ),
+          showAppSnackBar(
+            context,
+            'Connection request sent to ${person.name}',
+            actionLabel: 'Undo',
+            onAction: () => _undoRequest(connectionId ?? ''),
+            duration: const Duration(seconds: 5),
+            tone: AppFeedbackTone.success,
           );
         }
       },

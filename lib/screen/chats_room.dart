@@ -16,6 +16,7 @@ import 'package:palturo/screen/chat_pending_message.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 
 class ChatRoom extends StatefulWidget {
   final String? connectionId;
@@ -180,11 +181,7 @@ class _ChatRoomState extends State<ChatRoom> {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
     if (widget.connectionId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This chat is not connected to the backend yet.'),
-        ),
-      );
+      showAppSnackBar(context, 'This chat is not ready yet.');
       return;
     }
 
@@ -271,16 +268,13 @@ class _ChatRoomState extends State<ChatRoom> {
 
   void _leaveChat(String message) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    showAppSnackBar(context, message);
   }
 
   void _showPeerUnavailable() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This profile is unavailable right now.')),
-    );
+    showAppSnackBar(context, 'This profile is unavailable right now.');
   }
 
   Future<void> _block() async {
@@ -293,14 +287,11 @@ class _ChatRoomState extends State<ChatRoom> {
       await MatchApi.blockUser(target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not block this person. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
         ),
       );
       return;
@@ -318,19 +309,14 @@ class _ChatRoomState extends State<ChatRoom> {
     try {
       await MatchApi.reportUser(target, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      showAppSuccess(context, 'Thanks for your report.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not send this report. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
         ),
       );
     }
@@ -351,10 +337,9 @@ class _ChatRoomState extends State<ChatRoom> {
   Future<void> _showFeedbackDialog() async {
     final connectionId = widget.connectionId;
     if (connectionId == null || (!_feedbackGateOpen && _messages.length < 15)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Feedback unlocks after 15 messages in this chat.'),
-        ),
+      showAppSnackBar(
+        context,
+        'Feedback unlocks after 15 messages in this chat.',
       );
       return;
     }
@@ -500,10 +485,9 @@ class _ChatRoomState extends State<ChatRoom> {
                       }
                     } catch (_) {
                       if (!mounted) return;
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Couldn’t save feedback. Try again.'),
-                        ),
+                      showAppErrorOn(
+                        messenger,
+                        'Couldn’t save feedback. Try again.',
                       );
                     }
                   },
@@ -517,9 +501,7 @@ class _ChatRoomState extends State<ChatRoom> {
     );
 
     if (submitted != true || !mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Thanks for your feedback.')));
+    showAppSuccess(context, 'Thanks for your feedback.');
     await _refreshFeedbackStatus();
   }
 

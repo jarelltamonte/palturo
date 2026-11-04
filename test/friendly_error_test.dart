@@ -21,5 +21,27 @@ void main() {
       ),
       'Too many deck requests. Please try again later.',
     );
+    expect(
+      friendlyError(Exception('Passwords do not match')),
+      'Passwords do not match',
+    );
+    expect(
+      friendlyError(Exception('At least 8 characters (currently 5)')),
+      'At least 8 characters (currently 5)',
+    );
+    expect(
+      friendlyError(
+        Exception('New password cannot be the same as the old password.'),
+      ),
+      'New password cannot be the same as the old password.',
+    );
+    expect(
+      friendlyError(
+        Exception(
+          'Account deletion is temporarily unavailable. Please try again.',
+        ),
+      ),
+      'Account deletion is temporarily unavailable. Please try again.',
+    );
   });
 }

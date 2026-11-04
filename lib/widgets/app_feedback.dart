@@ -14,8 +14,25 @@ void showAppSnackBar(
   Duration? duration,
   AppFeedbackTone tone = AppFeedbackTone.info,
 }) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.hideCurrentSnackBar();
+  showAppSnackBarOn(
+    ScaffoldMessenger.of(context),
+    message,
+    actionLabel: actionLabel,
+    onAction: onAction,
+    duration: duration,
+    tone: tone,
+  );
+}
+
+void showAppSnackBarOn(
+  ScaffoldMessengerState messenger,
+  String message, {
+  String? actionLabel,
+  VoidCallback? onAction,
+  Duration? duration,
+  AppFeedbackTone tone = AppFeedbackTone.info,
+}) {
+  messenger.clearSnackBars();
   final color =
       tone == AppFeedbackTone.error
           ? AppColors.dangerLight
@@ -38,23 +55,20 @@ void showAppSnackBar(
               : tone == AppFeedbackTone.success
               ? const Duration(seconds: 3)
               : const Duration(seconds: 4)),
-      content: Semantics(
-        liveRegion: true,
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.white,
-                  fontSize: 13,
-                ),
+      content: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.white,
+                fontSize: 13,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       action:
           actionLabel != null && onAction != null
@@ -70,4 +84,8 @@ void showAppSuccess(BuildContext context, String message) {
 
 void showAppError(BuildContext context, String message) {
   showAppSnackBar(context, message, tone: AppFeedbackTone.error);
+}
+
+void showAppErrorOn(ScaffoldMessengerState messenger, String message) {
+  showAppSnackBarOn(messenger, message, tone: AppFeedbackTone.error);
 }

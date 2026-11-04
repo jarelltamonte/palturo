@@ -6,6 +6,7 @@ import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
@@ -58,20 +59,15 @@ class _BlockListPageState extends State<BlockListPage> {
     try {
       await MatchApi.unblockUser(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('You unblocked $name')));
+      showAppSuccess(context, 'You unblocked $name');
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(
-              e,
-              fallback: 'Could not unblock this person. Please try again.',
-            ),
-          ),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not unblock this person. Please try again.',
         ),
       );
     }

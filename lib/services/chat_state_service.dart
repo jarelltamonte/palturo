@@ -71,6 +71,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       } else if (event == AuthChangeEvent.tokenRefreshed) {
         // Realtime pushes the refreshed token to joined channels. If the
         // channel never joined, recover here.
+        _resubscribeAttempts = 0;
         if (!_realtimeSubscribed) unawaited(_resubscribeRealtime());
         loadConversations(showSpinner: false);
       } else if (event == AuthChangeEvent.signedOut) {
@@ -92,6 +93,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       try {
         await auth.refreshSession();
       } catch (_) {
+        _realtimeSubscribed = false;
         return;
       }
     }
@@ -101,6 +103,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _resubscribeRealtime() async {
     if (_resubscribing) return;
     _resubscribing = true;
+    _realtimeSubscribed = false;
     try {
       final channel = _realtimeChannel;
       _realtimeChannel = null;

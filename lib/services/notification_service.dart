@@ -66,6 +66,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
         // The realtime client pushes the refreshed token to joined channels.
         // If the channel never joined (cold-start refresh failure or exhausted
         // backoff), this is the recovery point.
+        _resubscribeAttempts = 0;
         if (!_channelSubscribed) unawaited(_resubscribe());
         unawaited(refresh(showSpinner: _items.isEmpty));
       }
@@ -88,6 +89,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
       try {
         await auth.refreshSession();
       } catch (_) {
+        _channelSubscribed = false;
         return;
       }
     }
@@ -98,6 +100,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _resubscribe() async {
     if (_resubscribing) return;
     _resubscribing = true;
+    _channelSubscribed = false;
     try {
       final channel = _channel;
       _channel = null;

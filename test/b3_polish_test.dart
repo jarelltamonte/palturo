@@ -4,6 +4,7 @@ import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/profile_page.dart';
 import 'package:palturo/theme/theme.dart';
+import 'package:palturo/widgets/profile_nudge_card.dart';
 import 'package:palturo/widgets/resume_setup_card.dart';
 
 void main() {
@@ -110,6 +111,41 @@ void main() {
 
     await tester.tap(find.byTooltip('Dismiss continue setup'));
     expect(dismissed, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('profile nudge fits 360px at 200% text', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    var later = 0;
+    var complete = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: ProfileNudgeCard(
+                onLater: () => later++,
+                onComplete: () => complete++,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Later'));
+    await tester.tap(find.text('Complete profile'));
+    expect(later, 1);
+    expect(complete, 1);
     expect(tester.takeException(), isNull);
   });
 }

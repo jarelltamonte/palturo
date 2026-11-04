@@ -23,6 +23,7 @@ import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/widgets/profile_nudge_card.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -375,69 +376,6 @@ class _HomePageState extends State<HomePage> {
         true,
       );
     }
-  }
-
-  Widget _buildProfileNudgeCard() {
-    final textColor = Theme.of(context).colorScheme.secondary;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
-      decoration: BoxDecoration(
-        color: AppColors.elevatedSurface(context),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border(context)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_outlined,
-                color: AppColors.accentText(context),
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Add a photo, bio, and languages so Pals can match with you.',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textColor,
-                    fontSize: 12.5,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () {
-                  _dismissProfileNudge(persist: false);
-                },
-                child: const Text('Later'),
-              ),
-              TextButton(
-                onPressed: () {
-                  _dismissProfileNudge(persist: true);
-                  _openSettings();
-                },
-                child: const Text('Complete profile'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   void _resetCard() {
@@ -942,7 +880,13 @@ class _HomePageState extends State<HomePage> {
           if (_showProfileNudge)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: _buildProfileNudgeCard(),
+              child: ProfileNudgeCard(
+                onLater: () => _dismissProfileNudge(persist: true),
+                onComplete: () {
+                  _dismissProfileNudge(persist: false);
+                  _openSettings();
+                },
+              ),
             ),
           Expanded(
             child: Padding(

@@ -10,13 +10,11 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
-import 'package:palturo/widgets/user_avatar.dart';
 
 /// Category detail sits between the Browse root and the people deck.
 ///
 /// It uses the visible taxonomy to expose child skills, shows a real count of
-/// people for the selected role, and lets the user search the loaded preview
-/// before committing to a swipe deck.
+/// people for the selected role, and sends the user straight to a swipe deck.
 class ExploreCategoryPage extends StatefulWidget {
   const ExploreCategoryPage({
     super.key,
@@ -46,9 +44,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   int _otherCount = 0;
   bool _loading = true;
   String? _error;
-  String _query = '';
   int _requestId = 0;
-  final TextEditingController _search = TextEditingController();
 
   String get _kind => _mentor ? 'learn' : 'teach';
   String get _roleLabel => _mentor ? 'Mentor' : 'Learner';
@@ -58,12 +54,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -169,19 +159,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     );
   }
 
-  List<Person> get _visiblePeople {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _people;
-    return _people
-        .where(
-          (p) =>
-              p.name.toLowerCase().contains(q) ||
-              p.bio.toLowerCase().contains(q) ||
-              p.skillName.toLowerCase().contains(q),
-        )
-        .toList();
-  }
-
   String _countLabel(int n) => n >= 50 ? '50+' : '$n';
 
   @override
@@ -240,7 +217,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         bottom: false,
         child:
             _loading
-                ? const ListRowsSkeleton(count: 6, rowHeight: 86)
+                ? const _CategorySkeleton()
                 : _error != null
                 ? _buildError(textTheme)
                 : ListView(
@@ -270,88 +247,20 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                       ),
                     ],
                     const SizedBox(height: 14),
-                    TextField(
-                      controller: _search,
-                      onChanged: (value) => setState(() => _query = value),
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Search people in ${widget.nodeLabel}',
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: textTheme.withValues(alpha: 0.6),
-                        ),
-                        suffixIcon:
-                            _query.isEmpty
-                                ? null
-                                : IconButton(
-                                  tooltip: 'Clear search',
-                                  onPressed: () {
-                                    _search.clear();
-                                    setState(() => _query = '');
-                                  },
-                                  icon: Icon(
-                                    Icons.cancel,
-                                    color: textTheme.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: _startBrowsing,
-                        icon: const Icon(Icons.style_outlined),
-                        label: Text(
-                          'Start browsing ${_mentor ? 'learners' : 'mentors'}',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'People ${_mentor ? 'learning' : 'teaching'} this',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textTheme,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          _query.trim().isEmpty
-                              ? '${_countLabel(_people.length)} found'
-                              : '${_visiblePeople.length} of ${_countLabel(_people.length)} found',
-                          style: AppTextStyles.regularText.copyWith(
-                            color: AppColors.mutedText(context),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    if (_visiblePeople.isEmpty)
+                    if (_people.isEmpty)
                       _buildEmpty(textTheme)
                     else
-                      for (final person in _visiblePeople.take(4))
-                        _PersonPreview(
-                          person: person,
-                          onTap: () => showPersonProfileDialog(context, person),
-                        ),
-                    if (_visiblePeople.length > 4) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Showing ${_visiblePeople.length > 4 ? 4 : _visiblePeople.length} of ${_countLabel(_people.length)} people. Start browsing to see everyone.',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: AppColors.mutedText(context),
-                          fontSize: 11,
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: _startBrowsing,
+                          icon: const Icon(Icons.style_outlined),
+                          label: Text(
+                            'Start browsing ${_mentor ? 'learners' : 'mentors'}',
+                          ),
                         ),
                       ),
-                    ],
                   ],
                 ),
       ),
@@ -437,37 +346,19 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       child: Column(
         children: [
           Icon(
-            Icons.search_off_rounded,
+            Icons.groups_outlined,
             size: 30,
             color: textTheme.withValues(alpha: 0.35),
           ),
           const SizedBox(height: 8),
           Text(
-            _query.isEmpty
-                ? 'No people in this category yet.'
-                : 'No people match your search.',
+            'No one is available in this category right now.',
             textAlign: TextAlign.center,
             style: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.7),
               fontSize: 13,
             ),
           ),
-          if (_query.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                _search.clear();
-                setState(() => _query = '');
-              },
-              child: const Text('Clear search'),
-            ),
-          ] else if (_otherCount > 0) ...[
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: _switchRole,
-              child: Text('Switch to ${_mentor ? 'Learner' : 'Mentor'} view'),
-            ),
-          ],
         ],
       ),
     );
@@ -507,25 +398,23 @@ class _SkillChip extends StatelessWidget {
       label: label,
       onTap: onTap,
       excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Text(
-            label,
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.accentText(context),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          backgroundColor: AppColors.primary.withValues(alpha: 0.14),
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.45)),
+          shape: const StadiumBorder(),
+          elevation: 0,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(
+            color: AppColors.accentText(context),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -565,71 +454,56 @@ class _MetaPill extends StatelessWidget {
   }
 }
 
-class _PersonPreview extends StatelessWidget {
-  final Person person;
-  final VoidCallback onTap;
-
-  const _PersonPreview({required this.person, required this.onTap});
+class _CategorySkeleton extends StatelessWidget {
+  const _CategorySkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).colorScheme.secondary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              UserAvatar(
-                name: person.name,
-                image:
-                    person.photoUrls.isNotEmpty &&
-                            person.photoUrls.first != null
-                        ? NetworkImage(person.photoUrls.first!)
-                        : null,
-                size: 44,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Semantics(
+      label: 'Loading category',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+        children: [
+          Container(
+            height: 142,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.elevatedSurface(context),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.border(context)),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBox(width: 220, height: 14),
+                SizedBox(height: 10),
+                SkeletonBox(width: 160, height: 12),
+                Spacer(),
+                Row(
                   children: [
-                    Text(
-                      person.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.boldText.copyWith(
-                        color: textTheme,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (person.bio.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        person.bio,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.62),
-                          fontSize: 11,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+                    SkeletonBox(width: 88, height: 28, radius: 14),
+                    SizedBox(width: 8),
+                    SkeletonBox(width: 96, height: 28, radius: 14),
                   ],
                 ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: AppColors.mutedText(context),
-              ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const SkeletonBox(width: 150, height: 14),
+          const SizedBox(height: 10),
+          const Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              SkeletonBox(width: 100, height: 44, radius: 22),
+              SkeletonBox(width: 128, height: 44, radius: 22),
+              SkeletonBox(width: 90, height: 44, radius: 22),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          const SkeletonBox(height: 48, radius: 24),
+        ],
       ),
     );
   }

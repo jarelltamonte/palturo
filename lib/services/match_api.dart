@@ -59,6 +59,11 @@ class ConversationLite {
   final String? otherSkill;
   final DateTime? mutedUntil;
   final bool markedUnread;
+  final DateTime? otherLastSeenAt;
+  final bool otherPresenceEnabled;
+  final bool otherTypingEnabled;
+  final bool otherReadReceiptsEnabled;
+  final DateTime? otherReadAt;
   const ConversationLite({
     required this.connectionId,
     required this.status,
@@ -72,6 +77,11 @@ class ConversationLite {
     this.otherSkill,
     this.mutedUntil,
     this.markedUnread = false,
+    this.otherLastSeenAt,
+    this.otherPresenceEnabled = true,
+    this.otherTypingEnabled = true,
+    this.otherReadReceiptsEnabled = true,
+    this.otherReadAt,
   });
 
   ConversationLite copyWith({
@@ -88,6 +98,11 @@ class ConversationLite {
     DateTime? mutedUntil,
     bool clearMutedUntil = false,
     bool? markedUnread,
+    DateTime? otherLastSeenAt,
+    bool? otherPresenceEnabled,
+    bool? otherTypingEnabled,
+    bool? otherReadReceiptsEnabled,
+    DateTime? otherReadAt,
   }) {
     return ConversationLite(
       connectionId: connectionId ?? this.connectionId,
@@ -102,6 +117,12 @@ class ConversationLite {
       otherSkill: otherSkill ?? this.otherSkill,
       mutedUntil: clearMutedUntil ? null : (mutedUntil ?? this.mutedUntil),
       markedUnread: markedUnread ?? this.markedUnread,
+      otherLastSeenAt: otherLastSeenAt ?? this.otherLastSeenAt,
+      otherPresenceEnabled: otherPresenceEnabled ?? this.otherPresenceEnabled,
+      otherTypingEnabled: otherTypingEnabled ?? this.otherTypingEnabled,
+      otherReadReceiptsEnabled:
+          otherReadReceiptsEnabled ?? this.otherReadReceiptsEnabled,
+      otherReadAt: otherReadAt ?? this.otherReadAt,
     );
   }
 
@@ -499,6 +520,17 @@ class MatchApi {
                   r['muted_until']?.toString() ?? '',
                 )?.toLocal(),
             markedUnread: r['marked_unread'] == true,
+            otherLastSeenAt:
+                DateTime.tryParse(
+                  r['other_last_seen_at']?.toString() ?? '',
+                )?.toLocal(),
+            otherPresenceEnabled: r['other_presence_enabled'] != false,
+            otherTypingEnabled: r['other_typing_enabled'] != false,
+            otherReadReceiptsEnabled: r['other_read_receipts_enabled'] != false,
+            otherReadAt:
+                DateTime.tryParse(
+                  r['other_read_at']?.toString() ?? '',
+                )?.toLocal(),
           ),
         )
         .toList();
@@ -817,6 +849,34 @@ class MatchApi {
   static Future<int> unreadNotifications() async {
     final res = await _Client.c.rpc('count_unread_notifications');
     return (res as num?)?.toInt() ?? 0;
+  }
+
+  static Future<void> touchLastSeen() async {
+    await _Client.c.rpc('touch_last_seen');
+  }
+
+  static Future<Map<String, dynamic>> getChatPrivacy() async {
+    final res = await _Client.c.rpc('get_chat_privacy');
+    if (res is List && res.isNotEmpty && res.first is Map) {
+      return Map<String, dynamic>.from(res.first as Map);
+    }
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return const {};
+  }
+
+  static Future<void> setChatPrivacy({
+    required bool presence,
+    required bool typing,
+    required bool readReceipts,
+  }) async {
+    await _Client.c.rpc(
+      'set_chat_privacy',
+      params: {
+        'p_presence': presence,
+        'p_typing': typing,
+        'p_read_receipts': readReceipts,
+      },
+    );
   }
 
   static Future<int> clearReadNotifications() async {

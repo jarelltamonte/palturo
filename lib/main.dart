@@ -7,6 +7,7 @@ import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
 import 'package:palturo/services/app_badge_service.dart';
 import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/chat_privacy_service.dart';
 import 'package:palturo/services/connectivity_service.dart';
 import 'package:palturo/services/draft_service.dart';
 import 'package:palturo/services/local_notification_service.dart';
@@ -53,6 +54,7 @@ void main() async {
   await DraftService.instance.init();
   unawaited(ConnectivityService.instance.init());
   AppBadgeService.instance.init();
+  unawaited(ChatPrivacyService.instance.loadIfNeeded());
   unawaited(SoundService.instance.init());
   if (PreferencesService.instance.soundEnabled) {
     unawaited(SoundService.instance.play(AppSound.success));
@@ -239,6 +241,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
           AppBadgeService.instance.reset();
           ConnectivityService.instance.reset();
           DraftService.instance.clearAll();
+          ChatPrivacyService.instance.reset();
           AppShellState.instance.reset();
           return;
         }

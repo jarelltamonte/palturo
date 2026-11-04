@@ -6,6 +6,7 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/screen/account/change_password_page.dart';
 import 'package:palturo/screen/account/delete_account_page.dart';
 import 'package:palturo/screen/account/privacy_page.dart';
+import 'package:palturo/screen/settings/chat_privacy_page.dart';
 import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -374,6 +375,11 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
             icon: Icons.shield_outlined,
             title: 'Data & privacy',
             onTap: () => _open(const PrivacyPage()),
+          ),
+          _tile(
+            icon: Icons.visibility_outlined,
+            title: 'Chat privacy',
+            onTap: () => _open(const ChatPrivacyPage()),
           ),
 
           _section('DANGER ZONE'),

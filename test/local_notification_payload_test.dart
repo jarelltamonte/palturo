@@ -39,6 +39,55 @@ void main() {
     );
   });
 
+  test('channel matrix honors sound and vibration independently', () {
+    final service = LocalNotificationService.instance;
+
+    expect(
+      service.channelIdFor(
+        AppNotificationKind.unknown,
+        sound: true,
+        vibration: true,
+        message: true,
+      ),
+      'palturo_messages',
+    );
+    expect(
+      service.channelIdFor(
+        AppNotificationKind.unknown,
+        sound: true,
+        vibration: false,
+        message: true,
+      ),
+      'palturo_messages_sound',
+    );
+    expect(
+      service.channelIdFor(
+        AppNotificationKind.unknown,
+        sound: false,
+        vibration: true,
+        message: true,
+      ),
+      'palturo_messages_vibration',
+    );
+    expect(
+      service.channelIdFor(
+        AppNotificationKind.unknown,
+        sound: false,
+        vibration: false,
+        message: true,
+      ),
+      'palturo_messages_quiet',
+    );
+    expect(
+      service.channelIdFor(
+        AppNotificationKind.connectionRequest,
+        sound: true,
+        vibration: true,
+      ),
+      'palturo_requests',
+    );
+  });
+
   test('chat payload carries the conversation context', () {
     final item = AppNotification.fromRow({
       'id': 'n1',

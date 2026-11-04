@@ -52,31 +52,6 @@ class LocalNotificationService extends ChangeNotifier
     playSound: true,
     enableVibration: true,
   );
-  static const _messagesQuietChannel = AndroidNotificationChannel(
-    'palturo_messages_quiet',
-    'Messages (silent)',
-    description: 'New messages shown without sound',
-    importance: Importance.defaultImportance,
-    playSound: false,
-    enableVibration: false,
-  );
-  static const _requestsQuietChannel = AndroidNotificationChannel(
-    'palturo_requests_quiet',
-    'Requests & matches (silent)',
-    description: 'Requests and matches shown without sound',
-    importance: Importance.defaultImportance,
-    playSound: false,
-    enableVibration: false,
-  );
-  static const _activityQuietChannel = AndroidNotificationChannel(
-    'palturo_activity_quiet',
-    'Activity updates (silent)',
-    description: 'Activity updates shown without sound',
-    importance: Importance.defaultImportance,
-    playSound: false,
-    enableVibration: false,
-  );
-
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   StreamSubscription<AppNotification>? _notificationSub;
@@ -127,12 +102,7 @@ class LocalNotificationService extends ChangeNotifier
             >();
     if (android != null) {
       try {
-        await android.createNotificationChannel(_messagesChannel);
-        await android.createNotificationChannel(_requestsChannel);
-        await android.createNotificationChannel(_activityChannel);
-        await android.createNotificationChannel(_messagesQuietChannel);
-        await android.createNotificationChannel(_requestsQuietChannel);
-        await android.createNotificationChannel(_activityQuietChannel);
+        await _createChannels(android);
       } catch (_) {}
     }
 
@@ -225,9 +195,11 @@ class LocalNotificationService extends ChangeNotifier
 
   Future<bool> requestPermission() async {
     var granted = false;
-    await PreferencesService.instance.setBool(
-      'notification_permission_asked',
-      true,
+    unawaited(
+      PreferencesService.instance.setBool(
+        'notification_permission_asked',
+        true,
+      ),
     );
     try {
       if (kIsWeb) {
@@ -296,15 +268,19 @@ class LocalNotificationService extends ChangeNotifier
     if (!notificationKindEnabled(item.kind)) return;
 
     final quiet = PreferencesService.instance.isQuietHoursNow;
+    final sound = PreferencesService.instance.soundEnabled && !quiet;
+    final vibration = PreferencesService.instance.vibrationEnabled && !quiet;
     final view = presentActivity(item.toRow());
     _show(
       id: item.id,
       title: view.title,
       body: view.body,
-      channel: _channelFor(item.kind, quiet: quiet),
+      channel: _channelFor(item.kind, sound: sound, vibration: vibration),
       payload: _payloadForNotification(item, view),
       threadId: item.connectionId,
       quiet: quiet,
+      sound: sound,
+      vibration: vibration,
     );
   }
 
@@ -314,6 +290,8 @@ class LocalNotificationService extends ChangeNotifier
     if (!PreferencesService.instance.messageNotificationsEnabled) return;
 
     final quiet = PreferencesService.instance.isQuietHoursNow;
+    final sound = PreferencesService.instance.soundEnabled && !quiet;
+    final vibration = PreferencesService.instance.vibrationEnabled && !quiet;
     final body =
         PreferencesService.instance.messagePreviewsEnabled
             ? event.preview
@@ -325,7 +303,8 @@ class LocalNotificationService extends ChangeNotifier
       body: body,
       channel: _channelFor(
         AppNotificationKind.unknown,
-        quiet: quiet,
+        sound: sound,
+        vibration: vibration,
         message: true,
       ),
       payload: {
@@ -338,6 +317,8 @@ class LocalNotificationService extends ChangeNotifier
       },
       threadId: event.connectionId,
       quiet: quiet,
+      sound: sound,
+      vibration: vibration,
     );
   }
 
@@ -349,10 +330,10 @@ class LocalNotificationService extends ChangeNotifier
     required Map<String, dynamic> payload,
     String? threadId,
     required bool quiet,
+    required bool sound,
+    required bool vibration,
   }) async {
     if (!isPermissionGranted) return;
-    final sound = PreferencesService.instance.soundEnabled && !quiet;
-    final vibration = PreferencesService.instance.vibrationEnabled && !quiet;
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         channel.id,
@@ -374,7 +355,10 @@ class LocalNotificationService extends ChangeNotifier
         presentSound: sound,
         threadIdentifier: threadId,
       ),
-      web: WebNotificationDetails(iconUrl: Uri.parse('icons/Icon-192.png')),
+      web: WebNotificationDetails(
+        iconUrl: Uri.parse('icons/Icon-192.png'),
+        isSilent: quiet || !sound,
+      ),
     );
     try {
       await _plugin.show(
@@ -389,25 +373,81 @@ class LocalNotificationService extends ChangeNotifier
     }
   }
 
+  Future<void> _createChannels(
+    AndroidFlutterLocalNotificationsPlugin android,
+  ) async {
+    for (final base in [_messagesChannel, _requestsChannel, _activityChannel]) {
+      for (final sound in [true, false]) {
+        for (final vibration in [true, false]) {
+          if (sound && vibration) {
+            await android.createNotificationChannel(base);
+            continue;
+          }
+          final suffix =
+              sound
+                  ? '_sound'
+                  : vibration
+                  ? '_vibration'
+                  : '_quiet';
+          final label =
+              sound
+                  ? ' (sound only)'
+                  : vibration
+                  ? ' (vibration only)'
+                  : ' (silent)';
+          await android.createNotificationChannel(
+            AndroidNotificationChannel(
+              '${base.id}$suffix',
+              '${base.name}$label',
+              description: base.description,
+              importance: base.importance,
+              playSound: sound,
+              enableVibration: vibration,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   AndroidNotificationChannel _channelFor(
     AppNotificationKind kind, {
-    required bool quiet,
+    required bool sound,
+    required bool vibration,
     bool message = false,
   }) {
-    if (message) {
-      return quiet ? _messagesQuietChannel : _messagesChannel;
-    }
-    switch (kind) {
-      case AppNotificationKind.connectionRequest:
-      case AppNotificationKind.requestAccepted:
-      case AppNotificationKind.requestDeclined:
-        return quiet ? _requestsQuietChannel : _requestsChannel;
-      case AppNotificationKind.feedbackReady:
-      case AppNotificationKind.skillModeration:
-        return quiet ? _activityQuietChannel : _activityChannel;
-      case AppNotificationKind.unknown:
-        return quiet ? _activityQuietChannel : _activityChannel;
-    }
+    final base =
+        message
+            ? _messagesChannel
+            : switch (kind) {
+              AppNotificationKind.connectionRequest ||
+              AppNotificationKind.requestAccepted ||
+              AppNotificationKind.requestDeclined => _requestsChannel,
+              AppNotificationKind.feedbackReady ||
+              AppNotificationKind.skillModeration ||
+              AppNotificationKind.unknown => _activityChannel,
+            };
+    if (sound && vibration) return base;
+    final suffix =
+        sound
+            ? '_sound'
+            : vibration
+            ? '_vibration'
+            : '_quiet';
+    final label =
+        sound
+            ? ' (sound only)'
+            : vibration
+            ? ' (vibration only)'
+            : ' (silent)';
+    return AndroidNotificationChannel(
+      '${base.id}$suffix',
+      '${base.name}$label',
+      description: base.description,
+      importance: base.importance,
+      playSound: sound,
+      enableVibration: vibration,
+    );
   }
 
   Map<String, dynamic> _payloadForNotification(
@@ -496,6 +536,21 @@ class LocalNotificationService extends ChangeNotifier
 
   @visibleForTesting
   int notificationIdFor(String key) => _notificationId(key);
+
+  @visibleForTesting
+  String channelIdFor(
+    AppNotificationKind kind, {
+    required bool sound,
+    required bool vibration,
+    bool message = false,
+  }) {
+    return _channelFor(
+      kind,
+      sound: sound,
+      vibration: vibration,
+      message: message,
+    ).id;
+  }
 
   @visibleForTesting
   Map<String, dynamic> payloadFor(AppNotification item) {

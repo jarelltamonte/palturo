@@ -267,11 +267,16 @@ class NotificationPreferencesPage extends StatelessWidget {
         );
       case NotificationPermissionStatus.denied:
         subtitle =
-            'Blocked in device settings. Enable PalTuro notifications there.';
-        trailing = TextButton(
-          onPressed: service.openSettings,
-          child: const Text('Open settings'),
-        );
+            kIsWeb
+                ? 'Blocked in browser settings. Allow notifications for this site.'
+                : 'Blocked in device settings. Enable PalTuro notifications there.';
+        trailing =
+            kIsWeb
+                ? null
+                : TextButton(
+                  onPressed: service.openSettings,
+                  child: const Text('Open settings'),
+                );
       case NotificationPermissionStatus.unknown:
         subtitle = 'Not requested yet. In-app banners work without it.';
         trailing = TextButton(

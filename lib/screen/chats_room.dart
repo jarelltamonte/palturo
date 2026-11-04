@@ -18,6 +18,8 @@ import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/screen/chat_pending_message.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/chat_menu_row.dart';
+import 'package:palturo/widgets/chat_search_sheet.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 
@@ -421,114 +423,16 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   Future<void> _showSearch() async {
-    final queryController = TextEditingController();
     final selected = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.elevatedSurface(context),
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            final query = queryController.text.trim().toLowerCase();
-            final matches =
-                query.isEmpty
-                    ? const <Map<String, dynamic>>[]
-                    : _messages
-                        .where((message) {
-                          final body =
-                              (message['body'] ?? '').toString().toLowerCase();
-                          return body.contains(query);
-                        })
-                        .toList(growable: false);
-            final textColor = Theme.of(sheetContext).colorScheme.secondary;
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 12,
-                  bottom: 12 + MediaQuery.viewInsetsOf(sheetContext).bottom,
-                ),
-                child: SizedBox(
-                  height: MediaQuery.sizeOf(sheetContext).height * 0.6,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: queryController,
-                        autofocus: true,
-                        onChanged: (_) => setSheetState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Search this chat',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          filled: true,
-                          fillColor: AppColors.mutedSurface(sheetContext),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (query.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'Type to search messages.',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: AppColors.mutedText(sheetContext),
-                            ),
-                          ),
-                        )
-                      else if (matches.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'No messages found.',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: AppColors.mutedText(sheetContext),
-                            ),
-                          ),
-                        )
-                      else
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: matches.length,
-                            itemBuilder: (context, index) {
-                              final message = matches[index];
-                              return ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(
-                                  (message['body'] ?? '').toString(),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.regularText.copyWith(
-                                    color: textColor,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  _formatSearchTime(message),
-                                  style: AppTextStyles.regularText.copyWith(
-                                    color: AppColors.mutedText(sheetContext),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                onTap:
-                                    () => Navigator.pop(sheetContext, message),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder:
+          (sheetContext) => ChatSearchSheet(
+            messages: List<Map<String, dynamic>>.unmodifiable(_messages),
+            formatTime: _formatSearchTime,
+          ),
     );
-    queryController.dispose();
     if (selected == null || !mounted) return;
     final index = _messages.indexWhere(
       (message) => _messageKey(message) == _messageKey(selected),
@@ -1015,158 +919,64 @@ class _ChatRoomState extends State<ChatRoom> {
                     if (_feedbackGateOpen && !_feedbackRated)
                       PopupMenuItem<String>(
                         value: 'feedback',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.star_outline,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Leave feedback',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme,
-                              ),
-                            ),
-                          ],
+                        child: _menuRow(
+                          'Leave feedback',
+                          Icons.star_outline,
+                          color: AppColors.primary,
                         ),
                       ),
                     if (widget.person != null)
                       PopupMenuItem<String>(
                         value: 'profile',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.person_outline,
-                              color: textTheme,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'View profile',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme,
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: _menuRow('View profile', Icons.person_outline),
                       ),
                     PopupMenuItem<String>(
                       value: 'mute',
-                      child: Row(
-                        children: [
-                          Icon(
-                            ChatStateService.instance.isMuted(
-                                  widget.connectionId ?? '',
-                                )
-                                ? Icons.notifications_active_outlined
-                                : Icons.notifications_off_outlined,
-                            color: textTheme,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            ChatStateService.instance.isMuted(
-                                  widget.connectionId ?? '',
-                                )
-                                ? 'Unmute notifications'
-                                : 'Mute notifications',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+                      child: _menuRow(
+                        ChatStateService.instance.isMuted(
+                              widget.connectionId ?? '',
+                            )
+                            ? 'Unmute notifications'
+                            : 'Mute notifications',
+                        ChatStateService.instance.isMuted(
+                              widget.connectionId ?? '',
+                            )
+                            ? Icons.notifications_active_outlined
+                            : Icons.notifications_off_outlined,
                       ),
                     ),
                     PopupMenuItem<String>(
                       value: 'unread',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.mark_chat_unread_outlined,
-                            color: textTheme,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Mark as unread',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+                      child: _menuRow(
+                        'Mark as unread',
+                        Icons.mark_chat_unread_outlined,
                       ),
                     ),
                     PopupMenuItem<String>(
                       value: 'search',
-                      child: Row(
-                        children: [
-                          Icon(Icons.search, color: textTheme, size: 20),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Search in chat',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _menuRow('Search in chat', Icons.search),
                     ),
                     if (_pending.any(
                       (item) => item.status == PendingMessageStatus.failed,
                     ))
                       PopupMenuItem<String>(
                         value: 'retry_failed',
-                        child: Row(
-                          children: [
-                            Icon(Icons.refresh, color: textTheme, size: 20),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Retry failed messages',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme,
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: _menuRow('Retry failed messages', Icons.refresh),
                       ),
                     PopupMenuItem<String>(
                       value: 'report',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.flag_outlined,
-                            color: AppColors.dangerText(context),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Report',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+                      child: _menuRow(
+                        'Report',
+                        Icons.flag_outlined,
+                        color: AppColors.dangerText(context),
                       ),
                     ),
                     PopupMenuItem<String>(
                       value: 'block',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.block,
-                            color: AppColors.dangerText(context),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Block',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textTheme,
-                            ),
-                          ),
-                        ],
+                      child: _menuRow(
+                        'Block',
+                        Icons.block,
+                        color: AppColors.dangerText(context),
                       ),
                     ),
                   ],
@@ -1522,6 +1332,9 @@ class _ChatRoomState extends State<ChatRoom> {
       ),
     );
   }
+
+  Widget _menuRow(String label, IconData icon, {Color? color}) =>
+      ChatMenuRow(label: label, icon: icon, color: color);
 
   Widget _buildUnreadDivider(Color textTheme) {
     return Padding(

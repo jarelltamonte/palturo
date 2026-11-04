@@ -186,7 +186,11 @@ class _ExploreExpandState extends State<ExploreExpand>
     _actionInFlight = true;
     if (mounted) setState(() => _sendingRequest = true);
     try {
-      final connectionId = await MatchApi.sendConnectionRequest(person.id);
+      final connectionId = await MatchApi.sendConnectionRequest(
+        person.id,
+        skillName: person.skillName,
+        skillPath: person.skillPath,
+      );
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');
       }

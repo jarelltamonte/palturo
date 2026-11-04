@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
@@ -33,7 +33,7 @@ class _SettingsState extends State<Settings> {
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _userChangedSettings = false;
-  String _version = 'â€¦';
+  String _version = '...';
   ProfileData? _profile;
   String? _email;
   String? _authName;

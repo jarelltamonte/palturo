@@ -30,6 +30,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _conversationsLoaded = false;
   bool _incomingLoaded = false;
   String? _error;
+  Future<void>? _enrichmentFuture;
 
   List<AppNotification> get _items => NotificationService.instance.items;
 
@@ -51,11 +52,27 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final scheduler = SchedulerBinding.instance;
     if (scheduler.schedulerPhase == SchedulerPhase.persistentCallbacks) {
       scheduler.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
+        if (mounted) {
+          setState(() {});
+          _refreshIfNewConnection();
+        }
       });
     } else {
       setState(() {});
+      _refreshIfNewConnection();
     }
+  }
+
+  /// A realtime row can arrive after the initial enrichment snapshot. Reload
+  /// conversations/requests so the new row cannot be mistaken for deleted.
+  void _refreshIfNewConnection() {
+    final needsRefresh = _items.any((item) {
+      final id = item.connectionId;
+      if (id == null) return false;
+      return (_incomingLoaded && !_incoming.containsKey(id)) ||
+          (_conversationsLoaded && !_conversations.containsKey(id));
+    });
+    if (needsRefresh) unawaited(_refreshEnrichment());
   }
 
   Future<void> _load() async {
@@ -65,7 +82,31 @@ class _NotificationsPageState extends State<NotificationsPage> {
     });
 
     await NotificationService.instance.refresh();
+    await _refreshEnrichment();
 
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (_items.isEmpty && NotificationService.instance.error != null) {
+        _error = friendlyError(
+          NotificationService.instance.error ?? '',
+          fallback: "Couldn't load activity. Please try again.",
+        );
+      } else {
+        _error = null;
+      }
+    });
+  }
+
+  Future<void> _refreshEnrichment() {
+    final existing = _enrichmentFuture;
+    if (existing != null) return existing;
+    final future = _doRefreshEnrichment();
+    _enrichmentFuture = future;
+    return future.whenComplete(() => _enrichmentFuture = null);
+  }
+
+  Future<void> _doRefreshEnrichment() async {
     var conversations = <String, ConversationLite>{};
     var incoming = <String, RequestLite>{};
     var conversationsLoaded = false;
@@ -84,20 +125,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
     } catch (_) {
       // Enrichment is optional; absence must not imply deletion.
     }
-
     if (!mounted) return;
     setState(() {
       _conversations = conversations;
       _incoming = incoming;
       _conversationsLoaded = conversationsLoaded;
       _incomingLoaded = incomingLoaded;
-      _loading = false;
-      if (_items.isEmpty && NotificationService.instance.error != null) {
-        _error = friendlyError(
-          NotificationService.instance.error ?? '',
-          fallback: "Couldn't load activity. Please try again.",
-        );
-      }
     });
   }
 
@@ -115,9 +148,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Future<void> _openItem(AppNotification item) async {
     final connectionId = item.connectionId;
-    final conversation =
+    var conversation =
         connectionId == null ? null : _conversations[connectionId];
-    final incoming = connectionId == null ? null : _incoming[connectionId];
+    var incoming = connectionId == null ? null : _incoming[connectionId];
+
+    // A row may have arrived after the initial snapshot. Re-read once before
+    // concluding that its conversation/request no longer exists.
+    if (connectionId != null &&
+        ((_incomingLoaded && incoming == null) ||
+            (_conversationsLoaded && conversation == null))) {
+      await _refreshEnrichment();
+      conversation = _conversations[connectionId];
+      incoming = _incoming[connectionId];
+    }
+
     final view = presentActivity(
       item.toRow(),
       incoming: incoming,

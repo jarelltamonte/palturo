@@ -71,6 +71,19 @@ void main() {
     expect(view.connectionId, 'c3');
   });
 
+  test('enriched top-level fields name the actor and skill', () {
+    final view = presentActivity({
+      'kind': 'request_accepted',
+      'payload': {'connection_id': 'c4'},
+      'actor_name': 'Grace Lim',
+      'skill_name': 'Binangkal',
+    });
+
+    expect(view.body, contains('Grace Lim'));
+    expect(view.body, contains('Binangkal'));
+    expect(view.connectionId, 'c4');
+  });
+
   test('unknown kinds stay on Activity with generic copy', () {
     final view = presentActivity({'kind': 'mystery', 'payload': {}});
     expect(view.title, 'Activity');

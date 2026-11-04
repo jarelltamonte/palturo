@@ -52,6 +52,7 @@ ActivityItemView presentActivity(
       incoming?.connectionId ??
       conversation?.connectionId;
   final name =
+      _text(item['actor_name']) ??
       _text(payload['name']) ??
       _text(payload['actor_name']) ??
       _text(payload['requester_name']) ??
@@ -59,6 +60,7 @@ ActivityItemView presentActivity(
       incoming?.requesterName ??
       conversation?.otherName;
   final skill =
+      _text(item['skill_name']) ??
       _text(payload['skill']) ??
       _text(payload['skill_name']) ??
       (incoming != null && incoming.skills.isNotEmpty

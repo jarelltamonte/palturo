@@ -276,6 +276,13 @@ class _ProfilePageState extends State<ProfilePage> {
     showPersonProfileDialog(context, _profileToPerson());
   }
 
+  bool get _showResume => shouldShowResumeCard(
+    skipped: _resumeSkipped,
+    dismissed: _resumeDismissed,
+    hasDraft: _resumeHasDraft,
+    setupComplete: _profile?.isProfileCompleted ?? true,
+  );
+
   bool _needsProfileTip(ProfileData profile) {
     final wantsTeaching =
         profile.role == OnboardingRole.teach ||
@@ -390,17 +397,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           onAvatarTap: _showMyProfile,
                         ),
                       ),
-                      if (_needsProfileTip(_profile!))
+                      if (_needsProfileTip(_profile!) && !_showResume)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: _ProfileTip(onEdit: _openEdit),
                         ),
-                      if (shouldShowResumeCard(
-                        skipped: _resumeSkipped,
-                        dismissed: _resumeDismissed,
-                        hasDraft: _resumeHasDraft,
-                        setupComplete: _profile?.isProfileCompleted ?? true,
-                      ))
+                      if (_showResume)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: ResumeSetupCard(

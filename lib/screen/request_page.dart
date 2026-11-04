@@ -10,7 +10,6 @@ import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
 import 'package:palturo/screen/notifications_page.dart';
-import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
@@ -1072,13 +1071,13 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
             ] else ...[
               const SizedBox(height: 8),
               TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomePage()),
-                  );
-                },
-                child: const Text('Find people to learn from'),
+                onPressed:
+                    _outgoing.isNotEmpty
+                        ? () => setState(() => _view = RequestView.sent)
+                        : _loadRequests,
+                child: Text(
+                  _outgoing.isNotEmpty ? 'View sent requests' : 'Refresh',
+                ),
               ),
             ],
           ],

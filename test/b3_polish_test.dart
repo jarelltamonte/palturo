@@ -78,6 +78,8 @@ void main() {
   });
 
   testWidgets('resume card opens and dismisses at 200% text', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     var opened = 0;
     var dismissed = 0;
     await tester.pumpWidget(

@@ -48,6 +48,7 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
   bool _profileNudgeShown = false;
+  bool _showProfileNudge = false;
 
   RoleFilter _roleFilter = RoleFilter.all;
   String _skillFilter = 'all';
@@ -363,40 +364,76 @@ class _HomePageState extends State<HomePage> {
         false;
     if (dismissed || !mounted) return;
     _profileNudgeShown = true;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentMaterialBanner();
-    messenger.showMaterialBanner(
-      MaterialBanner(
-        leading: Icon(
-          Icons.auto_awesome_outlined,
-          color: AppColors.accentText(context),
-        ),
-        content: Text(
-          'Add a photo, bio, and languages so Pals can match with you.',
-          style: AppTextStyles.regularText.copyWith(
-            color: Theme.of(context).colorScheme.secondary,
-            fontSize: 13,
+    setState(() => _showProfileNudge = true);
+  }
+
+  void _dismissProfileNudge({required bool persist}) {
+    setState(() => _showProfileNudge = false);
+    if (persist) {
+      PreferencesService.instance.setBool(
+        profileNudgeDismissedKey(Supabase.instance.client.auth.currentUser?.id),
+        true,
+      );
+    }
+  }
+
+  Widget _buildProfileNudgeCard() {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+      decoration: BoxDecoration(
+        color: AppColors.elevatedSurface(context),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border(context)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              messenger.hideCurrentMaterialBanner();
-              _openSettings();
-            },
-            child: const Text('Complete profile'),
-          ),
-          TextButton(
-            onPressed: () {
-              PreferencesService.instance.setBool(
-                profileNudgeDismissedKey(
-                  Supabase.instance.client.auth.currentUser?.id,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_outlined,
+                color: AppColors.accentText(context),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Add a photo, bio, and languages so Pals can match with you.',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textColor,
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
                 ),
-                true,
-              );
-              messenger.hideCurrentMaterialBanner();
-            },
-            child: const Text('Not now'),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () {
+                  _dismissProfileNudge(persist: false);
+                },
+                child: const Text('Later'),
+              ),
+              TextButton(
+                onPressed: () {
+                  _dismissProfileNudge(persist: true);
+                  _openSettings();
+                },
+                child: const Text('Complete profile'),
+              ),
+            ],
           ),
         ],
       ),
@@ -900,21 +937,32 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
-        ),
-        child:
-            _loading
-                ? const PersonCardSkeleton()
-                : _error != null
-                ? _buildErrorState(textTheme)
-                : hasMore
-                ? _buildDeck(people)
-                : _buildEmptyState(textTheme),
+      body: Column(
+        children: [
+          if (_showProfileNudge)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: _buildProfileNudgeCard(),
+            ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+              ),
+              child:
+                  _loading
+                      ? const PersonCardSkeleton()
+                      : _error != null
+                      ? _buildErrorState(textTheme)
+                      : hasMore
+                      ? _buildDeck(people)
+                      : _buildEmptyState(textTheme),
+            ),
+          ),
+        ],
       ),
     );
   }

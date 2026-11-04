@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter/material.dart';
@@ -100,9 +99,6 @@ class _ChatsPageState extends State<ChatsPage> {
   bool get _loadingChats => ChatStateService.instance.loading;
   String? get _chatsError => ChatStateService.instance.error;
 
-  late final TapGestureRecognizer _swipeTap =
-      TapGestureRecognizer()..onTap = _startSwiping;
-
   @override
   void initState() {
     super.initState();
@@ -141,7 +137,6 @@ class _ChatsPageState extends State<ChatsPage> {
     ChatStateService.instance.removeListener(_onChatStateChanged);
     NotificationService.instance.removeListener(_onChatStateChanged);
     DraftService.instance.removeListener(_onChatStateChanged);
-    _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -345,6 +340,17 @@ class _ChatsPageState extends State<ChatsPage> {
     }
   }
 
+  void _clearSearchAndFilters() {
+    _searchController.clear();
+    _searchFocus.unfocus();
+    setState(() {
+      _query = '';
+      _isSearching = false;
+      _filters = {'role': 'all', 'status': 'all'};
+    });
+    PreferencesService.instance.setFilterMap('chat_filters_v1', _filters);
+  }
+
   void _startSearch() {
     setState(() => _isSearching = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -504,6 +510,13 @@ class _ChatsPageState extends State<ChatsPage> {
                 color: textTheme.withValues(alpha: 0.6),
               ),
             ),
+            if (_hasActiveFilter || _query.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _clearSearchAndFilters,
+                child: const Text('Clear search and filters'),
+              ),
+            ],
           ],
         ),
       ),
@@ -529,26 +542,17 @@ class _ChatsPageState extends State<ChatsPage> {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 8),
-            Text.rich(
-              TextSpan(
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.7),
-                ),
-                children: [
-                  const TextSpan(text: 'Start '),
-                  TextSpan(
-                    text: 'Swiping',
-                    recognizer: _swipeTap,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accentText(context),
-                      decoration: TextDecoration.underline,
-                      decorationThickness: 1.5,
-                    ),
-                  ),
-                ],
-              ),
+            Text(
+              'No chats yet. Send a request or start swiping to meet your first Pal.',
               textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _startSwiping,
+              child: const Text('Start swiping'),
             ),
           ],
         ),

@@ -6,7 +6,12 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
-    show OnboardingFlow, kLearningOptions, kTeachingOptions, onboardingDraftKey;
+    show
+        OnboardingFlow,
+        kLearningOptions,
+        kTeachingOptions,
+        onboardingDraftKey,
+        onboardingResumeDismissedKey;
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
@@ -38,7 +43,8 @@ bool shouldShowResumeCard({
   required bool skipped,
   required bool dismissed,
   required bool hasDraft,
-}) => !dismissed && (skipped || hasDraft);
+  required bool setupComplete,
+}) => !setupComplete && !dismissed && (skipped || hasDraft);
 
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
@@ -57,7 +63,9 @@ class _ProfilePageState extends State<ProfilePage> {
       "Couldn't load your profile. Please try again.";
   int? _friendCount;
   bool _openingEditor = false;
-  bool _showResumeCard = false;
+  bool _resumeSkipped = false;
+  bool _resumeDismissed = false;
+  bool _resumeHasDraft = false;
 
   @override
   void initState() {
@@ -69,16 +77,16 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadProfile();
   }
 
+  String? get _uid => Supabase.instance.client.auth.currentUser?.id;
+
   Future<void> _loadResumeState() async {
     final prefs = PreferencesService.instance;
     final skipped = await prefs.getBool('skipped_onboarding') ?? false;
     final dismissed =
-        await prefs.getBool('onboarding_resume_dismissed') ?? false;
+        await prefs.getBool(onboardingResumeDismissedKey(_uid)) ?? false;
     var hasDraft = false;
     try {
-      final raw = await prefs.getString(
-        onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id),
-      );
+      final raw = await prefs.getString(onboardingDraftKey(_uid));
       if (raw != null && raw.trim().isNotEmpty) {
         final decoded = jsonDecode(raw);
         hasDraft = decoded is Map && decoded['role'] != null;
@@ -88,18 +96,16 @@ class _ProfilePageState extends State<ProfilePage> {
     }
     if (!mounted) return;
     setState(() {
-      _showResumeCard = shouldShowResumeCard(
-        skipped: skipped,
-        dismissed: dismissed,
-        hasDraft: hasDraft,
-      );
+      _resumeSkipped = skipped;
+      _resumeDismissed = dismissed;
+      _resumeHasDraft = hasDraft;
     });
   }
 
   Future<void> _dismissResume() async {
-    setState(() => _showResumeCard = false);
+    setState(() => _resumeDismissed = true);
     await PreferencesService.instance.setBool(
-      'onboarding_resume_dismissed',
+      onboardingResumeDismissedKey(_uid),
       true,
     );
   }
@@ -117,9 +123,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 );
                 if (!mounted) return;
                 Navigator.of(context).pop();
-                setState(() => _showResumeCard = false);
+                setState(() {
+                  _resumeSkipped = false;
+                  _resumeDismissed = true;
+                });
                 await PreferencesService.instance.setBool(
-                  'onboarding_resume_dismissed',
+                  onboardingResumeDismissedKey(_uid),
                   true,
                 );
                 _loadProfile();
@@ -130,12 +139,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   true,
                 );
                 await PreferencesService.instance.setBool(
-                  'onboarding_resume_dismissed',
+                  onboardingResumeDismissedKey(_uid),
                   false,
                 );
                 if (!mounted) return;
                 Navigator.of(context).pop();
-                setState(() => _showResumeCard = true);
+                setState(() {
+                  _resumeSkipped = true;
+                  _resumeDismissed = false;
+                });
               },
             ),
       ),
@@ -383,7 +395,12 @@ class _ProfilePageState extends State<ProfilePage> {
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: _ProfileTip(onEdit: _openEdit),
                         ),
-                      if (_showResumeCard)
+                      if (shouldShowResumeCard(
+                        skipped: _resumeSkipped,
+                        dismissed: _resumeDismissed,
+                        hasDraft: _resumeHasDraft,
+                        setupComplete: _profile?.isProfileCompleted ?? true,
+                      ))
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: ResumeSetupCard(

@@ -25,8 +25,15 @@ import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum RoleFilter { all, learner, mentor }
+
+@visibleForTesting
+String profileNudgeDismissedKey(String? userId) =>
+    userId == null
+        ? 'profile_nudge_dismissed'
+        : 'profile_nudge_dismissed_$userId';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -348,8 +355,11 @@ class _HomePageState extends State<HomePage> {
     if (_profileNudgeShown) return;
     final profile = _myProfile;
     if (profile == null || profile.isProfileCompleted) return;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
     final dismissed =
-        await PreferencesService.instance.getBool('profile_nudge_dismissed') ??
+        await PreferencesService.instance.getBool(
+          profileNudgeDismissedKey(uid),
+        ) ??
         false;
     if (dismissed || !mounted) return;
     _profileNudgeShown = true;
@@ -379,7 +389,9 @@ class _HomePageState extends State<HomePage> {
           TextButton(
             onPressed: () {
               PreferencesService.instance.setBool(
-                'profile_nudge_dismissed',
+                profileNudgeDismissedKey(
+                  Supabase.instance.client.auth.currentUser?.id,
+                ),
                 true,
               );
               messenger.hideCurrentMaterialBanner();

@@ -209,7 +209,12 @@ class _AuthGateState extends State<AuthGate> {
         _evaluateUserStatus(_session);
       },
       onSkip: () async {
+        final uid = Supabase.instance.client.auth.currentUser?.id;
         await PreferencesService.instance.setBool('skipped_onboarding', true);
+        await PreferencesService.instance.setBool(
+          onboardingResumeDismissedKey(uid),
+          false,
+        );
         if (mounted) {
           setState(() {
             _hasSkipped = true;

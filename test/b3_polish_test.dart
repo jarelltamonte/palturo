@@ -16,19 +16,39 @@ void main() {
     'resume card shows for skipped or drafted onboarding unless dismissed',
     () {
       expect(
-        shouldShowResumeCard(skipped: false, dismissed: false, hasDraft: false),
+        shouldShowResumeCard(
+          skipped: false,
+          dismissed: false,
+          hasDraft: false,
+          setupComplete: false,
+        ),
         isFalse,
       );
       expect(
-        shouldShowResumeCard(skipped: true, dismissed: false, hasDraft: false),
+        shouldShowResumeCard(
+          skipped: true,
+          dismissed: false,
+          hasDraft: false,
+          setupComplete: false,
+        ),
         isTrue,
       );
       expect(
-        shouldShowResumeCard(skipped: false, dismissed: false, hasDraft: true),
+        shouldShowResumeCard(
+          skipped: false,
+          dismissed: false,
+          hasDraft: true,
+          setupComplete: false,
+        ),
         isTrue,
       );
       expect(
-        shouldShowResumeCard(skipped: true, dismissed: true, hasDraft: true),
+        shouldShowResumeCard(
+          skipped: true,
+          dismissed: true,
+          hasDraft: true,
+          setupComplete: false,
+        ),
         isFalse,
       );
     },

@@ -77,6 +77,11 @@ List<String> resolveCategoriesForSkills(Iterable<String> skills) {
 String onboardingDraftKey(String? userId) =>
     userId == null ? 'onboarding_draft' : 'onboarding_draft_$userId';
 
+String onboardingResumeDismissedKey(String? userId) =>
+    userId == null
+        ? 'onboarding_resume_dismissed'
+        : 'onboarding_resume_dismissed_$userId';
+
 class OnboardingFlow extends StatefulWidget {
   final VoidCallback onFinished;
   final VoidCallback onSkip;

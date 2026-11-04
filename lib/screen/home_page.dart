@@ -20,6 +20,7 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
 import 'package:palturo/utils/friendly_error.dart';
@@ -323,12 +324,7 @@ class _HomePageState extends State<HomePage> {
       }
       _advanceFrom(person, right: true, connectionId: connectionId);
       Haptics.success();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 3),
-          content: Text('Connection request sent to ${person.name}'),
-        ),
-      );
+      showAppSuccess(context, 'Connection request sent to ${person.name}');
     } catch (e) {
       if (!mounted) return;
       Haptics.error();
@@ -388,9 +384,7 @@ class _HomePageState extends State<HomePage> {
       _undoing = false;
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connection request withdrawn')),
-      );
+      showAppSnackBar(context, 'Connection request withdrawn');
     }
 
     if (!mounted) return;
@@ -640,9 +634,16 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not block this person. Please try again.',
+            ),
+          ),
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }
@@ -668,9 +669,16 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not send this report. Please try again.',
+            ),
+          ),
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }

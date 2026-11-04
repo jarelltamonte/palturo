@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -44,7 +45,14 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       if (!mounted) return;
       setState(() => _deleting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not update your account. Please try again.',
+            ),
+          ),
+        ),
       );
     }
   }

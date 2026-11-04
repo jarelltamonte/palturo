@@ -64,9 +64,16 @@ class _BlockListPageState extends State<BlockListPage> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Unblock failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not unblock this person. Please try again.',
+            ),
+          ),
+        ),
+      );
     }
   }
 

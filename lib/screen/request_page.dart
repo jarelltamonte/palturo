@@ -414,7 +414,10 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Could not withdraw request: ${e.toString().replaceFirst('Exception: ', '')}',
+            friendlyError(
+              e,
+              fallback: 'Could not withdraw this request. Please try again.',
+            ),
           ),
         ),
       );
@@ -500,9 +503,16 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       await ChatStateService.instance.loadConversations(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not block this person. Please try again.',
+            ),
+          ),
+        ),
+      );
       return;
     }
     if (!mounted) return;
@@ -522,9 +532,16 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not send this report. Please try again.',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -591,9 +608,16 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     } catch (e) {
       if (!mounted) return false;
       unawaited(Haptics.error());
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not respond to this request. Please try again.',
+            ),
+          ),
+        ),
+      );
       return false;
     } finally {
       _responding = false;

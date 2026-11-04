@@ -251,9 +251,16 @@ class _MatchesState extends State<Matches> {
       await MatchApi.unmatch(connectionId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Remove pal failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not remove this Pal. Please try again.',
+            ),
+          ),
+        ),
+      );
       return;
     }
 
@@ -286,9 +293,16 @@ class _MatchesState extends State<Matches> {
       await MatchApi.blockUser(target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not block this person. Please try again.',
+            ),
+          ),
+        ),
+      );
       return;
     }
     await ChatStateService.instance.loadConversations(showSpinner: false);
@@ -318,9 +332,16 @@ class _MatchesState extends State<Matches> {
       ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not send this report. Please try again.',
+            ),
+          ),
+        ),
+      );
     }
   }
 

@@ -24,8 +24,7 @@ class NotificationsPage extends StatefulWidget {
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsPageState extends State<NotificationsPage>
-    with RouteAware {
+class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
   Map<String, ConversationLite> _conversations = const {};
   Map<String, RequestLite> _incoming = const {};
   bool _loading = true;

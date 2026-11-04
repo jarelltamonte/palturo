@@ -165,7 +165,14 @@ class _ExploreExpandState extends State<ExploreExpand>
         _undoing = false;
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not withdraw request: $e')),
+          SnackBar(
+            content: Text(
+              friendlyError(
+                e,
+                fallback: 'Could not withdraw this request. Please try again.',
+              ),
+            ),
+          ),
         );
         return;
       }
@@ -201,7 +208,10 @@ class _ExploreExpandState extends State<ExploreExpand>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Could not send request: ${e.toString().replaceFirst('Exception: ', '')}',
+              friendlyError(
+                e,
+                fallback: 'Could not send this request. Please try again.',
+              ),
             ),
           ),
         );
@@ -256,9 +266,16 @@ class _ExploreExpandState extends State<ExploreExpand>
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not block this person. Please try again.',
+            ),
+          ),
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }
@@ -284,9 +301,16 @@ class _ExploreExpandState extends State<ExploreExpand>
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              e,
+              fallback: 'Could not send this report. Please try again.',
+            ),
+          ),
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }

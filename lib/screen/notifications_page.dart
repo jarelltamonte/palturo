@@ -276,9 +276,13 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
       confirmLabel: 'Clear',
     );
     if (!confirmed || !mounted) return;
-    await NotificationService.instance.clearRead();
+    final cleared = await NotificationService.instance.clearRead();
     if (!mounted) return;
-    showAppSuccess(context, 'Read activity cleared');
+    if (cleared) {
+      showAppSuccess(context, 'Read activity cleared');
+    } else {
+      showAppError(context, "Couldn't clear read activity. Please try again.");
+    }
   }
 
   Widget _filterBar(Color textColor) {

@@ -269,8 +269,19 @@ class _ChatsPageState extends State<ChatsPage> {
       case 'mute':
         await showChatMuteSheet(context, connectionId);
       case 'unread':
-        await ChatStateService.instance.setMarkedUnread(connectionId, true);
-        if (mounted) showAppSnackBar(context, 'Marked as unread');
+        final saved = await ChatStateService.instance.setMarkedUnread(
+          connectionId,
+          true,
+        );
+        if (!mounted) return;
+        if (saved) {
+          showAppSnackBar(context, 'Marked as unread');
+        } else {
+          showAppError(
+            context,
+            "Couldn't mark this chat unread. Please try again.",
+          );
+        }
       case 'report':
         final reason = await showReportReasonDialog(context, name: chat.name);
         if (reason == null) return;

@@ -186,19 +186,21 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Removes already-read items from Activity and the server.
-  Future<void> clearRead() async {
+  Future<bool> clearRead() async {
     final remaining = _items
         .where((item) => item.isUnread)
         .toList(growable: false);
-    if (remaining.length == _items.length) return;
+    if (remaining.length == _items.length) return true;
     final previous = _items;
     _items = remaining;
     notifyListeners();
     try {
       await MatchApi.clearReadNotifications();
+      return true;
     } catch (_) {
       _items = previous;
       notifyListeners();
+      return false;
     }
   }
 

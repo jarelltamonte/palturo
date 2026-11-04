@@ -759,8 +759,18 @@ class _ChatRoomState extends State<ChatRoom> {
   Future<void> _markUnreadAndLeave() async {
     final connectionId = widget.connectionId;
     if (connectionId == null) return;
-    await ChatStateService.instance.setMarkedUnread(connectionId, true);
+    final saved = await ChatStateService.instance.setMarkedUnread(
+      connectionId,
+      true,
+    );
     if (!mounted) return;
+    if (!saved) {
+      showAppError(
+        context,
+        "Couldn't mark this chat unread. Please try again.",
+      );
+      return;
+    }
     unawaited(Haptics.selection());
     Navigator.pop(context);
   }

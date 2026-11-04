@@ -330,7 +330,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     return index == -1 ? false : _conversations[index].markedUnread;
   }
 
-  Future<void> setMuted(String connectionId, DateTime? until) async {
+  Future<bool> setMuted(String connectionId, DateTime? until) async {
     final index = _conversations.indexWhere(
       (c) => c.connectionId == connectionId,
     );
@@ -343,13 +343,15 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       await MatchApi.setConnectionMute(connectionId, until);
+      return true;
     } catch (_) {
       // Revert to the server truth on failure.
-      unawaited(loadConversations(showSpinner: false));
+      await loadConversations(showSpinner: false);
+      return false;
     }
   }
 
-  Future<void> setMarkedUnread(String connectionId, bool unread) async {
+  Future<bool> setMarkedUnread(String connectionId, bool unread) async {
     final index = _conversations.indexWhere(
       (c) => c.connectionId == connectionId,
     );
@@ -361,8 +363,10 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       await MatchApi.setConnectionUnread(connectionId, unread);
+      return true;
     } catch (_) {
-      unawaited(loadConversations(showSpinner: false));
+      await loadConversations(showSpinner: false);
+      return false;
     }
   }
 

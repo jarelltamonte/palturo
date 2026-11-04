@@ -64,8 +64,15 @@ Future<void> showChatMuteSheet(
     case 'off':
       until = null;
   }
-  await ChatStateService.instance.setMuted(connectionId, until);
+  final saved = await ChatStateService.instance.setMuted(connectionId, until);
   if (!context.mounted) return;
+  if (!saved) {
+    showAppError(
+      context,
+      "Couldn't update notifications for this chat. Please try again.",
+    );
+    return;
+  }
   unawaited(Haptics.selection());
   showAppSnackBar(
     context,

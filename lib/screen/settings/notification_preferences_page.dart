@@ -83,7 +83,7 @@ class NotificationPreferencesPage extends StatelessWidget {
                   NotificationService.instance.notifyPreferenceChanged();
                 },
               ),
-              _permissionRow(context),
+              if (master) _permissionRow(context),
               const SizedBox(height: 8),
               _sectionLabel(context, 'Notify me about'),
               _categorySwitch(
@@ -266,18 +266,26 @@ class NotificationPreferencesPage extends StatelessWidget {
           color: AppColors.accentText(context),
         );
       case NotificationPermissionStatus.denied:
-        subtitle = 'Blocked in device settings. In-app banners still work.';
+        subtitle =
+            'Blocked in device settings. Enable PalTuro notifications there.';
         trailing = TextButton(
-          onPressed: () async {
-            await service.requestPermission();
-          },
-          child: const Text('Request'),
+          onPressed: service.openSettings,
+          child: const Text('Open settings'),
         );
       case NotificationPermissionStatus.unknown:
         subtitle = 'Not requested yet. In-app banners work without it.';
         trailing = TextButton(
           onPressed: () async {
-            await service.requestPermission();
+            final granted = await service.requestPermission();
+            if (!granted && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'System notifications are still off. You can enable them in device settings.',
+                  ),
+                ),
+              );
+            }
           },
           child: const Text('Allow'),
         );

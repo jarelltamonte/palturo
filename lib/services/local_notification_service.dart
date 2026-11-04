@@ -22,7 +22,8 @@ enum NotificationPermissionStatus { unknown, granted, denied, unsupported }
 /// Foreground events stay in the in-app banner presenter; this service only
 /// presents when the app is not resumed. Push (A5) will reuse the same payload
 /// contract.
-class LocalNotificationService extends ChangeNotifier {
+class LocalNotificationService extends ChangeNotifier
+    with WidgetsBindingObserver {
   LocalNotificationService._();
 
   static final LocalNotificationService instance = LocalNotificationService._();
@@ -50,6 +51,30 @@ class LocalNotificationService extends ChangeNotifier {
     importance: Importance.defaultImportance,
     playSound: true,
     enableVibration: true,
+  );
+  static const _messagesQuietChannel = AndroidNotificationChannel(
+    'palturo_messages_quiet',
+    'Messages (silent)',
+    description: 'New messages shown without sound',
+    importance: Importance.defaultImportance,
+    playSound: false,
+    enableVibration: false,
+  );
+  static const _requestsQuietChannel = AndroidNotificationChannel(
+    'palturo_requests_quiet',
+    'Requests & matches (silent)',
+    description: 'Requests and matches shown without sound',
+    importance: Importance.defaultImportance,
+    playSound: false,
+    enableVibration: false,
+  );
+  static const _activityQuietChannel = AndroidNotificationChannel(
+    'palturo_activity_quiet',
+    'Activity updates (silent)',
+    description: 'Activity updates shown without sound',
+    importance: Importance.defaultImportance,
+    playSound: false,
+    enableVibration: false,
   );
 
   final FlutterLocalNotificationsPlugin _plugin =
@@ -80,14 +105,20 @@ class LocalNotificationService extends ChangeNotifier {
     );
 
     try {
-      await _plugin.initialize(
+      final initialized = await _plugin.initialize(
         settings: settings,
         onDidReceiveNotificationResponse: _onResponse,
       );
+      if (initialized == false) {
+        _initialized = false;
+        return;
+      }
     } catch (_) {
       // Local notifications are best-effort; the in-app banner still works.
+      _initialized = false;
       return;
     }
+    WidgetsBinding.instance.addObserver(this);
 
     final android =
         _plugin
@@ -99,6 +130,9 @@ class LocalNotificationService extends ChangeNotifier {
         await android.createNotificationChannel(_messagesChannel);
         await android.createNotificationChannel(_requestsChannel);
         await android.createNotificationChannel(_activityChannel);
+        await android.createNotificationChannel(_messagesQuietChannel);
+        await android.createNotificationChannel(_requestsQuietChannel);
+        await android.createNotificationChannel(_activityQuietChannel);
       } catch (_) {}
     }
 
@@ -121,8 +155,27 @@ class LocalNotificationService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  @visibleForTesting
+  NotificationPermissionStatus resolvePermissionStatus({
+    required bool? enabled,
+    required bool asked,
+  }) {
+    if (enabled == true) return NotificationPermissionStatus.granted;
+    if (enabled == false) {
+      return asked
+          ? NotificationPermissionStatus.denied
+          : NotificationPermissionStatus.unknown;
+    }
+    return NotificationPermissionStatus.unknown;
+  }
+
   Future<void> refreshPermissionStatus() async {
     var next = NotificationPermissionStatus.unknown;
+    final asked =
+        await PreferencesService.instance.getBool(
+          'notification_permission_asked',
+        ) ??
+        false;
     try {
       if (kIsWeb) {
         final web =
@@ -147,12 +200,7 @@ class LocalNotificationService extends ChangeNotifier {
                   AndroidFlutterLocalNotificationsPlugin
                 >();
         final enabled = await android?.areNotificationsEnabled();
-        next =
-            enabled == true
-                ? NotificationPermissionStatus.granted
-                : enabled == false
-                ? NotificationPermissionStatus.denied
-                : NotificationPermissionStatus.unknown;
+        next = resolvePermissionStatus(enabled: enabled, asked: asked);
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final ios =
             _plugin
@@ -160,12 +208,10 @@ class LocalNotificationService extends ChangeNotifier {
                   IOSFlutterLocalNotificationsPlugin
                 >();
         final options = await ios?.checkPermissions();
-        next =
-            options?.isEnabled == true
-                ? NotificationPermissionStatus.granted
-                : options?.isEnabled == false
-                ? NotificationPermissionStatus.denied
-                : NotificationPermissionStatus.unknown;
+        next = resolvePermissionStatus(
+          enabled: options?.isEnabled,
+          asked: asked,
+        );
       } else {
         next = NotificationPermissionStatus.unsupported;
       }
@@ -179,6 +225,10 @@ class LocalNotificationService extends ChangeNotifier {
 
   Future<bool> requestPermission() async {
     var granted = false;
+    await PreferencesService.instance.setBool(
+      'notification_permission_asked',
+      true,
+    );
     try {
       if (kIsWeb) {
         final web =
@@ -219,6 +269,20 @@ class LocalNotificationService extends ChangeNotifier {
     return granted;
   }
 
+  Future<void> openSettings() async {
+    if (kIsWeb) return;
+    try {
+      await _plugin.openAppNotificationSettings();
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(refreshPermissionStatus());
+    }
+  }
+
   Future<void> cancelAll() async {
     try {
       await _plugin.cancelAll();
@@ -228,19 +292,19 @@ class LocalNotificationService extends ChangeNotifier {
   void _onNotification(AppNotification item) {
     if (NotificationService.instance.isForeground) return;
     if (!PreferencesService.instance.notificationsEnabled) return;
-    if (PreferencesService.instance.isQuietHoursNow) return;
     if (item.kind == AppNotificationKind.unknown) return;
     if (!notificationKindEnabled(item.kind)) return;
 
+    final quiet = PreferencesService.instance.isQuietHoursNow;
     final view = presentActivity(item.toRow());
-    final channel = _channelFor(item.kind);
     _show(
       id: item.id,
       title: view.title,
       body: view.body,
-      channel: channel,
+      channel: _channelFor(item.kind, quiet: quiet),
       payload: _payloadForNotification(item, view),
       threadId: item.connectionId,
+      quiet: quiet,
     );
   }
 
@@ -248,8 +312,8 @@ class LocalNotificationService extends ChangeNotifier {
     if (NotificationService.instance.isForeground) return;
     if (!PreferencesService.instance.notificationsEnabled) return;
     if (!PreferencesService.instance.messageNotificationsEnabled) return;
-    if (PreferencesService.instance.isQuietHoursNow) return;
 
+    final quiet = PreferencesService.instance.isQuietHoursNow;
     final body =
         PreferencesService.instance.messagePreviewsEnabled
             ? event.preview
@@ -259,7 +323,11 @@ class LocalNotificationService extends ChangeNotifier {
           'message:${event.connectionId}:${event.createdAt.microsecondsSinceEpoch}',
       title: event.senderName,
       body: body,
-      channel: _messagesChannel,
+      channel: _channelFor(
+        AppNotificationKind.unknown,
+        quiet: quiet,
+        message: true,
+      ),
       payload: {
         'route': 'chat',
         'connectionId': event.connectionId,
@@ -269,17 +337,22 @@ class LocalNotificationService extends ChangeNotifier {
         'avatarUrl': event.avatarUrl,
       },
       threadId: event.connectionId,
+      quiet: quiet,
     );
   }
 
-  void _show({
+  Future<void> _show({
     required String id,
     required String title,
     required String body,
     required AndroidNotificationChannel channel,
     required Map<String, dynamic> payload,
     String? threadId,
-  }) {
+    required bool quiet,
+  }) async {
+    if (!isPermissionGranted) return;
+    final sound = PreferencesService.instance.soundEnabled && !quiet;
+    final vibration = PreferencesService.instance.vibrationEnabled && !quiet;
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         channel.id,
@@ -289,41 +362,51 @@ class LocalNotificationService extends ChangeNotifier {
         priority: Priority.high,
         icon: 'ic_stat_palturo',
         styleInformation: BigTextStyleInformation(body),
-        playSound: true,
-        enableVibration: true,
+        playSound: sound,
+        enableVibration: vibration,
+        silent: quiet || (!sound && !vibration),
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBanner: true,
         presentList: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: sound,
         threadIdentifier: threadId,
       ),
       web: WebNotificationDetails(iconUrl: Uri.parse('icons/Icon-192.png')),
     );
-    unawaited(
-      _plugin.show(
+    try {
+      await _plugin.show(
         id: _notificationId(id),
         title: title,
         body: body,
         notificationDetails: details,
         payload: jsonEncode(payload),
-      ),
-    );
+      );
+    } catch (_) {
+      // Best-effort: a failed system notification must not break the event.
+    }
   }
 
-  AndroidNotificationChannel _channelFor(AppNotificationKind kind) {
+  AndroidNotificationChannel _channelFor(
+    AppNotificationKind kind, {
+    required bool quiet,
+    bool message = false,
+  }) {
+    if (message) {
+      return quiet ? _messagesQuietChannel : _messagesChannel;
+    }
     switch (kind) {
       case AppNotificationKind.connectionRequest:
       case AppNotificationKind.requestAccepted:
       case AppNotificationKind.requestDeclined:
-        return _requestsChannel;
+        return quiet ? _requestsQuietChannel : _requestsChannel;
       case AppNotificationKind.feedbackReady:
       case AppNotificationKind.skillModeration:
-        return _activityChannel;
+        return quiet ? _activityQuietChannel : _activityChannel;
       case AppNotificationKind.unknown:
-        return _activityChannel;
+        return quiet ? _activityQuietChannel : _activityChannel;
     }
   }
 
@@ -429,6 +512,7 @@ class LocalNotificationService extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notificationSub?.cancel();
     _messageSub?.cancel();
     super.dispose();

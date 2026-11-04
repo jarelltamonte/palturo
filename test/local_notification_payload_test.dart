@@ -18,6 +18,27 @@ void main() {
     expect(first, lessThanOrEqualTo(0x7fffffff));
   });
 
+  test('permission state distinguishes not-asked from denied', () {
+    final service = LocalNotificationService.instance;
+
+    expect(
+      service.resolvePermissionStatus(enabled: true, asked: false),
+      NotificationPermissionStatus.granted,
+    );
+    expect(
+      service.resolvePermissionStatus(enabled: false, asked: false),
+      NotificationPermissionStatus.unknown,
+    );
+    expect(
+      service.resolvePermissionStatus(enabled: false, asked: true),
+      NotificationPermissionStatus.denied,
+    );
+    expect(
+      service.resolvePermissionStatus(enabled: null, asked: true),
+      NotificationPermissionStatus.unknown,
+    );
+  });
+
   test('chat payload carries the conversation context', () {
     final item = AppNotification.fromRow({
       'id': 'n1',

@@ -24,6 +24,7 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   int _unread = 0;
   bool _loading = false;
   bool _initialized = false;
+  bool _resubscribing = false;
   String? _error;
   RealtimeChannel? _channel;
   StreamSubscription<AuthState>? _authSubscription;
@@ -57,14 +58,47 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
       }
       if (data.event == AuthChangeEvent.signedIn ||
           data.event == AuthChangeEvent.tokenRefreshed) {
-        _subscribe();
-        refresh(showSpinner: _items.isEmpty);
+        unawaited(_resubscribe());
+        unawaited(refresh(showSpinner: _items.isEmpty));
       }
     });
 
-    if (Supabase.instance.client.auth.currentUser != null) {
-      _subscribe();
-      refresh(showSpinner: true);
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      unawaited(_prepareAndSubscribe());
+    }
+  }
+
+  /// Realtime authenticates with the access token captured at subscribe time,
+  /// so refresh it before joining. Otherwise a restored web session can join
+  /// with an expired JWT and never receive events.
+  Future<void> _prepareAndSubscribe() async {
+    final auth = Supabase.instance.client.auth;
+    final session = auth.currentSession;
+    if (session == null) return;
+    if (session.isExpired) {
+      try {
+        await auth.refreshSession();
+      } catch (_) {
+        return;
+      }
+    }
+    _subscribe();
+    unawaited(refresh(showSpinner: _items.isEmpty));
+  }
+
+  Future<void> _resubscribe() async {
+    if (_resubscribing) return;
+    _resubscribing = true;
+    try {
+      final channel = _channel;
+      _channel = null;
+      if (channel != null) {
+        await Supabase.instance.client.removeChannel(channel);
+      }
+      await _prepareAndSubscribe();
+    } finally {
+      _resubscribing = false;
     }
   }
 
@@ -147,8 +181,16 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _lifecycleState = state;
     if (state == AppLifecycleState.resumed) {
-      if (_channel == null) _subscribe();
+      unawaited(_ensureRealtime());
       unawaited(refresh());
+    }
+  }
+
+  Future<void> _ensureRealtime() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return;
+    if (_channel == null || session.isExpired) {
+      await _resubscribe();
     }
   }
 
@@ -168,23 +210,29 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     if (_channel != null) return;
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      return;
+    }
 
-    _channel =
-        client
-            .channel('notifications:${user.id}')
-            .onPostgresChanges(
-              event: PostgresChangeEvent.insert,
-              schema: 'public',
-              table: 'notifications',
-              filter: PostgresChangeFilter(
-                type: PostgresChangeFilterType.eq,
-                column: 'user_id',
-                value: user.id,
-              ),
-              callback: _handleInsert,
-            )
-            .subscribe();
+    _channel = client
+        .channel('notifications:${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: _handleInsert,
+        )
+        .subscribe((status, error) {
+          if (status == RealtimeSubscribeStatus.channelError &&
+              (error?.toString().toLowerCase().contains('jwt') ?? false)) {
+            unawaited(_resubscribe());
+          }
+        });
   }
 
   void _handleInsert(PostgresChangePayload payload) {
@@ -198,8 +246,29 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     if (item.isUnread) _unread++;
     _items = [item, ..._items.where((existing) => existing.id != item.id)];
     notifyListeners();
-    _events.add(item);
-    unawaited(refresh());
+    unawaited(_emitEnriched(item));
+  }
+
+  /// Realtime rows only contain the base table columns. Fetch the enriched
+  /// row once so banners can name the actor and skill, with a safe fallback.
+  Future<void> _emitEnriched(AppNotification fallback) async {
+    var event = fallback;
+    try {
+      final rows = await MatchApi.listNotifications(limit: 10);
+      for (final row in rows) {
+        final candidate = AppNotification.fromRow(row);
+        if (candidate.id != fallback.id) continue;
+        event = candidate;
+        _items = _items
+            .map((item) => item.id == event.id ? event : item)
+            .toList(growable: false);
+        notifyListeners();
+        break;
+      }
+    } catch (_) {
+      // Fall back to the raw row; the banner still opens the right screen.
+    }
+    _events.add(event);
   }
 
   void _trimSeen() {

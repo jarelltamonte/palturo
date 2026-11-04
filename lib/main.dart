@@ -6,9 +6,11 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
+import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -57,6 +59,7 @@ void main() async {
   }
   ChatStateService.instance.init();
   NotificationService.instance.init();
+  NotificationPresenter.instance.init();
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );
@@ -368,9 +371,22 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
       theme: lightMode,
       darkTheme: darkMode,
       themeMode: _themeMode,
-      builder:
-          (context, child) =>
-              ResponsiveShell(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) {
+        final systemDark =
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+        final effectiveDark =
+            _themeMode == ThemeMode.dark ||
+            (_themeMode == ThemeMode.system && systemDark);
+        return Theme(
+          data: effectiveDark ? darkMode : lightMode,
+          child: ResponsiveShell(
+            child: AppBannerHost(
+              isDark: effectiveDark,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
       home: AppRootDecider(isOnboardingDone: widget.isOnboardingDone),
     );
   }

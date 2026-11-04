@@ -13,9 +13,12 @@ import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/app_navigation.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/notification_service.dart';
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
@@ -706,6 +709,70 @@ class _HomePageState extends State<HomePage> {
               ),
               Row(
                 children: [
+                  ListenableBuilder(
+                    listenable: NotificationService.instance,
+                    builder: (context, _) {
+                      final unread =
+                          PreferencesService.instance.notificationsEnabled
+                              ? NotificationService.instance.unread
+                              : 0;
+                      final label =
+                          unread > 0 ? 'Activity, $unread unread' : 'Activity';
+                      return Semantics(
+                        button: true,
+                        label: label,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => AppRouter.openActivity(),
+                          child: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: textTheme,
+                                    size: 24,
+                                  ),
+                                ),
+                                if (unread > 0)
+                                  Positioned(
+                                    right: -2,
+                                    top: 8,
+                                    child: Container(
+                                      constraints: const BoxConstraints(
+                                        minWidth: 16,
+                                      ),
+                                      height: 16,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        unread > 99 ? '99+' : '$unread',
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   Semantics(
                     button: true,
                     enabled: _history.isNotEmpty,

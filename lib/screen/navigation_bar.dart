@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/haptics.dart';
@@ -65,6 +66,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
 
   void _onItemTapped(int index) {
     Haptics.selection();
+    AppShellState.instance.setSelectedTab(index);
     if (index == 3) {
       _requestsRefresh.value++;
     }
@@ -112,6 +114,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             _tabHistory.removeLast();
             _selectedIndex = _tabHistory.last;
           });
+          AppShellState.instance.setSelectedTab(_selectedIndex);
           return;
         }
       },

@@ -8,6 +8,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart';
 import 'package:palturo/screen/utils/chat_time_formatter.dart';
 import 'package:palturo/services/app_navigation.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -37,12 +38,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void initState() {
     super.initState();
+    AppShellState.instance.setActivityOpen(true);
     NotificationService.instance.addListener(_onServiceChanged);
     _load();
   }
 
   @override
   void dispose() {
+    AppShellState.instance.setActivityOpen(false);
     NotificationService.instance.removeListener(_onServiceChanged);
     super.dispose();
   }

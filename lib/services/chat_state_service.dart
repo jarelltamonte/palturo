@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:palturo/models/incoming_message_event.dart';
 import 'package:palturo/services/match_api.dart';
 
 /// Single source of truth for chat conversations, live preview/ordering,
@@ -12,6 +13,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   ChatStateService._();
 
   bool _initialized = false;
+  bool _resubscribing = false;
   List<ConversationLite> _conversations = [];
   bool _loading = false;
   bool _hasLoaded = false;
@@ -22,6 +24,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   RealtimeChannel? _realtimeChannel;
   StreamSubscription<AuthState>? _authSubscription;
   Timer? _midnightTimer;
+  final StreamController<IncomingMessageEvent> _messageEvents =
+      StreamController<IncomingMessageEvent>.broadcast();
 
   List<ConversationLite> get conversations => _conversations;
   bool get loading => _loading;
@@ -29,6 +33,10 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   String? get error => _error;
   String? get activeConnectionId => _activeConnectionId;
   AppLifecycleState get lifecycleState => _lifecycleState;
+
+  /// Incoming messages for the global notification presenter. Only messages
+  /// received outside the active room are emitted.
+  Stream<IncomingMessageEvent> get messageEvents => _messageEvents.stream;
 
   /// Total unread count across all accepted conversations (excluding active chat room).
   int get totalUnreadCount {
@@ -57,7 +65,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       if (event == AuthChangeEvent.signedIn ||
           event == AuthChangeEvent.tokenRefreshed) {
         loadConversations();
-        _subscribeRealtime();
+        unawaited(_resubscribeRealtime());
       } else if (event == AuthChangeEvent.signedOut) {
         reset();
       }
@@ -65,7 +73,36 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
     if (Supabase.instance.client.auth.currentUser != null) {
       loadConversations();
-      _subscribeRealtime();
+      unawaited(_prepareRealtime());
+    }
+  }
+
+  Future<void> _prepareRealtime() async {
+    final auth = Supabase.instance.client.auth;
+    final session = auth.currentSession;
+    if (session == null) return;
+    if (session.isExpired) {
+      try {
+        await auth.refreshSession();
+      } catch (_) {
+        return;
+      }
+    }
+    _subscribeRealtime();
+  }
+
+  Future<void> _resubscribeRealtime() async {
+    if (_resubscribing) return;
+    _resubscribing = true;
+    try {
+      final channel = _realtimeChannel;
+      _realtimeChannel = null;
+      if (channel != null) {
+        await Supabase.instance.client.removeChannel(channel);
+      }
+      await _prepareRealtime();
+    } finally {
+      _resubscribing = false;
     }
   }
 
@@ -108,16 +145,20 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     final currentUser = client.auth.currentUser;
     if (currentUser == null) return;
 
-    _realtimeChannel =
-        client
-            .channel('chat_state_global_messages')
-            .onPostgresChanges(
-              event: PostgresChangeEvent.all,
-              schema: 'public',
-              table: 'messages',
-              callback: _handleRealtimeMessage,
-            )
-            .subscribe();
+    _realtimeChannel = client
+        .channel('chat_state_global_messages')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'messages',
+          callback: _handleRealtimeMessage,
+        )
+        .subscribe((status, error) {
+          if (status == RealtimeSubscribeStatus.channelError &&
+              (error?.toString().toLowerCase().contains('jwt') ?? false)) {
+            unawaited(_resubscribeRealtime());
+          }
+        });
   }
 
   void _handleRealtimeMessage(PostgresChangePayload payload) {
@@ -160,9 +201,21 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
         _conversations.removeAt(index);
         _conversations.insert(0, updated);
         notifyListeners();
+        if (!isMine && !isRoomActiveAndResumed) {
+          _emitIncoming(updated, body, createdAt);
+        }
       } else {
-        // Conversation not found in local list (e.g. newly accepted connection) -> reload
-        loadConversations(showSpinner: false);
+        // Conversation not found in local list (e.g. newly accepted connection)
+        // -> reload, then emit if the message is still relevant.
+        unawaited(
+          _emitAfterReload(
+            connectionId: connectionId,
+            body: body,
+            createdAt: createdAt,
+            isMine: isMine,
+            isRoomActiveAndResumed: isRoomActiveAndResumed,
+          ),
+        );
       }
     } else if (eventType == PostgresChangeEvent.update) {
       final newRecord = payload.newRecord;
@@ -180,6 +233,41 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
         }
       }
     }
+  }
+
+  Future<void> _emitAfterReload({
+    required String connectionId,
+    required String body,
+    required DateTime createdAt,
+    required bool isMine,
+    required bool isRoomActiveAndResumed,
+  }) async {
+    await loadConversations(showSpinner: false);
+    if (isMine || isRoomActiveAndResumed) return;
+    final index = _conversations.indexWhere(
+      (c) => c.connectionId == connectionId,
+    );
+    if (index == -1) return;
+    _emitIncoming(_conversations[index], body, createdAt);
+  }
+
+  void _emitIncoming(
+    ConversationLite conversation,
+    String body,
+    DateTime createdAt,
+  ) {
+    if (body.trim().isEmpty) return;
+    _messageEvents.add(
+      IncomingMessageEvent(
+        connectionId: conversation.connectionId,
+        senderName: conversation.otherName,
+        body: body,
+        createdAt: createdAt,
+        avatarUrl: conversation.otherAvatar,
+        skillName: conversation.otherSkill,
+        role: conversation.otherRole,
+      ),
+    );
   }
 
   /// Called when user opens ChatRoom. Clears unread immediately and marks read on server.
@@ -213,6 +301,10 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       // Re-sync unread & conversations from backend
       if (_activeConnectionId != null) {
         MatchApi.markMessagesRead(_activeConnectionId!);
+      }
+      final session = Supabase.instance.client.auth.currentSession;
+      if (_realtimeChannel == null || (session?.isExpired ?? false)) {
+        unawaited(_resubscribeRealtime());
       }
       loadConversations(showSpinner: false);
       _scheduleMidnightTimer();
@@ -264,6 +356,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     _midnightTimer?.cancel();
+    _messageEvents.close();
     if (_realtimeChannel != null) {
       Supabase.instance.client.removeChannel(_realtimeChannel!);
     }

@@ -8,11 +8,10 @@ import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
 import 'package:palturo/screen/notifications_page.dart';
-import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/matches.dart';
-import 'package:palturo/screen/request_match_sheet.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
@@ -550,26 +549,11 @@ class _RequestPageState extends State<RequestPage> {
 
       _removeRequest(request.id);
 
-      final action = await showRequestMatchSheet(
-        context,
+      NotificationPresenter.instance.showMatch(
+        connectionId: request.id,
         name: request.requesterName,
         skillName: request.skillName,
-        avatarImage: _requestAvatar(request),
-      );
-      if (!mounted || action != RequestMatchAction.sayHello) return true;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (_) => ChatRoom(
-                connectionId: request.id,
-                name: request.requesterName,
-                skillName: request.skillName,
-                role: request.role,
-                person: request.toPerson(),
-                avatarImage: _requestAvatar(request),
-              ),
-        ),
+        avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
       );
       return true;
     } catch (e) {

@@ -25,7 +25,12 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
 
   Future<void> _load() async {
     final service = ChatPrivacyService.instance;
-    if (service.loaded) return;
+    if (service.loaded) {
+      if (_error != null && mounted) {
+        setState(() => _error = null);
+      }
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;

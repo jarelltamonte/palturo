@@ -14,6 +14,7 @@ class ChatPrivacyService extends ChangeNotifier {
   bool _loading = false;
   bool _loadFailed = false;
   int _generation = 0;
+  Future<bool>? _inflightLoad;
 
   bool get loaded => _loaded;
   bool get loading => _loading;
@@ -24,8 +25,18 @@ class ChatPrivacyService extends ChangeNotifier {
     await load();
   }
 
-  Future<bool> load() async {
-    if (_loading) return _loaded;
+  Future<bool> load() {
+    if (_loaded) return Future.value(true);
+    final existing = _inflightLoad;
+    if (existing != null) return existing;
+    final future = _doLoad();
+    _inflightLoad = future;
+    return future.whenComplete(() {
+      if (identical(_inflightLoad, future)) _inflightLoad = null;
+    });
+  }
+
+  Future<bool> _doLoad() async {
     final generation = _generation;
     _loading = true;
     _loadFailed = false;
@@ -57,6 +68,7 @@ class ChatPrivacyService extends ChangeNotifier {
     required bool typing,
     required bool readReceipts,
   }) async {
+    final generation = _generation;
     final previous = (presenceEnabled, typingEnabled, readReceiptsEnabled);
     presenceEnabled = presence;
     typingEnabled = typing;
@@ -68,9 +80,11 @@ class ChatPrivacyService extends ChangeNotifier {
         typing: typing,
         readReceipts: readReceipts,
       );
+      if (generation != _generation) return false;
       _loaded = true;
       return true;
     } catch (_) {
+      if (generation != _generation) return false;
       presenceEnabled = previous.$1;
       typingEnabled = previous.$2;
       readReceiptsEnabled = previous.$3;
@@ -96,6 +110,7 @@ class ChatPrivacyService extends ChangeNotifier {
 
   void reset() {
     _generation++;
+    _inflightLoad = null;
     presenceEnabled = true;
     typingEnabled = true;
     readReceiptsEnabled = true;

@@ -76,6 +76,39 @@ void main() {
     AppBannerController.instance.clear();
   });
 
+  testWidgets('banner survives 360px at 200% text', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: AppBannerHost(child: const Scaffold(body: Text('content'))),
+        ),
+      ),
+    );
+
+    AppBannerController.instance.show(
+      buildMatchBanner(
+        id: 'c-long',
+        name: 'Nanay Cita Bautista',
+        skillName: 'Barong Embroidery and Parol Making',
+        onSayHello: () {},
+      ),
+      preempt: true,
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Say hello'), findsOneWidget);
+    AppBannerController.instance.clear();
+  });
+
   testWidgets('match banner exposes the say-hello action', (tester) async {
     var saidHello = false;
     await tester.pumpWidget(

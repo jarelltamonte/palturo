@@ -27,6 +27,32 @@ bool isProfileComplete({
       hasRoleSkills;
 }
 
+class NameChangeStatus {
+  const NameChangeStatus({
+    required this.changesUsed,
+    required this.changesRemaining,
+    required this.canChange,
+    this.nextChangeAt,
+  });
+
+  final int changesUsed;
+  final int changesRemaining;
+  final bool canChange;
+  final DateTime? nextChangeAt;
+
+  factory NameChangeStatus.fromMap(Map<String, dynamic> map) {
+    return NameChangeStatus(
+      changesUsed: (map['changes_used'] as num?)?.toInt() ?? 0,
+      changesRemaining: (map['changes_remaining'] as num?)?.toInt() ?? 0,
+      canChange: map['can_change'] as bool? ?? false,
+      nextChangeAt:
+          map['next_change_at'] == null
+              ? null
+              : DateTime.tryParse(map['next_change_at'].toString()),
+    );
+  }
+}
+
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
@@ -389,6 +415,32 @@ class ProfileService {
     return null;
   }
 
+  Future<NameChangeStatus?> getNameChangeStatus() async {
+    final res = await _supabase.rpc('get_name_change_status') as List;
+    if (res.isEmpty) return null;
+    return NameChangeStatus.fromMap(
+      Map<String, dynamic>.from(res.first as Map),
+    );
+  }
+
+  Future<NameChangeStatus> changeName(String firstName, String lastName) async {
+    final res =
+        await _supabase.rpc(
+              'change_profile_name',
+              params: {
+                'p_first_name': firstName.trim(),
+                'p_last_name': lastName.trim(),
+              },
+            )
+            as List;
+    if (res.isEmpty) {
+      throw Exception('The name change did not complete.');
+    }
+    return NameChangeStatus.fromMap(
+      Map<String, dynamic>.from(res.first as Map),
+    );
+  }
+
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
     List<String?>? newPhotoLocalPaths,
@@ -638,8 +690,6 @@ class ProfileService {
     await _supabase
         .from('profiles')
         .update({
-          'first_name': updatedProfile.firstName,
-          'last_name': updatedProfile.lastName,
           'bio': updatedProfile.bio,
           'avatar_url': primaryAvatar,
           'photos': uploadedPhotoUrls.whereType<String>().toList(),

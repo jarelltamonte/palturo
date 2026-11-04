@@ -5,6 +5,7 @@ import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/activity_service.dart';
+import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -36,6 +37,7 @@ class _SettingsState extends State<Settings> {
   ProfileData? _profile;
   String? _email;
   String? _authName;
+  bool _loggingOut = false;
 
   static const _notificationsKey = 'notifications_enabled';
   static const _soundKey = 'sound_enabled';
@@ -802,6 +804,33 @@ class _SettingsState extends State<Settings> {
     submitting.dispose();
   }
 
+  Future<void> _logout() async {
+    if (_loggingOut) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Log out',
+      message: 'Are you sure you want to log out of PalTuro?',
+      confirmLabel: 'Log out',
+      destructive: false,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _loggingOut = true);
+    try {
+      await AuthService().logout();
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loggingOut = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't log out. Please try again.")),
+      );
+    }
+  }
+
   void _openAccount() async {
     await Navigator.push(
       context,
@@ -1071,6 +1100,11 @@ class _SettingsState extends State<Settings> {
                 trailing: Icon(Icons.chevron_right, color: textTheme),
                 onTap: _openAccount,
               ),
+            ),
+            _settingsTile(
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              onTap: _loggingOut ? null : _logout,
             ),
 
             _sectionLabel('Support'),

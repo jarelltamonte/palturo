@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:palturo/authentication/legal_dialogs.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
-/// A truthful privacy destination. It links to the policies that already
-/// exist and explains what is stored; it does not promise an export flow that
-/// is not implemented.
+/// A truthful privacy destination. It explains what is stored and points to
+/// account deletion without duplicating the legal dialogs from Settings.
 class PrivacyPage extends StatelessWidget {
   const PrivacyPage({super.key});
 
@@ -61,22 +59,6 @@ class PrivacyPage extends StatelessWidget {
               height: 1.45,
             ),
           ),
-          const SizedBox(height: 18),
-          _PolicyRow(
-            icon: Icons.shield_outlined,
-            title: 'Data Policy',
-            onTap: () => LegalDialogs.showDataPolicy(context),
-          ),
-          _PolicyRow(
-            icon: Icons.cookie_outlined,
-            title: 'Cookies Policy',
-            onTap: () => LegalDialogs.showCookiesPolicy(context),
-          ),
-          _PolicyRow(
-            icon: Icons.description_outlined,
-            title: 'Terms of Service',
-            onTap: () => LegalDialogs.showTermsOfService(context),
-          ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
@@ -120,33 +102,6 @@ class PrivacyPage extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _PolicyRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  const _PolicyRow({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).colorScheme.secondary;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: textTheme),
-      title: Text(
-        title,
-        style: AppTextStyles.regularText.copyWith(color: textTheme),
-      ),
-      trailing: Icon(Icons.chevron_right, color: textTheme),
-      onTap: onTap,
     );
   }
 }

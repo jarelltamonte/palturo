@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
+import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/profile_page.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/resume_setup_card.dart';
@@ -51,8 +52,30 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        shouldShowResumeCard(
+          skipped: true,
+          dismissed: false,
+          hasDraft: true,
+          setupComplete: true,
+        ),
+        isFalse,
+      );
     },
   );
+
+  test('dismissal keys are scoped per user', () {
+    expect(onboardingResumeDismissedKey(null), 'onboarding_resume_dismissed');
+    expect(
+      onboardingResumeDismissedKey('user-1'),
+      'onboarding_resume_dismissed_user-1',
+    );
+    expect(profileNudgeDismissedKey(null), 'profile_nudge_dismissed');
+    expect(
+      profileNudgeDismissedKey('user-1'),
+      'profile_nudge_dismissed_user-1',
+    );
+  });
 
   testWidgets('resume card opens and dismisses at 200% text', (tester) async {
     var opened = 0;

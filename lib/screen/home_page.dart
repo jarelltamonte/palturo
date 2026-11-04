@@ -22,19 +22,12 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
-import 'package:palturo/widgets/profile_nudge_card.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
 import 'package:palturo/utils/friendly_error.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum RoleFilter { all, learner, mentor }
-
-@visibleForTesting
-String profileNudgeDismissedKey(String? userId) =>
-    userId == null
-        ? 'profile_nudge_dismissed'
-        : 'profile_nudge_dismissed_$userId';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -49,7 +42,6 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
   bool _profileNudgeShown = false;
-  bool _showProfileNudge = false;
 
   RoleFilter _roleFilter = RoleFilter.all;
   String _skillFilter = 'all';
@@ -357,25 +349,18 @@ class _HomePageState extends State<HomePage> {
     if (_profileNudgeShown) return;
     final profile = _myProfile;
     if (profile == null || profile.isProfileCompleted) return;
-    final uid = Supabase.instance.client.auth.currentUser?.id;
-    final dismissed =
-        await PreferencesService.instance.getBool(
-          profileNudgeDismissedKey(uid),
-        ) ??
-        false;
-    if (dismissed || !mounted) return;
     _profileNudgeShown = true;
-    setState(() => _showProfileNudge = true);
-  }
-
-  void _dismissProfileNudge({required bool persist}) {
-    setState(() => _showProfileNudge = false);
-    if (persist) {
-      PreferencesService.instance.setBool(
-        profileNudgeDismissedKey(Supabase.instance.client.auth.currentUser?.id),
-        true,
-      );
-    }
+    AppBannerController.instance.show(
+      AppBannerData(
+        id: 'profile-nudge',
+        title: 'Finish your profile',
+        body: 'Add a photo, bio, and languages so Pals can match with you.',
+        icon: Icons.auto_awesome_outlined,
+        actionLabel: 'Complete profile',
+        onAction: _openSettings,
+        duration: const Duration(seconds: 10),
+      ),
+    );
   }
 
   void _resetCard() {
@@ -875,38 +860,21 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          if (_showProfileNudge)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: ProfileNudgeCard(
-                onLater: () => _dismissProfileNudge(persist: true),
-                onComplete: () {
-                  _dismissProfileNudge(persist: false);
-                  _openSettings();
-                },
-              ),
-            ),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                8,
-                16,
-                MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
-              ),
-              child:
-                  _loading
-                      ? const PersonCardSkeleton()
-                      : _error != null
-                      ? _buildErrorState(textTheme)
-                      : hasMore
-                      ? _buildDeck(people)
-                      : _buildEmptyState(textTheme),
-            ),
-          ),
-        ],
+      body: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+        ),
+        child:
+            _loading
+                ? const PersonCardSkeleton()
+                : _error != null
+                ? _buildErrorState(textTheme)
+                : hasMore
+                ? _buildDeck(people)
+                : _buildEmptyState(textTheme),
       ),
     );
   }

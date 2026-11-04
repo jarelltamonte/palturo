@@ -1,10 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
-import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/profile_page.dart';
 import 'package:palturo/theme/theme.dart';
-import 'package:palturo/widgets/profile_nudge_card.dart';
 import 'package:palturo/widgets/resume_setup_card.dart';
 
 void main() {
@@ -65,16 +63,11 @@ void main() {
     },
   );
 
-  test('dismissal keys are scoped per user', () {
+  test('resume dismissal keys are scoped per user', () {
     expect(onboardingResumeDismissedKey(null), 'onboarding_resume_dismissed');
     expect(
       onboardingResumeDismissedKey('user-1'),
       'onboarding_resume_dismissed_user-1',
-    );
-    expect(profileNudgeDismissedKey(null), 'profile_nudge_dismissed');
-    expect(
-      profileNudgeDismissedKey('user-1'),
-      'profile_nudge_dismissed_user-1',
     );
   });
 
@@ -111,41 +104,6 @@ void main() {
 
     await tester.tap(find.byTooltip('Dismiss continue setup'));
     expect(dismissed, 1);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('profile nudge fits 360px at 200% text', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(360, 640));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    var later = 0;
-    var complete = 0;
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: lightMode,
-        home: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(360, 640),
-            textScaler: TextScaler.linear(2),
-          ),
-          child: Scaffold(
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: ProfileNudgeCard(
-                onLater: () => later++,
-                onComplete: () => complete++,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    expect(tester.takeException(), isNull);
-    await tester.tap(find.text('Later'));
-    await tester.tap(find.text('Complete profile'));
-    expect(later, 1);
-    expect(complete, 1);
     expect(tester.takeException(), isNull);
   });
 }

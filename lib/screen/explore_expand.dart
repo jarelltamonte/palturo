@@ -3,7 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
-import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
@@ -12,6 +11,7 @@ import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/widgets/swipe_deck.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
 class ExploreExpand extends StatefulWidget {
@@ -33,8 +33,7 @@ class ExploreExpand extends StatefulWidget {
   State<ExploreExpand> createState() => _ExploreExpandState();
 }
 
-class _ExploreExpandState extends State<ExploreExpand>
-    with SingleTickerProviderStateMixin {
+class _ExploreExpandState extends State<ExploreExpand> {
   List<Person> _people = const [];
   bool _loading = true;
   String? _error;
@@ -42,38 +41,10 @@ class _ExploreExpandState extends State<ExploreExpand>
   int _currentIndex = 0;
   final List<int> _history = [];
   final List<String?> _historyConnectionIds = [];
-  final Map<String, String> _pendingSwipeIds = {};
   bool _actionInFlight = false;
   bool _undoing = false;
   bool _sendingRequest = false;
-  bool? _exitRight;
-
-  late final AnimationController _exitController = AnimationController(
-    vsync: this,
-    duration: AppMotion.exit,
-  );
-
-  @override
-  void dispose() {
-    _exitController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _animateAdvance(
-    Person person, {
-    bool right = false,
-    String? connectionId,
-  }) async {
-    if (_exitController.isAnimating) return;
-    if (_currentIndex < 0 || _currentIndex >= _people.length) return;
-    if (_people[_currentIndex].id != person.id) return;
-
-    _exitRight = right;
-    await _exitController.forward(from: 0);
-    if (!mounted) return;
-    _advanceFrom(person, connectionId: connectionId);
-    _exitController.reset();
-  }
+  final GlobalKey<SwipeDeckState> _deckKey = GlobalKey();
 
   @override
   void initState() {
@@ -88,7 +59,6 @@ class _ExploreExpandState extends State<ExploreExpand>
       _currentIndex = 0;
       _history.clear();
       _historyConnectionIds.clear();
-      _pendingSwipeIds.clear();
     });
 
     try {
@@ -138,6 +108,35 @@ class _ExploreExpandState extends State<ExploreExpand>
     if (_currentIndex < 0 || _currentIndex >= _people.length) return;
     if (_people[_currentIndex].id != person.id) return;
     _next(connectionId: connectionId);
+  }
+
+  void _dismissCard(Person person, {bool right = false}) {
+    if (!mounted) return;
+    if (_currentIndex < 0 || _currentIndex >= _people.length) return;
+    if (_people[_currentIndex].id != person.id) return;
+    _deckKey.currentState?.dismiss(right: right);
+  }
+
+  Future<void> _handleSwipe(Person person, bool right) async {
+    if (!right) {
+      _advanceFrom(person);
+      return;
+    }
+    final connectionId = await _sendRequest(person);
+    if (!mounted) return;
+    if (connectionId == null) {
+      _deckKey.currentState?.reset();
+      return;
+    }
+    _advanceFrom(person, connectionId: connectionId);
+    showAppSnackBar(
+      context,
+      'Connection request sent to ${person.name}',
+      actionLabel: 'Undo',
+      onAction: () => _undoRequest(connectionId),
+      duration: const Duration(seconds: 5),
+      tone: AppFeedbackTone.success,
+    );
   }
 
   Future<void> _undoRequest(String connectionId) async {
@@ -214,21 +213,6 @@ class _ExploreExpandState extends State<ExploreExpand>
     }
   }
 
-  Future<void> _confirmAdd(Person person) async {
-    final connectionId = await _sendRequest(person);
-    if (!mounted || connectionId == null) return;
-    await _animateAdvance(person, right: true, connectionId: connectionId);
-    if (!mounted) return;
-    showAppSnackBar(
-      context,
-      'Connection request sent to ${person.name}',
-      actionLabel: 'Undo',
-      onAction: () => _undoRequest(connectionId),
-      duration: const Duration(seconds: 5),
-      tone: AppFeedbackTone.success,
-    );
-  }
-
   Future<void> _confirmBlock(Person person) async {
     if (_actionInFlight) return;
 
@@ -250,7 +234,7 @@ class _ExploreExpandState extends State<ExploreExpand>
       if (!mounted) return;
 
       showAppSuccess(context, 'You blocked ${person.name}');
-      await _animateAdvance(person);
+      _dismissCard(person, right: false);
     } catch (e) {
       if (!mounted) return;
 
@@ -280,7 +264,7 @@ class _ExploreExpandState extends State<ExploreExpand>
       if (!mounted) return;
 
       showAppSuccess(context, 'Thanks for your report.');
-      await _animateAdvance(person);
+      _dismissCard(person, right: false);
     } catch (e) {
       if (!mounted) return;
 
@@ -330,171 +314,26 @@ class _ExploreExpandState extends State<ExploreExpand>
     );
   }
 
-  Widget _swipeBackground({
-    required Alignment alignment,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Icon(icon, color: color, size: 36),
-    );
-  }
-
   Widget _buildDeck() {
     final current = _people[_currentIndex];
-    final next =
-        _currentIndex + 1 < _people.length ? _people[_currentIndex + 1] : null;
-
-    return Stack(
-      fit: StackFit.expand,
-      clipBehavior: Clip.none,
-      children: [
-        if (next != null)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Transform.scale(
-                scale: 0.97,
-                alignment: Alignment.bottomCenter,
-                child: Transform.translate(
-                  offset: const Offset(0, 10),
-                  child: Opacity(
-                    opacity: 0.55,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: ExcludeSemantics(
-                        child: PersonCardOverlay(
-                          person: next,
-                          showActions: false,
-                          showMenu: false,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        Padding(
-          padding: EdgeInsets.only(bottom: next == null ? 0 : 26),
-          child: _buildDeckCard(current),
-        ),
-        if (next != null)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 3,
-            child: IgnorePointer(
-              child: Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 210),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.elevatedSurface(
-                      context,
-                    ).withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AppColors.border(context)),
-                  ),
-                  child: Text(
-                    'Up next · ${next.name}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildDeckCard(Person person) {
-    final card = Dismissible(
-      key: ValueKey(person.id),
-      direction: DismissDirection.horizontal,
-      background: _swipeBackground(
-        alignment: Alignment.centerLeft,
-        color: AppColors.primary,
-        icon: Icons.check,
-      ),
-      secondaryBackground: _swipeBackground(
-        alignment: Alignment.centerRight,
-        color: AppColors.dangerText(context),
-        icon: Icons.close,
-      ),
-      confirmDismiss: (direction) async {
-        if (direction != DismissDirection.startToEnd) return true;
-        final connectionId = await _sendRequest(person);
-        if (connectionId == null) return false;
-        _pendingSwipeIds[person.id] = connectionId;
-        return true;
-      },
-      onDismissed: (direction) {
-        final connectionId = _pendingSwipeIds.remove(person.id);
-        _advanceFrom(person, connectionId: connectionId);
-        if (direction == DismissDirection.startToEnd) {
-          showAppSnackBar(
-            context,
-            'Connection request sent to ${person.name}',
-            actionLabel: 'Undo',
-            onAction: () => _undoRequest(connectionId ?? ''),
-            duration: const Duration(seconds: 5),
-            tone: AppFeedbackTone.success,
-          );
-        }
-      },
+    return SwipeDeck(
+      key: _deckKey,
+      cardKey: current.id,
+      enabled: !_sendingRequest,
+      busy: _sendingRequest,
+      rightLabel: 'Send request',
+      leftLabel: 'Pass',
+      onSwiped: (right) => _handleSwipe(current, right),
       child: PersonCardOverlay(
-        person: person,
-        onAdd: () => _confirmAdd(person),
-        onSkip: () => _animateAdvance(person),
-        onBlock: () => _confirmBlock(person),
-        onReport: () => _confirmReport(person),
-        onOpenProfile: () => showPersonProfileDialog(context, person),
+        person: current,
+        onAdd: () => _deckKey.currentState?.dismiss(right: true),
+        onSkip: () => _deckKey.currentState?.dismiss(right: false),
+        onBlock: () => _confirmBlock(current),
+        onReport: () => _confirmReport(current),
+        onOpenProfile: () => showPersonProfileDialog(context, current),
         skipLabel: 'Pass',
         addLabel: 'Send request',
       ),
-    );
-
-    return AnimatedBuilder(
-      animation: _exitController,
-      child: card,
-      builder: (context, child) {
-        final progress = Curves.easeOutCubic.transform(_exitController.value);
-        if (progress == 0) return child!;
-        final cardWidth = MediaQuery.sizeOf(context).width - 32;
-        final screenHeight = MediaQuery.sizeOf(context).height;
-        final direction = _exitRight == true ? 1.0 : -1.0;
-        return IgnorePointer(
-          ignoring: true,
-          child: Opacity(
-            opacity: 1 - progress,
-            child: Transform.translate(
-              offset: Offset(
-                direction * cardWidth * 1.1 * progress,
-                screenHeight * 0.35 * progress,
-              ),
-              child: Transform.rotate(
-                angle: direction * 0.22 * progress,
-                child: child,
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 

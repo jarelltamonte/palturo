@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
@@ -24,6 +23,7 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/widgets/swipe_deck.dart';
 import 'package:palturo/widgets/profile_update_link.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
@@ -56,10 +56,9 @@ class _HomePageState extends State<HomePage> {
   bool _openingEditor = false;
   bool _actionInFlight = false;
   bool _sendingRequest = false;
-  double _dragProgress = 0;
   bool _discovering = false;
   int _deckGeneration = 0;
-  final GlobalKey<_SwipeableCardState> _swipeKey = GlobalKey();
+  final GlobalKey<SwipeDeckState> _swipeKey = GlobalKey();
 
   @override
   void initState() {
@@ -286,7 +285,6 @@ class _HomePageState extends State<HomePage> {
       _historyConnectionIds.add(connectionId);
       _undoActive = false;
       _currentIndex++;
-      _dragProgress = 0;
     });
   }
 
@@ -365,7 +363,6 @@ class _HomePageState extends State<HomePage> {
 
   void _resetCard() {
     if (!mounted) return;
-    setState(() => _dragProgress = 0);
     _swipeKey.currentState?.reset();
   }
 
@@ -375,7 +372,7 @@ class _HomePageState extends State<HomePage> {
     if (people[_currentIndex].id != person.id) return;
 
     final state = _swipeKey.currentState;
-    if (state == null || state.widget.personId != person.id) {
+    if (state == null || state.widget.cardKey != person.id) {
       _handleSwiped(person, right);
       return;
     }
@@ -450,125 +447,31 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildDeckCard(Person person) {
+  Widget _buildDeck(List<Person> people) {
+    final current = people[_currentIndex];
+
     return _wrapUndo(
-      _SwipeableCard(
+      SwipeDeck(
         key: _swipeKey,
-        personId: person.id,
-        onSwiped: (right) => _handleSwiped(person, right),
-        onDragProgress: (value) {
-          if ((value - _dragProgress).abs() > 0.01) {
-            setState(() => _dragProgress = value);
-          }
-        },
+        cardKey: current.id,
+        enabled: !_sendingRequest,
+        busy: _sendingRequest,
+        rightLabel: 'Send request',
+        leftLabel: 'Skip',
+        onSwiped: (right) => _handleSwiped(current, right),
         child: PersonCardOverlay(
-          person: person,
+          person: current,
           addLabel: 'Send request',
-          onAdd: () => _confirmAdd(person),
-          onSkip: () => _dismissCard(person),
-          onBlock: () => _confirmBlock(person),
-          onReport: () => _confirmReport(person),
-          onOpenProfile: () => _openProfile(person),
+          onAdd: () => _confirmAdd(current),
+          onSkip: () => _dismissCard(current),
+          onBlock: () => _confirmBlock(current),
+          onReport: () => _confirmReport(current),
+          onOpenProfile: () => _openProfile(current),
           showProfilePill: false,
           showShadow: false,
           showSkillNote: true,
         ),
       ),
-    );
-  }
-
-  Widget _buildDeck(List<Person> people) {
-    final current = people[_currentIndex];
-    final next =
-        _currentIndex + 1 < people.length ? people[_currentIndex + 1] : null;
-    final progress = _dragProgress.clamp(0.0, 1.0);
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-
-    return Stack(
-      fit: StackFit.expand,
-      clipBehavior: Clip.none,
-      children: [
-        if (next != null)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Transform.scale(
-                scale: 0.97 + (0.03 * progress),
-                alignment: Alignment.bottomCenter,
-                child: Transform.translate(
-                  offset: Offset(0, 10 * (1 - progress)),
-                  child: Opacity(
-                    opacity: 0.55 + (0.45 * progress),
-                    child: ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(
-                        sigmaX: reduceMotion ? 0 : 3 * (1 - progress),
-                        sigmaY: reduceMotion ? 0 : 3 * (1 - progress),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: ExcludeSemantics(
-                          child: PersonCardOverlay(
-                            person: next,
-                            showActions: false,
-                            showMenu: false,
-                            showShadow: false,
-                            showSkillNote: true,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        Padding(
-          padding: EdgeInsets.only(
-            bottom: next == null ? 0 : 26 * (1 - progress),
-          ),
-          child: _buildDeckCard(current),
-        ),
-        if (_sendingRequest)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.28),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.elevatedSurface(context),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Sending request…',
-                          style: AppTextStyles.boldText.copyWith(
-                            color: Theme.of(context).colorScheme.secondary,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -998,198 +901,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-    );
-  }
-}
-
-class _SwipeableCard extends StatefulWidget {
-  final String personId;
-  final Widget child;
-  final ValueChanged<bool> onSwiped;
-  final ValueChanged<double>? onDragProgress;
-
-  const _SwipeableCard({
-    super.key,
-    required this.personId,
-    required this.child,
-    required this.onSwiped,
-    this.onDragProgress,
-  });
-
-  @override
-  State<_SwipeableCard> createState() => _SwipeableCardState();
-}
-
-class _SwipeableCardState extends State<_SwipeableCard>
-    with SingleTickerProviderStateMixin {
-  static const double _maxAngle = 0.25;
-  static const double _exitFactor = 1.1;
-
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: AppMotion.exit,
-  )..addListener(_onTick);
-
-  double _dx = 0;
-  double _from = 0;
-  double _to = 0;
-  double _width = 1;
-  bool _exiting = false;
-
-  @override
-  void didUpdateWidget(covariant _SwipeableCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.personId != widget.personId) {
-      _controller.stop();
-      _dx = 0;
-      _from = 0;
-      _to = 0;
-      _exiting = false;
-    }
-  }
-
-  void dismiss({bool right = false}) {
-    if (_exiting) return;
-    _exiting = true;
-    _animateTo(
-      (right ? 1 : -1) * _width * _exitFactor,
-      onDone: () => widget.onSwiped(right),
-    );
-  }
-
-  /// Restore a card after a failed request or a cancelled gesture.
-  void reset() {
-    _controller.stop();
-    _exiting = false;
-    _dx = 0;
-    _from = 0;
-    _to = 0;
-    widget.onDragProgress?.call(0);
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onTick() {
-    setState(() {
-      _dx =
-          _from +
-          (_to - _from) * Curves.easeOutCubic.transform(_controller.value);
-    });
-    widget.onDragProgress?.call(
-      (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0),
-    );
-  }
-
-  void _animateTo(double target, {VoidCallback? onDone}) {
-    _from = _dx;
-    _to = target;
-
-    _controller.forward(from: 0).whenComplete(() {
-      if (mounted) onDone?.call();
-    });
-  }
-
-  void _onDragStart(DragStartDetails d) {
-    if (_exiting) return;
-    _controller.stop();
-  }
-
-  void _onDragUpdate(DragUpdateDetails d) {
-    if (_exiting) return;
-    setState(() => _dx += d.delta.dx);
-    widget.onDragProgress?.call(
-      (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0),
-    );
-  }
-
-  void _onDragEnd(DragEndDetails d) {
-    if (_exiting) return;
-
-    final velocity = d.velocity.pixelsPerSecond.dx;
-    final flung = velocity.abs() > 800 && velocity.sign == _dx.sign;
-    final passed = _dx.abs() > _width * 0.35 || flung;
-
-    if (!passed) {
-      _animateTo(0);
-      return;
-    }
-
-    final right = _dx > 0;
-    _exiting = true;
-    Haptics.impact();
-
-    _animateTo(
-      (right ? 1 : -1) * _width * _exitFactor,
-      onDone: () => widget.onSwiped(right),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screen = MediaQuery.of(context).size;
-    final driftRatio = (0.35 * screen.height) / (0.7 * screen.width);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _width = constraints.maxWidth;
-
-        final angle = (_dx / (_width * 0.7)) * _maxAngle;
-        final dy = _dx.abs() * driftRatio;
-        final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
-
-        final goingRight = _dx > 0;
-        final tint =
-            goingRight ? AppColors.primary : AppColors.dangerText(context);
-
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onHorizontalDragStart: _onDragStart,
-          onHorizontalDragUpdate: _onDragUpdate,
-          onHorizontalDragEnd: _onDragEnd,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (_dx != 0)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: tint.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    alignment:
-                        goingRight
-                            ? Alignment.centerLeft
-                            : Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Icon(
-                      goingRight ? Icons.check : Icons.close,
-                      color: tint,
-                      size: 36,
-                    ),
-                  ),
-                ),
-              Opacity(
-                opacity: 1 - fade,
-                child: Transform.translate(
-                  offset: Offset(_dx, dy),
-                  child: Transform.rotate(
-                    angle: angle,
-                    child: IgnorePointer(
-                      ignoring: _exiting,
-                      child: widget.child,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

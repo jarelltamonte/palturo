@@ -45,36 +45,46 @@ fell back to Site URL. The client now chooses the redirect by platform:
 
 Open **Authentication → URL Configuration**.
 
-1. **Site URL** — set this to the production web app, for example
-   `https://palturo.app/`. Do not leave the GitHub Pages URL here.
+1. **Site URL** — set to the production web app:
+   `https://palturo.app/`.
 2. **Redirect URLs** — add every origin that may receive an auth link:
 
    ```
    https://palturo.app
    https://palturo.app/**
+   https://www.palturo.app
+   https://www.palturo.app/**
    http://localhost:5317
    http://localhost:5317/**
    palturo://auth/callback
    palturo://auth/reset-callback
    ```
 
-3. Keep the GitHub Pages URL only while that deployment is still in use.
+The production Site URL and this allowlist are already applied to the project.
+The GitHub Pages URL is no longer used.
 
 The repository's `supabase/config.toml` uses the local origin for the Supabase
 CLI. Production values live in the dashboard and are not read from this file.
 
 ## Production build
 
-Pass the public origin so the redirect does not depend on where the build is
-served:
+`.env.production` already sets:
 
-```sh
-flutter build web --release \
-  --dart-define-from-file=.env \
-  --dart-define=APP_PUBLIC_URL=https://palturo.app
+```
+APP_PUBLIC_URL=https://palturo.app
 ```
 
-For local development, leave `APP_PUBLIC_URL` empty and the app uses
+Build and deploy with:
+
+```sh
+flutter build web --release `
+  --dart-define-from-file=.env.production `
+  --base-href /
+```
+
+See [`DEPLOY_VERCEL.md`](DEPLOY_VERCEL.md) for the Vercel and DNS steps.
+
+For local development, use `.env` with `APP_PUBLIC_URL` empty so the app uses
 `Uri.base.origin` (for example `http://localhost:5317/`).
 
 ## Email delivery
@@ -89,12 +99,13 @@ template into the confirmation slot.
 
 ## Domain prerequisite
 
-`palturo.app` currently has no DNS record. Before changing **Site URL** to that
-domain, deploy the web build to a host and point the domain at it. Changing Site
-URL before DNS resolves would break confirmation and reset links for everyone.
+The Supabase Site URL is already `https://palturo.app/`, but the domain still
+needs DNS records pointing at Vercel. Until those records are live, reset and
+confirmation links will not resolve.
 
-If the production domain is `palturo.ph` or another host, use that value instead
-everywhere in this document.
+Deploy the web build and add `palturo.app` in Vercel, then copy the DNS records
+Vercel displays into the registrar. Full steps are in
+[`DEPLOY_VERCEL.md`](DEPLOY_VERCEL.md).
 
 ## Verification checklist
 

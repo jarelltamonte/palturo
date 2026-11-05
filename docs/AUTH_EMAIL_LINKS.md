@@ -2,119 +2,85 @@
 
 ## Short answer
 
-No separate backend is required. Supabase Auth creates the confirmation and
-recovery tokens and sends the mail through Resend. The GitHub domain appeared
-because the Supabase project's **Site URL** was still the old GitHub Pages auth
-page. It is now:
+No separate backend is required. Supabase Auth creates the tokens and sends the
+mail through Resend. `https://palturo.app` is a small static auth page that
+verifies those tokens, lets the user choose a new password in the browser, and
+confirms signups.
 
-```
-https://palturo.app/
-```
+## Current flow
 
-`https://palturo.app` is a small static auth page, not the Flutter app. It
-handles confirmation and reset links, then hands the user to the app through the
-`palturo://` deep link.
+The recovery and confirmation templates now link directly to the auth page with
+a Supabase token hash:
 
-## Why the reset email looked like a confirmation email
+| Email | Link |
+| --- | --- |
+| Password reset | `https://palturo.app/reset?token_hash={{ .TokenHash }}&type=recovery` |
+| Signup confirmation | `https://palturo.app/confirm?token_hash={{ .TokenHash }}&type=signup` |
 
-The recovery template is correct (`Reset your password`, with a
-`{{ .ConfirmationURL }}` button). The problem was the destination:
+`/reset` calls `supabase.auth.verifyOtp({ type: 'recovery' })`, shows the new
+password form, then calls `supabase.auth.updateUser({ password })`. The reset is
+completed in the browser and works on desktop or mobile.
 
-1. Supabase verified the recovery token.
-2. It redirected to the `redirect_to` value if allowlisted.
-3. Otherwise it fell back to **Site URL** — the GitHub Pages “Email confirmed”
-   page.
-4. That page is not the app's reset screen, so the flow dead-ended.
+`/confirm` calls `verifyOtp({ type: 'signup' })` and shows the confirmation
+state.
 
-The Flutter client also sent `palturo://auth/reset-callback` on web, which a
-browser cannot open.
-
-## How redirects work now
-
-Production builds set:
-
-```
-APP_PUBLIC_URL=https://palturo.app
-```
-
-That makes auth emails use the static site:
-
-| Flow | Redirect target | Final destination |
-| --- | --- | --- |
-| Signup confirmation | `https://palturo.app/confirm` | `palturo://auth/callback` |
-| Password reset | `https://palturo.app/reset` | `palturo://auth/reset-callback` |
-
-The static page preserves the query string and fragment when forwarding, so the
-app still receives the Supabase code or tokens.
-
-Auth emails always use the static site, even when the reset was requested from
-localhost. `APP_PUBLIC_URL` can override the origin for a staging deployment; if
-it is absent, the app defaults to `https://palturo.app`.
-
-## Mobile-first limitation
-
-The reset is completed in the app, not in the browser. That keeps PKCE intact
-and avoids a second password form.
-
-- On a phone, the page tries the deep link automatically and keeps an **Open
-  PalTuro** button as fallback.
-- On desktop, it shows **Copy link for your phone**. The user opens that link on
-  the device with PalTuro installed.
-- A desktop-only password reset is not supported by this page. That would
-  require a browser reset form and a different auth flow.
+The old `{{ .ConfirmationURL }}` style links still fall back to the app handoff:
+the page forwards the `code` or session fragment to
+`palturo://auth/reset-callback` / `palturo://auth/callback`.
 
 ## Supabase settings
 
-Open **Authentication → URL Configuration**.
+**Authentication → URL Configuration**
 
-- **Site URL:** `https://palturo.app/`
-- **Redirect URLs:**
+- Site URL: `https://palturo.app/`
+- Redirect URLs:
   `https://palturo.app/**`, `https://www.palturo.app/**`,
   `http://localhost:5317/**`,
   `palturo://auth/callback`, `palturo://auth/reset-callback`
 
-These are already applied.
+**Authentication → Email Templates**
 
-## Production build
+- Reset Password uses the `/reset` token-hash link.
+- Confirm signup uses the `/confirm` token-hash link.
 
-`.env.production` contains `APP_PUBLIC_URL=https://palturo.app`. Build the mobile
-app with that file when you want email links to use the web auth page:
+Both templates were updated in the project. The `{{ .ConfirmationURL }}` links
+were replaced, so the app no longer depends on the GitHub Pages auth page.
 
-```sh
-flutter build apk --release --dart-define-from-file=.env.production
+## App configuration
+
+The app still sets `emailRedirectTo` to the auth page for compatibility:
+
+```
+https://palturo.app/reset
+https://palturo.app/confirm
 ```
 
-Local development uses `.env`, where `APP_PUBLIC_URL` is empty.
-
-## Deployment
-
-The static page lives beside this repo in `palturo-auth-web` and is deployed to
-Cloudflare:
-
-```powershell
-cd ..\palturo-auth-web
-npx wrangler deploy
-```
-
-Custom domains `palturo.app` and `www.palturo.app` are attached to the Worker
-`palturo-auth`. DNS is managed in Cloudflare; the Resend SPF/DKIM records are
-untouched.
+`APP_PUBLIC_URL` defaults to `https://palturo.app` when it is not set, so a reset
+requested from localhost cannot produce a localhost email link.
 
 ## Email delivery
 
 Resend is the SMTP host and `team@palturo.app` is the sender. Keep the
 `palturo.app` domain verified in Resend with SPF and DKIM.
 
-The recovery template is under **Authentication → Email Templates → Reset
-Password**. The confirmation template is separate.
+## Deployment
+
+The page is a separate project at `../palturo-auth-web`, served by Cloudflare:
+
+```powershell
+cd ..\palturo-auth-web
+npx --yes wrangler@latest deploy
+```
+
+Custom domains `palturo.app` and `www.palturo.app` are attached to the Worker
+`palturo-auth`. The Resend DNS records are untouched.
 
 ## Verification checklist
 
-- [ ] Request a reset for a real account.
-- [ ] The email subject is `Reset your PalTuro password`.
-- [ ] The link host is `palturo.app`, not `github.io` or `supabase.co`.
-- [ ] `/reset` shows the reset state and forwards to the app.
-- [ ] `/confirm` shows the confirmation state and forwards to the app.
-- [ ] A new password can be saved and the old password no longer works.
-- [ ] Expired or reused links show the expired-reset state.
-- [ ] A desktop reset shows the copy-link fallback.
+- [x] Reset link opens the password form, not a dead end.
+- [x] New password can be saved and used to sign in.
+- [x] Confirmation link marks the account confirmed.
+- [x] Expired or reused token shows the expired state.
+- [x] Requesting from localhost still produces a `palturo.app` email link.
+- [ ] Request a real reset from a production app build and open the email on a
+      phone and a desktop browser.

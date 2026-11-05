@@ -17,16 +17,16 @@ def esc(value):
 
 
 commits = []
-for line in sh("git", "log", "3ab6700..HEAD", "--reverse", "--pretty=format:%h|%ad|%s", "--date=short").splitlines():
+for line in sh("git", "log", "3ab6700..08de0e8", "--reverse", "--pretty=format:%h|%ad|%s", "--date=short").splitlines():
     h, d, subject = line.split("|", 2)
     commits.append((h, d, subject))
 
 changed = []
-for line in sh("git", "diff", "--name-status", "3ab6700..HEAD").splitlines():
+for line in sh("git", "diff", "--name-status", "3ab6700..08de0e8").splitlines():
     status, path = line.split("\t", 1)
     changed.append((status, path))
 
-shortstat = sh("git", "diff", "--shortstat", "3ab6700..HEAD")
+shortstat = sh("git", "diff", "--shortstat", "3ab6700..08de0e8")
 
 # Phase definitions: (id, title, status, commits, goal, changes[list], files[list], evidence)
 phases = [
@@ -487,131 +487,164 @@ audits = [
 ]
 
 css = """
-@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
 * { box-sizing: border-box; }
 body {
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  color: #1a2433;
+  color: #161616;
+  background: #F5F4EF;
   font-size: 9.6pt;
-  line-height: 1.48;
+  line-height: 1.5;
   margin: 0;
 }
-h1, h2, h3, h4 { font-family: Georgia, 'Times New Roman', serif; color: #12233a; }
-h1 { font-size: 26pt; margin: 0 0 6pt; }
-h2 {
-  font-size: 16pt;
-  margin: 20pt 0 8pt;
-  padding-bottom: 4pt;
-  border-bottom: 2px solid #BFE109;
-  page-break-after: avoid;
-}
-h3 {
-  font-size: 11.5pt;
-  margin: 12pt 0 4pt;
-  color: #213a5a;
-  page-break-after: avoid;
-}
+h1, h2, h3, h4 { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: #111; }
+h2 { font-size: 23pt; line-height: 1.08; margin: 0 0 7pt; letter-spacing: -0.5pt; page-break-after: avoid; }
+h3 { font-size: 12.4pt; margin: 14pt 0 4pt; color: #111; page-break-after: avoid; }
 p { margin: 0 0 6pt; }
-ul { margin: 3pt 0 7pt 14pt; padding: 0; }
+ul { margin: 3pt 0 8pt 13pt; padding: 0; }
 li { margin-bottom: 3pt; }
 .small { font-size: 8.3pt; }
-.muted { color: #5C6B73; }
+.muted { color: #6C7560; }
+.kicker {
+  font-size: 7.2pt;
+  letter-spacing: 1.8pt;
+  text-transform: uppercase;
+  color: #6F7A4A;
+  font-weight: 700;
+  margin: 0 0 7pt;
+}
+.section-label {
+  font-size: 7pt;
+  letter-spacing: 1.6pt;
+  text-transform: uppercase;
+  color: #6F7A4A;
+  font-weight: 700;
+  text-align: right;
+}
+.section-top { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #D9DCCD; padding-bottom: 4mm; margin-bottom: 6mm; }
 .cover {
-  height: 257mm;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  width: 210mm;
+  height: 297mm;
+  background: #171717;
+  color: #fff;
+  padding: 20mm;
+  position: relative;
+  overflow: hidden;
   page-break-after: always;
 }
-.cover-top { border-top: 10mm solid #12233a; padding-top: 12mm; }
-.brand {
-  font-size: 10pt;
-  letter-spacing: 3pt;
-  text-transform: uppercase;
-  color: #5F7300;
-  font-weight: 700;
+.cover .glow {
+  position: absolute; right: -55mm; bottom: -70mm; width: 190mm; height: 190mm;
+  border: 0.35mm solid rgba(191,225,9,0.55); border-radius: 50%;
 }
-.cover h1 { font-size: 34pt; line-height: 1.08; margin-top: 10mm; }
-.cover .subtitle { font-size: 14pt; color: #3b4b60; margin-top: 6mm; max-width: 150mm; }
-.cover .meta { display: grid; grid-template-columns: 40mm 1fr; gap: 2mm 4mm; margin-top: 18mm; font-size: 9.5pt; }
-.cover .meta div:nth-child(odd) { color: #5C6B73; }
-.cover-foot { border-top: 1px solid #d7dde5; padding-top: 5mm; font-size: 8.5pt; color: #5C6B73; }
-.badge {
-  display: inline-block;
-  border-radius: 10pt;
-  padding: 1pt 7pt;
-  font-size: 7.8pt;
-  font-weight: 700;
-  letter-spacing: 0.4pt;
-  color: #fff;
-  background: #2F7D32;
+.cover .glow:after {
+  content: ''; position: absolute; inset: 18mm; border: 0.25mm solid rgba(191,225,9,0.30); border-radius: 50%;
 }
+.cover .glow:before {
+  content: ''; position: absolute; inset: 38mm; border: 0.2mm solid rgba(191,225,9,0.16); border-radius: 50%;
+}
+.cover-logo { height: 11mm; }
+.cover-kicker { margin-top: 26mm; color: #BFE109; font-size: 7.2pt; letter-spacing: 2pt; text-transform: uppercase; font-weight: 700; }
+.cover h1 { color: #fff; font-size: 34pt; line-height: 1.03; letter-spacing: -1.2pt; margin: 5mm 0 5mm; max-width: 100mm; }
+.cover h1 .lime { color: #BFE109; }
+.cover .subtitle { color: #D8D8D3; font-size: 11.5pt; line-height: 1.35; max-width: 96mm; }
+.cover .desc { color: #A9ADA4; font-size: 8.2pt; line-height: 1.5; max-width: 96mm; margin-top: 4mm; }
+.cover .stats { display: grid; grid-template-columns: repeat(4, 22mm); gap: 3mm; margin-top: 9mm; width: 97mm; }
+.cover .stat { background: #222; border: 0.25mm solid #333; border-radius: 2.5mm; padding: 3.2mm 2.8mm; }
+.cover .stat b { color: #BFE109; display: block; font-size: 19pt; line-height: 1; font-weight: 700; }
+.cover .stat span { color: #A9ADA4; display: block; margin-top: 2mm; font-size: 5.8pt; letter-spacing: 1.2pt; text-transform: uppercase; }
+.cover .meta { display: grid; grid-template-columns: 24mm 1fr 24mm 1fr; gap: 2mm 3mm; margin-top: 10mm; font-size: 6.4pt; color: #8F948B; max-width: 100mm; }
+.cover .meta b { color: #EDEDE7; display: block; font-weight: 600; font-size: 8pt; margin-top: 1mm; }
+.cover .phone { position: absolute; right: 12mm; top: 45mm; width: 70mm; }
+.cover .phone img { width: 100%; border-radius: 5mm; border: 1mm solid #2A2A2A; box-shadow: 0 8mm 22mm rgba(0,0,0,0.55); }
+.cover-foot { position: absolute; left: 20mm; right: 20mm; bottom: 13mm; border-top: 0.25mm solid #3A3A3A; padding-top: 4mm; color: #777; font-size: 6.4pt; letter-spacing: 1.2pt; text-transform: uppercase; }
+.cover-page { margin: 0; }
+.badge { display: inline-block; border-radius: 8pt; padding: 1.5pt 6pt; font-size: 7pt; font-weight: 700; letter-spacing: 0.3pt; color: #fff; background: #2F7D32; }
 .badge.blocked { background: #A23B3B; }
 .badge.deferred { background: #9A6A00; }
-table { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 8.5pt; }
-th {
-  background: #12233a;
-  color: #fff;
-  text-align: left;
-  padding: 4pt 5pt;
-  font-weight: 600;
-  font-size: 8pt;
-}
-td { padding: 4pt 5pt; border-bottom: 1px solid #e1e6ec; vertical-align: top; }
-tr:nth-child(even) td { background: #f7f9fb; }
-table { page-break-inside: auto; }
-tr, td, th { page-break-inside: avoid; }
-.callout {
-  background: #f4f8e8;
-  border-left: 4px solid #BFE109;
-  padding: 7pt 10pt;
-  margin: 8pt 0 10pt;
-  page-break-inside: avoid;
-}
-.callout.warn { background: #fdf5ef; border-left-color: #c06a2b; }
-.callout.risk { background: #fbf1f1; border-left-color: #A23B3B; }
-.kv { display: grid; grid-template-columns: 42mm 1fr; gap: 2pt 6mm; margin: 5pt 0 10pt; }
-.kv div:nth-child(odd) { color: #5C6B73; font-weight: 600; }
-.page-break { page-break-before: always; }
-.toc { columns: 2; column-gap: 10mm; font-size: 9pt; }
-.toc div { margin-bottom: 3pt; break-inside: avoid; }
-.toc .num { display: inline-block; width: 10mm; color: #5F7300; font-weight: 700; }
+table { width: 100%; border-collapse: collapse; margin: 4pt 0 9pt; font-size: 8.4pt; page-break-inside: auto; }
+th { background: transparent; color: #6F7A4A; text-align: left; padding: 3pt 4pt 4pt; font-weight: 700; font-size: 6.8pt; letter-spacing: 1.1pt; text-transform: uppercase; border-bottom: 1px solid #B9C09F; }
+td { padding: 4.5pt 4pt; border-bottom: 1px solid #E1E3D5; vertical-align: top; }
+tr { page-break-inside: avoid; }
+.callout { background: #EAF4B8; border-left: 3px solid #BFE109; padding: 7pt 10pt; margin: 8pt 0 10pt; page-break-inside: avoid; color: #1C1C1C; }
+.callout.warn { background: #FBF0DC; border-left-color: #C58A2B; }
+.callout.risk { background: #F8E4E1; border-left-color: #A23B3B; }
+.kv { display: grid; grid-template-columns: 40mm 1fr; gap: 2pt 5mm; margin: 4pt 0 10pt; }
+.kv div:nth-child(odd) { color: #6C7560; font-weight: 600; }
+.card-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 6mm 0; }
+.card { background: #fff; border: 0.25mm solid #E2E3D7; border-radius: 3mm; padding: 5mm; page-break-inside: avoid; }
+.card .num { color: #7C8A22; font-size: 17pt; font-weight: 700; line-height: 1; }
+.card h4 { font-size: 9.5pt; margin: 2mm 0 1.5mm; }
+.card p { font-size: 7.8pt; color: #5D6558; margin: 0; line-height: 1.4; }
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin: 4mm 0 6mm; }
+.stat-box { background: #EFF4D2; border-radius: 2.5mm; padding: 4mm; }
+.stat-box b { display: block; font-size: 20pt; line-height: 1; font-weight: 700; }
+.stat-box span { display: block; font-size: 6.4pt; letter-spacing: 1.1pt; text-transform: uppercase; color: #667048; margin-top: 1.5mm; }
 .phase-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8mm; }
-.phase-head h2 { flex: 1; }
-.phase-meta { font-size: 8pt; color: #5C6B73; margin: -4pt 0 7pt; }
-code, .mono { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 8.2pt; color: #24384f; }
-.hash { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 8pt; }
-.note { font-size: 8.4pt; color: #5C6B73; }
-footer { font-size: 7.5pt; color: #6b7785; }
+.phase-meta { font-size: 7.4pt; color: #6C7560; margin: 1pt 0 6pt; }
+.page-break { page-break-before: always; }
+.toc { columns: 2; column-gap: 12mm; font-size: 9pt; margin-top: 4mm; }
+.toc div { margin-bottom: 4pt; break-inside: avoid; }
+.toc .num { display: inline-block; width: 11mm; color: #7C8A22; font-weight: 700; }
+code, .mono { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 7.9pt; color: #2C3E2A; }
+.hash { font-family: 'Cascadia Mono', Consolas, monospace; font-size: 7.7pt; }
+.note { font-size: 8.1pt; color: #6C7560; }
+.shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin: 5mm 0 4mm; }
+.shots.two { grid-template-columns: repeat(2, 1fr); }
+.shot { margin: 0; background: #fff; border: 0.25mm solid #E2E3D7; border-radius: 4mm; padding: 2.5mm; page-break-inside: avoid; }
+.shot img { width: 100%; display: block; border-radius: 2.5mm; }
+.shot figcaption { font-size: 6.8pt; color: #5D6558; line-height: 1.35; padding: 2mm 1mm 0.5mm; }
+.caption { font-size: 7.2pt; color: #6C7560; margin-top: 2mm; }
 """
+
+
+from pathlib import Path as _Path
+import base64 as _b64
+_TEMP = _Path.home() / 'AppData' / 'Local' / 'Temp' / 'opencode'
+
+def data_uri(rel):
+    path = _Path(rel)
+    if not path.is_absolute():
+        path = ROOT / path if (ROOT / path).exists() else _TEMP / path
+    return 'data:image/png;base64,' + _b64.b64encode(path.read_bytes()).decode()
+
+def shot(image, caption):
+    return f"<figure class='shot'><img src='{data_uri(image)}' alt='{esc(caption)}'><figcaption>{esc(caption)}</figcaption></figure>"
+
+def shot_grid(items, two=False):
+    cls = 'shots two' if two else 'shots'
+    return f"<div class='{cls}'>{''.join(shot(i, c) for i, c in items)}</div>"
 
 parts = []
 parts.append(f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>PalTuro Dynamic UX - Change Documentation</title><style>{css}</style></head><body>")
 
 # Cover
-parts.append(f"""
-<section class='cover'>
-  <div class='cover-top'>
-    <div class='brand'>PalTuro &middot; Engineering Documentation</div>
-    <h1>Dynamic UX,<br>QOL &amp; Social<br>Presence</h1>
-    <div class='subtitle'>Complete record of the notification, feedback, chat quality-of-life, privacy, presence, typing, and read-receipt work.</div>
-    <div class='meta'>
-      <div>Document</div><div>Full change documentation</div>
-      <div>Branch</div><div>ui-features</div>
-      <div>Baseline</div><div class='hash'>3ab6700</div>
-      <div>Final commit</div><div class='hash'>08de0e8</div>
-      <div>Date</div><div>5 November 2026</div>
-      <div>Scope</div><div>{len(commits)} commits &middot; {len(changed)} files &middot; 155 tests</div>
-      <div>Status</div><div>Tracks A, B, C complete; D-01 complete; A5 blocked on credentials; D-02 deferred</div>
-    </div>
+cover_html = f"""
+<section class='cover cover-page'>
+  <div class='glow'></div>
+  <img class='cover-logo' src='{data_uri('assets/images/hlogo_white.png')}' alt='PalTuro'>
+  <div class='cover-kicker'>Implementation &amp; verification &middot; 5 November 2026</div>
+  <h1>Dynamic UX,<br><span class='lime'>QOL &amp; Social</span><br>Presence</h1>
+  <div class='subtitle'>What changed, how it was audited, and what is ready to ship.</div>
+  <div class='desc'>A complete record of the notification, banner, feedback, chat quality-of-life, privacy, presence, typing, and read-receipt work &mdash; from the first typed event to the final release gate.</div>
+  <div class='stats'>
+    <div class='stat'><b>{len(commits)}</b><span>Commits</span></div>
+    <div class='stat'><b>155</b><span>Tests passing</span></div>
+    <div class='stat'><b>14</b><span>Phases verified</span></div>
+    <div class='stat'><b>1</b><span>External blocker</span></div>
   </div>
-  <div class='cover-foot'>
-    Prepared from the repository history, migrations, persistent plan, audit sessions, and final verification runs.
-    Secrets and credentials are intentionally excluded.
+  <div class='meta'>
+    <div>BRANCH<b>ui-features @ 08de0e8</b></div>
+    <div>PREPARED FOR<b>PalTuro product team</b></div>
+    <div>METHOD<b>3 independent audits per phase</b></div>
+    <div>SCOPE<b>{len(changed)} files &middot; 7 migrations</b></div>
+  </div>
+  <div class='phone'>
+    <img src='{data_uri('a1-home-390.png')}' alt='PalTuro For You deck'>
   </div>
 </section>
-""")
-
+"""
+parts.append(cover_html)
+parts.append("<!-- CONTENT_START -->")
 # TOC
 parts.append("""
 <section>
@@ -628,8 +661,9 @@ parts.append("""
   <div><span class='num'>9</span>Delivery and privacy behaviour</div>
   <div><span class='num'>10</span>Platform configuration</div>
   <div><span class='num'>11</span>Verification and audits</div>
-  <div><span class='num'>12</span>Known limitations and deferred work</div>
-  <div><span class='num'>13</span>Operations and credential checklist</div>
+  <div><span class='num'>12</span>Visual evidence</div>
+  <div><span class='num'>13</span>Known limitations and deferred work</div>
+  <div><span class='num'>14</span>Operations and credential checklist</div>
   <div><span class='num'>A</span>Appendix A - Commit log</div>
   <div><span class='num'>B</span>Appendix B - File inventory</div>
   <div><span class='num'>C</span>Appendix C - Test suite and audit sessions</div>
@@ -733,7 +767,7 @@ parts.append("</section>")
 
 # 6 Track D
 parts.append("""
-<section class='page-break'>
+<section>
 <h2>6. Track D - Optional polish</h2>
 <table>
 <tr><th style='width:8%'>ID</th><th style='width:26%'>Feature</th><th>Implementation</th><th style='width:14%'>Status</th></tr>
@@ -895,10 +929,76 @@ for phase, date, fn, qa, reg, commit in audits:
     parts.append(f"<tr><td>{phase}</td><td>{date}</td><td><span class='mono'>{fn}</span></td><td><span class='mono'>{qa}</span></td><td><span class='mono'>{reg}</span></td><td><span class='hash'>{commit}</span></td></tr>")
 parts.append("</table></section>")
 
+# Visual evidence
+parts.append("""
+<section class='page-break'>
+  <div class='section-top'><div class='kicker'>Visual evidence</div><div class='section-label'>Live builds</div></div>
+  <h2>The product, as verified.</h2>
+  <p>Every image below was captured from a release web build or the Android debug build against the linked Supabase project. Phone captures are 390 &times; 844 unless noted; the desktop shell is 1440 px.</p>
+  <h3>Live events and banners</h3>
+""")
+parts.append(shot_grid([
+    ('a1-declined-banner-final-390.png', 'Event banner over the deck: request declined, with a route-aware action.'),
+    ('a1-match-banner-dark-final-390.png', 'Match banner in dark mode: subtle top placement, skill context, Say hello.'),
+    ('a1-message-banner-dark2-390.png', 'Message banner: sender, preview, and tap-to-chat.'),
+]))
+parts.append("<h3>Notification controls</h3>")
+parts.append(shot_grid([
+    ('a3-notifications-page-light-390.png', 'Notification preferences: categories, previews, quiet hours, sound and vibration.'),
+    ('a3-notifications-page-dark-390.png', 'The same settings page in dark mode.'),
+    ('a4-notifications-permission-390.png', 'System permission state with an honest request and fallback.'),
+]))
+parts.append("""
+  <h3>Connectivity, drafts, and chat controls</h3>
+""")
+parts.append(shot_grid([
+    ('b0-offline-fixed-390.png', 'Offline strip laid out above the app bar; navigation stays tappable.'),
+    ('b0-draft-list-390.png', 'Per-chat draft preview after leaving the composer.'),
+    ('b1-chat-menu-390.png', 'Chat menu with feedback, profile, mute, mark unread, search, report, block.'),
+]))
+parts.append("<h3>Chat controls</h3>")
+parts.append(shot_grid([
+    ('b1-mute-sheet-390.png', 'Mute durations: one hour through until turned back on.'),
+    ('b1-muted-list-390.png', 'Muted chat remains in the list with a mute icon.'),
+    ('b1-unread-divider-390.png', 'First-unread divider before the new messages.'),
+]))
+parts.append(shot_grid([
+    ('b1-fab-count-390.png', 'New-message FAB with count while scrolled up.'),
+    ('b1-search-390.png', 'In-chat search results over loaded messages.'),
+    ('b1-copied-390.png', 'Long-press copy with one confirmation.'),
+]))
+parts.append("""
+  <h3>Lists, Activity, and contextual polish</h3>
+""")
+parts.append(shot_grid([
+    ('b2-activity-filters-390.png', 'Activity filters with counts and day groups.'),
+    ('b2-clear-read-confirm-390.png', 'Clear-read confirmation: read rows only.'),
+    ('b2-chat-longpress-390.png', 'Chat long-press actions: profile, mute, unread, report, block.'),
+]))
+parts.append("<h3>Contextual polish</h3>")
+parts.append(shot_grid([
+    ('b3-nudge-banner-390.png', 'Non-blocking profile nudge through the app banner after a request.'),
+    ('d-whatsnew-390.png', 'One-time what\'s new sheet, version-gated.'),
+    ('a7-shell-1440.png', 'Desktop shell at 1440 px with the mobile-width column.'),
+]))
+parts.append("""
+  <h3>Privacy, presence, and read receipts</h3>
+""")
+parts.append(shot_grid([
+    ('c0-chat-privacy-390.png', 'Chat privacy: online status, typing, read receipts, Pals only.'),
+    ('c1-chat-list-presence-390.png', 'Online in the chat list, with message time retained.'),
+    ('c1-chat-room-presence-390.png', 'Online under the peer name in the chat header.'),
+]))
+parts.append("<h3>Read receipts</h3>")
+parts.append(shot_grid([
+    ('c3-seen-390b.png', 'Seen under the last own message, server-authoritative.'),
+], two=True))
+parts.append("</section>")
+
 # 12 limitations
 parts.append("""
 <section class='page-break'>
-<h2>12. Known limitations and deferred work</h2>
+<h2>13. Known limitations and deferred work</h2>
 <table>
 <tr><th style='width:24%'>Item</th><th>Status and detail</th></tr>
 """)
@@ -915,7 +1015,7 @@ parts.append("""
 # 13 ops
 parts.append("""
 <section class='page-break'>
-<h2>13. Operations and credential checklist</h2>
+<h2>14. Operations and credential checklist</h2>
 <h3>Build and test</h3>
 <ul>
   <li><span class='mono'>flutter pub get</span></li>
@@ -966,6 +1066,24 @@ for phase, date, fn, qa, reg, commit in audits:
     parts.append(f"<tr><td>{phase}</td><td><span class='mono'>{fn}</span></td><td><span class='mono'>{qa}</span></td><td><span class='mono'>{reg}</span></td></tr>")
 parts.append("</table><p class='note'>Audit sessions are resumable in the same OpenCode child session if a follow-up is needed.</p></section>")
 
-parts.append("</body></html>")
-OUT.write_text("\n".join(parts), encoding="utf-8")
+# Split cover and content, keep one shared head/style.
+full = "\n".join(parts)
+head_end = full.index("<body>") + len("<body>")
+head = full[:head_end]
+body = full[head_end:]
+marker_pos = body.index("<!-- CONTENT_START -->")
+cover_body = body[:marker_pos]
+content_body = body[marker_pos + len("<!-- CONTENT_START -->"):]
+
+docs = ROOT / "docs"
+docs.mkdir(exist_ok=True)
+cover_file = docs / "_cover.html"
+content_file = docs / "_content.html"
+cover_file.write_text(head + "<style>@page{margin:0}</style>" + cover_body + "</body></html>", encoding="utf-8")
+content_file.write_text(head + content_body + "</body></html>", encoding="utf-8")
+OUT.write_text(full.replace("<!-- CONTENT_START -->", ""), encoding="utf-8")
+
+
 print(f"Wrote {OUT} ({OUT.stat().st_size} bytes)")
+print(f"Cover: {cover_file}")
+print(f"Content: {content_file}")

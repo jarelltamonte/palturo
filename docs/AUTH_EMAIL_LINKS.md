@@ -47,8 +47,9 @@ That makes auth emails use the static site:
 The static page preserves the query string and fragment when forwarding, so the
 app still receives the Supabase code or tokens.
 
-Without `APP_PUBLIC_URL`, web keeps the current origin and native keeps the deep
-link. This is what local development uses.
+Auth emails always use the static site, even when the reset was requested from
+localhost. `APP_PUBLIC_URL` can override the origin for a staging deployment; if
+it is absent, the app defaults to `https://palturo.app`.
 
 ## Mobile-first limitation
 

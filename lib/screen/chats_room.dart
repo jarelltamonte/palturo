@@ -178,21 +178,7 @@ class _ChatRoomState extends State<ChatRoom> {
       'chat:$connectionId',
       opts: const RealtimeChannelConfig(self: true),
     );
-    final peerId =
-        ChatStateService.instance.conversationFor(connectionId)?.otherUserId;
-    channel.onPresenceSync((_) {
-      final states = channel.presenceState();
-      final peerOnline =
-          peerId != null &&
-          states.any(
-            (state) => state.presences.any(
-              (presence) => presence.payload['user_id']?.toString() == peerId,
-            ),
-          );
-      if (mounted && peerOnline != _peerOnlineFromChannel) {
-        setState(() => _peerOnlineFromChannel = peerOnline);
-      }
-    });
+    channel.onPresenceSync((_) => _refreshPeerOnline(channel));
     channel.subscribe((status, error) {
       if (status == RealtimeSubscribeStatus.subscribed) {
         unawaited(channel.track({'user_id': uid}));
@@ -200,7 +186,11 @@ class _ChatRoomState extends State<ChatRoom> {
           status == RealtimeSubscribeStatus.closed) {
         if (identical(_presenceChannel, channel)) {
           _presenceChannel = null;
+          if (mounted && _peerOnlineFromChannel) {
+            setState(() => _peerOnlineFromChannel = false);
+          }
         }
+        unawaited(Supabase.instance.client.removeChannel(channel));
       }
     });
     _presenceChannel = channel;

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
@@ -9,7 +10,11 @@ import '../services/auth_service.dart';
 import '../utils/validators.dart';
 
 class ForgotPasswordType extends StatefulWidget {
-  const ForgotPasswordType({super.key});
+  const ForgotPasswordType({super.key, this.tokenHash});
+
+  /// When present, the page verifies the recovery token before showing the
+  /// form. This is the in-app half of the hybrid reset flow.
+  final String? tokenHash;
 
   @override
   State<ForgotPasswordType> createState() => _ForgotPasswordTypeState();
@@ -19,6 +24,8 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
   bool _isLoading = false;
+  bool _verifyingToken = false;
+  bool _tokenInvalid = false;
 
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -35,6 +42,30 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
     _confirmPasswordController.addListener(_handleChange);
     _passwordFocusNode.addListener(_handleChange);
     _confirmPasswordFocusNode.addListener(_handleChange);
+
+    if (widget.tokenHash != null) {
+      _verifyingToken = true;
+      _verifyRecoveryToken();
+    }
+  }
+
+  Future<void> _verifyRecoveryToken() async {
+    try {
+      await Supabase.instance.client.auth.verifyOTP(
+        tokenHash: widget.tokenHash!,
+        type: OtpType.recovery,
+      );
+      if (!mounted) return;
+      setState(() {
+        _verifyingToken = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _verifyingToken = false;
+        _tokenInvalid = true;
+      });
+    }
   }
 
   void _handleChange() {
@@ -172,6 +203,95 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
     final errorColor = Theme.of(context).colorScheme.error;
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+
+    if (_verifyingToken) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  height: 28,
+                  width: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Checking your reset link…',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_tokenInvalid) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: errorColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'This reset link has expired',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.headingText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Request a new reset link, then open the new email.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            Navigator.popUntil(context, (route) => route.isFirst),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.textSecondary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text('Return to login'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&

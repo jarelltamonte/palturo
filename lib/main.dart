@@ -169,6 +169,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   Uri? _lastHandledLink;
   WidgetBuilder? _pendingAuthScreen;
   int _authScreenRetry = 0;
+  bool _suppressRecoveryEvent = false;
 
   /// Replaces the whole stack with a fresh AuthGate root, then pushes the
   /// deep-link screen above it. This guarantees that `popUntil(isFirst)`
@@ -247,6 +248,10 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
         }
 
         if (event == AuthChangeEvent.passwordRecovery) {
+          if (_suppressRecoveryEvent) {
+            _suppressRecoveryEvent = false;
+            return;
+          }
           _latestDeepLink = null;
           _latestDeepLinkAt = null;
           _openAuthScreen((_) => const ForgotPasswordType());
@@ -328,6 +333,17 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
         fragment.contains('error=');
   }
 
+  String? _tokenHashFrom(Uri uri) {
+    final queryToken = uri.queryParameters['token_hash'];
+    if (queryToken != null && queryToken.isNotEmpty) return queryToken;
+    if (uri.fragment.isEmpty) return null;
+    final fragment = Uri.splitQueryString(uri.fragment);
+    final fragmentToken = fragment['token_hash'];
+    return (fragmentToken != null && fragmentToken.isNotEmpty)
+        ? fragmentToken
+        : null;
+  }
+
   /// A link can arrive after signedIn (cold start race); route it once.
   void _handleLateLink(Uri uri) {
     final isCallback = _isAuthLink(uri, '/callback');
@@ -345,6 +361,19 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
                 ? const ForgotPasswordExpired()
                 : const EmailConfirmationExpired(),
       );
+      return;
+    }
+
+    final tokenHash = _tokenHashFrom(uri);
+    if (isReset && tokenHash != null) {
+      _lastHandledLink = uri;
+      _latestDeepLink = null;
+      _latestDeepLinkAt = null;
+      _suppressRecoveryEvent = true;
+      Future<void>.delayed(const Duration(seconds: 3), () {
+        if (mounted) _suppressRecoveryEvent = false;
+      });
+      _openAuthScreen((_) => ForgotPasswordType(tokenHash: tokenHash));
       return;
     }
 

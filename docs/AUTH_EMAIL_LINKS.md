@@ -4,25 +4,31 @@
 
 No separate backend is required. Supabase Auth creates the tokens and sends the
 mail through Resend. `https://palturo.app` is a small static auth page that
-verifies those tokens, lets the user choose a new password in the browser, and
-confirms signups.
+verifies confirmation tokens, hands password resets to the app on phones, and
+provides a browser reset form on desktop.
 
 ## Current flow
 
-The recovery and confirmation templates now link directly to the auth page with
-a Supabase token hash:
+The recovery and confirmation templates link directly to the auth page with a
+Supabase token hash:
 
 | Email | Link |
 | --- | --- |
 | Password reset | `https://palturo.app/reset?token_hash={{ .TokenHash }}&type=recovery` |
 | Signup confirmation | `https://palturo.app/confirm?token_hash={{ .TokenHash }}&type=signup` |
 
-`/reset` calls `supabase.auth.verifyOtp({ type: 'recovery' })`, shows the new
-password form, then calls `supabase.auth.updateUser({ password })`. The reset is
-completed in the browser and works on desktop or mobile.
+`/reset` is hybrid:
+
+- **Phone:** the page forwards the token hash to
+  `palturo://auth/reset-callback`. `ForgotPasswordType` verifies it with
+  `verifyOTP(type: recovery)` and shows the in-app reset form.
+- **Desktop:** the page verifies the token hash with the Supabase JS client and
+  shows the same reset form in the browser.
+- **Phone fallback:** “Continue in this browser” reveals the desktop form if the
+  app is not installed.
 
 `/confirm` calls `verifyOtp({ type: 'signup' })` and shows the confirmation
-state.
+state on the page.
 
 The old `{{ .ConfirmationURL }}` style links still fall back to the app handoff:
 the page forwards the `code` or session fragment to
@@ -77,10 +83,11 @@ Custom domains `palturo.app` and `www.palturo.app` are attached to the Worker
 
 ## Verification checklist
 
-- [x] Reset link opens the password form, not a dead end.
+- [x] Desktop reset link opens the password form.
 - [x] New password can be saved and used to sign in.
 - [x] Confirmation link marks the account confirmed.
 - [x] Expired or reused token shows the expired state.
 - [x] Requesting from localhost still produces a `palturo.app` email link.
-- [ ] Request a real reset from a production app build and open the email on a
-      phone and a desktop browser.
+- [x] Phone view forwards the reset token to `palturo://auth/reset-callback`
+      and offers “Continue in this browser” as a fallback.
+- [ ] In-app token verification on a physical phone with a production build.

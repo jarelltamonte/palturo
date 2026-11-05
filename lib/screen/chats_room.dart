@@ -118,6 +118,8 @@ class _ChatRoomState extends State<ChatRoom> {
   bool _peerTyping = false;
   DateTime? _peerReadAt;
   DateTime? _lastReadBroadcast;
+  Timer? _readBroadcastTimer;
+  AppLifecycleState _lastLifecycleState = AppLifecycleState.resumed;
   bool _typingActive = false;
   DateTime? _lastTypingSent;
   Timer? _peerTypingTimer;
@@ -170,6 +172,12 @@ class _ChatRoomState extends State<ChatRoom> {
         _peerReadAt = readAt;
       }
     }
+    final lifecycle = ChatStateService.instance.lifecycleState;
+    if (lifecycle == AppLifecycleState.resumed &&
+        _lastLifecycleState != AppLifecycleState.resumed) {
+      _broadcastRead();
+    }
+    _lastLifecycleState = lifecycle;
     setState(() {});
     final channel = _presenceChannel;
     if (channel != null) {
@@ -352,9 +360,9 @@ class _ChatRoomState extends State<ChatRoom> {
       receiptsEnabled: conversation.otherReadReceiptsEnabled,
     );
     if (readAt == null) return;
-    if (mounted && (_peerReadAt == null || readAt.isAfter(_peerReadAt!))) {
-      setState(() => _peerReadAt = readAt);
-    }
+    // The payload only tells us that the peer read something. The receipt
+    // timestamp must come from the server to avoid device-clock skew.
+    unawaited(ChatStateService.instance.loadConversations(showSpinner: false));
   }
 
   void _broadcastRead([RealtimeChannel? target]) {
@@ -367,9 +375,21 @@ class _ChatRoomState extends State<ChatRoom> {
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (channel == null || uid == null) return;
     final now = DateTime.now().toUtc();
-    if (_lastReadBroadcast != null &&
-        now.difference(_lastReadBroadcast!) < const Duration(seconds: 2)) {
-      return;
+    if (_lastReadBroadcast != null) {
+      final elapsed = now.difference(_lastReadBroadcast!);
+      if (elapsed < const Duration(seconds: 2)) {
+        _readBroadcastTimer?.cancel();
+        _readBroadcastTimer = Timer(
+          const Duration(seconds: 2) -
+              elapsed +
+              const Duration(milliseconds: 20),
+          () {
+            _readBroadcastTimer = null;
+            _broadcastRead();
+          },
+        );
+        return;
+      }
     }
     _lastReadBroadcast = now;
     unawaited(_sendReadMessage(channel, uid, now));
@@ -472,6 +492,7 @@ class _ChatRoomState extends State<ChatRoom> {
     _draftTimer?.cancel();
     _highlightTimer?.cancel();
     _peerTypingTimer?.cancel();
+    _readBroadcastTimer?.cancel();
     if (_typingActive) {
       unawaited(_sendTyping(false));
     }
@@ -558,12 +579,15 @@ class _ChatRoomState extends State<ChatRoom> {
           });
           if (wasAtBottom) {
             _scrollToBottom();
-          } else if (rows.length > previousCount) {
-            setState(() {
-              _newWhileScrolled += rows.length - previousCount;
-            });
           }
-          _broadcastRead();
+          if (rows.length > previousCount) {
+            if (!wasAtBottom) {
+              setState(() {
+                _newWhileScrolled += rows.length - previousCount;
+              });
+            }
+            _broadcastRead();
+          }
         });
   }
 

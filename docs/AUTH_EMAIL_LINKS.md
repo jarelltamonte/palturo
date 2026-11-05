@@ -3,8 +3,8 @@
 ## Short answer
 
 No separate backend is required. Supabase Auth creates the tokens and sends the
-mail through Resend. `https://palturo.app` is a small static auth page that reads
-email links and opens PalTuro. Password changes happen only inside the app.
+mail through Resend. `https://palturo.app` is a small static auth page that
+verifies those tokens, shows the new-password form, and confirms signups.
 
 ## Current flow
 
@@ -16,16 +16,16 @@ Supabase token hash:
 | Password reset | `https://palturo.app/reset?token_hash={{ .TokenHash }}&type=recovery` |
 | Signup confirmation | `https://palturo.app/confirm?token_hash={{ .TokenHash }}&type=signup` |
 
-`/reset` forwards the token hash to
-`palturo://auth/reset-callback`. `ForgotPasswordType` verifies it with
-`verifyOTP(type: recovery)` and shows the in-app reset form. There is no browser
-password form.
+`/reset` calls `verifyOtp({ type: 'recovery' })`, shows the new-password form,
+then calls `updateUser({ password })`. Password reset is completed in the browser
+on desktop and mobile. No app is required.
 
-`/confirm` shows the confirmed state and offers **Open in App**.
+`/confirm` calls `verifyOtp({ type: 'signup' })` and shows the confirmation
+state.
 
-The old `{{ .ConfirmationURL }}` style links still fall back to the app handoff:
-the page forwards the `code` or session fragment to
-`palturo://auth/reset-callback` / `palturo://auth/callback`.
+Legacy `{{ .ConfirmationURL }}` links that only carry a `code` or session
+fragment show a “request a new link” state because the browser cannot complete
+the PKCE exchange without the original verifier.
 
 ## Supabase settings
 
@@ -76,9 +76,10 @@ Custom domains `palturo.app` and `www.palturo.app` are attached to the Worker
 
 ## Verification checklist
 
-- [x] Desktop reset link shows **Open in App** and does not expose a password form.
-- [x] Confirmation redirect shows the confirmed state.
+- [x] Reset link opens the browser password form on desktop and mobile.
+- [x] Invalid passwords show one inline message, not a rules list.
+- [x] New password can be saved and used to sign in.
+- [x] Confirmation link marks the account confirmed.
 - [x] Expired or reused token shows the expired state.
 - [x] Requesting from localhost still produces a `palturo.app` email link.
-- [x] Phone view forwards the reset token to `palturo://auth/reset-callback`.
-- [ ] Complete in-app reset on a physical phone with a production build.
+- [ ] Request a real reset from a production build and open it in a browser.

@@ -109,7 +109,7 @@ class _ForgotPasswordWaitState extends State<ForgotPasswordWait> {
                   Text(
                     _linkConfirmed
                         ? 'Redirecting to reset your password...'
-                        : 'We sent a password reset link to ${widget.email}.\n\nClick the link in your email to continue on this device.',
+                        : 'We sent a password reset link to ${widget.email}.\n\nOpen the link in your browser to choose a new password.',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.regularText.copyWith(
                       color: textTheme.withValues(alpha: 0.8),

@@ -154,8 +154,8 @@ class AuthService {
   /// Public origin used in Supabase auth email links.
   ///
   /// Auth emails always point at the static auth page so the link uses
-  /// `palturo.app` even when the request came from localhost. The page then
-  /// forwards the recovery session to the app through its deep link.
+  /// `palturo.app` even when the request came from localhost. Recovery and
+  /// confirmation are completed on that page in the browser.
   String _authRedirect(String webPath) {
     const configured = String.fromEnvironment('APP_PUBLIC_URL');
     final origin = configured.isEmpty ? 'https://palturo.app' : configured;

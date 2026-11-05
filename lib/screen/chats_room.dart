@@ -1005,6 +1005,7 @@ class _ChatRoomState extends State<ChatRoom> {
     final isTyping = _messageController.text.isNotEmpty;
     final hasMessages = _messages.isNotEmpty || _pending.isNotEmpty;
 
+    final showEmptyCard = !hasMessages && !keyboardIsOpen && !isTyping;
     final showProfileInAppBar =
         hasMessages || keyboardIsOpen || isTyping || _peerTyping;
     final presenceText = _peerPresenceText;
@@ -1230,7 +1231,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     ? const ChatRoomMessageSkeleton()
                     : _loadError != null && _messages.isEmpty
                     ? _buildLoadError(textTheme)
-                    : !hasMessages && !showProfileInAppBar
+                    : showEmptyCard
                     ? Center(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.symmetric(vertical: 12),

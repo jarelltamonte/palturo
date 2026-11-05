@@ -142,7 +142,8 @@ class _ChatRoomState extends State<ChatRoom> {
       _refreshPeerOnline(channel);
     } else {
       final privacy = ChatPrivacyService.instance;
-      if (privacy.loaded && privacy.presenceEnabled) {
+      if (privacy.loaded &&
+          (privacy.presenceEnabled || privacy.typingEnabled)) {
         _subscribePresenceChannel();
       }
     }
@@ -178,6 +179,12 @@ class _ChatRoomState extends State<ChatRoom> {
       }
       if (_peerOnlineFromChannel && mounted) {
         setState(() => _peerOnlineFromChannel = false);
+      }
+    } else if (enabled && service.presenceEnabled) {
+      final channel = _presenceChannel;
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (channel != null && uid != null) {
+        unawaited(channel.track({'user_id': uid}));
       }
     } else if (!enabled) {
       final channel = _presenceChannel;
@@ -998,7 +1005,8 @@ class _ChatRoomState extends State<ChatRoom> {
     final isTyping = _messageController.text.isNotEmpty;
     final hasMessages = _messages.isNotEmpty || _pending.isNotEmpty;
 
-    final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
+    final showProfileInAppBar =
+        hasMessages || keyboardIsOpen || isTyping || _peerTyping;
     final presenceText = _peerPresenceText;
     final peerTyping = _showPeerTyping;
     final bgColor = AppColors.mutedSurface(context);

@@ -17,6 +17,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/app_empty_state.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 
@@ -461,48 +462,24 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
                   Expanded(
                     child:
                         all.isEmpty
-                            ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'No activity yet',
-                                    style: AppTextStyles.regularText.copyWith(
-                                      color: AppColors.mutedText(context),
-                                    ),
+                            ? AppEmptyState(
+                              title: 'No activity yet',
+                              actionLabel: 'View requests',
+                              onAction:
+                                  () => AppRouter.openRequests(
+                                    view: RequestView.incoming,
                                   ),
-                                  const SizedBox(height: 8),
-                                  TextButton(
-                                    onPressed:
-                                        () => AppRouter.openRequests(
-                                          view: RequestView.incoming,
-                                        ),
-                                    child: const Text('View requests'),
-                                  ),
-                                ],
-                              ),
                             )
                             : items.isEmpty
-                            ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'No ${_filter.label.toLowerCase()} activity.',
-                                    style: AppTextStyles.regularText.copyWith(
-                                      color: AppColors.mutedText(context),
-                                    ),
+                            ? AppEmptyState(
+                              showIllustration: false,
+                              title:
+                                  'No ${_filter.label.toLowerCase()} activity.',
+                              actionLabel: 'Show all',
+                              onAction:
+                                  () => setState(
+                                    () => _filter = ActivityFilter.all,
                                   ),
-                                  const SizedBox(height: 8),
-                                  TextButton(
-                                    onPressed:
-                                        () => setState(
-                                          () => _filter = ActivityFilter.all,
-                                        ),
-                                    child: const Text('Show all'),
-                                  ),
-                                ],
-                              ),
                             )
                             : RefreshIndicator(
                               onRefresh: _load,

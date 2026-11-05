@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/action_dialogs.dart';
@@ -23,6 +22,7 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/app_empty_state.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/theme/app_spacing.dart';
@@ -787,7 +787,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     final requests = _filteredAndSortedRequests;
     if (_loading) return const RequestCardsSkeleton();
     if (_loadError != null) return _buildLoadError(textTheme);
-    if (requests.isEmpty) return _buildEmptyState(textTheme);
+    if (requests.isEmpty) return _buildEmptyState();
     return RefreshIndicator(
       onRefresh: _refreshRequests,
       child: ListView.builder(
@@ -1031,68 +1031,42 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     );
   }
 
-  Widget _buildEmptyState(Color textTheme) {
+  Widget _buildEmptyState() {
     final filteredOut = _requests.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 0, 32, 110),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Lottie.asset(
-              'assets/lottie/empty.json',
-              width: 220,
-              height: 220,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              filteredOut
-                  ? 'No requests match your filters'
-                  : 'No requests yet',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme.withValues(alpha: 0.7),
-              ),
-            ),
-            if (filteredOut) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _dateFilter = DateFilter.all;
-                    _roleFilter = RoleFilter.all;
-                    _skillFilter = 'all';
-                    _domainFilter = 'all';
-                    _sortFilter = SortFilter.newest;
-                  });
-                  _persistFilters();
-                },
-                child: const Text('Clear filters'),
-              ),
-            ] else ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed:
-                    _outgoing.isNotEmpty
-                        ? () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (_) => const RequestPage(
-                                  initialView: RequestView.sent,
-                                ),
+    return AppEmptyState(
+      bottomPadding:
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 124 : 110,
+      title:
+          filteredOut
+              ? 'No requests match your filters'
+              : 'No requests yet',
+      actionLabel:
+          filteredOut
+              ? 'Clear filters'
+              : (_outgoing.isNotEmpty ? 'View sent requests' : 'Refresh'),
+      onAction:
+          filteredOut
+              ? () {
+                setState(() {
+                  _dateFilter = DateFilter.all;
+                  _roleFilter = RoleFilter.all;
+                  _skillFilter = 'all';
+                  _domainFilter = 'all';
+                  _sortFilter = SortFilter.newest;
+                });
+                _persistFilters();
+              }
+              : (_outgoing.isNotEmpty
+                  ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) => const RequestPage(
+                            initialView: RequestView.sent,
                           ),
-                        )
-                        : _loadRequests,
-                child: Text(
-                  _outgoing.isNotEmpty ? 'View sent requests' : 'Refresh',
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+                    ),
+                  )
+                  : _loadRequests),
     );
   }
 

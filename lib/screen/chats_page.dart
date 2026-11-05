@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:lottie/lottie.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/widgets/app_empty_state.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/screen/chats_room.dart';
@@ -496,74 +496,33 @@ class _ChatsPageState extends State<ChatsPage> {
     );
   }
 
-  Widget _buildEmptyState(Color textTheme) {
+  Widget _buildEmptyState() {
     return Padding(
       padding: const EdgeInsets.only(top: 80),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              CupertinoIcons.search,
-              size: 40,
-              color: textTheme.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _hasActiveFilter && _query.trim().isEmpty
-                  ? 'No chats match your filters'
-                  : 'No chats found',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme.withValues(alpha: 0.6),
-              ),
-            ),
-            if (_hasActiveFilter || _query.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _clearSearchAndFilters,
-                child: const Text('Clear search and filters'),
-              ),
-            ],
-          ],
-        ),
+      child: AppEmptyState(
+        showIllustration: false,
+        title:
+            _hasActiveFilter && _query.trim().isEmpty
+                ? 'No chats match your filters'
+                : 'No chats found',
+        actionLabel:
+            _hasActiveFilter || _query.trim().isNotEmpty
+                ? 'Clear search and filters'
+                : null,
+        onAction: _clearSearchAndFilters,
       ),
     );
   }
 
-  Widget _buildNoMatchesState(Color textTheme) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        32,
-        0,
-        32,
-        MediaQuery.textScalerOf(context).scale(12) > 16 ? 124 : 110,
-      ),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Lottie.asset(
-              'assets/lottie/empty.json',
-              width: 220,
-              height: 220,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No chats yet. Send a request or start swiping to meet your first Pal.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: _startSwiping,
-              child: const Text('Start swiping'),
-            ),
-          ],
-        ),
-      ),
+  Widget _buildNoMatchesState() {
+    return AppEmptyState(
+      title: 'No chats yet',
+      message:
+          'Send a request or start swiping to meet your first Pal.',
+      actionLabel: 'Start swiping',
+      onAction: _startSwiping,
+      bottomPadding:
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 124 : 110,
     );
   }
 
@@ -836,11 +795,11 @@ class _ChatsPageState extends State<ChatsPage> {
               if (hasNoChats)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _buildNoMatchesState(textTheme),
+                  child: _buildNoMatchesState(),
                 )
               else ...[
                 if (nothingFound)
-                  SliverToBoxAdapter(child: _buildEmptyState(textTheme)),
+                  SliverToBoxAdapter(child: _buildEmptyState()),
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height:

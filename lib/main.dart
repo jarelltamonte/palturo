@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
@@ -213,6 +214,31 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
     });
 
     _initAuthAndLinks();
+    if (kIsWeb) _handleWebAuthLink();
+  }
+
+  /// The web build receives recovery links at app.palturo.app with a
+  /// `token_hash` query parameter. Open the same in-app reset screen used by
+  /// the native deep link; no browser password form is involved.
+  void _handleWebAuthLink() {
+    final uri = Uri.base;
+    final query = uri.queryParameters;
+    final fragment = uri.fragment.isEmpty
+        ? <String, String>{}
+        : Uri.splitQueryString(uri.fragment);
+    final tokenHash = query['token_hash'] ?? fragment['token_hash'];
+    final type = query['type'] ?? fragment['type'];
+    if (tokenHash == null || tokenHash.isEmpty) return;
+
+    final isRecovery =
+        type == 'recovery' || uri.path.endsWith('/reset');
+    if (!isRecovery) return;
+
+    _suppressRecoveryEvent = true;
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted) _suppressRecoveryEvent = false;
+    });
+    _openAuthScreen((_) => ForgotPasswordType(tokenHash: tokenHash));
   }
 
   /// Subscribe to auth first, then read the launch link. If signedIn fires

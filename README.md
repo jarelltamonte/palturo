@@ -38,6 +38,10 @@ Auth email links and redirect URLs are documented in
 and reset page is a separate project in `../palturo-auth-web` and is deployed to
 Cloudflare at `palturo.app`.
 
+The cross-platform webapp build lives on the `palturo-webapp` branch and is
+deployed to Vercel at `app.palturo.app`. See
+[`docs/DEPLOY_WEBAPP.md`](docs/DEPLOY_WEBAPP.md).
+
 ## Backend functions
 
 ```sh

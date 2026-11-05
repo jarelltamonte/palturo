@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/chats_page.dart';
+import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/chat_menu_row.dart';
 import 'package:palturo/widgets/chat_search_sheet.dart';
+import 'package:palturo/widgets/typing_indicator.dart';
 
 void main() {
   testWidgets('search sheet survives its dismissal animation', (tester) async {
@@ -153,5 +155,64 @@ void main() {
     expect(find.text('Active 20m ago'), findsOneWidget);
     expect(find.text('Yesterday'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  test('typing payloads only match the enabled peer', () {
+    expect(
+      typingPayloadMatchesPeer(
+        {'user_id': 'peer-1'},
+        peerId: 'peer-1',
+        peerEnabled: true,
+      ),
+      isTrue,
+    );
+    expect(
+      typingPayloadMatchesPeer(
+        {'user_id': 'peer-2'},
+        peerId: 'peer-1',
+        peerEnabled: true,
+      ),
+      isFalse,
+    );
+    expect(
+      typingPayloadMatchesPeer(
+        {'user_id': 'peer-1'},
+        peerId: 'peer-1',
+        peerEnabled: false,
+      ),
+      isFalse,
+    );
+    expect(
+      typingPayloadMatchesPeer({}, peerId: null, peerEnabled: true),
+      isFalse,
+    );
+  });
+
+  testWidgets('typing indicator renders with and without motion', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    for (final disable in [false, true]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: lightMode,
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: const Size(360, 640),
+              textScaler: const TextScaler.linear(2),
+              disableAnimations: disable,
+            ),
+            child: const Scaffold(
+              body: Center(child: TypingIndicator(name: 'Grace')),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
+      expect(find.text('typing'), findsOneWidget);
+      expect(find.byType(TypingIndicator), findsOneWidget);
+    }
+    handle.dispose();
   });
 }

@@ -22,9 +22,20 @@ import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/chat_menu_row.dart';
 import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/chat_search_sheet.dart';
+import 'package:palturo/widgets/typing_indicator.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/utils/presence_label.dart';
 import 'package:palturo/widgets/app_feedback.dart';
+
+@visibleForTesting
+bool typingPayloadMatchesPeer(
+  Map<String, dynamic> payload, {
+  required String? peerId,
+  required bool peerEnabled,
+}) {
+  if (!peerEnabled || peerId == null || peerId.isEmpty) return false;
+  return payload['user_id']?.toString() == peerId;
+}
 
 @visibleForTesting
 int? unreadDividerIndex({required int length, required int unreadAtOpen}) {
@@ -83,6 +94,10 @@ class _ChatRoomState extends State<ChatRoom> {
   Timer? _highlightTimer;
   RealtimeChannel? _presenceChannel;
   bool _peerOnlineFromChannel = false;
+  bool _peerTyping = false;
+  bool _typingActive = false;
+  DateTime? _lastTypingSent;
+  Timer? _peerTypingTimer;
 
   @override
   void initState() {
@@ -107,6 +122,7 @@ class _ChatRoomState extends State<ChatRoom> {
     _messageController.addListener(() {
       setState(() {});
       _queueDraftSave();
+      _onComposerChanged();
     });
     _scrollController.addListener(_onScrollChanged);
     ConnectivityService.instance.addListener(_onConnectivityChanged);
@@ -151,9 +167,18 @@ class _ChatRoomState extends State<ChatRoom> {
 
   void _onPrivacyChanged() {
     final service = ChatPrivacyService.instance;
-    final enabled = service.loaded && service.presenceEnabled;
+    final enabled =
+        service.loaded && (service.presenceEnabled || service.typingEnabled);
     if (enabled && _presenceChannel == null) {
       _subscribePresenceChannel();
+    } else if (enabled && !service.presenceEnabled) {
+      final channel = _presenceChannel;
+      if (channel != null) {
+        unawaited(channel.untrack());
+      }
+      if (_peerOnlineFromChannel && mounted) {
+        setState(() => _peerOnlineFromChannel = false);
+      }
     } else if (!enabled) {
       final channel = _presenceChannel;
       _presenceChannel = null;
@@ -170,7 +195,10 @@ class _ChatRoomState extends State<ChatRoom> {
     final connectionId = widget.connectionId;
     if (connectionId == null || _presenceChannel != null) return;
     final privacy = ChatPrivacyService.instance;
-    if (!privacy.loaded || !privacy.presenceEnabled) return;
+    if (!privacy.loaded ||
+        (!privacy.presenceEnabled && !privacy.typingEnabled)) {
+      return;
+    }
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (uid == null) return;
 
@@ -179,9 +207,13 @@ class _ChatRoomState extends State<ChatRoom> {
       opts: const RealtimeChannelConfig(self: true),
     );
     channel.onPresenceSync((_) => _refreshPeerOnline(channel));
+    channel.onBroadcast(event: 'typing', callback: _onTypingPayload);
     channel.subscribe((status, error) {
       if (status == RealtimeSubscribeStatus.subscribed) {
-        unawaited(channel.track({'user_id': uid}));
+        final privacy = ChatPrivacyService.instance;
+        if (privacy.presenceEnabled) {
+          unawaited(channel.track({'user_id': uid}));
+        }
       } else if (status == RealtimeSubscribeStatus.channelError ||
           status == RealtimeSubscribeStatus.closed) {
         if (identical(_presenceChannel, channel)) {
@@ -194,6 +226,75 @@ class _ChatRoomState extends State<ChatRoom> {
       }
     });
     _presenceChannel = channel;
+  }
+
+  void _onComposerChanged() {
+    final privacy = ChatPrivacyService.instance;
+    if (!privacy.loaded || !privacy.typingEnabled) return;
+    final text = _messageController.text.trim();
+    if (text.isEmpty) {
+      if (_typingActive) unawaited(_sendTyping(false));
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastTypingSent != null &&
+        now.difference(_lastTypingSent!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastTypingSent = now;
+    unawaited(_sendTyping(true));
+  }
+
+  Future<void> _sendTyping(bool active) async {
+    final channel = _presenceChannel;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (channel == null || uid == null) return;
+    _typingActive = active;
+    try {
+      await channel.sendBroadcastMessage(
+        event: 'typing',
+        payload: {'user_id': uid, 'active': active},
+      );
+    } catch (_) {
+      // Typing is best-effort.
+    }
+  }
+
+  void _onTypingPayload(Map<String, dynamic> payload) {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    final conversation = ChatStateService.instance.conversationFor(
+      connectionId,
+    );
+    if (conversation == null || !conversation.otherTypingEnabled) return;
+    if (!typingPayloadMatchesPeer(
+      payload,
+      peerId: conversation.otherUserId,
+      peerEnabled: conversation.otherTypingEnabled,
+    )) {
+      return;
+    }
+
+    final active = payload['active'] == true;
+    _peerTypingTimer?.cancel();
+    if (!active) {
+      if (mounted && _peerTyping) setState(() => _peerTyping = false);
+      return;
+    }
+    if (mounted && !_peerTyping) setState(() => _peerTyping = true);
+    _peerTypingTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _peerTyping) setState(() => _peerTyping = false);
+    });
+  }
+
+  bool get _showPeerTyping {
+    if (!_peerTyping) return false;
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return false;
+    final conversation = ChatStateService.instance.conversationFor(
+      connectionId,
+    );
+    return conversation?.otherTypingEnabled ?? false;
   }
 
   String? get _peerPresenceText {
@@ -258,6 +359,10 @@ class _ChatRoomState extends State<ChatRoom> {
     _messageStream?.cancel();
     _draftTimer?.cancel();
     _highlightTimer?.cancel();
+    _peerTypingTimer?.cancel();
+    if (_typingActive) {
+      unawaited(_sendTyping(false));
+    }
     _scrollController.removeListener(_onScrollChanged);
     ConnectivityService.instance.removeListener(_onConnectivityChanged);
     ChatPrivacyService.instance.removeListener(_onPrivacyChanged);
@@ -413,6 +518,7 @@ class _ChatRoomState extends State<ChatRoom> {
       createdAt: DateTime.now(),
     );
     _messageController.clear();
+    _typingActive = false;
     _draftTimer?.cancel();
     unawaited(DraftService.instance.clearDraft(widget.connectionId!));
     setState(() {
@@ -894,6 +1000,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final showProfileInAppBar = hasMessages || keyboardIsOpen || isTyping;
     final presenceText = _peerPresenceText;
+    final peerTyping = _showPeerTyping;
     final bgColor = AppColors.mutedSurface(context);
 
     return Scaffold(
@@ -903,7 +1010,7 @@ class _ChatRoomState extends State<ChatRoom> {
         toolbarHeight:
             adaptiveHeight +
             (widget.skillName != null ? 8 : 0) +
-            (presenceText != null ? 10 : 0),
+            (presenceText != null || peerTyping ? 10 : 0),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -958,7 +1065,10 @@ class _ChatRoomState extends State<ChatRoom> {
                                 ),
                               ),
                             ],
-                            if (presenceText != null) ...[
+                            if (peerTyping) ...[
+                              const SizedBox(height: 2),
+                              TypingIndicator(name: widget.name),
+                            ] else if (presenceText != null) ...[
                               const SizedBox(height: 2),
                               Row(
                                 mainAxisSize: MainAxisSize.min,

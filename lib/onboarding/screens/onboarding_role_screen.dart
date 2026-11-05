@@ -53,6 +53,7 @@ class OnboardingRoleScreen extends StatelessWidget {
           onBack: onBack,
           onPrimaryPressed: controller.role == null ? null : onContinue,
           onSkip: onSkip,
+          scrollBody: true,
           child: RoleCardGroup(
             options: _options,
             selected: controller.role,

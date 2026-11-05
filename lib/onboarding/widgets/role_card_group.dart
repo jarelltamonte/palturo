@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding_models.dart';
@@ -103,17 +104,26 @@ class _RoleCard extends StatelessWidget {
         onTap: isEditing ? onTap : null,
         child: AnimatedContainer(
           duration: AppMotion.micro,
-          constraints: BoxConstraints(minHeight: compact ? 44 : 120),
-          alignment: Alignment.center,
+          constraints: BoxConstraints(
+            minHeight:
+                compact
+                    ? AppSpacing.onboardingRoleCardCompactHeight
+                    : AppSpacing.onboardingRoleCardHeight,
+          ),
+          // Narrow horizontal padding keeps three cards readable at 390 px.
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 16 : 8,
-            vertical: compact ? 8 : 4,
+            vertical: compact ? 8 : 16,
           ),
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : cardColor,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border(context),
+              color:
+                  selected
+                      ? AppColors.textSecondary
+                      : AppColors.border(context),
+              width: selected ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(

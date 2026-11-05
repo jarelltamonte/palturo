@@ -9,6 +9,13 @@ class AppSpacing {
   static const double titleSpacing = 16;
   static const double trailingInset = 16;
 
+  /// Content height for the editable onboarding role cards. The card is
+  /// content-sized above this floor, never stretched to the page height.
+  static const double onboardingRoleCardHeight = 168;
+
+  /// Height of the single selected role card in read-only/review mode.
+  static const double onboardingRoleCardCompactHeight = 44;
+
   static double topBarHeight() =>
       defaultTargetPlatform == TargetPlatform.iOS ? 44 : 56;
 }

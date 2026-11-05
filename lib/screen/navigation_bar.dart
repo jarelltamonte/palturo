@@ -7,6 +7,7 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/whats_new_sheet.dart';
 
 import 'home_page.dart';
 import 'explore_page.dart';
@@ -334,6 +335,9 @@ class _NavItemState extends State<_NavItem>
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.92), weight: 1),
       TweenSequenceItem(tween: Tween(begin: 0.92, end: 1.0), weight: 1),
     ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowWhatsNew(context);
+    });
   }
 
   @override

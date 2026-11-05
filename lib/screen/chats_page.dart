@@ -1072,23 +1072,6 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (presence != null) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          presence!,
-                          style: AppTextStyles.regularText.copyWith(
-                            color:
-                                presence == 'Online'
-                                    ? AppColors.accentText(context)
-                                    : AppColors.mutedText(context),
-                            fontSize: 11,
-                            fontWeight:
-                                presence == 'Online'
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                          ),
-                        ),
-                      ],
                       if (time.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Text(
@@ -1101,6 +1084,43 @@ class ChatListItem extends StatelessWidget {
                       ],
                     ],
                   ),
+                  if (presence != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color:
+                                presence == 'Online'
+                                    ? AppColors.primary
+                                    : AppColors.mutedText(context),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            presence!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.regularText.copyWith(
+                              color:
+                                  presence == 'Online'
+                                      ? AppColors.accentText(context)
+                                      : AppColors.mutedText(context),
+                              fontSize: 10.5,
+                              fontWeight:
+                                  presence == 'Online'
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

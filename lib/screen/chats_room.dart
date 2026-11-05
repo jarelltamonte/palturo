@@ -119,7 +119,34 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   void _onConversationChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    final channel = _presenceChannel;
+    if (channel != null) {
+      _refreshPeerOnline(channel);
+    } else {
+      final privacy = ChatPrivacyService.instance;
+      if (privacy.loaded && privacy.presenceEnabled) {
+        _subscribePresenceChannel();
+      }
+    }
+  }
+
+  void _refreshPeerOnline(RealtimeChannel channel) {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    final peerId =
+        ChatStateService.instance.conversationFor(connectionId)?.otherUserId;
+    final peerOnline =
+        peerId != null &&
+        channel.presenceState().any(
+          (state) => state.presences.any(
+            (presence) => presence.payload['user_id']?.toString() == peerId,
+          ),
+        );
+    if (mounted && peerOnline != _peerOnlineFromChannel) {
+      setState(() => _peerOnlineFromChannel = peerOnline);
+    }
   }
 
   void _onPrivacyChanged() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:palturo/screen/chats_page.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/chat_menu_row.dart';
 import 'package:palturo/widgets/chat_search_sheet.dart';
@@ -118,5 +119,39 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: label);
     }
+  });
+
+  testWidgets('chat row shows presence and time at 360/200%', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: SizedBox(
+              width: 360,
+              child: ChatListItem(
+                name: 'Grace Lim',
+                message: 'Kumusta! Gusto mo bang mag-exchange ng adobo recipe?',
+                time: 'Yesterday',
+                presence: 'Active 20m ago',
+                skillName: 'Binangkal',
+                onTap: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Active 20m ago'), findsOneWidget);
+    expect(find.text('Yesterday'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

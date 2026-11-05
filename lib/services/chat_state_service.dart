@@ -77,6 +77,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       if (event == AuthChangeEvent.signedIn) {
         unawaited(ChatPrivacyService.instance.load());
         loadConversations();
+        _startRefreshTimer();
         unawaited(_resubscribeRealtime());
       } else if (event == AuthChangeEvent.tokenRefreshed) {
         // Realtime pushes the refreshed token to joined channels. If the

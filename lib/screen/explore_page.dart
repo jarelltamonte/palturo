@@ -445,7 +445,7 @@ class _RoleToggle extends StatelessWidget {
     }
 
     return Container(
-      height: 44,
+      height: AppSpacing.iconTarget,
       decoration: BoxDecoration(
         color: textColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),

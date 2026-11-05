@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/theme/app_spacing.dart';
 
 class RequestDetailDialog extends StatelessWidget {
   final Person person;
@@ -81,8 +82,8 @@ class RequestDetailDialog extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: SizedBox(
-                    width: 44,
-                    height: 44,
+                    width: AppSpacing.iconTarget,
+                    height: AppSpacing.iconTarget,
                     child: Center(
                       child: Container(
                         padding: const EdgeInsets.all(6),

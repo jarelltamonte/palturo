@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
 /// A truthful privacy destination. It explains what is stored and points to
@@ -13,7 +13,7 @@ class PrivacyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+        AppSpacing.topBarHeight();
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(

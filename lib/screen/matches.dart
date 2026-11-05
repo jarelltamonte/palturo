@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -459,8 +458,8 @@ class _MatchesState extends State<Matches> {
               ),
             ),
             SizedBox(
-              width: 44,
-              height: 44,
+              width: AppSpacing.iconTarget,
+              height: AppSpacing.iconTarget,
               child: PopupMenuButton<String>(
                 icon: Icon(Icons.more_horiz, color: textTheme),
                 padding: EdgeInsets.zero,
@@ -697,8 +696,7 @@ class _MatchesState extends State<Matches> {
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
     final filtered = _filteredPals();
     final grouped = _groupedPals(filtered);
     final isFiltered =
@@ -728,7 +726,7 @@ class _MatchesState extends State<Matches> {
                 ? Padding(
                   padding: EdgeInsets.zero,
                   child: Container(
-                    height: 44,
+                    height: AppSpacing.iconTarget,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       color: textTheme.withValues(alpha: 0.08),
@@ -775,8 +773,8 @@ class _MatchesState extends State<Matches> {
                                 setState(() => _query = '');
                               },
                               child: SizedBox(
-                                width: 44,
-                                height: 44,
+                                width: AppSpacing.iconTarget,
+                                height: AppSpacing.iconTarget,
                                 child: Center(
                                   child: Icon(
                                     Icons.cancel,

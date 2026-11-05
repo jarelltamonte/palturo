@@ -1074,8 +1074,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
     final toolbarHeight =
         (MediaQuery.textScalerOf(context).scale(20) + 24)
             .clamp(adaptiveHeight, 96.0)
@@ -1153,8 +1152,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                   behavior: HitTestBehavior.opaque,
                   onTap: _openFilterSheet,
                   child: SizedBox(
-                    width: 44,
-                    height: 44,
+                    width: AppSpacing.iconTarget,
+                    height: AppSpacing.iconTarget,
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [

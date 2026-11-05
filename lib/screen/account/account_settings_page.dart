@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:palturo/services/profile_service.dart';
@@ -10,7 +9,9 @@ import 'package:palturo/screen/settings/chat_privacy_page.dart';
 import 'package:palturo/screen/block_list.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/utils/validators.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -286,7 +287,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+        AppSpacing.topBarHeight();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -296,15 +297,8 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
-        leadingWidth: 56,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: IconButton(
-            tooltip: 'Back',
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
-          ),
-        ),
+        leadingWidth: AppSpacing.leadingWidth,
+        leading: AppChrome.backButton(context, color: textTheme),
         title: Text(
           'Account & security',
           maxLines: 1,

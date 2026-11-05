@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
@@ -50,9 +49,7 @@ class OnboardingScaffold extends StatelessWidget {
     final surface = Theme.of(context).colorScheme.surface;
     // Keep the back target at 48 even on iOS; the toolbar grows to fit it.
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS
-            ? AppSpacing.iconTarget
-            : 56.0;
+        AppSpacing.topBarHeight();
 
     return Scaffold(
       backgroundColor: surface,
@@ -66,7 +63,7 @@ class OnboardingScaffold extends StatelessWidget {
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   automaticallyImplyLeading: false,
-                  titleSpacing: 16,
+                  titleSpacing: AppSpacing.titleSpacing,
                   title: Row(
                     children: [
                       if (showBackButton)

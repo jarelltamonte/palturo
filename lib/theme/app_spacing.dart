@@ -17,5 +17,5 @@ class AppSpacing {
   static const double onboardingRoleCardCompactHeight = 44;
 
   static double topBarHeight() =>
-      defaultTargetPlatform == TargetPlatform.iOS ? 44 : 56;
+      defaultTargetPlatform == TargetPlatform.iOS ? iconTarget : 56;
 }

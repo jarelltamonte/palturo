@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
@@ -164,8 +164,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -175,7 +174,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: AppSpacing.titleSpacing,
         title: Row(
           children: [
             Semantics(
@@ -185,8 +184,8 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.pop(context),
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Icon(
@@ -292,10 +291,12 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               ),
               const SizedBox(width: 8),
               SizedBox(
-                height: 44,
+                height: AppSpacing.iconTarget,
                 child: TextButton(
                   onPressed: _switchRole,
-                  style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, AppSpacing.iconTarget),
+                  ),
                   child: Text(
                     'Switch to ${_mentor ? 'Learner' : 'Mentor'}',
                     style: AppTextStyles.regularText.copyWith(

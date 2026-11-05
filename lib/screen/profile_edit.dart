@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
@@ -1529,8 +1530,8 @@ class _PhotoSlot extends StatelessWidget {
                     child: GestureDetector(
                       onTap: onRemove,
                       child: SizedBox(
-                        width: 44,
-                        height: 44,
+                        width: AppSpacing.iconTarget,
+                        height: AppSpacing.iconTarget,
                         child: Center(
                           child: Container(
                             padding: const EdgeInsets.all(2),

@@ -7,7 +7,6 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/widgets/app_empty_state.dart';
 import 'package:palturo/widgets/app_chrome.dart';
-import 'package:flutter/foundation.dart';
 import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/matches.dart';
@@ -435,7 +434,7 @@ class _ChatsPageState extends State<ChatsPage> {
 
   Widget _buildSearchField(Color textTheme, Color primaryColor) {
     return Container(
-      height: 44,
+      height: AppSpacing.iconTarget,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: textTheme.withValues(alpha: 0.08),
@@ -479,8 +478,8 @@ class _ChatsPageState extends State<ChatsPage> {
                   setState(() => _query = '');
                 },
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
                   child: Center(
                     child: Icon(
                       Icons.cancel,
@@ -529,8 +528,7 @@ class _ChatsPageState extends State<ChatsPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
 
     final matches = _filteredMatches;
     final visibleMatches = matches.take(_maxMatchCards).toList();
@@ -621,8 +619,8 @@ class _ChatsPageState extends State<ChatsPage> {
                           onPressed: _startSearch,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                            minWidth: 44,
-                            minHeight: 44,
+                            minWidth: AppSpacing.iconTarget,
+                            minHeight: AppSpacing.iconTarget,
                           ),
                           icon: Icon(
                             CupertinoIcons.search,
@@ -639,8 +637,8 @@ class _ChatsPageState extends State<ChatsPage> {
                             onTap: _openFilterSheet,
                             behavior: HitTestBehavior.opaque,
                             child: SizedBox(
-                              width: 44,
-                              height: 44,
+                              width: AppSpacing.iconTarget,
+                              height: AppSpacing.iconTarget,
                               child: Stack(
                                 clipBehavior: Clip.none,
                                 children: [

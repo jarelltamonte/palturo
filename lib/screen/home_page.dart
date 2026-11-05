@@ -735,8 +735,8 @@ class _HomePageState extends State<HomePage> {
                           behavior: HitTestBehavior.opaque,
                           onTap: () => AppRouter.openActivity(),
                           child: SizedBox(
-                            width: 44,
-                            height: 44,
+                            width: AppSpacing.iconTarget,
+                            height: AppSpacing.iconTarget,
                             child: Stack(
                               clipBehavior: Clip.none,
                               children: [
@@ -794,8 +794,8 @@ class _HomePageState extends State<HomePage> {
                               ? null
                               : _undo,
                       child: SizedBox(
-                        width: 44,
-                        height: 44,
+                        width: AppSpacing.iconTarget,
+                        height: AppSpacing.iconTarget,
                         child: Align(
                           alignment: Alignment.center,
                           child: Icon(
@@ -817,8 +817,8 @@ class _HomePageState extends State<HomePage> {
                       behavior: HitTestBehavior.opaque,
                       onTap: _openFilterSheet,
                       child: SizedBox(
-                        width: 44,
-                        height: 44,
+                        width: AppSpacing.iconTarget,
+                        height: AppSpacing.iconTarget,
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [

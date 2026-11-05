@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
@@ -473,8 +474,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       ),
                     ],
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.all(6),
@@ -1000,8 +1001,8 @@ void showPersonProfileDialog(
                   child: GestureDetector(
                     onTap: () => Navigator.pop(dialogContext),
                     child: SizedBox(
-                      width: 44,
-                      height: 44,
+                      width: AppSpacing.iconTarget,
+                      height: AppSpacing.iconTarget,
                       child: Center(
                         child: Container(
                           padding: const EdgeInsets.all(6),

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 
@@ -538,8 +539,8 @@ class _SkillsCardState extends State<SkillsCard> {
                   child: GestureDetector(
                     onTap: _addSkill,
                     child: SizedBox(
-                      width: 44,
-                      height: 44,
+                      width: AppSpacing.iconTarget,
+                      height: AppSpacing.iconTarget,
                       child: Center(
                         child: Container(
                           width: 28,
@@ -893,8 +894,8 @@ class _SkillRowState extends State<_SkillRow> {
                 customBorder: const CircleBorder(),
                 onTap: _clearQuery,
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
                   child: Icon(Icons.close, size: 18, color: dim),
                 ),
               ),
@@ -1184,8 +1185,8 @@ class _SkillRowState extends State<_SkillRow> {
                         button: true,
                         label: 'Remove attachment',
                         child: SizedBox(
-                          width: 44,
-                          height: 44,
+                          width: AppSpacing.iconTarget,
+                          height: AppSpacing.iconTarget,
                           child: Center(
                             child: Material(
                               color: Colors.transparent,
@@ -1222,7 +1223,7 @@ class _SkillRowState extends State<_SkillRow> {
                   behavior: HitTestBehavior.opaque,
                   onTap: widget.onAttachFile,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 44),
+                    constraints: const BoxConstraints(minHeight: AppSpacing.iconTarget),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Row(
@@ -1393,8 +1394,8 @@ class _SkillRowState extends State<_SkillRow> {
                     customBorder: const CircleBorder(),
                     onTap: widget.onRemove,
                     child: SizedBox(
-                      width: 44,
-                      height: 44,
+                      width: AppSpacing.iconTarget,
+                      height: AppSpacing.iconTarget,
                       child: Icon(Icons.close, color: textColor, size: 20),
                     ),
                   ),

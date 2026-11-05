@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/theme/app_motion.dart';
@@ -1131,8 +1130,7 @@ class _ChatRoomState extends State<ChatRoom> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
 
     final keyboardIsOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isTyping = _messageController.text.isNotEmpty;
@@ -1149,10 +1147,24 @@ class _ChatRoomState extends State<ChatRoom> {
       backgroundColor: Theme.of(context).colorScheme.surface,
 
       appBar: AppBar(
-        toolbarHeight:
-            adaptiveHeight +
-            (widget.skillName != null ? 8 : 0) +
-            (presenceText != null || peerTyping ? 10 : 0),
+        toolbarHeight: () {
+          // AppBar clamps its title subtree to 1.34x; size the bar to the same
+          // scaler so large text does not leave a dead band.
+          final scaler = MediaQuery.textScalerOf(
+            context,
+          ).clamp(maxScaleFactor: 1.34);
+          final hasSkill =
+              showProfileInAppBar &&
+              (widget.skillName?.trim().isNotEmpty ?? false);
+          final hasPresence =
+              showProfileInAppBar && (presenceText != null || peerTyping);
+          final titleHeight =
+              scaler.scale(20) +
+              (hasSkill ? scaler.scale(12) + 6 : 0) +
+              (hasPresence ? scaler.scale(12) + 2 : 0) +
+              12;
+          return titleHeight > adaptiveHeight ? titleHeight : adaptiveHeight;
+        }(),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -1328,8 +1340,8 @@ class _ChatRoomState extends State<ChatRoom> {
                     ),
                   ],
               child: SizedBox(
-                width: 44,
-                height: 44,
+                width: AppSpacing.iconTarget,
+                height: AppSpacing.iconTarget,
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.all(6),
@@ -1460,7 +1472,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.background,
-                      minimumSize: const Size(48, 48),
+                      minimumSize: const Size(AppSpacing.iconTarget, AppSpacing.iconTarget),
                       maximumSize: const Size(58, 48),
                     ),
                     icon:
@@ -1626,7 +1638,7 @@ class _ChatRoomState extends State<ChatRoom> {
                 TextButton(
                   onPressed: () => setState(() => _feedbackCollapsed = true),
                   style: TextButton.styleFrom(
-                    minimumSize: const Size(44, 44),
+                    minimumSize: const Size(AppSpacing.iconTarget, AppSpacing.iconTarget),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text('Hide', style: TextStyle(fontSize: 12)),
@@ -1634,7 +1646,7 @@ class _ChatRoomState extends State<ChatRoom> {
                 TextButton(
                   onPressed: _showFeedbackDialog,
                   style: TextButton.styleFrom(
-                    minimumSize: const Size(44, 44),
+                    minimumSize: const Size(AppSpacing.iconTarget, AppSpacing.iconTarget),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text(

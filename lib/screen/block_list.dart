@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
-import 'package:palturo/theme/app_text_styles.dart';
-import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
 /// Live blocked list from the `blocks` table (FR-15).
@@ -77,7 +77,7 @@ class _BlockListPageState extends State<BlockListPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+        AppSpacing.topBarHeight();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,

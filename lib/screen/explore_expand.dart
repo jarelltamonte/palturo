@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
@@ -340,8 +340,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
 
     final hasMore = _currentIndex < _people.length;
 
@@ -353,7 +352,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: AppSpacing.titleSpacing,
         title: Row(
           children: [
             Semantics(
@@ -364,8 +363,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.pop(context),
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Icon(
@@ -397,8 +396,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
                 behavior: HitTestBehavior.opaque,
                 onTap: _history.isEmpty ? null : _undo,
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: Icon(

@@ -288,14 +288,15 @@ class _ExplorePageState extends State<ExplorePage> {
       builder: (context, constraints) {
         const spacing = 16.0;
         const topInset = 8.0;
-        const bottomInset = 90.0;
+        final bottomInset = AppSpacing.bottomNavClearanceFor(context);
         final itemHeight =
             (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
+        if (itemHeight < 172) return _buildGridAuto(textTheme);
         return RefreshIndicator(
           onRefresh: _refreshTaxonomy,
           child: GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
+            padding: EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: spacing,
@@ -319,7 +320,7 @@ class _ExplorePageState extends State<ExplorePage> {
           16,
           8,
           16,
-          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+          AppSpacing.bottomNavClearanceFor(context),
         ),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,

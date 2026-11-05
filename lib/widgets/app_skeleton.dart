@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_colors.dart';
 
 class SkeletonBox extends StatelessWidget {
@@ -39,11 +40,12 @@ class ExploreGridSkeleton extends StatelessWidget {
         builder: (context, constraints) {
           const spacing = 16.0;
           const topInset = 8.0;
-          const bottomInset = 90.0;
+          final bottomInset = AppSpacing.bottomNavClearanceFor(context);
           final itemHeight =
-              (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
+              ((constraints.maxHeight - topInset - bottomInset - spacing) / 2)
+                  .clamp(120.0, double.infinity);
           return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
+            padding: EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,

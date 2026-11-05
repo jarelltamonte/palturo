@@ -1034,8 +1034,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   Widget _buildEmptyState() {
     final filteredOut = _requests.isNotEmpty;
     return AppEmptyState(
-      bottomPadding:
-          MediaQuery.textScalerOf(context).scale(12) > 16 ? 124 : 110,
+      bottomPadding: AppSpacing.bottomNavClearanceFor(context),
       title:
           filteredOut
               ? 'No requests match your filters'

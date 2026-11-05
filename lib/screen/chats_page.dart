@@ -520,8 +520,7 @@ class _ChatsPageState extends State<ChatsPage> {
           'Send a request or start swiping to meet your first Pal.',
       actionLabel: 'Start swiping',
       onAction: _startSwiping,
-      bottomPadding:
-          MediaQuery.textScalerOf(context).scale(12) > 16 ? 124 : 110,
+      bottomPadding: AppSpacing.bottomNavClearanceFor(context),
     );
   }
 

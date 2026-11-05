@@ -111,14 +111,20 @@ class _ChatRoomState extends State<ChatRoom> {
     _scrollController.addListener(_onScrollChanged);
     ConnectivityService.instance.addListener(_onConnectivityChanged);
     ChatPrivacyService.instance.addListener(_onPrivacyChanged);
+    ChatStateService.instance.addListener(_onConversationChanged);
     _subscribePresenceChannel();
     _loadMessages();
     _subscribeRealtime();
     _refreshFeedbackStatus();
   }
 
+  void _onConversationChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _onPrivacyChanged() {
-    final enabled = ChatPrivacyService.instance.presenceEnabled;
+    final service = ChatPrivacyService.instance;
+    final enabled = service.loaded && service.presenceEnabled;
     if (enabled && _presenceChannel == null) {
       _subscribePresenceChannel();
     } else if (!enabled) {
@@ -136,7 +142,8 @@ class _ChatRoomState extends State<ChatRoom> {
   void _subscribePresenceChannel() {
     final connectionId = widget.connectionId;
     if (connectionId == null || _presenceChannel != null) return;
-    if (!ChatPrivacyService.instance.presenceEnabled) return;
+    final privacy = ChatPrivacyService.instance;
+    if (!privacy.loaded || !privacy.presenceEnabled) return;
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (uid == null) return;
 
@@ -228,6 +235,7 @@ class _ChatRoomState extends State<ChatRoom> {
     _scrollController.removeListener(_onScrollChanged);
     ConnectivityService.instance.removeListener(_onConnectivityChanged);
     ChatPrivacyService.instance.removeListener(_onPrivacyChanged);
+    ChatStateService.instance.removeListener(_onConversationChanged);
     final presence = _presenceChannel;
     _presenceChannel = null;
     if (presence != null) {

@@ -35,6 +35,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _resubscribeTimer;
   int _resubscribeAttempts = 0;
   DateTime? _lastHeartbeat;
+  Timer? _heartbeatTimer;
   final StreamController<IncomingMessageEvent> _messageEvents =
       StreamController<IncomingMessageEvent>.broadcast();
 
@@ -93,6 +94,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       unawaited(ChatPrivacyService.instance.loadIfNeeded());
       loadConversations();
       _heartbeat(force: true);
+      _startHeartbeatTimer();
       unawaited(_prepareRealtime());
     }
   }
@@ -102,7 +104,24 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     if (ChatPrivacyService.instance.loaded &&
         ChatPrivacyService.instance.presenceEnabled) {
       _heartbeat(force: true);
+      _startHeartbeatTimer();
+    } else {
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
     }
+  }
+
+  void _startHeartbeatTimer() {
+    if (!ChatPrivacyService.instance.loaded ||
+        !ChatPrivacyService.instance.presenceEnabled) {
+      return;
+    }
+    if (_heartbeatTimer?.isActive ?? false) return;
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (_lifecycleState != AppLifecycleState.resumed) return;
+      _heartbeat(force: true);
+      unawaited(loadConversations(showSpinner: false));
+    });
   }
 
   void _heartbeat({bool force = false}) {
@@ -438,6 +457,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _lifecycleState = state;
     if (state == AppLifecycleState.resumed) {
       _heartbeat();
+      _startHeartbeatTimer();
       unawaited(ChatPrivacyService.instance.loadIfNeeded());
       // Re-sync unread & conversations from backend
       if (_activeConnectionId != null) {
@@ -454,6 +474,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       _scheduleMidnightTimer();
     } else if (state == AppLifecycleState.paused) {
       _heartbeat(force: true);
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
     }
   }
 
@@ -473,6 +495,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   /// Resets state on logout and unsubscribes from Realtime.
   void reset() {
     MatchApi.clearCaches();
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     _resubscribeTimer?.cancel();
     _resubscribeTimer = null;
     _resubscribeAttempts = 0;
@@ -507,6 +531,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _authSubscription?.cancel();
     _midnightTimer?.cancel();
     _resubscribeTimer?.cancel();
+    _heartbeatTimer?.cancel();
     ChatPrivacyService.instance.removeListener(_onPrivacyChanged);
     _realtimeSubscribed = false;
     _messageEvents.close();

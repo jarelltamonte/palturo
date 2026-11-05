@@ -151,13 +151,17 @@ class _ChatRoomState extends State<ChatRoom> {
       'chat:$connectionId',
       opts: const RealtimeChannelConfig(self: true),
     );
+    final peerId =
+        ChatStateService.instance.conversationFor(connectionId)?.otherUserId;
     channel.onPresenceSync((_) {
       final states = channel.presenceState();
-      final peerOnline = states.any(
-        (state) => state.presences.any(
-          (presence) => presence.payload['user_id']?.toString() != uid,
-        ),
-      );
+      final peerOnline =
+          peerId != null &&
+          states.any(
+            (state) => state.presences.any(
+              (presence) => presence.payload['user_id']?.toString() == peerId,
+            ),
+          );
       if (mounted && peerOnline != _peerOnlineFromChannel) {
         setState(() => _peerOnlineFromChannel = peerOnline);
       }
@@ -165,19 +169,24 @@ class _ChatRoomState extends State<ChatRoom> {
     channel.subscribe((status, error) {
       if (status == RealtimeSubscribeStatus.subscribed) {
         unawaited(channel.track({'user_id': uid}));
+      } else if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.closed) {
+        if (identical(_presenceChannel, channel)) {
+          _presenceChannel = null;
+        }
       }
     });
     _presenceChannel = channel;
   }
 
   String? get _peerPresenceText {
-    if (_peerOnlineFromChannel) return 'Online';
     final connectionId = widget.connectionId;
     if (connectionId == null) return null;
     final conversation = ChatStateService.instance.conversationFor(
       connectionId,
     );
-    if (conversation == null) return null;
+    if (conversation == null || !conversation.otherPresenceEnabled) return null;
+    if (_peerOnlineFromChannel) return 'Online';
     return presenceLabel(
       conversation.otherLastSeenAt,
       enabled: conversation.otherPresenceEnabled,

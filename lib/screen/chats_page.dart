@@ -1080,7 +1080,7 @@ class ChatListItem extends StatelessWidget {
                             color:
                                 presence == 'Online'
                                     ? AppColors.accentText(context)
-                                    : textTheme.withValues(alpha: 0.55),
+                                    : AppColors.mutedText(context),
                             fontSize: 11,
                             fontWeight:
                                 presence == 'Online'
@@ -1088,7 +1088,8 @@ class ChatListItem extends StatelessWidget {
                                     : FontWeight.w400,
                           ),
                         ),
-                      ] else if (time.isNotEmpty) ...[
+                      ],
+                      if (time.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Text(
                           time,

@@ -852,7 +852,11 @@ class MatchApi {
   }
 
   static Future<void> touchLastSeen() async {
-    await _Client.c.rpc('touch_last_seen');
+    try {
+      await _Client.c.rpc('touch_last_seen');
+    } catch (_) {
+      // Best-effort heartbeat; the next tick retries.
+    }
   }
 
   static Future<Map<String, dynamic>> getChatPrivacy() async {

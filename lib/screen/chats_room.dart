@@ -28,6 +28,27 @@ import 'package:palturo/utils/presence_label.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 
 @visibleForTesting
+DateTime? peerReadTimestamp(
+  Map<String, dynamic> payload, {
+  required String? peerId,
+  required bool receiptsEnabled,
+}) {
+  if (!receiptsEnabled || peerId == null || peerId.isEmpty) return null;
+  if (payload['user_id']?.toString() != peerId) return null;
+  return DateTime.tryParse(payload['read_at']?.toString() ?? '')?.toLocal();
+}
+
+@visibleForTesting
+bool shouldShowSeen({
+  required DateTime? lastOwnAt,
+  required DateTime? peerReadAt,
+  required bool receiptsEnabled,
+}) {
+  if (!receiptsEnabled || lastOwnAt == null || peerReadAt == null) return false;
+  return !lastOwnAt.isAfter(peerReadAt);
+}
+
+@visibleForTesting
 bool typingPayloadMatchesPeer(
   Map<String, dynamic> payload, {
   required String? peerId,
@@ -95,6 +116,8 @@ class _ChatRoomState extends State<ChatRoom> {
   RealtimeChannel? _presenceChannel;
   bool _peerOnlineFromChannel = false;
   bool _peerTyping = false;
+  DateTime? _peerReadAt;
+  DateTime? _lastReadBroadcast;
   bool _typingActive = false;
   DateTime? _lastTypingSent;
   Timer? _peerTypingTimer;
@@ -110,6 +133,8 @@ class _ChatRoomState extends State<ChatRoom> {
           break;
         }
       }
+      _peerReadAt =
+          ChatStateService.instance.conversationFor(connectionId)?.otherReadAt;
       ChatStateService.instance.enterRoom(connectionId);
       final draft = DraftService.instance.draftFor(connectionId);
       if (draft != null) {
@@ -136,6 +161,15 @@ class _ChatRoomState extends State<ChatRoom> {
 
   void _onConversationChanged() {
     if (!mounted) return;
+    final connectionId = widget.connectionId;
+    if (connectionId != null) {
+      final readAt =
+          ChatStateService.instance.conversationFor(connectionId)?.otherReadAt;
+      if (readAt != null &&
+          (_peerReadAt == null || readAt.isAfter(_peerReadAt!))) {
+        _peerReadAt = readAt;
+      }
+    }
     setState(() {});
     final channel = _presenceChannel;
     if (channel != null) {
@@ -143,7 +177,9 @@ class _ChatRoomState extends State<ChatRoom> {
     } else {
       final privacy = ChatPrivacyService.instance;
       if (privacy.loaded &&
-          (privacy.presenceEnabled || privacy.typingEnabled)) {
+          (privacy.presenceEnabled ||
+              privacy.typingEnabled ||
+              privacy.readReceiptsEnabled)) {
         _subscribePresenceChannel();
       }
     }
@@ -169,7 +205,10 @@ class _ChatRoomState extends State<ChatRoom> {
   void _onPrivacyChanged() {
     final service = ChatPrivacyService.instance;
     final enabled =
-        service.loaded && (service.presenceEnabled || service.typingEnabled);
+        service.loaded &&
+        (service.presenceEnabled ||
+            service.typingEnabled ||
+            service.readReceiptsEnabled);
     if (enabled && _presenceChannel == null) {
       _subscribePresenceChannel();
     } else if (enabled && !service.presenceEnabled) {
@@ -203,7 +242,9 @@ class _ChatRoomState extends State<ChatRoom> {
     if (connectionId == null || _presenceChannel != null) return;
     final privacy = ChatPrivacyService.instance;
     if (!privacy.loaded ||
-        (!privacy.presenceEnabled && !privacy.typingEnabled)) {
+        (!privacy.presenceEnabled &&
+            !privacy.typingEnabled &&
+            !privacy.readReceiptsEnabled)) {
       return;
     }
     final uid = Supabase.instance.client.auth.currentUser?.id;
@@ -215,7 +256,11 @@ class _ChatRoomState extends State<ChatRoom> {
     );
     channel.onPresenceSync((_) => _refreshPeerOnline(channel));
     channel.onBroadcast(event: 'typing', callback: _onTypingPayload);
+    channel.onBroadcast(event: 'read', callback: _onReadPayload);
     channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        _broadcastRead(channel);
+      }
       if (status == RealtimeSubscribeStatus.subscribed) {
         final privacy = ChatPrivacyService.instance;
         if (privacy.presenceEnabled) {
@@ -292,6 +337,61 @@ class _ChatRoomState extends State<ChatRoom> {
     _peerTypingTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && _peerTyping) setState(() => _peerTyping = false);
     });
+  }
+
+  void _onReadPayload(Map<String, dynamic> payload) {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return;
+    final conversation = ChatStateService.instance.conversationFor(
+      connectionId,
+    );
+    if (conversation == null || !conversation.otherReadReceiptsEnabled) return;
+    if (payload['user_id']?.toString() != conversation.otherUserId) return;
+    final readAt =
+        DateTime.tryParse(payload['read_at']?.toString() ?? '')?.toLocal();
+    if (readAt == null) return;
+    if (mounted && (_peerReadAt == null || readAt.isAfter(_peerReadAt!))) {
+      setState(() => _peerReadAt = readAt);
+    }
+  }
+
+  void _broadcastRead([RealtimeChannel? target]) {
+    final privacy = ChatPrivacyService.instance;
+    if (!privacy.loaded || !privacy.readReceiptsEnabled) return;
+    final channel = target ?? _presenceChannel;
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (channel == null || uid == null) return;
+    final now = DateTime.now().toUtc();
+    if (_lastReadBroadcast != null &&
+        now.difference(_lastReadBroadcast!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastReadBroadcast = now;
+    unawaited(_sendReadMessage(channel, uid, now));
+  }
+
+  Future<void> _sendReadMessage(
+    RealtimeChannel channel,
+    String uid,
+    DateTime readAt,
+  ) async {
+    try {
+      await channel.sendBroadcastMessage(
+        event: 'read',
+        payload: {'user_id': uid, 'read_at': readAt.toIso8601String()},
+      );
+    } catch (_) {
+      // Receipts are best-effort; the next refresh reconciles.
+    }
+  }
+
+  bool get _peerReceiptsEnabled {
+    final connectionId = widget.connectionId;
+    if (connectionId == null) return false;
+    return ChatStateService.instance
+            .conversationFor(connectionId)
+            ?.otherReadReceiptsEnabled ??
+        false;
   }
 
   bool get _showPeerTyping {
@@ -419,6 +519,7 @@ class _ChatRoomState extends State<ChatRoom> {
         _loadingMessages = false;
       });
       _scrollToBottom();
+      _broadcastRead();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -457,6 +558,7 @@ class _ChatRoomState extends State<ChatRoom> {
               _newWhileScrolled += rows.length - previousCount;
             });
           }
+          _broadcastRead();
         });
   }
 
@@ -1657,6 +1759,9 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Widget _buildMessageList(Color textTheme) {
     final myId = Supabase.instance.client.auth.currentUser?.id;
+    final lastOwnIndex = _messages.lastIndexWhere(
+      (message) => message['sender_id'] == myId,
+    );
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollUpdateNotification &&
@@ -1775,6 +1880,22 @@ class _ChatRoomState extends State<ChatRoom> {
                     style: AppTextStyles.regularText.copyWith(
                       fontSize: 11,
                       color: textTheme.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+              if (i == lastOwnIndex &&
+                  shouldShowSeen(
+                    lastOwnAt: currTime,
+                    peerReadAt: _peerReadAt,
+                    receiptsEnabled: _peerReceiptsEnabled,
+                  ))
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 4),
+                  child: Text(
+                    'Seen',
+                    style: AppTextStyles.regularText.copyWith(
+                      fontSize: 10.5,
+                      color: textTheme.withValues(alpha: 0.6),
                     ),
                   ),
                 ),

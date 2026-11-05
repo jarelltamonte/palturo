@@ -312,21 +312,6 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
           ),
         );
       }
-    } else if (eventType == PostgresChangeEvent.update) {
-      final newRecord = payload.newRecord;
-      final isRead = newRecord['is_read'] == true;
-      final connectionId = newRecord['connection_id']?.toString();
-
-      if (isRead && connectionId != null) {
-        final index = _conversations.indexWhere(
-          (c) => c.connectionId == connectionId,
-        );
-        if (index != -1 && _conversations[index].unread > 0) {
-          final old = _conversations[index];
-          _conversations[index] = old.copyWith(unread: 0);
-          notifyListeners();
-        }
-      }
     }
   }
 

@@ -215,4 +215,55 @@ void main() {
     }
     handle.dispose();
   });
+
+  test('seen only shows on the last own message covered by the peer read', () {
+    final own = DateTime(2026, 11, 5, 12);
+    final after = own.add(const Duration(minutes: 1));
+    final before = own.subtract(const Duration(minutes: 1));
+
+    expect(
+      shouldShowSeen(lastOwnAt: own, peerReadAt: after, receiptsEnabled: true),
+      isTrue,
+    );
+    expect(
+      shouldShowSeen(lastOwnAt: own, peerReadAt: before, receiptsEnabled: true),
+      isFalse,
+    );
+    expect(
+      shouldShowSeen(lastOwnAt: own, peerReadAt: after, receiptsEnabled: false),
+      isFalse,
+    );
+    expect(
+      shouldShowSeen(lastOwnAt: null, peerReadAt: after, receiptsEnabled: true),
+      isFalse,
+    );
+  });
+
+  test('read payloads only match an opted-in peer', () {
+    final read = DateTime.utc(2026, 11, 5, 12).toIso8601String();
+    expect(
+      peerReadTimestamp(
+        {'user_id': 'peer-1', 'read_at': read},
+        peerId: 'peer-1',
+        receiptsEnabled: true,
+      ),
+      isNotNull,
+    );
+    expect(
+      peerReadTimestamp(
+        {'user_id': 'peer-2', 'read_at': read},
+        peerId: 'peer-1',
+        receiptsEnabled: true,
+      ),
+      isNull,
+    );
+    expect(
+      peerReadTimestamp(
+        {'user_id': 'peer-1', 'read_at': read},
+        peerId: 'peer-1',
+        receiptsEnabled: false,
+      ),
+      isNull,
+    );
+  });
 }

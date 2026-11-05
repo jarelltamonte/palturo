@@ -3,9 +3,8 @@
 ## Short answer
 
 No separate backend is required. Supabase Auth creates the tokens and sends the
-mail through Resend. `https://palturo.app` is a small static auth page that
-verifies confirmation tokens, hands password resets to the app on phones, and
-provides a browser reset form on desktop.
+mail through Resend. `https://palturo.app` is a small static auth page that reads
+email links and opens PalTuro. Password changes happen only inside the app.
 
 ## Current flow
 
@@ -17,18 +16,12 @@ Supabase token hash:
 | Password reset | `https://palturo.app/reset?token_hash={{ .TokenHash }}&type=recovery` |
 | Signup confirmation | `https://palturo.app/confirm?token_hash={{ .TokenHash }}&type=signup` |
 
-`/reset` is hybrid:
+`/reset` forwards the token hash to
+`palturo://auth/reset-callback`. `ForgotPasswordType` verifies it with
+`verifyOTP(type: recovery)` and shows the in-app reset form. There is no browser
+password form.
 
-- **Phone:** the page forwards the token hash to
-  `palturo://auth/reset-callback`. `ForgotPasswordType` verifies it with
-  `verifyOTP(type: recovery)` and shows the in-app reset form.
-- **Desktop:** the page verifies the token hash with the Supabase JS client and
-  shows the same reset form in the browser.
-- **Phone fallback:** “Continue in this browser” reveals the desktop form if the
-  app is not installed.
-
-`/confirm` calls `verifyOtp({ type: 'signup' })` and shows the confirmation
-state on the page.
+`/confirm` shows the confirmed state and offers **Open in App**.
 
 The old `{{ .ConfirmationURL }}` style links still fall back to the app handoff:
 the page forwards the `code` or session fragment to
@@ -83,11 +76,9 @@ Custom domains `palturo.app` and `www.palturo.app` are attached to the Worker
 
 ## Verification checklist
 
-- [x] Desktop reset link opens the password form.
-- [x] New password can be saved and used to sign in.
-- [x] Confirmation link marks the account confirmed.
+- [x] Desktop reset link shows **Open in App** and does not expose a password form.
+- [x] Confirmation redirect shows the confirmed state.
 - [x] Expired or reused token shows the expired state.
 - [x] Requesting from localhost still produces a `palturo.app` email link.
-- [x] Phone view forwards the reset token to `palturo://auth/reset-callback`
-      and offers “Continue in this browser” as a fallback.
-- [ ] In-app token verification on a physical phone with a production build.
+- [x] Phone view forwards the reset token to `palturo://auth/reset-callback`.
+- [ ] Complete in-app reset on a physical phone with a production build.

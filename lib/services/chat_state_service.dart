@@ -36,6 +36,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   int _resubscribeAttempts = 0;
   DateTime? _lastHeartbeat;
   Timer? _refreshTimer;
+  int _conversationGeneration = 0;
   final StreamController<IncomingMessageEvent> _messageEvents =
       StreamController<IncomingMessageEvent>.broadcast();
 
@@ -111,6 +112,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   /// Presence refresh is independent of the local broadcast opt-in: even a
   /// user who hides their own status still needs fresh peer status.
   void _startRefreshTimer() {
+    if (Supabase.instance.client.auth.currentUser == null) return;
     if (_refreshTimer?.isActive ?? false) return;
     _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (_lifecycleState != AppLifecycleState.resumed) return;
@@ -183,6 +185,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Loads conversations from backend and sorts them with most recent on top.
   Future<bool> loadConversations({bool showSpinner = true}) async {
+    if (Supabase.instance.client.auth.currentUser == null) return false;
+    final generation = _conversationGeneration;
     if (showSpinner && _conversations.isEmpty) {
       _loading = true;
       _error = null;
@@ -191,6 +195,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
     try {
       final convos = await MatchApi.getConversations();
+      if (generation != _conversationGeneration) return false;
       final accepted = convos.where((c) => c.status == 'accepted').toList();
       _sortConversations(accepted);
       _conversations = accepted;
@@ -200,6 +205,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return true;
     } catch (e) {
+      if (generation != _conversationGeneration) return false;
       _loading = false;
       // Keep whatever is already on screen; the full error scaffold is only
       // for a first load with no data.
@@ -490,6 +496,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   /// Resets state on logout and unsubscribes from Realtime.
   void reset() {
     MatchApi.clearCaches();
+    _conversationGeneration++;
     _refreshTimer?.cancel();
     _refreshTimer = null;
     _resubscribeTimer?.cancel();

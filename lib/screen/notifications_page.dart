@@ -16,6 +16,7 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 
@@ -391,12 +392,8 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
     final all = _items;
     final items = _filteredItems;
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_ios_new, size: 16, color: textColor),
-        ),
+      appBar: AppChrome.appBar(
+        leading: AppChrome.backButton(context, color: textColor),
         title: Text(
           'Activity',
           style: AppTextStyles.headingText.copyWith(
@@ -406,27 +403,29 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
         ),
         actions: [
           if (!_loading && _error == null && _hasUnread)
-            IconButton(
+            AppChrome.iconAction(
+              icon: Icons.done_all,
               tooltip: 'Mark all read',
               onPressed: _markingAll ? null : _markAllRead,
-              icon:
+              color: textColor,
+              child:
                   _markingAll
-                      ? const SizedBox(
+                      ? SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.accentText(context),
+                        ),
                       )
-                      : Icon(Icons.done_all, size: 20, color: textColor),
+                      : null,
             ),
           if (!_loading && _error == null && all.any((item) => !item.isUnread))
-            IconButton(
+            AppChrome.iconAction(
+              icon: Icons.delete_sweep_outlined,
               tooltip: 'Clear read notifications',
               onPressed: _clearRead,
-              icon: Icon(
-                Icons.delete_sweep_outlined,
-                size: 20,
-                color: textColor,
-              ),
+              color: textColor,
             ),
         ],
       ),

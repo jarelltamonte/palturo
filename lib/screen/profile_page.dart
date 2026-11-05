@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
@@ -26,6 +25,7 @@ import 'profile_edit.dart';
 import 'settings.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/resume_setup_card.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -332,49 +332,25 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: bgTheme,
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Profile',
-            style: AppTextStyles.headingText.copyWith(color: textTheme),
-          ),
+      appBar: AppChrome.appBar(
+        title: Text(
+          'Profile',
+          style: AppTextStyles.headingText.copyWith(color: textTheme),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Semantics(
-              button: true,
-              label: 'Settings',
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const Settings()),
-                  );
-                },
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Icon(Icons.settings, color: textTheme),
-                  ),
-                ),
-              ),
-            ),
+          AppChrome.iconAction(
+            icon: Icons.settings,
+            tooltip: 'Settings',
+            color: textTheme,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const Settings()),
+              );
+            },
           ),
         ],
       ),

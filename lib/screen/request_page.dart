@@ -24,6 +24,8 @@ import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 
 class ConnectionRequest {
@@ -1113,21 +1115,14 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
+        leadingWidth: AppSpacing.leadingWidth,
         leading:
             ModalRoute.of(context)?.isFirst == false
-                ? IconButton(
-                  tooltip: 'Back',
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(
-                    Icons.arrow_back_ios_new,
-                    size: 16,
-                    color: textTheme,
-                  ),
-                )
+                ? AppChrome.backButton(context, color: textTheme)
                 : null,
-        titleSpacing: 0,
+        titleSpacing: AppSpacing.titleSpacing,
         title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.zero,
           child: Row(
             children: [
               Expanded(
@@ -1138,7 +1133,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                   style: AppTextStyles.headingText.copyWith(color: textTheme),
                 ),
               ),
-              IconButton(
+              AppChrome.iconAction(
+                icon: Icons.notifications_none_rounded,
                 tooltip: 'Activity',
                 onPressed:
                     () => Navigator.push(
@@ -1147,7 +1143,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                         builder: (_) => const NotificationsPage(),
                       ),
                     ),
-                icon: Stack(
+                child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     Icon(
@@ -1189,7 +1185,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                       clipBehavior: Clip.none,
                       children: [
                         Align(
-                          alignment: Alignment.centerRight,
+                          alignment: Alignment.center,
                           child: Icon(Icons.tune, color: textTheme, size: 24),
                         ),
                         if (_view == RequestView.incoming

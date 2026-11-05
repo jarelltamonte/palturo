@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_feedback.dart';
@@ -200,20 +202,13 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
+      appBar: AppChrome.appBar(
+        titleSpacing: AppSpacing.titleSpacing,
         title: Padding(
-          padding: const EdgeInsets.only(left: 16, right: 16),
+          padding: EdgeInsets.zero,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -221,15 +216,10 @@ class _ExplorePageState extends State<ExplorePage> {
                 'Browse',
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
-              IconButton(
+              AppChrome.iconAction(
+                icon: CupertinoIcons.question_circle,
                 tooltip: 'How Browse works',
-                icon: Icon(
-                  CupertinoIcons.question_circle,
-                  color: textTheme,
-                  size: 24,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                color: textTheme,
                 onPressed: () {
                   showAdaptiveDialog(
                     context: context,

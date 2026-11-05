@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
@@ -1156,18 +1158,12 @@ class _ChatRoomState extends State<ChatRoom> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        titleSpacing: 0,
+        leadingWidth: AppSpacing.leadingWidth,
+        leading: AppChrome.backButton(context),
+        titleSpacing: AppSpacing.titleSpacing,
         title: Row(
           children: [
-            IconButton(
-              tooltip: 'Back',
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.arrow_back_ios_new, size: 16),
-            ),
             if (showProfileInAppBar) ...[
-              const SizedBox(width: 4),
               Expanded(
                 child: GestureDetector(
                   onTap: _showProfile,
@@ -1337,12 +1333,11 @@ class _ChatRoomState extends State<ChatRoom> {
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.all(6),
-                    margin: const EdgeInsets.only(right: 8),
                     decoration: const BoxDecoration(
                       color: Colors.transparent,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.more_horiz, color: textTheme, size: 22),
+                    child: Icon(Icons.more_horiz, color: textTheme, size: 24),
                   ),
                 ),
               ),

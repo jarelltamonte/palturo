@@ -5,6 +5,8 @@ import 'package:lottie/lottie.dart';
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/action_dialogs.dart';
@@ -584,12 +586,7 @@ class _ChatsPageState extends State<ChatsPage> {
     if (_loadingChats) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        appBar: AppBar(
-          toolbarHeight: adaptiveHeight,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          titleSpacing: 16,
+        appBar: AppChrome.appBar(
           title: Text(
             'Chats',
             style: AppTextStyles.headingText.copyWith(color: textTheme),
@@ -601,12 +598,7 @@ class _ChatsPageState extends State<ChatsPage> {
     if (_chatsError != null) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        appBar: AppBar(
-          toolbarHeight: adaptiveHeight,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          titleSpacing: 16,
+        appBar: AppChrome.appBar(
           title: Text(
             'Chats',
             style: AppTextStyles.headingText.copyWith(color: textTheme),
@@ -649,7 +641,7 @@ class _ChatsPageState extends State<ChatsPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: AppSpacing.titleSpacing,
         title:
             _isSearching
                 ? _buildSearchField(textTheme, AppColors.accentText(context))

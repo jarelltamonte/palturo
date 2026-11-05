@@ -16,6 +16,7 @@ import 'package:palturo/screen/settings/notification_preferences_page.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -887,8 +888,6 @@ class _SettingsState extends State<Settings> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final accountName = _profile?.name ?? _authName ?? _email ?? 'Your account';
     final accountSubtitle =
@@ -898,24 +897,8 @@ class _SettingsState extends State<Settings> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        leadingWidth: 46,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: IconButton(
-            tooltip: 'Back',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
-          ),
-        ),
+      appBar: AppChrome.appBar(
+        leading: AppChrome.backButton(context, color: textTheme),
         title: Text(
           'Settings',
           style: AppTextStyles.headingText.copyWith(

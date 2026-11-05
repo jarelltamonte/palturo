@@ -5,6 +5,8 @@ import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
@@ -715,11 +717,16 @@ class _MatchesState extends State<Matches> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 0,
+        leadingWidth: AppSpacing.leadingWidth,
+        titleSpacing: AppSpacing.titleSpacing,
+        leading:
+            _isSearching
+                ? null
+                : AppChrome.backButton(context, color: textTheme),
         title:
             _isSearching
                 ? Padding(
-                  padding: const EdgeInsets.only(left: 16),
+                  padding: EdgeInsets.zero,
                   child: Container(
                     height: 44,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -784,93 +791,54 @@ class _MatchesState extends State<Matches> {
                     ),
                   ),
                 )
-                : Row(
-                  children: [
-                    Semantics(
-                      container: true,
-                      button: true,
-                      label: 'Back',
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => Navigator.pop(context),
-                        child: SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: Center(
-                            child: Icon(
-                              Icons.arrow_back_ios_new,
-                              color: textTheme,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      'Pals',
-                      style: AppTextStyles.headingText.copyWith(
-                        color: textTheme,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ],
-                ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isSearching)
-                  TextButton(
-                    onPressed: _stopSearch,
-                    child: Text(
-                      'Cancel',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                  )
-                else
-                  IconButton(
-                    tooltip: 'Search pals',
-                    constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
-                    ),
-                    icon: Icon(CupertinoIcons.search, color: textTheme),
-                    onPressed: _startSearch,
+                : Text(
+                  'Pals',
+                  style: AppTextStyles.headingText.copyWith(
+                    color: textTheme,
+                    fontSize: 20,
                   ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      tooltip: 'Filter pals',
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                      icon: Icon(Icons.tune, color: textTheme),
-                      onPressed: _showFilterSheet,
-                    ),
-                    if (_hasActiveFilter)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.accentText(context),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
                 ),
+        actionsPadding: const EdgeInsets.only(right: AppSpacing.trailingInset),
+        actions: [
+          if (_isSearching)
+            AppChrome.iconAction(
+              icon: Icons.close,
+              tooltip: 'Cancel search',
+              color: textTheme,
+              onPressed: _stopSearch,
+            )
+          else ...[
+            AppChrome.iconAction(
+              icon: CupertinoIcons.search,
+              tooltip: 'Search pals',
+              color: textTheme,
+              onPressed: _startSearch,
+            ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AppChrome.iconAction(
+                  icon: Icons.tune,
+                  tooltip: 'Filter pals',
+                  color: textTheme,
+                  onPressed: _showFilterSheet,
+                ),
+                if (_hasActiveFilter)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentText(context),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
               ],
             ),
-          ),
+          ],
         ],
       ),
       body:

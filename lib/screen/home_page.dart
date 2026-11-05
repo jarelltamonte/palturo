@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
@@ -694,9 +694,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
-
     final people = _filteredPeople;
     final hasMore = _currentIndex < people.length;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -704,13 +701,16 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
+        toolbarHeight: AppSpacing.topBarHeight(),
         backgroundColor: Colors.transparent,
         titleSpacing: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.only(
+            left: AppSpacing.pageHorizontal,
+            right: AppSpacing.trailingInset,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -747,7 +747,7 @@ class _HomePageState extends State<HomePage> {
                               clipBehavior: Clip.none,
                               children: [
                                 Align(
-                                  alignment: Alignment.centerRight,
+                                  alignment: Alignment.center,
                                   child: Icon(
                                     Icons.notifications_none_rounded,
                                     color: textTheme,
@@ -803,7 +803,7 @@ class _HomePageState extends State<HomePage> {
                         width: 44,
                         height: 44,
                         child: Align(
-                          alignment: Alignment.centerRight,
+                          alignment: Alignment.center,
                           child: Icon(
                             CupertinoIcons.arrow_uturn_left,
                             color:
@@ -829,7 +829,7 @@ class _HomePageState extends State<HomePage> {
                           clipBehavior: Clip.none,
                           children: [
                             Align(
-                              alignment: Alignment.centerRight,
+                              alignment: Alignment.center,
                               child: Icon(
                                 Icons.tune,
                                 color: textTheme,

@@ -15,6 +15,7 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
 
@@ -331,7 +332,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           builder: (context, setModalState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,24 +618,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       },
       child: Scaffold(
         backgroundColor: lightColor,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          iconTheme: IconThemeData(color: textTheme),
-          titleSpacing: 0,
-          title: Text(
-            largeText ? 'Edit' : 'Edit Profile',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.headingText.copyWith(
-              color: textTheme,
-              fontSize: 20,
-            ),
-          ),
-          leading: IconButton(
+        appBar: AppChrome.appBar(
+          leading: AppChrome.iconAction(
+            icon: Icons.arrow_back_ios_new,
             tooltip: 'Back',
-            icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
+            color: textTheme,
+            size: 16,
             onPressed: () async {
               if (_isSaving) return;
               if (_hasUnsavedChanges()) {
@@ -647,11 +636,21 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
               }
             },
           ),
+          title: Text(
+            largeText ? 'Edit' : 'Edit Profile',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.headingText.copyWith(
+              color: textTheme,
+              fontSize: 20,
+            ),
+          ),
           actions: [
-            IconButton(
+            AppChrome.iconAction(
+              icon: Icons.visibility_outlined,
               tooltip: 'Preview profile',
               onPressed: _isSaving ? null : _openPreview,
-              icon: Icon(Icons.visibility_outlined, color: textTheme),
+              color: textTheme,
             ),
             if (hasChanges)
               Padding(
@@ -668,32 +667,28 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   ),
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: TextButton(
-                style: TextButton.styleFrom(
-                  backgroundColor:
-                      canSave
-                          ? AppColors.primary
-                          : AppColors.mutedSurface(context),
-                  foregroundColor:
-                      canSave ? Colors.black : AppColors.mutedText(context),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  minimumSize: const Size(0, 44),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
-                  ),
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor:
+                    canSave
+                        ? AppColors.primary
+                        : AppColors.mutedSurface(context),
+                foregroundColor:
+                    canSave ? Colors.black : AppColors.mutedText(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                onPressed: canSave ? _save : null,
-                child: Text(
-                  'Save',
-                  style: AppTextStyles.regularText.copyWith(
-                    color:
-                        canSave ? Colors.black : AppColors.mutedText(context),
-                  ),
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+              ),
+              onPressed: canSave ? _save : null,
+              child: Text(
+                'Save',
+                style: AppTextStyles.regularText.copyWith(
+                  color: canSave ? Colors.black : AppColors.mutedText(context),
                 ),
               ),
             ),
@@ -709,12 +704,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 children: [
                   const SizedBox(height: 24),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: _ProfileSectionHeader(title: 'Profile photos'),
                   ),
                   const SizedBox(height: 10),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _PhotoPickerRow(
                       photoPaths: _photos,
                       onChanged: (updated) {
@@ -725,7 +720,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   ),
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       'The main photo appears on your profile and cards.',
                       style: AppTextStyles.regularText.copyWith(
@@ -736,12 +731,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   ),
                   const SizedBox(height: 24),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: _ProfileSectionHeader(title: 'About you'),
                   ),
                   const SizedBox(height: 12),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       'Bio',
                       style: AppTextStyles.boldText.copyWith(
@@ -752,7 +747,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   ),
                   const SizedBox(height: 12),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: TopLabeledField(
                       label: 'Introduce yourself',
                       controller: _bioController,
@@ -766,7 +761,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   ),
                   const SizedBox(height: 20),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -815,7 +810,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   ),
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1072,15 +1067,8 @@ class _ProfilePreviewPage extends StatelessWidget {
     final schedule = formatScheduleDays(profile.availableDays);
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_ios_new, size: 16, color: textTheme),
-        ),
+      appBar: AppChrome.appBar(
+        leading: AppChrome.backButton(context, color: textTheme),
         title: Text(
           'Profile preview',
           style: AppTextStyles.headingText.copyWith(
@@ -1090,7 +1078,7 @@ class _ProfilePreviewPage extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(24),

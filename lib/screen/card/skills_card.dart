@@ -257,6 +257,7 @@ class SkillsCard extends StatefulWidget {
   final ValueChanged<String>? onSkillRemoved;
   final ValueChanged<String>? onAttachFile;
   final ValueChanged<String>? onRemoveAttachment;
+  final VoidCallback? onAddSkills;
 
   const SkillsCard({
     super.key,
@@ -275,6 +276,7 @@ class SkillsCard extends StatefulWidget {
     this.onSkillRemoved,
     this.onAttachFile,
     this.onRemoveAttachment,
+    this.onAddSkills,
   });
 
   factory SkillsCard.toLearn({
@@ -286,6 +288,7 @@ class SkillsCard extends StatefulWidget {
         const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
     void Function(String skillId, String note)? onNoteChanged,
+    VoidCallback? onAddSkills,
   }) {
     return SkillsCard(
       key: key,
@@ -299,6 +302,7 @@ class SkillsCard extends StatefulWidget {
       suggestionService: suggestionService,
       onChanged: onChanged,
       onNoteChanged: onNoteChanged,
+      onAddSkills: onAddSkills,
     );
   }
 
@@ -316,6 +320,7 @@ class SkillsCard extends StatefulWidget {
     ValueChanged<String>? onSkillRemoved,
     ValueChanged<String>? onAttachFile,
     ValueChanged<String>? onRemoveAttachment,
+    VoidCallback? onAddSkills,
   }) {
     return SkillsCard(
       key: key,
@@ -334,6 +339,7 @@ class SkillsCard extends StatefulWidget {
       onSkillRemoved: onSkillRemoved,
       onAttachFile: onAttachFile,
       onRemoveAttachment: onRemoveAttachment,
+      onAddSkills: onAddSkills,
     );
   }
 
@@ -551,8 +557,34 @@ class _SkillsCardState extends State<SkillsCard> {
             ],
           ),
           const SizedBox(height: 16),
-          for (int i = 0; i < _skillIds.length; i++) ...[
-            _SkillRow(
+          if (_skillIds.isEmpty && !widget.isEditing) ...[
+            Text(
+              'No skills added yet',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+              ),
+            ),
+            if (widget.onAddSkills != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Add skills to ${widget.labelSuffix.toLowerCase()}',
+                  onTap: widget.onAddSkills,
+                  excludeSemantics: true,
+                  child: TextButton(
+                    onPressed: widget.onAddSkills,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: const Text('Add skills'),
+                  ),
+                ),
+              ),
+          ] else
+            for (int i = 0; i < _skillIds.length; i++) ...[
+              _SkillRow(
               key: ValueKey('skill_row_${_rowUids[i]}'),
               selectedId: _skillIds[i],
               alreadyUsedIds: _skillIds,

@@ -367,7 +367,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        child: _ProfileSummaryCard(
+                        child: ProfileSummaryCard(
                           profile: _profile!,
                           onTap: _openEdit,
                           onAvatarTap: _showMyProfile,
@@ -504,6 +504,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 isEditing: false,
                                 initialSkillIds: _profile!.learningSkillIds,
                                 notes: _profile!.learningNotes,
+                                onAddSkills: _openEdit,
                               ),
                               const SizedBox(height: 24),
                             ],
@@ -513,6 +514,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 isEditing: false,
                                 initialSkillIds: _profile!.teachingSkillIds,
                                 notes: _profile!.teachingNotes,
+                                onAddSkills: _openEdit,
                               ),
                           ],
                         ),
@@ -526,12 +528,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-class _ProfileSummaryCard extends StatelessWidget {
+class ProfileSummaryCard extends StatelessWidget {
   final ProfileData profile;
   final VoidCallback onTap;
   final VoidCallback onAvatarTap;
 
-  const _ProfileSummaryCard({
+  const ProfileSummaryCard({
+    super.key,
     required this.profile,
     required this.onTap,
     required this.onAvatarTap,
@@ -582,7 +585,7 @@ class _ProfileSummaryCard extends StatelessWidget {
                           displayAvatar != null
                               ? NetworkImage(displayAvatar)
                               : null,
-                      size: 80,
+                      size: 72,
                     ),
                   ),
                 ),
@@ -590,10 +593,11 @@ class _ProfileSummaryCard extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         profile.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.headingText.copyWith(
                           color: textColor,
                           fontSize: 18,

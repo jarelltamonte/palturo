@@ -189,8 +189,8 @@ class _ChatRoomState extends State<ChatRoom> {
           if (mounted && _peerOnlineFromChannel) {
             setState(() => _peerOnlineFromChannel = false);
           }
+          unawaited(Supabase.instance.client.removeChannel(channel));
         }
-        unawaited(Supabase.instance.client.removeChannel(channel));
       }
     });
     _presenceChannel = channel;

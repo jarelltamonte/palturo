@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/settings/notification_preferences_page.dart';
 import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -133,6 +134,9 @@ void main() {
     expect(find.text('Show message text'), findsOneWidget);
     expect(find.widgetWithText(SwitchListTile, 'Quiet hours'), findsOneWidget);
 
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect((list.padding! as EdgeInsets).bottom, AppSpacing.pageBottom);
+
     await tester.tap(find.byType(SwitchListTile).first);
     await tester.pumpAndSettle();
 
@@ -166,6 +170,29 @@ void main() {
       300,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bottom padding adds the safe-area inset', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: const MediaQuery(
+          data: MediaQueryData(
+            size: Size(390, 844),
+            padding: EdgeInsets.only(bottom: 34),
+          ),
+          child: NotificationPreferencesPage(),
+        ),
+      ),
+    );
+
+    final list = tester.widget<ListView>(find.byType(ListView));
+    expect(
+      (list.padding! as EdgeInsets).bottom,
+      AppSpacing.pageBottom + 34,
+    );
   });
 
   testWidgets('message preview and quiet hours rows update', (tester) async {

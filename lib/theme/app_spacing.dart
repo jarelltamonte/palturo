@@ -10,6 +10,9 @@ class AppSpacing {
   static const double titleSpacing = 16;
   static const double trailingInset = 16;
 
+  /// Bottom inset for pushed pages that do not sit under the tab bar.
+  static const double pageBottom = 32;
+
   /// Bottom padding for a scroll view under the floating tab bar. Inside the
   /// shell, Scaffold already reports the nav height in `padding.bottom`
   /// (extendBody), so add only the 16 px breathing room.

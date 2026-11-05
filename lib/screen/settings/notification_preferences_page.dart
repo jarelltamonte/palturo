@@ -7,7 +7,9 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/widgets/app_chrome.dart';
 
 class NotificationPreferencesPage extends StatelessWidget {
   const NotificationPreferencesPage({super.key});
@@ -39,7 +41,12 @@ class NotificationPreferencesPage extends StatelessWidget {
           final prefs = PreferencesService.instance;
           final master = prefs.notificationsEnabled;
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              AppSpacing.pageBottom + MediaQuery.paddingOf(context).bottom,
+            ),
             children: [
               _sectionLabel(context, 'Delivery'),
               SwitchListTile.adaptive(
@@ -273,9 +280,11 @@ class NotificationPreferencesPage extends StatelessWidget {
         trailing =
             kIsWeb
                 ? null
-                : TextButton(
+                : AppChrome.iconAction(
+                  icon: Icons.open_in_new,
+                  tooltip: 'Open settings',
                   onPressed: service.openSettings,
-                  child: const Text('Open settings'),
+                  size: 20,
                 );
       case NotificationPermissionStatus.unknown:
         subtitle = 'Not requested yet. In-app banners work without it.';

@@ -373,8 +373,8 @@ class MatchApi {
     _deckCacheUserId = null;
   }
 
-  static bool hasCachedDeck(String asRoleDb) =>
-      _deckCache.containsKey(_deckKey(asRoleDb));
+  /// Returns the cached deck without a network or profile call, or null.
+  static List<Person>? peekDeck(String asRoleDb) => _deckCache[_deckKey(asRoleDb)];
 
   /// Cached deck instantly (no spinner); triggers a background refresh when
   /// stale. force bypasses both.

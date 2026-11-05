@@ -29,8 +29,19 @@ import 'package:palturo/utils/friendly_error.dart';
 
 enum RoleFilter { all, learner, mentor }
 
+/// How long a cold deck load may look idle before the UI admits it is slow.
+@visibleForTesting
+const kDeckSlowThreshold = Duration(seconds: 4);
+
+/// Hard cap for a cold deck load. After this the UI offers a retry.
+@visibleForTesting
+const kDeckTimeout = Duration(seconds: 12);
+
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  /// Test hook: replaces the real deck fetch. Production leaves this null.
+  final Future<List<Person>> Function({bool force})? deckLoader;
+
+  const HomePage({super.key, this.deckLoader});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -39,6 +50,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Person> _people = const [];
   bool _loading = true;
+  bool _slowLoad = false;
+  Timer? _slowTimer;
+  Timer? _timeoutTimer;
   String? _error;
   ProfileData? _myProfile;
   bool _profileNudgeShown = false;
@@ -66,43 +80,92 @@ class _HomePageState extends State<HomePage> {
     _loadDeck();
   }
 
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadDeck({bool force = false}) async {
-    final cached =
-        _roleFilter == RoleFilter.all
-            ? MatchApi.hasCachedDeck('learner') &&
-                MatchApi.hasCachedDeck('mentor')
-            : MatchApi.hasCachedDeck(_roleKey);
+    final cached = _cachedDeck();
     final generation = ++_deckGeneration;
 
+    _slowTimer?.cancel();
+    _timeoutTimer?.cancel();
     setState(() {
-      _loading = !cached && _people.isEmpty;
+      if (_people.isEmpty && cached != null) {
+        _people = List<Person>.of(cached);
+        _currentIndex = 0;
+      }
+      _loading = _people.isEmpty;
+      _slowLoad = false;
       _error = null;
       _discovering = false;
     });
 
+    if (_loading) {
+      _slowTimer = Timer(kDeckSlowThreshold, () {
+        if (mounted && _loading) setState(() => _slowLoad = true);
+      });
+    }
+
     try {
-      final deck = await _fetchDeck(force: force);
+      final result = Completer<List<Person>>();
+      _timeoutTimer = Timer(kDeckTimeout, () {
+        if (!result.isCompleted) {
+          result.completeError(TimeoutException('deck load timed out'));
+        }
+      });
+      unawaited(
+        _fetchDeck(force: force).then(
+          (deck) {
+            if (!result.isCompleted) result.complete(deck);
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!result.isCompleted) result.completeError(error, stack);
+          },
+        ),
+      );
+
+      final deck = await result.future;
+      if (!mounted || generation != _deckGeneration) return;
+      _timeoutTimer?.cancel();
+      _slowTimer?.cancel();
       debugPrint('[People] deck loaded: ${deck.length} people');
 
-      if (!mounted || generation != _deckGeneration) return;
-
       setState(() {
+        final sameDeck = _sameDeck(_people, deck);
         _people = deck;
         _loading = false;
-        _currentIndex = 0;
-        _history.clear();
-        _historyRight.clear();
-        _historyConnectionIds.clear();
-        _undoActive = false;
+        _slowLoad = false;
+        if (!sameDeck) {
+          _currentIndex = 0;
+          _history.clear();
+          _historyRight.clear();
+          _historyConnectionIds.clear();
+          _undoActive = false;
+        }
         if (_skillFilter != 'all' &&
             !deck.any((person) => person.skillName == _skillFilter)) {
           _skillFilter = 'all';
         }
       });
-    } catch (e, st) {
-      debugPrint('[People] _loadDeck ERROR: $e\n$st');
-
+    } on TimeoutException {
       if (!mounted || generation != _deckGeneration) return;
+      _slowTimer?.cancel();
+      _timeoutTimer?.cancel();
+      setState(() {
+        _error =
+            'This is taking longer than expected. Check your connection and try again.';
+        _loading = false;
+        _slowLoad = false;
+      });
+    } catch (e, st) {
+      if (!mounted || generation != _deckGeneration) return;
+      _slowTimer?.cancel();
+      _timeoutTimer?.cancel();
+      debugPrint('[People] _loadDeck ERROR: $e\n$st');
 
       setState(() {
         _error = friendlyError(
@@ -110,6 +173,7 @@ class _HomePageState extends State<HomePage> {
           fallback: "Couldn't load recommendations. Please try again.",
         );
         _loading = false;
+        _slowLoad = false;
       });
     }
   }
@@ -120,7 +184,45 @@ class _HomePageState extends State<HomePage> {
     RoleFilter.all => 'all',
   };
 
+  /// Cached deck for the current filter, if one is already in memory. This
+  /// paints the previous deck instantly on a cold open instead of flashing an
+  /// empty state while the profile and network calls settle.
+  List<Person>? _cachedDeck() {
+    if (widget.deckLoader != null) return null;
+    if (_roleFilter == RoleFilter.all) {
+      final learner = MatchApi.peekDeck('learner');
+      final mentor = MatchApi.peekDeck('mentor');
+      if (learner == null || mentor == null) return null;
+      return _mergeDecks([learner, mentor]);
+    }
+    return MatchApi.peekDeck(_roleKey);
+  }
+
+  bool _sameDeck(List<Person> a, List<Person> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
+
+  List<Person> _mergeDecks(Iterable<List<Person>> decks) {
+    final byId = <String, Person>{};
+    for (final person in decks.expand((deck) => deck)) {
+      final existing = byId[person.id];
+      if (existing == null ||
+          (person.compatibility ?? 0) > (existing.compatibility ?? 0)) {
+        byId[person.id] = person;
+      }
+    }
+    return byId.values.toList()..sort(
+      (a, b) => (b.compatibility ?? 0).compareTo(a.compatibility ?? 0),
+    );
+  }
+
   Future<List<Person>> _fetchDeck({bool force = false}) async {
+    if (widget.deckLoader != null) return widget.deckLoader!(force: force);
+
     final me = await ProfileService().getCurrentUserProfile();
 
     if (mounted && me != null) {
@@ -140,19 +242,7 @@ class _HomePageState extends State<HomePage> {
           enrichLimit: 10,
         ),
       ]);
-      final byId = <String, Person>{};
-      for (final person in decks.expand((deck) => deck)) {
-        final existing = byId[person.id];
-        if (existing == null ||
-            (person.compatibility ?? 0) > (existing.compatibility ?? 0)) {
-          byId[person.id] = person;
-        }
-      }
-      final merged =
-          byId.values.toList()..sort(
-            (a, b) => (b.compatibility ?? 0).compareTo(a.compatibility ?? 0),
-          );
-      return merged;
+      return _mergeDecks(decks);
     }
 
     return MatchApi.getMatchDeck(
@@ -264,6 +354,7 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           _roleFilter = newRole;
           _skillFilter = newSkill;
+          if (roleChanged) _people = const [];
           _currentIndex = 0;
           _history.clear();
           _historyRight.clear();
@@ -772,13 +863,55 @@ class _HomePageState extends State<HomePage> {
         ),
         child:
             _loading
-                ? const PersonCardSkeleton()
-                : _error != null
+                ? _buildLoadingState()
+                : _error != null && _people.isEmpty
                 ? _buildErrorState(textTheme)
                 : hasMore
                 ? _buildDeck(people)
                 : _buildEmptyState(textTheme),
       ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const PersonCardSkeleton(),
+        if (_slowLoad)
+          Positioned(
+            left: AppSpacing.pageHorizontal,
+            right: AppSpacing.pageHorizontal,
+            bottom: 16,
+            child: Semantics(
+              liveRegion: true,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                decoration: BoxDecoration(
+                  color: AppColors.elevatedSurface(context),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border(context)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Still looking for matches…',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _loadDeck(force: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -790,26 +923,29 @@ class _HomePageState extends State<HomePage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              style: AppTextStyles.regularText.copyWith(color: textColor),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadDeck,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+        child: Semantics(
+          liveRegion: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                message,
+                style: AppTextStyles.regularText.copyWith(color: textColor),
+                textAlign: TextAlign.center,
               ),
-              child: const Text(
-                'Retry',
-                style: TextStyle(color: Colors.black, fontSize: 16),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadDeck,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Colors.black, fontSize: 16),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

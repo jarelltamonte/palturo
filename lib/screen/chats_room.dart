@@ -345,10 +345,12 @@ class _ChatRoomState extends State<ChatRoom> {
     final conversation = ChatStateService.instance.conversationFor(
       connectionId,
     );
-    if (conversation == null || !conversation.otherReadReceiptsEnabled) return;
-    if (payload['user_id']?.toString() != conversation.otherUserId) return;
-    final readAt =
-        DateTime.tryParse(payload['read_at']?.toString() ?? '')?.toLocal();
+    if (conversation == null) return;
+    final readAt = peerReadTimestamp(
+      payload,
+      peerId: conversation.otherUserId,
+      receiptsEnabled: conversation.otherReadReceiptsEnabled,
+    );
     if (readAt == null) return;
     if (mounted && (_peerReadAt == null || readAt.isAfter(_peerReadAt!))) {
       setState(() => _peerReadAt = readAt);
@@ -356,6 +358,9 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   void _broadcastRead([RealtimeChannel? target]) {
+    if (ChatStateService.instance.lifecycleState != AppLifecycleState.resumed) {
+      return;
+    }
     final privacy = ChatPrivacyService.instance;
     if (!privacy.loaded || !privacy.readReceiptsEnabled) return;
     final channel = target ?? _presenceChannel;

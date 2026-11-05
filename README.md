@@ -34,9 +34,9 @@ crashing. Only the publishable (anon) key belongs here — never a service-role 
 > `$env:SUPABASE_ACCESS_TOKEN = (Get-Content .env.cli | Where-Object { $_ -match '^SUPABASE_PAT=' }) -replace '^SUPABASE_PAT=', ''`
 
 Auth email links and redirect URLs are documented in
-[`docs/AUTH_EMAIL_LINKS.md`](docs/AUTH_EMAIL_LINKS.md). The production web
-deployment (Vercel + `palturo.app`) is documented in
-[`docs/DEPLOY_VERCEL.md`](docs/DEPLOY_VERCEL.md).
+[`docs/AUTH_EMAIL_LINKS.md`](docs/AUTH_EMAIL_LINKS.md). The static confirmation
+and reset page is a separate project in `../palturo-auth-web` and is deployed to
+Cloudflare at `palturo.app`.
 
 ## Backend functions
 

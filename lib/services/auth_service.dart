@@ -154,23 +154,25 @@ class AuthService {
 
   /// Public origin used in Supabase auth email links.
   ///
-  /// On web, a custom scheme such as `palturo://` cannot be opened by a
-  /// browser, so the redirect must be an HTTPS (or localhost) URL. Set
-  /// APP_PUBLIC_URL at build time for production, for example
-  /// `--dart-define=APP_PUBLIC_URL=https://palturo.app`.
-  ///
-  /// On native, the app keeps its deep-link callback.
-  String _authRedirect(String mobilePath) {
-    if (!kIsWeb) return 'palturo://auth/$mobilePath';
-
+  /// Production builds set APP_PUBLIC_URL (for example
+  /// `https://palturo.app`) and email links land on the static auth page at
+  /// `/reset` or `/confirm`. Without it, web keeps the current origin so the
+  /// Flutter web app can handle the recovery session itself, and native keeps
+  /// its deep-link callback.
+  String _authRedirect(String mobilePath, String webPath) {
     const configured = String.fromEnvironment('APP_PUBLIC_URL');
     if (configured.isNotEmpty) {
-      return configured.endsWith('/') ? configured : '$configured/';
+      final base = configured.endsWith('/') ? configured : '$configured/';
+      return '$base$webPath';
     }
 
-    final base = Uri.base;
-    final path = base.path.endsWith('/') ? base.path : '${base.path}/';
-    return '${base.origin}$path';
+    if (kIsWeb) {
+      final base = Uri.base;
+      final path = base.path.endsWith('/') ? base.path : '${base.path}/';
+      return '${base.origin}$path';
+    }
+
+    return 'palturo://auth/$mobilePath';
   }
 
   // login
@@ -236,7 +238,7 @@ class AuthService {
           .resend(
             email: cleanEmail,
             type: OtpType.signup,
-            emailRedirectTo: _authRedirect('callback'),
+            emailRedirectTo: _authRedirect('callback', 'confirm'),
           )
           .timeout(const Duration(seconds: 30));
     } on AuthException catch (e) {
@@ -323,7 +325,7 @@ class AuthService {
         email: cleanEmail,
         password: password,
         data: {'first_name': cleanFirstName, 'last_name': cleanLastName},
-        emailRedirectTo: _authRedirect('callback'),
+        emailRedirectTo: _authRedirect('callback', 'confirm'),
       );
 
       // Handle email confirmation edge case:
@@ -468,7 +470,7 @@ class AuthService {
     try {
       await _supabase.auth.resetPasswordForEmail(
         cleanEmail,
-        redirectTo: _authRedirect('reset-callback'),
+        redirectTo: _authRedirect('reset-callback', 'reset'),
       );
     } on AuthException catch (e) {
       if (e.code == 'over_email_send_rate_limit') {

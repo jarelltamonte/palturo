@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/validators.dart';
 
@@ -151,6 +152,27 @@ class AuthService {
   bool _isRegistering = false;
   static DateTime? _rateLimitCooldownUntil;
 
+  /// Public origin used in Supabase auth email links.
+  ///
+  /// On web, a custom scheme such as `palturo://` cannot be opened by a
+  /// browser, so the redirect must be an HTTPS (or localhost) URL. Set
+  /// APP_PUBLIC_URL at build time for production, for example
+  /// `--dart-define=APP_PUBLIC_URL=https://palturo.app`.
+  ///
+  /// On native, the app keeps its deep-link callback.
+  String _authRedirect(String mobilePath) {
+    if (!kIsWeb) return 'palturo://auth/$mobilePath';
+
+    const configured = String.fromEnvironment('APP_PUBLIC_URL');
+    if (configured.isNotEmpty) {
+      return configured.endsWith('/') ? configured : '$configured/';
+    }
+
+    final base = Uri.base;
+    final path = base.path.endsWith('/') ? base.path : '${base.path}/';
+    return '${base.origin}$path';
+  }
+
   // login
   Future<AuthResponse> login(String email, String password) async {
     final cleanEmail = Validators.normalizeEmail(email);
@@ -214,7 +236,7 @@ class AuthService {
           .resend(
             email: cleanEmail,
             type: OtpType.signup,
-            emailRedirectTo: 'palturo://auth/callback',
+            emailRedirectTo: _authRedirect('callback'),
           )
           .timeout(const Duration(seconds: 30));
     } on AuthException catch (e) {
@@ -301,7 +323,7 @@ class AuthService {
         email: cleanEmail,
         password: password,
         data: {'first_name': cleanFirstName, 'last_name': cleanLastName},
-        emailRedirectTo: 'palturo://auth/callback',
+        emailRedirectTo: _authRedirect('callback'),
       );
 
       // Handle email confirmation edge case:
@@ -446,7 +468,7 @@ class AuthService {
     try {
       await _supabase.auth.resetPasswordForEmail(
         cleanEmail,
-        redirectTo: 'palturo://auth/reset-callback',
+        redirectTo: _authRedirect('reset-callback'),
       );
     } on AuthException catch (e) {
       if (e.code == 'over_email_send_rate_limit') {

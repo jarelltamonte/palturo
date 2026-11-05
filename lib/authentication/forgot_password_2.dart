@@ -83,48 +83,54 @@ class _ForgotPasswordWaitState extends State<ForgotPasswordWait> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Lottie.asset(
-                'assets/lottie/lottie_finished.json',
-                width: 260,
-                repeat: !_linkConfirmed,
-                animate: true,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Lottie.asset(
+                    'assets/lottie/lottie_finished.json',
+                    width: 220,
+                    repeat: !_linkConfirmed,
+                    animate: true,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _linkConfirmed
+                        ? 'Reset Link Verified!'
+                        : 'Check your email',
+                    style: AppTextStyles.headingText.copyWith(color: textTheme),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _linkConfirmed
+                        ? 'Redirecting to reset your password...'
+                        : 'We sent a password reset link to ${widget.email}.\n\nClick the link in your email to continue on this device.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  TextButton(
+                    onPressed: _returnToLogin,
+                    style: TextButton.styleFrom(
+                      foregroundColor: textTheme.withValues(alpha: 0.7),
+                      textStyle: AppTextStyles.regularText,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text('Cancel and Return to Login'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              Text(
-                _linkConfirmed ? 'Reset Link Verified!' : 'Check your email',
-                style: AppTextStyles.headingText.copyWith(color: textTheme),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _linkConfirmed
-                    ? 'Redirecting to reset your password...'
-                    : 'We sent a password reset link to\n${widget.email}.\n\nClick the link in your email to continue on this device.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 24.0),
-          child: TextButton(
-            onPressed: _returnToLogin,
-            style: TextButton.styleFrom(
-              foregroundColor: textTheme.withValues(alpha: 0.7),
-              textStyle: AppTextStyles.regularText,
-              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
-            child: const Text('Cancel and Return to Login'),
           ),
         ),
       ),

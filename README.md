@@ -28,6 +28,14 @@ flutter run \
 If the values are missing, the app starts on a configuration screen instead of
 crashing. Only the publishable (anon) key belongs here — never a service-role key.
 
+> **Do not put `SUPABASE_PAT` or any service-role key in `.env`.**
+> `--dart-define-from-file` compiles every value in that file into the client.
+> Keep CLI tokens in `.env.cli` (gitignored) and load them only in your shell:
+> `$env:SUPABASE_ACCESS_TOKEN = (Get-Content .env.cli | Where-Object { $_ -match '^SUPABASE_PAT=' }) -replace '^SUPABASE_PAT=', ''`
+
+Auth email links and redirect URLs are documented in
+[`docs/AUTH_EMAIL_LINKS.md`](docs/AUTH_EMAIL_LINKS.md).
+
 ## Backend functions
 
 ```sh

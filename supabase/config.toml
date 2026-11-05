@@ -1,9 +1,9 @@
 project_id = "palturo"
 
 [auth]
-site_url = "palturo://auth/callback"
+site_url = "http://localhost:5317"
 jwt_expiry = 1800
-additional_redirect_urls = ["palturo://auth/callback", "palturo://auth/reset-callback"]
+additional_redirect_urls = ["http://localhost:5317", "http://localhost:5317/**", "palturo://auth/callback", "palturo://auth/reset-callback"]
 
 [auth.email]
 enable_confirmations = true

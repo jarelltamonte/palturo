@@ -118,68 +118,63 @@ class _ForgotPasswordState extends State<ForgotPassword> {
       ),
 
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Find your account',
-                      style: AppTextStyles.headingText.copyWith(
-                        color: textTheme,
-                      ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Find your account',
+                    style: AppTextStyles.headingText.copyWith(color: textTheme),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    'Enter your email address.',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme.withValues(alpha: 0.8),
                     ),
+                    textAlign: TextAlign.center,
+                  ),
 
-                    const SizedBox(height: 8),
+                  const SizedBox(height: 32),
+                  TopLabeledField(label: 'Email', controller: _emailController),
+                  const SizedBox(height: 16),
 
-                    Text(
-                      'Enter your email address.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.8),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-                    TopLabeledField(
-                      label: 'Email',
-                      controller: _emailController,
-                    ),
-                    const SizedBox(height: 16),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleSendResetLink,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          textStyle: AppTextStyles.boldText,
-                          foregroundColor: AppColors.textSecondary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleSendResetLink,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: AppTextStyles.boldText,
+                        foregroundColor: AppColors.textSecondary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                        child:
-                            _isLoading
-                                ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                )
-                                : const Text('Send Reset Password Link'),
                       ),
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.textSecondary,
+                                ),
+                              )
+                              : const Text('Send Reset Password Link'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

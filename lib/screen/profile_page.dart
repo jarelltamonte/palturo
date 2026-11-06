@@ -444,31 +444,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                                     _friendCount!,
                                                   ),
                                           excludeSemantics: true,
-                                          child: Row(
-                                            children: [
-                                              Text(
-                                                (_friendCount ?? 0) > 1
-                                                    ? 'Pals'
-                                                    : 'Pal',
-                                                style: AppTextStyles.boldText
-                                                    .copyWith(color: textTheme),
-                                              ),
-                                              if (_friendCount != null) ...[
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  '$_friendCount',
-                                                  style: AppTextStyles
-                                                      .regularText
-                                                      .copyWith(
-                                                        color:
-                                                            AppColors.mutedText(
-                                                              context,
-                                                            ),
-                                                        fontSize: 14,
-                                                      ),
-                                                ),
-                                              ],
-                                            ],
+                                          child: Text(
+                                            _friendCount == null
+                                                ? 'Pals'
+                                                : palCountLabel(_friendCount!),
+                                            style: AppTextStyles.boldText
+                                                .copyWith(color: textTheme),
                                           ),
                                         ),
                                       ),

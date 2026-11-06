@@ -15,6 +15,10 @@ class ShowcaseMedia extends StatefulWidget {
   final String url;
   final Widget fallback;
   final BoxFit fit;
+
+  /// Focal point used when [fit] crops the media. Cards use top-center so
+  /// portrait photos keep faces in frame.
+  final Alignment alignment;
   final VoidCallback? onOpenProfile;
 
   const ShowcaseMedia({
@@ -22,6 +26,7 @@ class ShowcaseMedia extends StatefulWidget {
     required this.url,
     required this.fallback,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.onOpenProfile,
   });
 
@@ -111,6 +116,7 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
       return Image.network(
         widget.url,
         fit: widget.fit,
+        alignment: widget.alignment,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded) return child;
           return AnimatedOpacity(
@@ -142,6 +148,7 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
       children: [
         FittedBox(
           fit: widget.fit,
+          alignment: widget.alignment,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
             width: controller.value.size.width,

@@ -18,7 +18,7 @@ class OnboardingRoleScreen extends StatelessWidget {
     required this.onContinue,
     this.onBack,
     this.onSkip,
-    this.stepLabel = 'Step 1 of 4 - Role',
+    this.stepLabel = 'Step 1 of 4 – Role',
     this.progress = 0.2,
   });
 
@@ -46,8 +46,8 @@ class OnboardingRoleScreen extends StatelessWidget {
           subtitle: 'Select one that applies',
           stepLabel:
               controller.role == OnboardingRole.both
-                  ? 'Step 1 of 5 - Role'
-                  : 'Step 1 of 4 - Role',
+                  ? 'Step 1 of 5 – Role'
+                  : 'Step 1 of 4 – Role',
           progress: controller.role == OnboardingRole.both ? 1 / 5 : 1 / 4,
           showBackButton: true,
           onBack: onBack,

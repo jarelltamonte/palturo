@@ -26,7 +26,7 @@ class OnboardingInterestsScreen extends StatelessWidget {
     required this.onContinue,
     this.onBack,
     this.onSkip,
-    this.stepLabel = 'Step 2 of 4 - Skills',
+    this.stepLabel = 'Step 2 of 4 – Skills',
   });
 
   @override

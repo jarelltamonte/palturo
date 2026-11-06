@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:palturo/onboarding/onboarding_controller.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
+import 'package:palturo/onboarding/screens/onboarding_role_screen.dart';
 import 'package:palturo/onboarding/widgets/chip_selector.dart';
 import 'package:palturo/onboarding/widgets/onboarding_scaffold.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
@@ -123,6 +125,20 @@ void main() {
     expect(unselectedBorder.top.width, 1);
     final card = tester.getSize(find.bySemanticsLabel('I want to learn'));
     expect(card.height, AppSpacing.onboardingRoleCardHeight);
+  });
+
+  testWidgets('role step label uses an en dash', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: OnboardingRoleScreen(
+          controller: OnboardingController(),
+          onContinue: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Step 1 of 4 – Role'), findsOneWidget);
   });
 
   testWidgets('role cards survive short landscape and 200% text', (

@@ -207,15 +207,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final total = both ? 5 : 4;
     switch (step) {
       case OnboardingStep.role:
-        return 'Step 1 of 4 - Role';
+        return 'Step 1 of 4 – Role';
       case OnboardingStep.learningInterests:
-        return 'Step 2 of $total - Learning skills';
+        return 'Step 2 of $total – Learning skills';
       case OnboardingStep.teachingInterests:
-        return 'Step ${both ? 3 : 2} of $total - Teaching skills';
+        return 'Step ${both ? 3 : 2} of $total – Teaching skills';
       case OnboardingStep.finalDetails:
-        return 'Step ${both ? 4 : 3} of $total - Availability';
+        return 'Step ${both ? 4 : 3} of $total – Availability';
       case OnboardingStep.review:
-        return 'Step $total of $total - Review';
+        return 'Step $total of $total – Review';
       case OnboardingStep.intro:
       case OnboardingStep.complete:
         return '';

@@ -267,6 +267,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ? ShowcaseMedia(
                 url: currentPhoto,
                 fallback: _CardFallback(name: widget.person.name),
+                alignment: Alignment.topCenter,
                 onOpenProfile: widget.onOpenProfile,
               )
               : _CardFallback(name: widget.person.name),

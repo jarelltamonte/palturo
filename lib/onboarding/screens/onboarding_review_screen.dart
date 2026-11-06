@@ -25,7 +25,7 @@ class OnboardingReviewScreen extends StatelessWidget {
     required this.onEditLearning,
     required this.onEditTeaching,
     required this.onEditDetails,
-    this.stepLabel = 'Step 4 of 4 - Review',
+    this.stepLabel = 'Step 4 of 4 – Review',
     this.onSkip,
   });
 

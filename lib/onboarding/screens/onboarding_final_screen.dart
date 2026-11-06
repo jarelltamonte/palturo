@@ -38,7 +38,7 @@ class OnboardingFinalScreen extends StatelessWidget {
     required this.onDone,
     this.onBack,
     this.onSkip,
-    this.stepLabel = 'Step 3 of 4 - Availability',
+    this.stepLabel = 'Step 3 of 4 – Availability',
     this.progress = 0.85,
   });
 

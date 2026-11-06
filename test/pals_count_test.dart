@@ -3,8 +3,8 @@ import 'package:palturo/screen/utils/pals_count.dart';
 
 void main() {
   test('pal count is pluralized', () {
-    expect(palCountLabel(0), '0 pals');
-    expect(palCountLabel(1), '1 pal');
-    expect(palCountLabel(2), '2 pals');
+    expect(palCountLabel(0), '0 Pals');
+    expect(palCountLabel(1), '1 Pal');
+    expect(palCountLabel(2), '2 Pals');
   });
 }

@@ -124,18 +124,26 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
   }
 
   void dismiss({bool right = false}) {
-    if (!widget.enabled || _exiting || _dx.abs() > _width * 1.1) return;
+    if (!widget.enabled || _exiting) return;
     _cancelHint();
     _exitRight = right;
     _exiting = true;
-    _exit.forward(from: 0).whenComplete(() {
-      if (!mounted) return;
-      setState(() {
-        _exiting = false;
-        _dx = (_exitRight ? 1 : -1) * _width * 1.2;
-      });
-      widget.onSwiped(_exitRight);
+    // A long drag can leave the card past the edge. Finish without waiting for
+    // another exit animation, otherwise the card stays outside the viewport.
+    if (_dx.abs() >= _width) {
+      _finishExit();
+      return;
+    }
+    _exit.forward(from: 0).whenComplete(_finishExit);
+  }
+
+  void _finishExit() {
+    if (!mounted || !_exiting) return;
+    setState(() {
+      _exiting = false;
+      _dx = (_exitRight ? 1 : -1) * _width * 1.2;
     });
+    widget.onSwiped(_exitRight);
   }
 
   void reset() {
@@ -160,7 +168,11 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (!widget.enabled || _exiting) return;
-    setState(() => _dx += details.delta.dx);
+    final next = (_dx + details.delta.dx).clamp(
+      -_width * 1.2,
+      _width * 1.2,
+    );
+    setState(() => _dx = next);
     final nextArmed = _dx.abs() > _width * _threshold;
     if (nextArmed && !_armed) Haptics.impact();
     _armed = nextArmed;
@@ -214,15 +226,13 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
         final showSurface = displayDx.abs() > 4 || _exiting;
         final goingRight = displayDx >= 0;
         final foreground =
-            goingRight
-                ? AppColors.textSecondary
-                : AppColors.dangerText(context);
+            goingRight ? AppColors.textSecondary : Colors.white;
         final surfaceColor =
             widget.busy
                 ? AppColors.elevatedSurface(context)
                 : goingRight
                 ? AppColors.primary
-                : AppColors.mutedSurface(context);
+                : AppColors.danger;
 
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -241,10 +251,6 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
                       decoration: BoxDecoration(
                         color: surfaceColor,
                         borderRadius: BorderRadius.circular(28),
-                        border:
-                            goingRight
-                                ? null
-                                : Border.all(color: foreground, width: 1.5),
                       ),
                       alignment:
                           goingRight

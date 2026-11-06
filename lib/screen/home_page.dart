@@ -37,11 +37,39 @@ const kDeckSlowThreshold = Duration(seconds: 4);
 @visibleForTesting
 const kDeckTimeout = Duration(seconds: 12);
 
+/// Hard cap for sending a connection request. A hanging request must not leave
+/// the deck stuck on its "Sending request…" surface forever.
+@visibleForTesting
+const kSendRequestTimeout = Duration(seconds: 12);
+
+typedef SendConnectionRequest =
+    Future<String?> Function(
+      String userId, {
+      String? skillName,
+      String? skillPath,
+    });
+
+/// Sends a request with a hard cap so a stalled network call cannot leave the
+/// deck on its busy surface forever.
+@visibleForTesting
+Future<String?> sendRequestWithTimeout(
+  SendConnectionRequest send,
+  Person person, {
+  Duration timeout = kSendRequestTimeout,
+}) => send(
+  person.id,
+  skillName: person.skillName,
+  skillPath: person.skillPath,
+).timeout(timeout);
+
 class HomePage extends StatefulWidget {
   /// Test hook: replaces the real deck fetch. Production leaves this null.
   final Future<List<Person>> Function({bool force})? deckLoader;
 
-  const HomePage({super.key, this.deckLoader});
+  /// Test hook: replaces the real request send. Production leaves this null.
+  final SendConnectionRequest? sendRequest;
+
+  const HomePage({super.key, this.deckLoader, this.sendRequest});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -404,11 +432,8 @@ class _HomePageState extends State<HomePage> {
     _actionInFlight = true;
     setState(() => _sendingRequest = true);
     try {
-      final connectionId = await MatchApi.sendConnectionRequest(
-        person.id,
-        skillName: person.skillName,
-        skillPath: person.skillPath,
-      );
+      final send = widget.sendRequest ?? MatchApi.sendConnectionRequest;
+      final connectionId = await sendRequestWithTimeout(send, person);
       if (!mounted) return;
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');
@@ -417,6 +442,14 @@ class _HomePageState extends State<HomePage> {
       Haptics.success();
       showAppSuccess(context, 'Connection request sent to ${person.name}');
       unawaited(_maybeShowProfileNudge());
+    } on TimeoutException {
+      if (!mounted) return;
+      Haptics.error();
+      _resetCard();
+      showAppError(
+        context,
+        'Sending the request took too long. Check your connection and try again.',
+      );
     } catch (e) {
       if (!mounted) return;
       Haptics.error();

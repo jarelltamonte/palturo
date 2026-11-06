@@ -4,7 +4,7 @@
 **Base:** `b121126` (after deck rebuild, chrome pass, auth web move)
 **Source audit:** `docs/PalTuro-Visual-Audit-2026-11-05.pdf` (5 Nov 2026)
 **Owner:** PalTuro engineering
-**Status:** IN PROGRESS
+**Status:** COMPLETE — all eight fixes passed their gates.
 
 ## 1. Objective
 
@@ -31,10 +31,10 @@ traceable to one audit ID, and gated by three independent audits.
 | VF-02 | V-02 | Home skeleton for 10–12 s with no fallback | `screen/home_page.dart`, `widgets/person_card_skeleton.dart` | Skeleton shows progress copy after 4 s; Retry available; request capped at 12 s; cached deck paints immediately | **DONE** |
 | VF-03 | V-03 | Empty states at three different heights | new `widgets/app_empty_state.dart`, `chats_page.dart`, `request_page.dart`, `notifications_page.dart` | One widget, one inset, one action slot; centres within ±12 px; Activity has an illustration | **DONE** |
 | VF-04 | V-04 | Profile name wraps; empty skill cards | `screen/profile_page.dart`, `screen/card/skills_card.dart` | Name clamps to 1 line; avatar 72 px; Edit stays top-right; empty skills show "Add skills" | **DONE** |
-| VF-05 | V-05 | Trailing icons drift 2 px and 44/48 px | `screen/home_page.dart`, other trailing actions | Every trailing action uses 48 px; rightmost centre = 350 px at 390 width | PENDING |
-| VF-06 | V-06 | Browse content runs under bottom nav | `screen/explore_page.dart`, `theme/app_spacing.dart` | Bottom padding ≥ nav + 16 px; last row fully clears the nav; no double gap | PENDING |
-| VF-07 | V-07 | Notification settings end with no bottom inset | `screen/settings/notification_preferences_page.dart` | Shared pushed-page bottom inset; scroll end has breathing room; no clipped section header at rest | PENDING |
-| VF-08 | V-08 | Copy/media polish | `screen/utils/pals_count.dart`, `onboarding/*`, `screen/card/person_card.dart` | "0 Pals"; en dash in step labels; media focal alignment documented; no new crop regressions | PENDING |
+| VF-05 | V-05 | Trailing icons drift 2 px and 44/48 px | `screen/home_page.dart`, other trailing actions | Every trailing action uses 48 px; rightmost centre = 350 px at 390 width | **DONE** |
+| VF-06 | V-06 | Browse content runs under bottom nav | `screen/explore_page.dart`, `theme/app_spacing.dart` | Bottom padding ≥ nav + 16 px; last row fully clears the nav; no double gap | **DONE** |
+| VF-07 | V-07 | Notification settings end with no bottom inset | `screen/settings/notification_preferences_page.dart` | Shared pushed-page bottom inset; scroll end has breathing room; no clipped section header at rest | **DONE** |
+| VF-08 | V-08 | Copy/media polish | `screen/utils/pals_count.dart`, `onboarding/*`, `screen/card/person_card.dart` | "0 Pals"; en dash in step labels; media focal alignment documented; no new crop regressions | **DONE** |
 
 ## 4. Audit protocol (per fix)
 
@@ -63,10 +63,10 @@ Rules:
 | VF-02 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `2cf6cde` | 166 tests; 4s/12s states; retry + stale-load test |
 | VF-03 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `f2b1ae2` | 169 tests; shared widget; 200% nav clearance |
 | VF-04 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `d6c68bf` | 172 tests; clamp/72 pinned; empty CTA semantics |
-| VF-05 | ☐ | ☐ | ☐ | — | — | — | — | — |
-| VF-06 | ☐ | ☐ | ☐ | — | — | — | — | — |
-| VF-07 | ☐ | ☐ | ☐ | — | — | — | — | — |
-| VF-08 | ☐ | ☐ | ☐ | — | — | — | — | — |
+| VF-05 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `dc12bed` | 174 tests; 48 px targets; centre 350 |
+| VF-06 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `f347172` | 175 tests; nav+16 clearance; 36-combo sweep |
+| VF-07 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `9629f56` | 176 tests; safe-area inset; 48 icon |
+| VF-08 | ☑ | ☑ | ☑ | PASS | PASS | PASS | `5a18e7a` | 177 tests; Pals/en dash/media focused |
 
 ## 6. Sequencing and rationale
 
@@ -112,3 +112,7 @@ Rules:
 | 2026-11-05 | VF-02 | PASS after 2 gate rounds (fixed stale-load timer clobbering) | `2cf6cde` |
 | 2026-11-05 | VF-03 | PASS after 4 gate rounds (fixed nav clearance + sliver intrinsics) | `f2b1ae2` |
 | 2026-11-05 | VF-04 | PASS after 3 gate rounds (fixed semantics + 200% test) | `d6c68bf` |
+| 2026-11-05 | VF-05 | PASS after 9 gate rounds (fixed iOS clamp + chat header scaling) | `dc12bed` |
+| 2026-11-05 | VF-06 | PASS after 4 gate rounds (fixed double-counted nav inset) | `f347172` |
+| 2026-11-05 | VF-07 | PASS after 3 gate rounds (safe area + 48 icon) | `9629f56` |
+| 2026-11-05 | VF-08 | PASS after 2 gate rounds (complete en dash + video alignment) | `5a18e7a` |

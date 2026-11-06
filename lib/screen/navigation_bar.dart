@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/whats_new_sheet.dart';
 
 import 'home_page.dart';
 import 'explore_page.dart';
@@ -22,6 +28,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
 
   final List<int> _tabHistory = [0];
   final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
+  final ValueNotifier<int> _requestsRefresh = ValueNotifier<int>(0);
 
   final List<IconData> _navigationIcons = [
     CupertinoIcons.arrowtriangle_left,
@@ -40,8 +47,8 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   final List<String> _navigationLabels = [
-    'People',
-    'Explore',
+    'For You',
+    'Browse',
     'Chats',
     'Requests',
     'Profile',
@@ -54,11 +61,16 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       isActive: () => _selectedIndex == _exploreIndex,
     ),
     ChatsPage(onStartSwiping: () => _onItemTapped(0)),
-    const RequestPage(),
-    const ProfilePage(),
+    RequestPage(refreshSignal: _requestsRefresh),
+    ProfilePage(onStartSwiping: () => _onItemTapped(0)),
   ];
 
   void _onItemTapped(int index) {
+    Haptics.selection();
+    AppShellState.instance.setSelectedTab(index);
+    if (index == 3) {
+      _requestsRefresh.value++;
+    }
     if (index == _exploreIndex && _selectedIndex == _exploreIndex) {
       _exploreNavKey.currentState?.popUntil((route) => route.isFirst);
       return;
@@ -71,6 +83,12 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       _tabHistory.remove(index);
       _tabHistory.add(index);
     });
+  }
+
+  @override
+  void dispose() {
+    _requestsRefresh.dispose();
+    super.dispose();
   }
 
   @override
@@ -97,27 +115,79 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             _tabHistory.removeLast();
             _selectedIndex = _tabHistory.last;
           });
+          AppShellState.instance.setSelectedTab(_selectedIndex);
           return;
         }
       },
       child: Scaffold(
         extendBody: true,
-        body: IndexedStack(index: _selectedIndex, children: _pages),
-        bottomNavigationBar: _buildNavBar(),
+        body: Stack(
+          children: List.generate(_pages.length, (index) {
+            final active = index == _selectedIndex;
+            final reducedMotion = MediaQuery.disableAnimationsOf(context);
+            return Positioned.fill(
+              child: ExcludeFocus(
+                excluding: !active,
+                child: IgnorePointer(
+                  ignoring: !active,
+                  child: ExcludeSemantics(
+                    excluding: !active,
+                    child: AnimatedSlide(
+                      duration: reducedMotion ? Duration.zero : AppMotion.base,
+                      curve: Curves.easeOut,
+                      offset:
+                          active
+                              ? Offset.zero
+                              : Offset(
+                                index < _selectedIndex ? -0.035 : 0.035,
+                                0,
+                              ),
+                      child: AnimatedOpacity(
+                        duration:
+                            !active || reducedMotion
+                                ? Duration.zero
+                                : AppMotion.base,
+                        curve: Curves.easeOut,
+                        opacity: active ? 1 : 0,
+                        child: TickerMode(
+                          enabled: active,
+                          child: _pages[index],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: 20),
+          child: _buildNavBar(),
+        ),
       ),
     );
   }
 
   Widget _buildNavBar() {
     return ListenableBuilder(
-      listenable: ChatStateService.instance,
+      listenable: Listenable.merge([
+        ChatStateService.instance,
+        NotificationService.instance,
+      ]),
       builder: (context, _) {
+        final badgesEnabled = PreferencesService.instance.notificationsEnabled;
+        final requestUnread =
+            badgesEnabled ? NotificationService.instance.unread : 0;
+        final largeText = MediaQuery.textScalerOf(context).scale(12) > 16;
         return Container(
-          height: 60,
-          margin: const EdgeInsets.only(right: 16, left: 16, bottom: 20),
+          height: largeText ? 74 : 60,
+          margin: const EdgeInsets.only(right: 16, left: 16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            color: Theme.of(context).colorScheme.surface,
+            color: AppColors.elevatedSurface(context),
+            border: Border.all(color: AppColors.border(context)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withAlpha(20),
@@ -131,16 +201,28 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             children: List.generate(_navigationIcons.length, (index) {
               final isSelected = _selectedIndex == index;
               final activeColor = AppColors.primary;
-              final inactiveColor = Colors.grey;
+              final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
-              final showBadge = isChat && !isSelected && ChatStateService.instance.totalUnreadCount > 0;
+              final isRequests = index == 3;
+              final unreadCount =
+                  isChat
+                      ? (badgesEnabled
+                          ? ChatStateService.instance.totalUnreadCount
+                          : 0)
+                      : isRequests
+                      ? requestUnread
+                      : 0;
 
               return _NavItem(
-                icon: isSelected ? _selectedIcons[index] : _navigationIcons[index],
+                icon:
+                    isSelected
+                        ? _selectedIcons[index]
+                        : _navigationIcons[index],
                 label: _navigationLabels[index],
                 color: isSelected ? activeColor : inactiveColor,
+                selected: isSelected,
                 onTap: () => _onItemTapped(index),
-                showBadge: showBadge,
+                unreadCount: unreadCount,
               );
             }),
           ),
@@ -223,14 +305,16 @@ class _NavItem extends StatefulWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  final bool showBadge;
+  final bool selected;
+  final int unreadCount;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
-    this.showBadge = false,
+    this.selected = false,
+    this.unreadCount = 0,
   });
 
   @override
@@ -240,22 +324,20 @@ class _NavItem extends StatefulWidget {
 class _NavItemState extends State<_NavItem>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _jiggle;
+  late final Animation<double> _selectionScale;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
+    _controller = AnimationController(vsync: this, duration: AppMotion.press);
 
-    _jiggle = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.15), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -0.15, end: 0.15), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 0.15, end: -0.1), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: -0.1, end: 0.0), weight: 1),
-    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _selectionScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.92), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.92, end: 1.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowWhatsNew(context);
+    });
   }
 
   @override
@@ -265,58 +347,92 @@ class _NavItemState extends State<_NavItem>
   }
 
   void _handleTap() {
-    _controller.forward(from: 0);
+    if (!widget.selected && !MediaQuery.disableAnimationsOf(context)) {
+      _controller.forward(from: 0);
+    }
     widget.onTap();
   }
 
   @override
   Widget build(BuildContext context) {
+    final showBadge = widget.unreadCount > 0;
+    final isRequests = widget.label == 'Requests';
+    final unreadLabel =
+        widget.unreadCount == 1
+            ? (isRequests ? '1 unread update' : '1 unread message')
+            : '${widget.unreadCount} unread ${isRequests ? 'updates' : 'messages'}';
+    final semanticsLabel =
+        showBadge ? '${widget.label}, $unreadLabel' : widget.label;
+
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: Semantics(
+        button: true,
+        selected: widget.selected,
+        label: semanticsLabel,
+        excludeSemantics: true,
         onTap: _handleTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                AnimatedBuilder(
-                  animation: _jiggle,
-                  builder: (context, child) {
-                    return Transform.rotate(angle: _jiggle.value, child: child);
-                  },
-                  child: Icon(widget.icon, color: widget.color, size: 24),
-                ),
-                if (widget.showBadge)
-                  Positioned(
-                    top: -2,
-                    right: -4,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedBuilder(
+                    animation: _selectionScale,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _selectionScale.value,
+                        child: child,
+                      );
+                    },
+                    child: Icon(widget.icon, color: widget.color, size: 24),
+                  ),
+                  if (showBadge)
+                    Positioned(
+                      top: -6,
+                      right: -10,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 16),
+                        height: 16,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.error,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          widget.unreadCount > 99
+                              ? '99+'
+                              : '${widget.unreadCount}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onError,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            height: 1,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              widget.label,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                color: widget.color,
-                fontSize: 11,
-                fontWeight:
-                    widget.color == AppColors.primary
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  color: widget.color,
+                  fontSize: 12,
+                  fontWeight:
+                      widget.selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,20 +1,33 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
-    show kLearningOptions, kTeachingOptions;
-import 'package:palturo/onboarding/widgets/role_card_group.dart';
+    show
+        OnboardingFlow,
+        kLearningOptions,
+        kTeachingOptions,
+        onboardingDraftKey,
+        onboardingResumeDismissedKey;
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
-import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/pals_count.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'matches.dart';
 import 'profile_data.dart';
 import 'profile_edit.dart';
 import 'settings.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/resume_setup_card.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/user_avatar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
   final custom = CustomSkill.tryParse(id);
@@ -25,8 +38,18 @@ String _skillLabel(String id, List<OnboardingOption> options) {
   return id;
 }
 
+@visibleForTesting
+bool shouldShowResumeCard({
+  required bool skipped,
+  required bool dismissed,
+  required bool hasDraft,
+  required bool setupComplete,
+}) => !setupComplete && !dismissed && (skipped || hasDraft);
+
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final VoidCallback? onStartSwiping;
+
+  const ProfilePage({super.key, this.onStartSwiping});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -37,39 +60,120 @@ class _ProfilePageState extends State<ProfilePage> {
   ProfileData? _profile;
   bool _isLoading = true;
   static const String _loadError =
-      'Couldn’t load your profile.\nPlease check your connection.';
+      "Couldn't load your profile. Please try again.";
   int? _friendCount;
   bool _openingEditor = false;
-
-  static const _roleOptions = [
-    RoleOption(
-      OnboardingRole.learn,
-      'assets/icons/rlearner.svg',
-      'I want to\nlearn',
-    ),
-    RoleOption(
-      OnboardingRole.teach,
-      'assets/icons/rmentor.svg',
-      'I want to\nteach',
-    ),
-    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
-  ];
+  bool _resumeSkipped = false;
+  bool _resumeDismissed = false;
+  bool _resumeHasDraft = false;
 
   @override
   void initState() {
     super.initState();
+    ChatStateService.instance.addListener(_onPalsChanged);
+    _onPalsChanged();
+    ChatStateService.instance.loadConversations(showSpinner: false);
+    _loadResumeState();
     _loadProfile();
-    _loadFriendCount();
   }
 
-  Future<void> _loadFriendCount() async {
+  String? get _uid => Supabase.instance.client.auth.currentUser?.id;
+
+  Future<void> _loadResumeState() async {
+    final prefs = PreferencesService.instance;
+    final skipped = await prefs.getBool('skipped_onboarding') ?? false;
+    final dismissed =
+        await prefs.getBool(onboardingResumeDismissedKey(_uid)) ?? false;
+    var hasDraft = false;
     try {
-      final convos = await MatchApi.getConversations();
-      final accepted = convos.where((c) => c.status == 'accepted').length;
-      if (mounted) setState(() => _friendCount = accepted);
+      final raw = await prefs.getString(onboardingDraftKey(_uid));
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        hasDraft = decoded is Map && decoded['role'] != null;
+      }
     } catch (_) {
-      /* keep null → renders plain label */
+      // A malformed draft must not surface a broken resume card.
     }
+    if (!mounted) return;
+    setState(() {
+      _resumeSkipped = skipped;
+      _resumeDismissed = dismissed;
+      _resumeHasDraft = hasDraft;
+    });
+  }
+
+  Future<void> _dismissResume() async {
+    setState(() => _resumeDismissed = true);
+    await PreferencesService.instance.setBool(
+      onboardingResumeDismissedKey(_uid),
+      true,
+    );
+  }
+
+  Future<void> _openSetup() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => OnboardingFlow(
+              onFinished: () async {
+                await PreferencesService.instance.setBool(
+                  'skipped_onboarding',
+                  false,
+                );
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                setState(() {
+                  _resumeSkipped = false;
+                  _resumeDismissed = true;
+                });
+                await PreferencesService.instance.setBool(
+                  onboardingResumeDismissedKey(_uid),
+                  true,
+                );
+                _loadProfile();
+              },
+              onSkip: () async {
+                await PreferencesService.instance.setBool(
+                  'skipped_onboarding',
+                  true,
+                );
+                await PreferencesService.instance.setBool(
+                  onboardingResumeDismissedKey(_uid),
+                  false,
+                );
+                if (!mounted) return;
+                Navigator.of(context).pop();
+                setState(() {
+                  _resumeSkipped = true;
+                  _resumeDismissed = false;
+                });
+              },
+            ),
+      ),
+    );
+  }
+
+  void _onPalsChanged() {
+    if (!mounted) return;
+    final service = ChatStateService.instance;
+    final count = service.hasLoaded ? service.conversations.length : null;
+    if (_friendCount != count) {
+      setState(() => _friendCount = count);
+    }
+  }
+
+  @override
+  void dispose() {
+    ChatStateService.instance.removeListener(_onPalsChanged);
+    super.dispose();
+  }
+
+  Future<void> _refreshProfileAndPals() async {
+    await Future.wait([
+      _loadProfile(showSpinner: false),
+      ChatStateService.instance.loadConversations(showSpinner: false),
+    ]);
   }
 
   Future<void> _loadProfile({bool showSpinner = true}) async {
@@ -172,6 +276,23 @@ class _ProfilePageState extends State<ProfilePage> {
     showPersonProfileDialog(context, _profileToPerson());
   }
 
+  bool get _showResume => shouldShowResumeCard(
+    skipped: _resumeSkipped,
+    dismissed: _resumeDismissed,
+    hasDraft: _resumeHasDraft,
+    setupComplete: _profile?.isProfileCompleted ?? true,
+  );
+
+  bool _needsProfileTip(ProfileData profile) {
+    final wantsTeaching =
+        profile.role == OnboardingRole.teach ||
+        profile.role == OnboardingRole.both;
+    return profile.bio.trim().isEmpty ||
+        profile.languages.isEmpty ||
+        profile.availableDays.isEmpty ||
+        (wantsTeaching && profile.teachingSkillImages.isEmpty);
+  }
+
   Widget _buildErrorState(Color textTheme) {
     return Center(
       child: Padding(
@@ -211,67 +332,60 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: bgTheme,
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Profile',
-            style: AppTextStyles.headingText.copyWith(color: textTheme),
-          ),
+      appBar: AppChrome.appBar(
+        title: Text(
+          'Profile',
+          style: AppTextStyles.headingText.copyWith(color: textTheme),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const Settings()),
-                );
-              },
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Icon(Icons.settings, color: textTheme),
-                ),
-              ),
-            ),
+          AppChrome.iconAction(
+            icon: Icons.settings,
+            tooltip: 'Settings',
+            color: textTheme,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const Settings()),
+              );
+            },
           ),
         ],
       ),
       body:
           _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const ProfileSkeleton()
               : _profile == null
               ? _buildErrorState(textTheme)
               : RefreshIndicator(
-                onRefresh: () => _loadProfile(showSpinner: false),
+                onRefresh: _refreshProfileAndPals,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        child: _ProfileSummaryCard(
+                        child: ProfileSummaryCard(
                           profile: _profile!,
                           onTap: _openEdit,
                           onAvatarTap: _showMyProfile,
                         ),
                       ),
+                      if (_needsProfileTip(_profile!) && !_showResume)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: _ProfileTip(onEdit: _openEdit),
+                        ),
+                      if (_showResume)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: ResumeSetupCard(
+                            onTap: _openSetup,
+                            onDismiss: _dismissResume,
+                          ),
+                        ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
                         child: Column(
@@ -285,20 +399,29 @@ class _ProfilePageState extends State<ProfilePage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const Matches(),
+                                      builder:
+                                          (context) => Matches(
+                                            onStartSwiping:
+                                                widget.onStartSwiping,
+                                          ),
                                     ),
                                   );
                                 },
                                 child: Container(
-                                  height: 56,
+                                  constraints: const BoxConstraints(
+                                    minHeight: 56,
+                                  ),
                                   alignment: Alignment.center,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
                                     vertical: 12,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: bgTheme,
+                                    color: AppColors.elevatedSurface(context),
                                     borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: AppColors.border(context),
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withValues(
@@ -313,27 +436,21 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: Row(
                                     children: [
                                       Expanded(
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              'Pals',
-                                              style: AppTextStyles.boldText
-                                                  .copyWith(color: textTheme),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
+                                        child: Semantics(
+                                          label:
                                               _friendCount == null
-                                                  ? ''
-                                                  : '$_friendCount',
-                                              style: AppTextStyles.regularText
-                                                  .copyWith(
-                                                    color: textTheme.withValues(
-                                                      alpha: 0.6,
-                                                    ),
-                                                    fontSize: 12,
+                                                  ? 'Pals'
+                                                  : palCountLabel(
+                                                    _friendCount!,
                                                   ),
-                                            ),
-                                          ],
+                                          excludeSemantics: true,
+                                          child: Text(
+                                            _friendCount == null
+                                                ? 'Pals'
+                                                : palCountLabel(_friendCount!),
+                                            style: AppTextStyles.boldText
+                                                .copyWith(color: textTheme),
+                                          ),
                                         ),
                                       ),
                                       Icon(
@@ -351,12 +468,16 @@ class _ProfilePageState extends State<ProfilePage> {
                               thickness: 1,
                             ),
                             const SizedBox(height: 16),
-                            RoleCardGroup(
-                              options: _roleOptions,
-                              selected: _profile!.role,
-                              isEditing: false,
-                              onSelect: (_) {},
+                            Text(
+                              'Role',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: AppColors.mutedText(context),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
+                            const SizedBox(height: 6),
+                            _RoleSummary(role: _profile!.role),
                             const SizedBox(height: 24),
                             if (_profile!.role == OnboardingRole.learn ||
                                 _profile!.role == OnboardingRole.both) ...[
@@ -364,6 +485,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 isEditing: false,
                                 initialSkillIds: _profile!.learningSkillIds,
                                 notes: _profile!.learningNotes,
+                                onAddSkills: _openEdit,
                               ),
                               const SizedBox(height: 24),
                             ],
@@ -373,6 +495,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 isEditing: false,
                                 initialSkillIds: _profile!.teachingSkillIds,
                                 notes: _profile!.teachingNotes,
+                                onAddSkills: _openEdit,
                               ),
                           ],
                         ),
@@ -386,12 +509,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-class _ProfileSummaryCard extends StatelessWidget {
+class ProfileSummaryCard extends StatelessWidget {
   final ProfileData profile;
   final VoidCallback onTap;
   final VoidCallback onAvatarTap;
 
-  const _ProfileSummaryCard({
+  const ProfileSummaryCard({
+    super.key,
     required this.profile,
     required this.onTap,
     required this.onAvatarTap,
@@ -400,7 +524,7 @@ class _ProfileSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final cardColor = Theme.of(context).colorScheme.surface;
+    final cardColor = AppColors.elevatedSurface(context);
     final displayAvatar =
         (profile.photos.isNotEmpty && profile.photos[0] != null)
             ? profile.photos[0]
@@ -414,6 +538,7 @@ class _ProfileSummaryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.border(context)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -429,36 +554,34 @@ class _ProfileSummaryCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: onAvatarTap,
-                  child: CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage:
-                        displayAvatar != null
-                            ? NetworkImage(displayAvatar)
-                            : null,
-                    child:
-                        displayAvatar == null
-                            ? Icon(
-                              Icons.person,
-                              size: 40,
-                              color: Colors.grey[600],
-                            )
-                            : null,
+                Semantics(
+                  container: true,
+                  button: true,
+                  label: 'View profile photo',
+                  child: GestureDetector(
+                    onTap: onAvatarTap,
+                    child: UserAvatar(
+                      name: profile.name,
+                      image:
+                          displayAvatar != null
+                              ? NetworkImage(displayAvatar)
+                              : null,
+                      size: 72,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         profile.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.headingText.copyWith(
                           color: textColor,
-                          fontSize: 20,
+                          fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -484,7 +607,15 @@ class _ProfileSummaryCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: textColor),
+                TextButton(
+                  onPressed: onTap,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accentText(context),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: const Size(0, 36),
+                  ),
+                  child: const Text('Edit'),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -515,6 +646,121 @@ class _ProfileSummaryCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProfileTip extends StatelessWidget {
+  final VoidCallback onEdit;
+
+  const _ProfileTip({required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.auto_awesome_outlined,
+            color: AppColors.accentText(context),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Finish your profile details to improve your recommendations.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textColor,
+                fontSize: 13,
+                height: 1.35,
+              ),
+            ),
+          ),
+          TextButton(onPressed: onEdit, child: const Text('Improve')),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleSummary extends StatelessWidget {
+  final OnboardingRole? role;
+
+  const _RoleSummary({required this.role});
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = <Widget>[];
+    if (role == OnboardingRole.learn || role == OnboardingRole.both) {
+      chips.add(
+        _RoleChip(
+          svgAsset: 'assets/icons/rlearner.svg',
+          label: role == OnboardingRole.both ? 'Learner' : 'I want to learn',
+        ),
+      );
+    }
+    if (role == OnboardingRole.teach || role == OnboardingRole.both) {
+      chips.add(
+        _RoleChip(
+          svgAsset: 'assets/icons/rmentor.svg',
+          label: role == OnboardingRole.both ? 'Mentor' : 'I want to teach',
+        ),
+      );
+    }
+    if (chips.isEmpty) {
+      chips.add(_RoleChip(icon: Icons.help_outline, label: 'Role not set'));
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+}
+
+class _RoleChip extends StatelessWidget {
+  final IconData? icon;
+  final String? svgAsset;
+  final String label;
+
+  const _RoleChip({this.icon, this.svgAsset, required this.label})
+    : assert(icon != null || svgAsset != null);
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = AppColors.accentText(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 16,
+              height: 16,
+              colorFilter: ColorFilter.mode(AppColors.black, BlendMode.srcIn),
+            )
+          else
+            Icon(icon, size: 16, color: iconColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.boldText.copyWith(
+              color: AppColors.black,
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     );
   }

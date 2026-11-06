@@ -1,19 +1,39 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/request_card.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/request_detail.dart';
+import 'package:palturo/screen/notifications_page.dart';
+import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/app_navigator.dart';
+import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/notification_presenter.dart';
+import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/app_empty_state.dart';
+import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 
 class ConnectionRequest {
   final String id;
   final String requesterId;
   final String skillName;
+  final String? skillPath;
+  final bool? inDeclaredDomain;
   final String requesterName;
   final String schedule;
   final String language;
@@ -29,6 +49,8 @@ class ConnectionRequest {
     required this.id,
     this.requesterId = '',
     required this.skillName,
+    this.skillPath,
+    this.inDeclaredDomain,
     required this.requesterName,
     required this.schedule,
     required this.language,
@@ -119,90 +141,296 @@ enum RoleFilter { all, learner, mentor }
 
 enum SortFilter { newest, oldest, ascending, descending }
 
+enum RequestView { incoming, sent }
+
 class RequestPage extends StatefulWidget {
-  const RequestPage({super.key});
+  final ValueListenable<int>? refreshSignal;
+  final RequestView initialView;
+
+  const RequestPage({
+    super.key,
+    this.refreshSignal,
+    this.initialView = RequestView.incoming,
+  });
 
   @override
   State<RequestPage> createState() => _RequestPageState();
 }
 
-class _RequestPageState extends State<RequestPage> {
+class _RequestPageState extends State<RequestPage> with RouteAware {
+  bool _isPushedRequests = false;
+
   DateFilter _dateFilter = DateFilter.all;
   RoleFilter _roleFilter = RoleFilter.all;
   SortFilter _sortFilter = SortFilter.newest;
+  String _skillFilter = 'all';
+  String _domainFilter = 'all';
+  RequestView _view = RequestView.incoming;
 
-  static const List<FilterSection> _filterSections = [
+  List<FilterSection> get _filterSections {
+    final skills =
+        _requests
+            .map((request) => request.skillName.trim())
+            .where((skill) => skill.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    return [
+      const FilterSection(
+        key: 'date',
+        title: 'Date',
+        options: [
+          FilterOption('All', 'all'),
+          FilterOption('Today', 'today'),
+          FilterOption('This Week', 'thisWeek'),
+          FilterOption('This Month', 'thisMonth'),
+          FilterOption('This Year', 'thisYear'),
+        ],
+      ),
+      const FilterSection(
+        key: 'role',
+        title: 'Role',
+        options: [
+          FilterOption('All', 'all'),
+          FilterOption('Learner', 'learner'),
+          FilterOption('Mentor', 'mentor'),
+        ],
+      ),
+      if (skills.isNotEmpty)
+        FilterSection(
+          key: 'skill',
+          title: 'Skill',
+          options: [
+            const FilterOption('All skills', 'all'),
+            for (final skill in skills) FilterOption(skill, skill),
+          ],
+        ),
+      const FilterSection(
+        key: 'domain',
+        title: 'Declared skill domain',
+        options: [
+          FilterOption('All requests', 'all'),
+          FilterOption('In my declared skills', 'inside'),
+          FilterOption('Outside my declared skills', 'outside'),
+        ],
+      ),
+      const FilterSection(
+        key: 'sort',
+        title: 'Sort by',
+        defaultValue: 'newest',
+        options: [
+          FilterOption('Newest', 'newest'),
+          FilterOption('Oldest', 'oldest'),
+          FilterOption('Ascending (A-Z)', 'ascending'),
+          FilterOption('Descending (Z-A)', 'descending'),
+        ],
+      ),
+    ];
+  }
+
+  static const List<FilterSection> _sentFilterSections = [
+    FilterSection(
+      key: 'status',
+      title: 'Status',
+      options: [
+        FilterOption('All', 'all'),
+        FilterOption('Waiting', 'pending'),
+        FilterOption('Declined', 'declined'),
+      ],
+    ),
     FilterSection(
       key: 'date',
       title: 'Date',
       options: [
         FilterOption('All', 'all'),
-        FilterOption('Today', 'today'),
         FilterOption('This Week', 'thisWeek'),
         FilterOption('This Month', 'thisMonth'),
-        FilterOption('This Year', 'thisYear'),
       ],
     ),
-    FilterSection(
-      key: 'role',
-      title: 'Role',
-      options: [
-        FilterOption('All', 'all'),
-        FilterOption('Learner', 'learner'),
-        FilterOption('Mentor', 'mentor'),
-      ],
-    ),
-    FilterSection(key: 'skills', title: 'Skills'),
     FilterSection(
       key: 'sort',
-      title: 'Filter',
+      title: 'Sort by',
       defaultValue: 'newest',
       options: [
         FilterOption('Newest', 'newest'),
         FilterOption('Oldest', 'oldest'),
-        FilterOption('Ascending (A-Z)', 'ascending'),
-        FilterOption('Descending (Z-A)', 'descending'),
       ],
     ),
   ];
 
-  Color get _filterDotColor => AppColors.primary;
-
   bool get _hasActiveFilter =>
       _dateFilter != DateFilter.all ||
       _roleFilter != RoleFilter.all ||
+      _skillFilter != 'all' ||
+      _domainFilter != 'all' ||
       _sortFilter != SortFilter.newest;
 
+  String _sentStatusFilter = 'all';
+  DateFilter _sentDateFilter = DateFilter.all;
+  SortFilter _sentSortFilter = SortFilter.newest;
+
+  bool get _hasSentFilter =>
+      _sentStatusFilter != 'all' ||
+      _sentDateFilter != DateFilter.all ||
+      _sentSortFilter != SortFilter.newest;
+
   late List<ConnectionRequest> _requests = const [];
+  late List<OutgoingRequestLite> _outgoing = const [];
   bool _loading = true;
+  bool _loadingOutgoing = true;
   String? _loadError;
+  String? _outgoingError;
   bool _responding = false;
+  bool _cancelling = false;
+  final Set<String> _declinedIds = {};
 
   @override
   void initState() {
     super.initState();
+    _view = widget.initialView;
+    _restoreFilters();
+    widget.refreshSignal?.addListener(_refreshFromShell);
+    NotificationService.instance.addListener(_onActivityChanged);
     _loadRequests();
+    _loadOutgoing();
   }
 
-  Future<void> _loadRequests() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      appRouteObserver.subscribe(this, route);
+      _isPushedRequests = !route.isFirst;
+      AppShellState.instance.setRequestsOpen(_isPushedRequests);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    if (_isPushedRequests) AppShellState.instance.setRequestsOpen(false);
+  }
+
+  @override
+  void didPopNext() {
+    if (_isPushedRequests) AppShellState.instance.setRequestsOpen(true);
+  }
+
+  @override
+  void dispose() {
+    appRouteObserver.unsubscribe(this);
+    if (_isPushedRequests) AppShellState.instance.setRequestsOpen(false);
+    widget.refreshSignal?.removeListener(_refreshFromShell);
+    NotificationService.instance.removeListener(_onActivityChanged);
+    super.dispose();
+  }
+
+  void _onActivityChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _refreshFromShell() {
+    if (!mounted) return;
+    _loadRequests();
+    _loadOutgoing();
+  }
+
+  Future<void> _loadRequests({bool notifyFailure = false}) async {
+    final hadData = _requests.isNotEmpty;
     setState(() {
-      _loading = true;
-      _loadError = null;
+      _loading = !hadData;
+      if (!hadData) _loadError = null;
     });
     try {
       final incoming = await MatchApi.getIncomingRequests();
       if (!mounted) return;
       setState(() {
         _requests = incoming.map((r) => r.toConnectionRequest()).toList();
+        _declinedIds.clear();
         _loading = false;
         _loadError = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load requests. Please try again.",
+      );
       setState(() {
         _loading = false;
-        _loadError = 'Couldn’t load requests.\nPlease check your connection.';
+        if (!hadData) _loadError = message;
       });
+      if (notifyFailure && hadData) showAppError(context, message);
+    }
+  }
+
+  Future<void> _refreshRequests() => _loadRequests(notifyFailure: true);
+
+  Future<void> _loadOutgoing({bool notifyFailure = false}) async {
+    final hadData = _outgoing.isNotEmpty;
+    setState(() {
+      _loadingOutgoing = !hadData;
+      if (!hadData) _outgoingError = null;
+    });
+    try {
+      final sent = await MatchApi.getOutgoingRequests();
+      if (!mounted) return;
+      setState(() {
+        _outgoing = sent;
+        _loadingOutgoing = false;
+        _outgoingError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load sent requests. Please try again.",
+      );
+      setState(() {
+        _loadingOutgoing = false;
+        if (!hadData) _outgoingError = message;
+      });
+      if (notifyFailure && hadData) showAppError(context, message);
+    }
+  }
+
+  Future<void> _refreshOutgoing() => _loadOutgoing(notifyFailure: true);
+
+  Future<void> _cancelOutgoing(OutgoingRequestLite request) async {
+    if (_cancelling) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Withdraw request',
+      message:
+          'Withdraw your connection request to ${request.recipientName}? They will no longer see it.',
+      confirmLabel: 'Withdraw',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await MatchApi.cancelConnectionRequest(request.connectionId);
+      if (!mounted) return;
+      setState(() {
+        _outgoing =
+            _outgoing
+                .where((item) => item.connectionId != request.connectionId)
+                .toList();
+      });
+      NotificationService.instance.refresh();
+      showAppSuccess(context, 'Request to ${request.recipientName} withdrawn');
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not withdraw this request. Please try again.',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
     }
   }
 
@@ -219,7 +447,13 @@ class _RequestPageState extends State<RequestPage> {
               (_roleFilter == RoleFilter.learner &&
                   r.role == PersonRole.learner) ||
               (_roleFilter == RoleFilter.mentor && r.role == PersonRole.mentor);
-          return matchesDate && matchesRole;
+          final matchesSkill =
+              _skillFilter == 'all' || r.skillName == _skillFilter;
+          final matchesDomain =
+              _domainFilter == 'all' ||
+              (_domainFilter == 'inside' && r.inDeclaredDomain == true) ||
+              (_domainFilter == 'outside' && r.inDeclaredDomain == false);
+          return matchesDate && matchesRole && matchesSkill && matchesDomain;
         }).toList();
 
     switch (_sortFilter) {
@@ -239,6 +473,31 @@ class _RequestPageState extends State<RequestPage> {
     return filtered;
   }
 
+  List<OutgoingRequestLite> get _filteredAndSortedOutgoing {
+    final filtered =
+        _outgoing.where((request) {
+          final matchesStatus =
+              _sentStatusFilter == 'all' || request.status == _sentStatusFilter;
+          return matchesStatus &&
+              matchesRequestDate(request.createdAt, _sentDateFilter);
+        }).toList();
+    switch (_sentSortFilter) {
+      case SortFilter.newest:
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case SortFilter.oldest:
+        filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        break;
+      case SortFilter.ascending:
+        filtered.sort((a, b) => a.recipientName.compareTo(b.recipientName));
+        break;
+      case SortFilter.descending:
+        filtered.sort((a, b) => b.recipientName.compareTo(a.recipientName));
+        break;
+    }
+    return filtered;
+  }
+
   void _removeRequest(String id) {
     setState(() {
       _requests.removeWhere((r) => r.id == id);
@@ -249,18 +508,21 @@ class _RequestPageState extends State<RequestPage> {
     if (!mounted) return;
     try {
       await MatchApi.blockUser(request.requesterId);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
+        ),
+      );
       return;
     }
     if (!mounted) return;
     _removeRequest(request.id);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${request.requesterName}')),
-    );
+    showAppSuccess(context, 'You blocked ${request.requesterName}');
   }
 
   void _reportRequester(ConnectionRequest request, String reason) async {
@@ -268,42 +530,115 @@ class _RequestPageState extends State<RequestPage> {
     try {
       await MatchApi.reportUser(request.requesterId, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
+      showAppSuccess(context, 'Thanks for your report.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
+        ),
+      );
     }
   }
 
-  Future<void> _respond(ConnectionRequest request, bool accept) async {
-    if (_responding) return;
+  Future<bool> _confirmDecline(ConnectionRequest request) async {
+    if (_responding) return false;
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return false;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Decline request?',
+      message:
+          'Decline ${request.requesterName}? They will not become a Pal and cannot message you.',
+      confirmLabel: 'Decline',
+    );
+    if (!confirmed || !mounted) return false;
+    return _respond(request, false);
+  }
+
+  ImageProvider? _requestAvatar(ConnectionRequest request) {
+    if (request.photoUrls.isEmpty) return null;
+    final url = request.photoUrls.first;
+    if (url == null || url.trim().isEmpty) return null;
+    return NetworkImage(url);
+  }
+
+  Future<bool> _respond(ConnectionRequest request, bool accept) async {
+    if (_responding) return false;
     _responding = true;
 
     try {
       await MatchApi.respondToRequest(request.id, accept);
-      if (!mounted) return;
+      await ChatStateService.instance.loadConversations(showSpinner: false);
+      if (!mounted) return false;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            accept
-                ? 'Connected with ${request.requesterName}!'
-                : 'Request from ${request.requesterName} declined.',
-          ),
+      NotificationService.instance.refresh();
+
+      if (!accept) {
+        setState(() => _declinedIds.add(request.id));
+        showAppSnackBar(
+          context,
+          'Request from ${request.requesterName} declined.',
+          duration: const Duration(seconds: 3),
+        );
+        Future<void>.delayed(const Duration(seconds: 5), () {
+          if (!mounted || !_declinedIds.contains(request.id)) return;
+          setState(() => _declinedIds.remove(request.id));
+          _removeRequest(request.id);
+        });
+        return true;
+      }
+
+      _removeRequest(request.id);
+
+      NotificationPresenter.instance.showMatch(
+        connectionId: request.id,
+        name: request.requesterName,
+        skillName: request.skillName,
+        avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
+        role: request.role,
+        person: request.toPerson(),
+      );
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      unawaited(Haptics.error());
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not respond to this request. Please try again.',
         ),
       );
-      _removeRequest(request.id);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to respond: $e')));
+      return false;
     } finally {
       _responding = false;
+    }
+  }
+
+  Future<void> _undoDecline(ConnectionRequest request) async {
+    if (!_declinedIds.contains(request.id)) return;
+    try {
+      await MatchApi.undoDecline(request.id);
+      if (!mounted) return;
+      unawaited(Haptics.selection());
+      setState(() => _declinedIds.remove(request.id));
+      NotificationService.instance.refresh();
+      showAppSuccess(
+        context,
+        'Request from ${request.requesterName} restored.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not restore the request. Please try again.',
+        ),
+      );
     }
   }
 
@@ -318,7 +653,7 @@ class _RequestPageState extends State<RequestPage> {
               _respond(request, true);
             },
             onDecline: () {
-              _respond(request, false);
+              _confirmDecline(request);
             },
             onBlock: () => _blockRequester(request),
             onReport: (reason) => _reportRequester(request, reason),
@@ -327,12 +662,40 @@ class _RequestPageState extends State<RequestPage> {
   }
 
   void _openFilterSheet() {
+    if (_view == RequestView.sent) {
+      FilterBottomSheet.show(
+        context,
+        sections: _sentFilterSections,
+        selected: {
+          'status': _sentStatusFilter,
+          'date': _sentDateFilter.name,
+          'sort': _sentSortFilter.name,
+        },
+        onApply: (result) {
+          setState(() {
+            _sentStatusFilter = result['status'] ?? 'all';
+            _sentDateFilter = DateFilter.values.firstWhere(
+              (d) => d.name == result['date'],
+              orElse: () => DateFilter.all,
+            );
+            _sentSortFilter = SortFilter.values.firstWhere(
+              (s) => s.name == result['sort'],
+              orElse: () => SortFilter.newest,
+            );
+          });
+          _persistFilters();
+        },
+      );
+      return;
+    }
     FilterBottomSheet.show(
       context,
       sections: _filterSections,
       selected: {
         'date': _dateFilter.name,
         'role': _roleFilter.name,
+        'skill': _skillFilter,
+        'domain': _domainFilter,
         'sort': _sortFilter.name,
       },
       onApply: (result) {
@@ -345,12 +708,297 @@ class _RequestPageState extends State<RequestPage> {
             (r) => r.name == result['role'],
             orElse: () => RoleFilter.all,
           );
+          _skillFilter = result['skill'] ?? 'all';
+          _domainFilter = result['domain'] ?? 'all';
           _sortFilter = SortFilter.values.firstWhere(
             (s) => s.name == result['sort'],
             orElse: () => SortFilter.newest,
           );
         });
+        _persistFilters();
       },
+    );
+  }
+
+  Future<void> _restoreFilters() async {
+    final incoming = await PreferencesService.instance.getFilterMap(
+      'request_filters_incoming_v1',
+    );
+    final sent = await PreferencesService.instance.getFilterMap(
+      'request_filters_sent_v1',
+    );
+    if (!mounted) return;
+    setState(() {
+      if (incoming != null) {
+        _dateFilter = DateFilter.values.firstWhere(
+          (value) => value.name == incoming['date'],
+          orElse: () => DateFilter.all,
+        );
+        _roleFilter = RoleFilter.values.firstWhere(
+          (value) => value.name == incoming['role'],
+          orElse: () => RoleFilter.all,
+        );
+        _sortFilter = SortFilter.values.firstWhere(
+          (value) => value.name == incoming['sort'],
+          orElse: () => SortFilter.newest,
+        );
+        _skillFilter = incoming['skill'] ?? 'all';
+        _domainFilter = incoming['domain'] ?? 'all';
+      }
+      if (sent != null) {
+        _sentStatusFilter = sent['status'] ?? 'all';
+        _sentDateFilter = DateFilter.values.firstWhere(
+          (value) => value.name == sent['date'],
+          orElse: () => DateFilter.all,
+        );
+        _sentSortFilter = SortFilter.values.firstWhere(
+          (value) => value.name == sent['sort'],
+          orElse: () => SortFilter.newest,
+        );
+      }
+    });
+  }
+
+  void _persistFilters() {
+    PreferencesService.instance.setFilterMap('request_filters_incoming_v1', {
+      'date': _dateFilter.name,
+      'role': _roleFilter.name,
+      'skill': _skillFilter,
+      'domain': _domainFilter,
+      'sort': _sortFilter.name,
+    });
+    PreferencesService.instance.setFilterMap('request_filters_sent_v1', {
+      'status': _sentStatusFilter,
+      'date': _sentDateFilter.name,
+      'sort': _sentSortFilter.name,
+    });
+  }
+
+  void _clearSentFilters() {
+    setState(() {
+      _sentStatusFilter = 'all';
+      _sentDateFilter = DateFilter.all;
+      _sentSortFilter = SortFilter.newest;
+    });
+    _persistFilters();
+  }
+
+  Widget _buildIncoming(Color textTheme) {
+    final requests = _filteredAndSortedRequests;
+    if (_loading) return const RequestCardsSkeleton();
+    if (_loadError != null) return _buildLoadError(textTheme);
+    if (requests.isEmpty) return _buildEmptyState();
+    return RefreshIndicator(
+      onRefresh: _refreshRequests,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
+        ),
+        itemCount: requests.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'They want to connect with you. Accept to become Pals.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.7),
+                  fontSize: 14,
+                ),
+              ),
+            );
+          }
+          final request = requests[index - 1];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: GestureDetector(
+              onTap: () => _openDetail(request),
+              child: RequestCard(
+                key: ValueKey(request.id),
+                skillName: request.skillName,
+                requesterName: request.requesterName,
+                schedule: request.schedule,
+                language: request.language,
+                learningStyle: request.learningStyle,
+                timeAgo: timeAgo(request.requestedAt),
+                iconAsset: request.iconAsset,
+                seekingLabel: request.seekingLabel,
+                connectionId: request.id,
+                avatarImage: _requestAvatar(request),
+                person: request.toPerson(),
+                role: request.role,
+                onAccept: () => _respond(request, true),
+                onDecline: () {},
+                onConfirmDecline: () => _confirmDecline(request),
+                onUndo: () => _undoDecline(request),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSent(Color textTheme) {
+    if (_loadingOutgoing) {
+      return const ListRowsSkeleton(count: 3, rowHeight: 96);
+    }
+    if (_outgoingError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _outgoingError!,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadOutgoing,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_outgoing.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.outbox_outlined,
+                size: 44,
+                color: textTheme.withValues(alpha: 0.35),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No sent requests yet',
+                style: AppTextStyles.boldText.copyWith(color: textTheme),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Requests you send from For You or Browse will appear here. Accepted requests move to Pals.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.65),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const Matches()),
+                  );
+                },
+                child: const Text('View Pals'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final requests = _filteredAndSortedOutgoing;
+    if (requests.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.filter_alt_off_outlined,
+                size: 44,
+                color: textTheme.withValues(alpha: 0.35),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No sent requests match your filters',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.boldText.copyWith(color: textTheme),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _clearSentFilters,
+                child: const Text('Clear filters'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshOutgoing,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 120 : 100,
+        ),
+        itemCount: requests.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pending and declined requests. Accepted requests move to Pals.',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme.withValues(alpha: 0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const Matches()),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: const Text('View Pals'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final request = requests[index - 1];
+          return _SentRequestCard(
+            request: request,
+            onWithdraw:
+                request.isPending ? () => _cancelOutgoing(request) : null,
+          );
+        },
+      ),
     );
   }
 
@@ -383,31 +1031,41 @@ class _RequestPageState extends State<RequestPage> {
     );
   }
 
-  Widget _buildEmptyState(Color textTheme) {
+  Widget _buildEmptyState() {
     final filteredOut = _requests.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 0, 32, 110),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Lottie.asset(
-              'assets/lottie/empty.json',
-              width: 220,
-              height: 220,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              filteredOut ? 'No requests found' : 'No requests yet',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme.withValues(alpha: 0.7),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      bottomPadding: AppSpacing.bottomNavClearanceFor(context),
+      title:
+          filteredOut
+              ? 'No requests match your filters'
+              : 'No requests yet',
+      actionLabel:
+          filteredOut
+              ? 'Clear filters'
+              : (_outgoing.isNotEmpty ? 'View sent requests' : 'Refresh'),
+      onAction:
+          filteredOut
+              ? () {
+                setState(() {
+                  _dateFilter = DateFilter.all;
+                  _roleFilter = RoleFilter.all;
+                  _skillFilter = 'all';
+                  _domainFilter = 'all';
+                  _sortFilter = SortFilter.newest;
+                });
+                _persistFilters();
+              }
+              : (_outgoing.isNotEmpty
+                  ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) => const RequestPage(
+                            initialView: RequestView.sent,
+                          ),
+                    ),
+                  )
+                  : _loadRequests),
     );
   }
 
@@ -415,56 +1073,110 @@ class _RequestPageState extends State<RequestPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
-
-    final requests = _filteredAndSortedRequests;
+    final adaptiveHeight = AppSpacing.topBarHeight();
+    final toolbarHeight =
+        (MediaQuery.textScalerOf(context).scale(20) + 24)
+            .clamp(adaptiveHeight, 96.0)
+            .toDouble();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
+        toolbarHeight: toolbarHeight,
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 0,
+        leadingWidth: AppSpacing.leadingWidth,
+        leading:
+            ModalRoute.of(context)?.isFirst == false
+                ? AppChrome.backButton(context, color: textTheme)
+                : null,
+        titleSpacing: AppSpacing.titleSpacing,
         title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.zero,
           child: Row(
             children: [
-              Text(
-                'Requests',
-                style: AppTextStyles.headingText.copyWith(color: textTheme),
+              Expanded(
+                child: Text(
+                  _view == RequestView.sent ? 'Sent requests' : 'Requests',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.headingText.copyWith(color: textTheme),
+                ),
               ),
-              const Spacer(),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _openFilterSheet,
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Icon(Icons.tune, color: textTheme, size: 24),
+              AppChrome.iconAction(
+                icon: Icons.notifications_none_rounded,
+                tooltip: 'Activity',
+                onPressed:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsPage(),
                       ),
-                      if (_hasActiveFilter)
-                        Positioned(
-                          right: -2,
-                          top: 9,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: _filterDotColor,
-                              shape: BoxShape.circle,
-                            ),
+                    ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      Icons.notifications_none_rounded,
+                      color: textTheme,
+                      size: 24,
+                    ),
+                    if (PreferencesService.instance.notificationsEnabled &&
+                        NotificationService.instance.unread > 0)
+                      Positioned(
+                        right: -1,
+                        top: -1,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                    ],
+                      ),
+                  ],
+                ),
+              ),
+              Semantics(
+                container: true,
+                button: true,
+                label:
+                    _view == RequestView.incoming
+                        ? 'Filter requests'
+                        : 'Filter sent requests',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _openFilterSheet,
+                  child: SizedBox(
+                    width: AppSpacing.iconTarget,
+                    height: AppSpacing.iconTarget,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Align(
+                          alignment: Alignment.center,
+                          child: Icon(Icons.tune, color: textTheme, size: 24),
+                        ),
+                        if (_view == RequestView.incoming
+                            ? _hasActiveFilter
+                            : _hasSentFilter)
+                          Positioned(
+                            right: -2,
+                            top: 9,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.accentText(context),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -472,50 +1184,172 @@ class _RequestPageState extends State<RequestPage> {
           ),
         ),
       ),
-      body:
-          _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _loadError != null
-              ? _buildLoadError(textTheme)
-              : requests.isEmpty
-              ? _buildEmptyState(textTheme)
-              : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                itemCount: requests.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        'They want to connect with you. Like back to start exchanging skills right away!',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.7),
-                          fontSize: 14,
+      body: Column(
+        children: [
+          if (_view == RequestView.incoming)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => const RequestPage(
+                                initialView: RequestView.sent,
+                              ),
                         ),
                       ),
-                    );
-                  }
-                  final request = requests[index - 1];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: GestureDetector(
-                      onTap: () => _openDetail(request),
-                      child: RequestCard(
-                        skillName: request.skillName,
-                        requesterName: request.requesterName,
-                        schedule: request.schedule,
-                        language: request.language,
-                        learningStyle: request.learningStyle,
-                        timeAgo: timeAgo(request.requestedAt),
-                        iconAsset: request.iconAsset,
-                        seekingLabel: request.seekingLabel,
-                        onAccept: () => _respond(request, true),
-                        onDecline: () => _respond(request, false),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text(
+                    'View sent requests',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.accentText(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Expanded(
+            child:
+                _view == RequestView.incoming
+                    ? _buildIncoming(textTheme)
+                    : _buildSent(textTheme),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SentRequestCard extends StatelessWidget {
+  final OutgoingRequestLite request;
+  final VoidCallback? onWithdraw;
+
+  const _SentRequestCard({required this.request, this.onWithdraw});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    final statusColor =
+        request.isPending
+            ? AppColors.accentText(context)
+            : AppColors.dangerText(context);
+    final statusLabel = request.isPending ? 'Waiting for reply' : 'Declined';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.elevatedSurface(context),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border(context)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          UserAvatar(
+            name: request.recipientName,
+            image:
+                request.avatarUrl == null
+                    ? null
+                    : NetworkImage(request.avatarUrl!),
+            size: 48,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        request.recipientName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.boldText.copyWith(
+                          color: textColor,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  request.skills.isEmpty
+                      ? 'Skill exchange'
+                      : request.skills.first,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textColor.withValues(alpha: 0.7),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  timeAgo(request.createdAt),
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(context),
+                    fontSize: 12,
+                  ),
+                ),
+                if (onWithdraw != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: onWithdraw,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.dangerText(context),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        minimumSize: const Size(0, 36),
+                      ),
+                      child: const Text('Withdraw request'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

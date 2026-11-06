@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
-import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 /// Live blocked list from the `blocks` table (FR-15).
 class BlockListPage extends StatefulWidget {
@@ -40,7 +44,10 @@ class _BlockListPageState extends State<BlockListPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback: "Couldn't load blocked users. Please try again.",
+        );
         _loading = false;
       });
     }
@@ -52,15 +59,17 @@ class _BlockListPageState extends State<BlockListPage> {
     try {
       await MatchApi.unblockUser(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('You unblocked $name')));
+      showAppSuccess(context, 'You unblocked $name');
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Unblock failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not unblock this person. Please try again.',
+        ),
+      );
     }
   }
 
@@ -68,7 +77,7 @@ class _BlockListPageState extends State<BlockListPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+        AppSpacing.topBarHeight();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -79,20 +88,21 @@ class _BlockListPageState extends State<BlockListPage> {
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
         leading: IconButton(
+          tooltip: 'Back',
           icon: Icon(Icons.arrow_back_ios_new, color: textTheme, size: 16),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Blocked Users',
-          style: AppTextStyles.regularText.copyWith(
+          style: AppTextStyles.headingText.copyWith(
             color: textTheme,
-            fontSize: 16,
+            fontSize: 20,
           ),
         ),
       ),
       body:
           _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const BlockedListSkeleton()
               : _error != null
               ? _buildErrorState(textTheme)
               : _blocked.isEmpty
@@ -133,7 +143,7 @@ class _BlockListPageState extends State<BlockListPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Couldn’t load blocked users.',
+              _error!,
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor.withValues(alpha: 0.7),
@@ -197,13 +207,13 @@ class _BlockedTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.grey.withValues(alpha: 0.3),
-            backgroundImage:
+          UserAvatar(
+            name: person.name,
+            image:
                 person.photoUrls[0] == null
                     ? null
                     : NetworkImage(person.photoUrls[0]!),
+            size: 48,
           ),
           const SizedBox(width: 12),
           Expanded(

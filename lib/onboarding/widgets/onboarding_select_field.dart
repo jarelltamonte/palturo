@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 
@@ -11,7 +12,7 @@ Future<Set<String>?> showMultiSelectPicker({
   return showModalBottomSheet<Set<String>>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: AppColors.elevatedSurface(context),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -68,7 +69,7 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
             : await showModalBottomSheet<Set<String>>(
               context: context,
               isScrollControlled: true,
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: AppColors.elevatedSurface(context),
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
@@ -139,7 +140,7 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
                 ),
                 AnimatedRotation(
                   turns: _isOpen ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
+                  duration: AppMotion.base,
                   curve: Curves.easeInOut,
                   child: Icon(
                     Icons.keyboard_arrow_down_rounded,

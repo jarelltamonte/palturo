@@ -1,10 +1,17 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/chats_page.dart' show SkillTag;
+import 'package:palturo/widgets/user_avatar.dart';
 
-class RequestCard extends StatelessWidget {
+enum _RequestOutcome { none, accepted, declined }
+
+class RequestCard extends StatefulWidget {
   final String skillName;
   final String requesterName;
   final String schedule;
@@ -13,8 +20,15 @@ class RequestCard extends StatelessWidget {
   final String timeAgo;
   final String iconAsset;
   final String seekingLabel;
+  final String? connectionId;
+  final ImageProvider? avatarImage;
+  final Person? person;
+  final PersonRole? role;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final Future<bool> Function()? onConfirmDecline;
+  final VoidCallback? onUndo;
+  final VoidCallback? onStartChatting;
 
   const RequestCard({
     super.key,
@@ -26,48 +40,379 @@ class RequestCard extends StatelessWidget {
     required this.timeAgo,
     this.iconAsset = 'assets/icons/rlearner.svg',
     this.seekingLabel = 'Seeking a learner in',
+    this.connectionId,
+    this.avatarImage,
+    this.person,
+    this.role,
     required this.onAccept,
     required this.onDecline,
+    this.onConfirmDecline,
+    this.onUndo,
+    this.onStartChatting,
   });
 
   @override
+  State<RequestCard> createState() => _RequestCardState();
+}
+
+class _RequestCardState extends State<RequestCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+  _RequestOutcome _outcome = _RequestOutcome.none;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && mounted) {
+        setState(() => _outcome = _RequestOutcome.none);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleAccept() {
+    if (_controller.isAnimating || _outcome != _RequestOutcome.none) return;
+    setState(() => _outcome = _RequestOutcome.accepted);
+    _controller.forward();
+    widget.onAccept();
+  }
+
+  Future<void> _handleDecline() async {
+    if (_controller.isAnimating || _outcome != _RequestOutcome.none) return;
+
+    final confirm = widget.onConfirmDecline;
+    if (confirm != null) {
+      final confirmed = await confirm();
+      if (!confirmed ||
+          !mounted ||
+          _controller.isAnimating ||
+          _outcome != _RequestOutcome.none) {
+        return;
+      }
+    } else {
+      widget.onDecline();
+    }
+
+    if (!mounted) return;
+    setState(() => _outcome = _RequestOutcome.declined);
+    _controller.forward();
+  }
+
+  void _handleUndo() {
+    if (_controller.isAnimating || _outcome == _RequestOutcome.none) return;
+    _controller.reverse();
+    widget.onUndo?.call();
+  }
+
+  void _handleStartChatting() {
+    final custom = widget.onStartChatting;
+    if (custom != null) {
+      custom();
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (_) => ChatRoom(
+              connectionId: widget.connectionId,
+              name: widget.requesterName,
+              avatarImage: widget.avatarImage,
+              skillName: widget.skillName,
+              role: widget.role,
+              person: widget.person,
+            ),
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration(
+    BuildContext context, {
+    Color? color,
+    Color? borderColor,
+    bool shadow = true,
+  }) {
+    return BoxDecoration(
+      color: color ?? AppColors.elevatedSurface(context),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: borderColor ?? AppColors.border(context)),
+      boxShadow:
+          shadow
+              ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  spreadRadius: 0,
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+              : null,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, _) {
+        final angle = _animation.value * pi;
+        final showBack = angle > pi / 2;
+
+        return Transform(
+          alignment: Alignment.center,
+          transform:
+              Matrix4.identity()
+                ..setEntry(3, 2, 0.0012)
+                ..rotateY(angle),
+          child: Stack(
+            children: [
+              Visibility(
+                visible: !showBack,
+                maintainSize: true,
+                maintainState: true,
+                maintainAnimation: true,
+                child: _buildFront(context),
+              ),
+              if (showBack)
+                Positioned.fill(
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.rotationY(pi),
+                    child: _buildBack(context),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBack(BuildContext context) {
+    switch (_outcome) {
+      case _RequestOutcome.accepted:
+        return _buildAcceptedBack(context);
+      case _RequestOutcome.declined:
+        return _buildDeclinedBack(context);
+      case _RequestOutcome.none:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _statusAvatar(
+    BuildContext context, {
+    required IconData badgeIcon,
+    required Color badgeColor,
+    required Color badgeBackground,
+    required Color ringColor,
+    double avatarOpacity = 1,
+  }) {
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Opacity(
+              opacity: avatarOpacity,
+              child: UserAvatar(
+                name: widget.requesterName,
+                image: widget.avatarImage,
+                size: 64,
+              ),
+            ),
+          ),
+          Positioned(
+            right: -4,
+            bottom: -4,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: badgeBackground,
+                shape: BoxShape.circle,
+                border: Border.all(color: ringColor, width: 2),
+              ),
+              child: Icon(badgeIcon, size: 14, color: badgeColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcceptedBack(BuildContext context) {
+    final surface = AppColors.elevatedSurface(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: _cardDecoration(
+        context,
+        color: surface,
+        borderColor: AppColors.primary.withValues(alpha: 0.6),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _statusAvatar(
+              context,
+              badgeIcon: Icons.check,
+              badgeColor: Colors.white,
+              badgeBackground: const Color(0xFF2E9E5B),
+              ringColor: surface,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              widget.requesterName,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.boldText.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 6),
+            SkillTag(skillName: widget.skillName, role: widget.role),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                onPressed: _handleStartChatting,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(23),
+                  ),
+                ),
+                child: Text(
+                  'Start chatting',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: Colors.black,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeclinedBack(BuildContext context) {
+    final surface = AppColors.mutedSurface(context);
+    final secondary = Theme.of(context).colorScheme.secondary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: _cardDecoration(context, color: surface, shadow: false),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _statusAvatar(
+              context,
+              badgeIcon: Icons.close,
+              badgeColor: Colors.white,
+              badgeBackground: AppColors.dangerText(context),
+              ringColor: surface,
+              avatarOpacity: 0.5,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              widget.requesterName,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.boldText.copyWith(
+                color: secondary,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Request declined',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: OutlinedButton.icon(
+                onPressed: _handleUndo,
+                icon: Icon(Icons.undo, size: 18, color: secondary),
+                label: Text(
+                  'Undo',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: secondary,
+                    fontSize: 15,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.border(context)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(23),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFront(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final accentColor = AppColors.accentText(context);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            spreadRadius: 0,
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              SvgPicture.asset(iconAsset, width: 22, height: 22),
+              SvgPicture.asset(widget.iconAsset, width: 22, height: 22),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  seekingLabel,
+                  widget.seekingLabel,
                   style: AppTextStyles.regularText.copyWith(
                     color: textTheme,
                     fontSize: 13,
                   ),
                 ),
               ),
-              Icon(Icons.keyboard_arrow_up, color: textTheme),
+              Icon(Icons.chevron_right, color: textTheme),
             ],
           ),
           const SizedBox(height: 4),
@@ -76,17 +421,17 @@ class RequestCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  skillName,
+                  widget.skillName,
                   style: AppTextStyles.boldText.copyWith(
-                    color: primaryColor,
+                    color: accentColor,
                     fontSize: 20,
                   ),
                 ),
               ),
               Text(
-                timeAgo,
+                widget.timeAgo,
                 style: AppTextStyles.regularText.copyWith(
-                  color: textTheme.withValues(alpha: 0.5),
+                  color: AppColors.mutedText(context),
                   fontSize: 12,
                 ),
               ),
@@ -102,14 +447,10 @@ class RequestCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFE8E8E8),
-                ),
-                child: const Icon(Icons.person, size: 28, color: Colors.grey),
+              UserAvatar(
+                name: widget.requesterName,
+                image: widget.avatarImage,
+                size: 40,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -117,7 +458,7 @@ class RequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      requesterName,
+                      widget.requesterName,
                       style: AppTextStyles.boldText.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 14,
@@ -129,52 +470,59 @@ class RequestCard extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_today_outlined,
-                              size: 13,
-                              color: textTheme,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              formatSchedule(schedule),
-                              style: AppTextStyles.regularText.copyWith(
+                        if (widget.schedule.trim().isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_outlined,
+                                size: 13,
                                 color: textTheme,
-                                fontSize: 12,
                               ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.translate, size: 13, color: textTheme),
-                            const SizedBox(width: 4),
-                            Text(
-                              language,
-                              style: AppTextStyles.regularText.copyWith(
+                              const SizedBox(width: 4),
+                              Text(
+                                formatSchedule(widget.schedule),
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (widget.language.trim().isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.translate, size: 13, color: textTheme),
+                              const SizedBox(width: 4),
+                              Text(
+                                widget.language,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (widget.learningStyle.trim().isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.psychology,
+                                size: 13,
                                 color: textTheme,
-                                fontSize: 12,
                               ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.psychology, size: 13, color: textTheme),
-                            const SizedBox(width: 4),
-                            Text(
-                              learningStyle,
-                              style: AppTextStyles.regularText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
+                              const SizedBox(width: 4),
+                              Text(
+                                widget.learningStyle,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: textTheme,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
                       ],
                     ),
                   ],
@@ -186,30 +534,32 @@ class RequestCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: TextButton(
-                  onPressed: onDecline,
-                  child: Text(
-                    'Decline',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: Colors.red,
-                      fontSize: 16,
+                child: SizedBox(
+                  height: 44,
+                  child: TextButton(
+                    onPressed: _handleDecline,
+                    child: Text(
+                      'Decline',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.dangerText(context),
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
               ),
-              Container(
-                width: 1,
-                height: 30,
-                color: AppColors.black.withValues(alpha: 0.2),
-              ),
+              Container(width: 1, height: 30, color: AppColors.border(context)),
               Expanded(
-                child: TextButton(
-                  onPressed: onAccept,
-                  child: Text(
-                    'Accept',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: primaryColor,
-                      fontSize: 16,
+                child: SizedBox(
+                  height: 44,
+                  child: TextButton(
+                    onPressed: _handleAccept,
+                    child: Text(
+                      'Accept',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: accentColor,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),

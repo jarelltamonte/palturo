@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart' show ConnectionRequest;
+import 'package:palturo/screen/utils/schedule_format.dart';
 
 class _Client {
   static SupabaseClient get c => Supabase.instance.client;
@@ -56,6 +57,13 @@ class ConversationLite {
   final int unread;
   final String? otherAvatar;
   final String? otherSkill;
+  final DateTime? mutedUntil;
+  final bool markedUnread;
+  final DateTime? otherLastSeenAt;
+  final bool otherPresenceEnabled;
+  final bool otherTypingEnabled;
+  final bool otherReadReceiptsEnabled;
+  final DateTime? otherReadAt;
   const ConversationLite({
     required this.connectionId,
     required this.status,
@@ -67,6 +75,13 @@ class ConversationLite {
     required this.unread,
     this.otherAvatar,
     this.otherSkill,
+    this.mutedUntil,
+    this.markedUnread = false,
+    this.otherLastSeenAt,
+    this.otherPresenceEnabled = true,
+    this.otherTypingEnabled = true,
+    this.otherReadReceiptsEnabled = true,
+    this.otherReadAt,
   });
 
   ConversationLite copyWith({
@@ -80,6 +95,14 @@ class ConversationLite {
     int? unread,
     String? otherAvatar,
     String? otherSkill,
+    DateTime? mutedUntil,
+    bool clearMutedUntil = false,
+    bool? markedUnread,
+    DateTime? otherLastSeenAt,
+    bool? otherPresenceEnabled,
+    bool? otherTypingEnabled,
+    bool? otherReadReceiptsEnabled,
+    DateTime? otherReadAt,
   }) {
     return ConversationLite(
       connectionId: connectionId ?? this.connectionId,
@@ -92,6 +115,14 @@ class ConversationLite {
       unread: unread ?? this.unread,
       otherAvatar: otherAvatar ?? this.otherAvatar,
       otherSkill: otherSkill ?? this.otherSkill,
+      mutedUntil: clearMutedUntil ? null : (mutedUntil ?? this.mutedUntil),
+      markedUnread: markedUnread ?? this.markedUnread,
+      otherLastSeenAt: otherLastSeenAt ?? this.otherLastSeenAt,
+      otherPresenceEnabled: otherPresenceEnabled ?? this.otherPresenceEnabled,
+      otherTypingEnabled: otherTypingEnabled ?? this.otherTypingEnabled,
+      otherReadReceiptsEnabled:
+          otherReadReceiptsEnabled ?? this.otherReadReceiptsEnabled,
+      otherReadAt: otherReadAt ?? this.otherReadAt,
     );
   }
 
@@ -112,36 +143,78 @@ class RequestLite {
   final String connectionId;
   final String requesterId;
   final String requesterName;
+  final PersonRole role;
   final String? avatarUrl;
   final List<String> skills; // title-cased skill names
+  final String? requestedSkillName;
+  final String? skillPath;
+  final bool? inDeclaredDomain;
   final DateTime createdAt;
   const RequestLite({
     required this.connectionId,
     required this.requesterId,
     required this.requesterName,
+    required this.role,
     this.avatarUrl,
     required this.skills,
+    this.requestedSkillName,
+    this.skillPath,
+    this.inDeclaredDomain,
     required this.createdAt,
   });
 
   ConnectionRequest toConnectionRequest() {
-    final skill = skills.isNotEmpty ? skills.first : 'Skill sharing';
+    final skill =
+        (requestedSkillName?.trim().isNotEmpty ?? false)
+            ? requestedSkillName!.trim()
+            : (skills.isNotEmpty ? skills.first : 'Skill sharing');
     return ConnectionRequest(
       id: connectionId,
       requesterId: requesterId,
       skillName: skill,
+      skillPath: skillPath,
+      inDeclaredDomain: inDeclaredDomain,
       requesterName: requesterName,
       schedule: '',
       language: '',
       learningStyle: '',
       bio: '',
       requestedAt: createdAt,
-      iconAsset: 'assets/icons/rlearner.svg',
-      seekingLabel: 'Wants to connect in',
-      role: PersonRole.mentor,
+      iconAsset:
+          role == PersonRole.learner
+              ? 'assets/icons/rlearner.svg'
+              : 'assets/icons/rmentor.svg',
+      seekingLabel:
+          role == PersonRole.learner
+              ? 'Seeking a mentor in'
+              : 'Seeking a learner in',
+      role: role,
       photoUrls: [avatarUrl],
     );
   }
+}
+
+/// Outgoing connection request from get_outgoing_requests.
+class OutgoingRequestLite {
+  final String connectionId;
+  final String recipientId;
+  final String recipientName;
+  final String? avatarUrl;
+  final List<String> skills;
+  final String status; // pending | declined
+  final DateTime createdAt;
+
+  const OutgoingRequestLite({
+    required this.connectionId,
+    required this.recipientId,
+    required this.recipientName,
+    this.avatarUrl,
+    required this.skills,
+    required this.status,
+    required this.createdAt,
+  });
+
+  bool get isPending => status == 'pending';
 }
 
 class MatchApi {
@@ -219,26 +292,38 @@ class MatchApi {
   static Future<Person?> getPersonFromPublicProfile(String userId) async {
     final p = await getPublicProfile(userId);
     if (p == null) return null;
+    return personFromPublicProfileMap(p, userId);
+  }
+
+  /// Pure mapping used by deck enrichment and tests.
+  static Person personFromPublicProfileMap(
+    Map<String, dynamic> p,
+    String userId,
+  ) {
     String name = ((p['p_name'] ?? '') as String).trim();
     if (name.isEmpty) name = 'Community member';
-    String skill = '';
+    final isLearner = p['p_role'] == 'learner';
     final teaching = (p['p_teaching'] as List?) ?? [];
     final learning = (p['p_learning'] as List?) ?? [];
-    if (teaching.isNotEmpty) {
-      final t = teaching.first as Map;
-      // leaf name only (short-form template) — full chain lives in the profile dialog
-      final raw = ((t['path'] ?? '') as String);
+    final preferred = isLearner ? learning : teaching;
+    final fallback = isLearner ? teaching : learning;
+    final skillEntries = preferred.isNotEmpty ? preferred : fallback;
+
+    String skill = '';
+    String skillPath = '';
+    String skillNote = '';
+    if (skillEntries.isNotEmpty) {
+      final entry = skillEntries.first as Map;
+      // leaf name only (short-form template) - full chain lives in the profile dialog
+      final raw = ((entry['path'] ?? '') as String);
+      skillPath = raw;
       skill =
           raw.isEmpty
-              ? ((t['skill'] ?? '') as String)
+              ? ((entry['skill'] ?? '') as String)
               : raw.split('.').last.replaceAll('_', ' ').trim();
-    } else if (learning.isNotEmpty) {
-      final l = learning.first as Map;
-      final raw = ((l['path'] ?? '') as String);
-      skill =
-          raw.isEmpty
-              ? ((l['skill'] ?? '') as String)
-              : raw.split('.').last.replaceAll('_', ' ').trim();
+      if (preferred.isNotEmpty) {
+        skillNote = ((entry['note'] as String?) ?? '').trim();
+      }
     }
     final showcases =
         ((p['p_showcases'] as List?) ?? [])
@@ -246,17 +331,20 @@ class MatchApi {
             .map((m) => m['media'] as String?)
             .whereType<String>()
             .toList();
+    final availabilityDays = parseAvailableDays(p['p_availability']);
     return Person(
       id: userId,
       name: name,
-      schedule: '', // availability lives in p_availability jsonb (legacy shape)
+      schedule: formatScheduleDays(availabilityDays),
       language: (p['p_languages'] ?? '') as String,
       learningStyle: (p['p_styles'] ?? '') as String,
       skillName: skill,
+      skillPath: skillPath,
       role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
+      skillNote: skillNote,
       photoUrls: [(p['p_avatar'] as String?)],
-      showcaseUrls: showcases.isNotEmpty ? showcases : const [null],
+      showcaseUrls: showcases,
     );
   }
 
@@ -285,8 +373,8 @@ class MatchApi {
     _deckCacheUserId = null;
   }
 
-  static bool hasCachedDeck(String asRoleDb) =>
-      _deckCache.containsKey(_deckKey(asRoleDb));
+  /// Returns the cached deck without a network or profile call, or null.
+  static List<Person>? peekDeck(String asRoleDb) => _deckCache[_deckKey(asRoleDb)];
 
   /// Cached deck instantly (no spinner); triggers a background refresh when
   /// stale. force bypasses both.
@@ -338,11 +426,14 @@ class MatchApi {
           language: person.language,
           learningStyle: person.learningStyle,
           skillName: person.skillName,
+          skillPath: person.skillPath,
           role: person.role,
           bio: person.bio,
+          skillNote: person.skillNote,
           photoUrls: person.photoUrls,
           showcaseUrls: person.showcaseUrls,
           compatibility: compat,
+          pipeline: m.pipeline,
         ),
       );
     }
@@ -424,9 +515,48 @@ class MatchApi {
             otherAvatar: r['other_avatar'] as String?,
             otherSkill:
                 (r['other_skill'] ?? r['skill_name'] ?? r['skill']) as String?,
+            mutedUntil:
+                DateTime.tryParse(
+                  r['muted_until']?.toString() ?? '',
+                )?.toLocal(),
+            markedUnread: r['marked_unread'] == true,
+            otherLastSeenAt:
+                DateTime.tryParse(
+                  r['other_last_seen_at']?.toString() ?? '',
+                )?.toLocal(),
+            otherPresenceEnabled: r['other_presence_enabled'] != false,
+            otherTypingEnabled: r['other_typing_enabled'] != false,
+            otherReadReceiptsEnabled: r['other_read_receipts_enabled'] != false,
+            otherReadAt:
+                DateTime.tryParse(
+                  r['other_read_at']?.toString() ?? '',
+                )?.toLocal(),
           ),
         )
         .toList();
+  }
+
+  static Future<void> setConnectionMute(
+    String connectionId,
+    DateTime? mutedUntil,
+  ) async {
+    await _Client.c.rpc(
+      'set_connection_mute',
+      params: {
+        'p_connection_id': connectionId,
+        'p_muted_until': mutedUntil?.toUtc().toIso8601String(),
+      },
+    );
+  }
+
+  static Future<void> setConnectionUnread(
+    String connectionId,
+    bool unread,
+  ) async {
+    await _Client.c.rpc(
+      'set_connection_unread',
+      params: {'p_connection_id': connectionId, 'p_unread': unread},
+    );
   }
 
   /// Messages in one room (renders in ChatRoom). Keeps created_at so the
@@ -521,8 +651,15 @@ class MatchApi {
         connectionId: r['connection_id'] as String,
         requesterId: r['requester_id'] as String,
         requesterName: _displayName(r['requester_name']),
+        role:
+            (r['requester_role'] == 'learner')
+                ? PersonRole.learner
+                : PersonRole.mentor,
         avatarUrl: r['avatar_url'] as String?,
         skills: skills,
+        requestedSkillName: r['requested_skill_name'] as String?,
+        skillPath: r['requested_skill_path'] as String?,
+        inDeclaredDomain: r['in_declared_domain'] as bool?,
         createdAt:
             DateTime.tryParse(r['created_at']?.toString() ?? '') ??
             DateTime.now(),
@@ -537,6 +674,13 @@ class MatchApi {
     );
   }
 
+  static Future<void> undoDecline(String connectionId) async {
+    await _Client.c.rpc(
+      'undo_decline_connection',
+      params: {'p_connection': connectionId},
+    );
+  }
+
   /// Deletes an accepted connection. The RPC verifies the caller is one of the
   /// two participants before removing it and its messages/feedback.
   static Future<void> unmatch(String connectionId) async {
@@ -546,8 +690,86 @@ class MatchApi {
     );
   }
 
-  static Future<void> sendConnectionRequest(String userId) =>
-      _Client.c.rpc('send_connection_request', params: {'p_recipient': userId});
+  static Future<String?> sendConnectionRequest(
+    String userId, {
+    String? skillName,
+    String? skillPath,
+  }) async {
+    final id = await _Client.c.rpc(
+      'send_connection_request',
+      params: {
+        'p_recipient': userId,
+        'p_skill_name': skillName,
+        'p_skill_path': skillPath,
+      },
+    );
+    return id?.toString();
+  }
+
+  /// Withdraw a pending request the caller sent. The RPC is idempotent when
+  /// the row was already removed by a retry.
+  static Future<void> cancelConnectionRequest(String connectionId) => _Client.c
+      .rpc('cancel_connection_request', params: {'p_connection': connectionId});
+
+  /// Outgoing pending/declined requests for the Requests → Sent surface.
+  static Future<List<OutgoingRequestLite>> getOutgoingRequests({
+    int limit = 25,
+  }) async {
+    final res =
+        await _Client.c.rpc('get_outgoing_requests', params: {'p_limit': limit})
+            as List;
+    return res
+        .whereType<Map>()
+        .map(
+          (r) => OutgoingRequestLite(
+            connectionId: r['connection_id'] as String,
+            recipientId: r['recipient_id'] as String,
+            recipientName: _displayName(r['recipient_name']),
+            avatarUrl: r['avatar_url'] as String?,
+            skills:
+                ((r['skills'] as List?) ?? [])
+                    .whereType<dynamic>()
+                    .map((s) => s.toString())
+                    .toList(),
+            status: (r['status'] ?? 'pending') as String,
+            createdAt:
+                DateTime.tryParse(r['created_at']?.toString() ?? '') ??
+                DateTime.now(),
+          ),
+        )
+        .toList();
+  }
+
+  /// App-level feedback / problem reports. RLS only permits the caller's row.
+  static Future<void> submitAppFeedback({
+    required String kind,
+    required Map<String, dynamic> payload,
+  }) async {
+    final user = _Client.c.auth.currentUser;
+    if (user == null) throw Exception('Please sign in again.');
+    await _Client.c.from('app_feedback').insert({
+      'user_id': user.id,
+      'kind': kind,
+      'payload': payload,
+    });
+  }
+
+  /// Notification rows for the activity surface.
+  static Future<List<Map<String, dynamic>>> listNotifications({
+    bool unreadOnly = false,
+    int limit = 30,
+  }) async {
+    final res =
+        await _Client.c.rpc(
+              'list_notifications',
+              params: {'p_unread_only': unreadOnly, 'p_limit': limit},
+            )
+            as List;
+    return res
+        .whereType<Map>()
+        .map((r) => Map<String, dynamic>.from(r))
+        .toList();
+  }
 
   static Future<void> blockUser(String userId) =>
       _Client.c.rpc('block_user', params: {'p_target': userId});
@@ -598,13 +820,22 @@ class MatchApi {
             )
             as List;
     return (res.whereType<Map>()).map((r) {
+      final availability = r['availability'];
+      final languages = List<String>.from(r['languages'] ?? const []);
+      final learningStyles = List<String>.from(
+        r['learning_styles'] ?? const [],
+      );
       return Person(
         id: r['user_id'] as String,
         name: _displayName(r['name']),
-        schedule: '',
-        language: '',
-        learningStyle: '',
-        skillName: '',
+        schedule:
+            availability is Map
+                ? formatScheduleDays(parseAvailableDays(availability))
+                : formatSchedule(availability),
+        language: languages.join(', '),
+        learningStyle: learningStyles.join(', '),
+        skillName: (r['skill_name'] ?? '').toString(),
+        skillPath: (r['skill_path'] ?? '').toString(),
         // The card is shown in a teaching or learning deck, so reflect the
         // placement being browsed rather than the profile's global role.
         role: kind == 'learn' ? PersonRole.learner : PersonRole.mentor,
@@ -620,8 +851,51 @@ class MatchApi {
     return (res as num?)?.toInt() ?? 0;
   }
 
+  static Future<void> touchLastSeen() async {
+    try {
+      await _Client.c.rpc('touch_last_seen');
+    } catch (_) {
+      // Best-effort heartbeat; the next tick retries.
+    }
+  }
+
+  static Future<Map<String, dynamic>> getChatPrivacy() async {
+    final res = await _Client.c.rpc('get_chat_privacy');
+    if (res is List && res.isNotEmpty && res.first is Map) {
+      return Map<String, dynamic>.from(res.first as Map);
+    }
+    if (res is Map) return Map<String, dynamic>.from(res);
+    return const {};
+  }
+
+  static Future<void> setChatPrivacy({
+    required bool presence,
+    required bool typing,
+    required bool readReceipts,
+  }) async {
+    await _Client.c.rpc(
+      'set_chat_privacy',
+      params: {
+        'p_presence': presence,
+        'p_typing': typing,
+        'p_read_receipts': readReceipts,
+      },
+    );
+  }
+
+  static Future<int> clearReadNotifications() async {
+    final res = await _Client.c.rpc('clear_read_notifications');
+    return (res as num?)?.toInt() ?? 0;
+  }
+
   static Future<void> markNotificationsRead() =>
       _Client.c.rpc('mark_notifications_read');
+
+  /// Marks one notification read so opening a row does not silently clear
+  /// unrelated unread items.
+  static Future<void> markNotificationRead(String id) async {
+    await _Client.c.rpc('mark_notification_read', params: {'p_id': id});
+  }
 
   // ---- Skill selection (spec: taxonomy + notes + classify) ----
 

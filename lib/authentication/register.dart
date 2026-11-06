@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -46,7 +45,8 @@ class _RegisterPageState extends State<RegisterPage> {
     super.initState();
 
     _firstNameFocusNode.addListener(() {
-      if (!_firstNameFocusNode.hasFocus && _firstNameController.text.isNotEmpty) {
+      if (!_firstNameFocusNode.hasFocus &&
+          _firstNameController.text.isNotEmpty) {
         setState(() => _firstNameTouched = true);
       }
     });
@@ -152,8 +152,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Validate name fields
-    final firstNameError =
-        Validators.validateName(_firstNameController.text, 'First name');
+    final firstNameError = Validators.validateName(
+      _firstNameController.text,
+      'First name',
+    );
     if (firstNameError != null) {
       setState(() {
         _firstNameTouched = true;
@@ -162,8 +164,10 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    final lastNameError =
-        Validators.validateName(_lastNameController.text, 'Last name');
+    final lastNameError = Validators.validateName(
+      _lastNameController.text,
+      'Last name',
+    );
     if (lastNameError != null) {
       setState(() {
         _lastNameTouched = true;
@@ -173,15 +177,15 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Validate password policy
-    final passwordResult =
-        Validators.checkPassword(_passwordController.text);
+    final passwordResult = Validators.checkPassword(_passwordController.text);
     if (!passwordResult.isValid) {
       setState(() {
         _passwordTouched = true;
       });
-      final errorMsg = passwordResult.unmetRequirements.isNotEmpty
-          ? passwordResult.unmetRequirements.first
-          : 'Password does not meet security requirements.';
+      final errorMsg =
+          passwordResult.unmetRequirements.isNotEmpty
+              ? passwordResult.unmetRequirements.first
+              : 'Password does not meet security requirements.';
       await _showSignUpFailedDialog(errorMsg);
       return;
     }
@@ -224,7 +228,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (result.isSuccess) {
         await _showAccountCreatedDialog(
-          message: result.message ??
+          message:
+              result.message ??
               'If your account is ready, please log in to continue.',
         );
 
@@ -258,7 +263,7 @@ class _RegisterPageState extends State<RegisterPage> {
       barrierDismissible: false,
       builder:
           (dialogContext) => AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
+            backgroundColor: AppColors.elevatedSurface(context),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -296,7 +301,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Text(
                   'Go to Log In',
                   style: AppTextStyles.boldText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -323,12 +328,15 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         );
 
-        final body = Text(
-          message,
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
+        final body = Semantics(
+          liveRegion: true,
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.regularText.copyWith(
+              color: textTheme,
+              fontSize: 14,
+            ),
           ),
         );
 
@@ -345,7 +353,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Text(
                   'OK',
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
@@ -354,7 +362,7 @@ class _RegisterPageState extends State<RegisterPage> {
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -366,7 +374,7 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Text(
                 'OK',
                 style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),
@@ -386,7 +394,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
-            !_passwordResult.isValid;
+        !_passwordResult.isValid;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -401,9 +409,8 @@ class _RegisterPageState extends State<RegisterPage> {
           child: TextButton.icon(
             onPressed: () => Navigator.pop(context),
             style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(44, 44),
               alignment: Alignment.centerLeft,
             ),
             icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
@@ -451,8 +458,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   controller: _firstNameController,
                                   focusNode: _firstNameFocusNode,
                                   keyboardType: TextInputType.name,
-                                  textCapitalization:
-                                      TextCapitalization.words,
+                                  textCapitalization: TextCapitalization.words,
                                   textInputAction: TextInputAction.next,
                                   autofillHints: const [
                                     AutofillHints.givenName,
@@ -471,8 +477,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                     ),
                                     child: Text(
                                       _firstNameError!,
-                                      style:
-                                          AppTextStyles.regularText.copyWith(
+                                      style: AppTextStyles.regularText.copyWith(
                                         color: errorColor,
                                         fontSize: 12,
                                       ),
@@ -492,8 +497,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   controller: _lastNameController,
                                   focusNode: _lastNameFocusNode,
                                   keyboardType: TextInputType.name,
-                                  textCapitalization:
-                                      TextCapitalization.words,
+                                  textCapitalization: TextCapitalization.words,
                                   textInputAction: TextInputAction.next,
                                   autofillHints: const [
                                     AutofillHints.familyName,
@@ -512,8 +516,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                     ),
                                     child: Text(
                                       _lastNameError!,
-                                      style:
-                                          AppTextStyles.regularText.copyWith(
+                                      style: AppTextStyles.regularText.copyWith(
                                         color: errorColor,
                                         fontSize: 12,
                                       ),
@@ -565,6 +568,10 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ],
                         suffixIcon: IconButton(
+                          tooltip:
+                              _isPasswordObscured
+                                  ? 'Show password'
+                                  : 'Hide password',
                           icon: Icon(
                             _isPasswordObscured
                                 ? Icons.visibility_off_outlined
@@ -583,32 +590,32 @@ class _RegisterPageState extends State<RegisterPage> {
                           padding: const EdgeInsets.only(top: 6, left: 4),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _passwordResult.unmetRequirements
-                                .map((req) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.circle,
-                                      size: 5,
-                                      color: errorColor,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        req,
-                                        style:
-                                            AppTextStyles.regularText.copyWith(
+                            children:
+                                _passwordResult.unmetRequirements.map((req) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.circle,
+                                          size: 5,
                                           color: errorColor,
-                                          fontSize: 12,
                                         ),
-                                      ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            req,
+                                            style: AppTextStyles.regularText
+                                                .copyWith(
+                                                  color: errorColor,
+                                                  fontSize: 12,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                }).toList(),
                           ),
                         ),
                       const SizedBox(height: 10),
@@ -626,6 +633,10 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ],
                         suffixIcon: IconButton(
+                          tooltip:
+                              _isConfirmPasswordObscured
+                                  ? 'Show confirmation password'
+                                  : 'Hide confirmation password',
                           icon: Icon(
                             _isConfirmPasswordObscured
                                 ? Icons.visibility_off_outlined
@@ -652,64 +663,71 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                       const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 64),
-                        child: RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            style: TextStyle(
-                              color: textTheme.withAlpha((0.7 * 255).round()),
-                              fontSize: 12,
-                              height: 1.4,
-                            ),
-                            children: [
-                              const TextSpan(
-                                text: 'By signing up, you agree to our ',
-                              ),
-                              TextSpan(
-                                text: 'Terms of Service',
-                                style: AppTextStyles.boldText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 12,
-                                ),
-                                recognizer:
-                                    TapGestureRecognizer()
-                                      ..onTap = () {
-                                        LegalDialogs.showTermsOfService(
-                                          context,
-                                        );
-                                      },
-                              ),
-                              const TextSpan(text: ', '),
-                              TextSpan(
-                                text: 'Data Policy',
-                                style: AppTextStyles.boldText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 12,
-                                ),
-                                recognizer:
-                                    TapGestureRecognizer()
-                                      ..onTap = () {
-                                        LegalDialogs.showDataPolicy(context);
-                                      },
-                              ),
-                              const TextSpan(text: ', and '),
-                              TextSpan(
-                                text: 'Cookies Policy',
-                                style: AppTextStyles.boldText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 12,
-                                ),
-                                recognizer:
-                                    TapGestureRecognizer()
-                                      ..onTap = () {
-                                        LegalDialogs.showCookiesPolicy(context);
-                                      },
-                              ),
-                              const TextSpan(text: '.'),
-                            ],
-                          ),
+                      Text(
+                        'By signing up, you agree to our',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: textTheme.withAlpha((0.7 * 255).round()),
+                          fontSize: 12,
+                          height: 1.4,
                         ),
+                      ),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 2,
+                        children: [
+                          TextButton(
+                            onPressed:
+                                () => LegalDialogs.showTermsOfService(context),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                            ),
+                            child: Text(
+                              'Terms of Service',
+                              style: AppTextStyles.boldText.copyWith(
+                                color: textTheme,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed:
+                                () => LegalDialogs.showDataPolicy(context),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                            ),
+                            child: Text(
+                              'Data Policy',
+                              style: AppTextStyles.boldText.copyWith(
+                                color: textTheme,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed:
+                                () => LegalDialogs.showCookiesPolicy(context),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                            ),
+                            child: Text(
+                              'Cookies Policy',
+                              style: AppTextStyles.boldText.copyWith(
+                                color: textTheme,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -721,7 +739,7 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -738,18 +756,19 @@ class _RegisterPageState extends State<RegisterPage> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.textSecondary,
+                  child:
+                      _isSubmitting
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                        )
-                      : const Text('Sign Up'),
+                          )
+                          : const Text('Sign Up'),
                 ),
               ),
             ],

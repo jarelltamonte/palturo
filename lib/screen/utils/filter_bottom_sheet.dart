@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
@@ -45,17 +46,18 @@ class FilterBottomSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       useSafeArea: true,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => FilterBottomSheet(
-        sections: sections,
-        selected: selected,
-        onApply: onApply,
-      ),
+      builder:
+          (_) => FilterBottomSheet(
+            sections: sections,
+            selected: selected,
+            onApply: onApply,
+          ),
     );
   }
 
@@ -177,7 +179,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 _filterChip(
                   option.label,
                   _draft[section.key] == option.value,
-                  () => setState(() => _draft[section.key] = option.value),
+                  () {
+                    Haptics.selection();
+                    setState(() => _draft[section.key] = option.value);
+                  },
                   textColor,
                   primaryColor,
                 ),
@@ -205,19 +210,23 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
     Color textColor,
     Color primaryColor,
   ) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? primaryColor
-                : textColor.withValues(alpha: 0.3),
+      excludeSemantics: true,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          backgroundColor: isSelected ? primaryColor : Colors.transparent,
+          side: BorderSide(
+            color: isSelected ? primaryColor : textColor.withValues(alpha: 0.3),
           ),
+          shape: const StadiumBorder(),
+          elevation: 0,
         ),
         child: Text(
           label,

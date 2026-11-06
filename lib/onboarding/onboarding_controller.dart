@@ -95,4 +95,51 @@ class OnboardingController extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Map<String, dynamic> toJson() => {
+    'role': role?.name,
+    'learningInterests': learningInterests.toList(),
+    'teachingInterests': teachingInterests.toList(),
+    'learningStyles': learningStyles.toList(),
+    'availabilityDays': availabilityDays.toList(),
+    'availability': availability,
+    'languages': languages.toList(),
+  };
+
+  void applyJson(Map<String, dynamic> json) {
+    final roleName = json['role']?.toString();
+    role =
+        OnboardingRole.values
+            .where((value) => value.name == roleName)
+            .firstOrNull;
+    learningInterests
+      ..clear()
+      ..addAll(_strings(json['learningInterests']));
+    teachingInterests
+      ..clear()
+      ..addAll(_strings(json['teachingInterests']));
+    learningStyles
+      ..clear()
+      ..addAll(_strings(json['learningStyles']));
+    availabilityDays
+      ..clear()
+      ..addAll(_strings(json['availabilityDays']));
+    languages
+      ..clear()
+      ..addAll(_strings(json['languages']));
+    availability
+      ..clear()
+      ..addAll(
+        (json['availability'] as Map?)?.map(
+              (key, value) => MapEntry(key.toString(), value.toString()),
+            ) ??
+            const {},
+      );
+    notifyListeners();
+  }
+
+  List<String> _strings(dynamic value) {
+    if (value is! List) return const [];
+    return value.map((item) => item.toString()).toList();
+  }
 }

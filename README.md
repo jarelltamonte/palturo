@@ -28,6 +28,16 @@ flutter run \
 If the values are missing, the app starts on a configuration screen instead of
 crashing. Only the publishable (anon) key belongs here — never a service-role key.
 
+> **Do not put `SUPABASE_PAT` or any service-role key in `.env`.**
+> `--dart-define-from-file` compiles every value in that file into the client.
+> Keep CLI tokens in `.env.cli` (gitignored) and load them only in your shell:
+> `$env:SUPABASE_ACCESS_TOKEN = (Get-Content .env.cli | Where-Object { $_ -match '^SUPABASE_PAT=' }) -replace '^SUPABASE_PAT=', ''`
+
+Auth email links and redirect URLs are documented in
+[`docs/AUTH_EMAIL_LINKS.md`](docs/AUTH_EMAIL_LINKS.md). The static confirmation
+and reset page is a separate project in `../palturo-auth-web` and is deployed to
+Cloudflare at `palturo.app`.
+
 ## Backend functions
 
 ```sh
@@ -66,4 +76,13 @@ approves them; custom-skill notes remain private in `user_skill_notes`.
 
 For another Supabase project, update the `pipeline_config.worker_url` row before
 applying the cron migration (it defaults to this project's function URL).
+
+
+## Web splash
+
+The native splash is generated from the `flutter_native_splash` block in `pubspec.yaml`.
+On web, `dart run flutter_native_splash:create` rewrites `web/index.html` and
+regenerates its CSS. After regeneration, re-apply the two responsive caps in the
+generated splash stylesheet: `.center` is capped at `min(55vw, 260px)` / `55vh`
+and `.bottom` at `min(42vw, 220px)` with a 24px bottom inset. Without those caps the square mark overflows small screens. The current patched block is marked with `/* Palturo: ... */` comments.
 

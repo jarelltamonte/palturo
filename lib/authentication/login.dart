@@ -7,6 +7,7 @@ import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/register.dart';
 import 'package:palturo/authentication/forgot_password_1.dart';
 import '../services/auth_service.dart';
+import '../utils/validators.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -31,6 +32,20 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   bool _isLoggingIn = false;
+  String? _emailError;
+  String? _passwordError;
+
+  void _submit() {
+    final emailError = Validators.validateEmail(_emailController.text.trim());
+    final passwordError =
+        _passwordController.text.isEmpty ? 'Password is required.' : null;
+    setState(() {
+      _emailError = emailError;
+      _passwordError = passwordError;
+    });
+    if (emailError != null || passwordError != null) return;
+    _login();
+  }
 
   Future<void> _login() async {
     if (_isLoggingIn) return;
@@ -47,23 +62,28 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoggingIn = false);
-      await _showLoginFailedDialog(
-        e.toString().replaceFirst('Exception: ', ''),
-      );
+      final failure =
+          e is LoginFailure
+              ? e
+              : const LoginFailure(
+                LoginFailureKind.generic,
+                'We could not sign you in. Check your details and try again.',
+              );
+      await _showLoginFailedDialog(failure);
     }
   }
 
-  Future<void> _showLoginFailedDialog(String message) {
+  Future<void> _showLoginFailedDialog(LoginFailure failure) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
-
-    return showAdaptiveDialog(
+    final resend = await showAdaptiveDialog<bool>(
       context: context,
       builder: (dialogContext) {
         final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
         final title = Center(
           child: Text(
-            'Login Failed',
+            failure.title,
+            textAlign: TextAlign.center,
             style: AppTextStyles.regularText.copyWith(
               color: textTheme,
               fontSize: 18,
@@ -72,11 +92,12 @@ class _LoginPageState extends State<LoginPage> {
         );
 
         final body = Text(
-          message,
+          failure.message,
           textAlign: TextAlign.center,
           style: AppTextStyles.regularText.copyWith(
             color: textTheme,
             fontSize: 14,
+            height: 1.4,
           ),
         );
 
@@ -89,20 +110,31 @@ class _LoginPageState extends State<LoginPage> {
             ),
             actions: [
               CupertinoDialogAction(
-                onPressed: () => Navigator.pop(dialogContext),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: Text(
-                  'OK',
+                  'Close',
                   style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ),
+              if (failure.canResendVerification)
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(
+                    'Resend email',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: AppColors.accentText(context),
+                    ),
+                  ),
+                ),
             ],
           );
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -110,18 +142,57 @@ class _LoginPageState extends State<LoginPage> {
           content: SizedBox(width: double.maxFinite, child: body),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'OK',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Close'),
             ),
+            if (failure.canResendVerification)
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Resend email'),
+              ),
           ],
         );
       },
     );
+
+    if (resend == true && mounted) {
+      await _resendVerificationEmail();
+    }
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      const SnackBar(
+        duration: Duration(seconds: 30),
+        content: Text('Sending a new confirmation email...'),
+      ),
+    );
+    try {
+      await _authService.resendVerificationEmail(_emailController.text.trim());
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Confirmation email sent. Check your inbox, then try signing in again.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final failure =
+          e is LoginFailure
+              ? e
+              : const LoginFailure(
+                LoginFailureKind.generic,
+                'Could not resend the confirmation email. Please try again.',
+              );
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+    }
   }
 
   @override
@@ -137,6 +208,10 @@ class _LoginPageState extends State<LoginPage> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final compact = constraints.maxHeight < 560;
+            final veryCompact = constraints.maxHeight < 430;
+            final logoWidth = veryCompact ? 150.0 : (compact ? 190.0 : 285.0);
+
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -158,23 +233,57 @@ class _LoginPageState extends State<LoginPage> {
                             isDarkMode
                                 ? 'assets/images/logo_white.png'
                                 : 'assets/images/logo_black.png',
-                            width: 285,
+                            width: logoWidth,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 56),
+                      SizedBox(height: compact ? 20 : 56),
 
                       TopLabeledField(
                         label: 'Email',
                         controller: _emailController,
+                        autofillHints: const [AutofillHints.email],
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) {
+                          if (_emailError != null) {
+                            setState(() => _emailError = null);
+                          }
+                        },
                       ),
+                      if (_emailError != null)
+                        Semantics(
+                          liveRegion: true,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                _emailError!,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
 
                       TopLabeledField(
                         label: 'Password',
                         controller: _passwordController,
                         obscureText: _isObscured,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(),
+                        onChanged: (_) {
+                          if (_passwordError != null) {
+                            setState(() => _passwordError = null);
+                          }
+                        },
                         suffixIcon: IconButton(
+                          tooltip:
+                              _isObscured ? 'Show password' : 'Hide password',
                           icon: Icon(
                             _isObscured
                                 ? Icons.visibility_off_outlined
@@ -188,17 +297,29 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                       ),
+                      if (_passwordError != null)
+                        Semantics(
+                          liveRegion: true,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                _passwordError!,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
 
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed:
-                              _isLoggingIn
-                                  ? null
-                                  : () {
-                                    _login();
-                                  },
+                          onPressed: _isLoggingIn ? null : _submit,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -223,8 +344,8 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 10),
                       Center(
-                        child: GestureDetector(
-                          onTap: () {
+                        child: TextButton(
+                          onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -232,11 +353,15 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             );
                           },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                          ),
                           child: Text(
                             'Forgot Password?',
                             textAlign: TextAlign.center,
                             style: AppTextStyles.boldText.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
+                              color: AppColors.accentText(context),
                             ),
                           ),
                         ),
@@ -251,7 +376,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 32.0),
+          padding: EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -269,11 +394,11 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: AppColors.accentText(context),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: AppTextStyles.boldText,
                     side: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppColors.accentText(context),
                       width: 1,
                     ),
                     shape: const RoundedRectangleBorder(
@@ -284,8 +409,8 @@ class _LoginPageState extends State<LoginPage> {
                   child: const Text('Create new account'),
                 ),
               ),
-              const SizedBox(height: 10),
-              Center(child: Image.asset('assets/images/brand.png', width: 145)),
+              const SizedBox(height: 16),
+              Center(child: Image.asset('assets/images/brand.png', width: 132)),
             ],
           ),
         ),

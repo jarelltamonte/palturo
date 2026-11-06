@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
@@ -18,16 +19,19 @@ Future<bool> showConfirmDialog(
   required String title,
   required String message,
   required String confirmLabel,
+  String cancelLabel = 'Cancel',
   bool destructive = true,
 }) async {
   final result = await showAdaptiveDialog<bool>(
     context: context,
-    builder: (dialogContext) => _ConfirmDialog(
-      title: title,
-      message: message,
-      confirmLabel: confirmLabel,
-      destructive: destructive,
-    ),
+    builder:
+        (dialogContext) => _ConfirmDialog(
+          title: title,
+          message: message,
+          confirmLabel: confirmLabel,
+          cancelLabel: cancelLabel,
+          destructive: destructive,
+        ),
   );
   return result ?? false;
 }
@@ -46,12 +50,14 @@ class _ConfirmDialog extends StatelessWidget {
   final String title;
   final String message;
   final String confirmLabel;
+  final String cancelLabel;
   final bool destructive;
 
   const _ConfirmDialog({
     required this.title,
     required this.message,
     required this.confirmLabel,
+    required this.cancelLabel,
     required this.destructive,
   });
 
@@ -59,7 +65,10 @@ class _ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-    final confirmColor = destructive ? Colors.red : AppColors.primary;
+    final confirmColor =
+        destructive
+            ? AppColors.dangerText(context)
+            : AppColors.accentText(context);
 
     final titleWidget = Center(
       child: Text(
@@ -74,10 +83,7 @@ class _ConfirmDialog extends StatelessWidget {
     final body = Text(
       message,
       textAlign: TextAlign.center,
-      style: AppTextStyles.regularText.copyWith(
-        color: textTheme,
-        fontSize: 14,
-      ),
+      style: AppTextStyles.regularText.copyWith(color: textTheme, fontSize: 14),
     );
 
     if (isIOS) {
@@ -89,15 +95,23 @@ class _ConfirmDialog extends StatelessWidget {
         ),
         actions: [
           CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () {
+              Haptics.selection();
+              Navigator.pop(context, false);
+            },
             child: Text(
-              'Cancel',
+              cancelLabel,
               style: AppTextStyles.regularText.copyWith(color: textTheme),
             ),
           ),
           CupertinoDialogAction(
             isDestructiveAction: destructive,
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              Haptics.fire(
+                destructive ? HapticIntent.warning : HapticIntent.selection,
+              );
+              Navigator.pop(context, true);
+            },
             child: Text(
               confirmLabel,
               style: AppTextStyles.regularText.copyWith(color: confirmColor),
@@ -108,33 +122,42 @@ class _ConfirmDialog extends StatelessWidget {
     }
 
     return AlertDialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: titleWidget,
       content: SizedBox(width: double.maxFinite, child: body),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context, false),
+          onPressed: () {
+            Haptics.selection();
+            Navigator.pop(context, false);
+          },
           child: Text(
-            'Cancel',
+            cancelLabel,
             style: AppTextStyles.regularText.copyWith(color: textTheme),
           ),
         ),
         TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: destructive
-              ? TextButton.styleFrom(
-                  backgroundColor: Colors.red.withValues(alpha: 0.12),
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                )
-              : null,
+          onPressed: () {
+            Haptics.fire(
+              destructive ? HapticIntent.warning : HapticIntent.selection,
+            );
+            Navigator.pop(context, true);
+          },
+          style:
+              destructive
+                  ? TextButton.styleFrom(
+                    backgroundColor: AppColors.danger.withValues(alpha: 0.12),
+                    foregroundColor: AppColors.dangerText(context),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  )
+                  : null,
           child: Text(
             confirmLabel,
             style: AppTextStyles.regularText.copyWith(color: confirmColor),
@@ -228,19 +251,15 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
                 fontSize: 14,
               ),
               filled: true,
-              fillColor: Theme.of(context).colorScheme.surface,
+              fillColor: AppColors.mutedSurface(context),
               contentPadding: const EdgeInsets.all(14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: textTheme.withValues(alpha: 0.2),
-                ),
+                borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: textTheme.withValues(alpha: 0.2),
-                ),
+                borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -277,9 +296,10 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
             child: Text(
               'Report',
               style: AppTextStyles.regularText.copyWith(
-                color: AppColors.primary.withValues(
-                  alpha: canSubmit ? 1 : 0.4,
-                ),
+                color:
+                    canSubmit
+                        ? AppColors.accentText(context)
+                        : textTheme.withValues(alpha: 0.38),
               ),
             ),
           ),
@@ -289,7 +309,7 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
 
     return AlertDialog(
       scrollable: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: titleWidget,
       content: SizedBox(width: double.maxFinite, child: content),
@@ -306,9 +326,10 @@ class _ReportReasonDialogState extends State<_ReportReasonDialog> {
           child: Text(
             'Report',
             style: AppTextStyles.regularText.copyWith(
-              color: AppColors.primary.withValues(
-                alpha: canSubmit ? 1 : 0.4,
-              ),
+              color:
+                  canSubmit
+                      ? AppColors.accentText(context)
+                      : textTheme.withValues(alpha: 0.38),
             ),
           ),
         ),
@@ -346,9 +367,10 @@ class _ReasonTile extends StatelessWidget {
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
                 size: 20,
-                color: selected
-                    ? AppColors.primary
-                    : textTheme.withValues(alpha: 0.5),
+                color:
+                    selected
+                        ? AppColors.primary
+                        : textTheme.withValues(alpha: 0.5),
               ),
               const SizedBox(width: 12),
               Expanded(

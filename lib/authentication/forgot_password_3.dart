@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/top_labeled_field.dart';
@@ -9,7 +10,11 @@ import '../services/auth_service.dart';
 import '../utils/validators.dart';
 
 class ForgotPasswordType extends StatefulWidget {
-  const ForgotPasswordType({super.key});
+  const ForgotPasswordType({super.key, this.tokenHash});
+
+  /// When present, the page verifies the recovery token before showing the
+  /// form. This is the in-app half of the hybrid reset flow.
+  final String? tokenHash;
 
   @override
   State<ForgotPasswordType> createState() => _ForgotPasswordTypeState();
@@ -19,6 +24,8 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
   bool _isLoading = false;
+  bool _verifyingToken = false;
+  bool _tokenInvalid = false;
 
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -35,6 +42,30 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
     _confirmPasswordController.addListener(_handleChange);
     _passwordFocusNode.addListener(_handleChange);
     _confirmPasswordFocusNode.addListener(_handleChange);
+
+    if (widget.tokenHash != null) {
+      _verifyingToken = true;
+      _verifyRecoveryToken();
+    }
+  }
+
+  Future<void> _verifyRecoveryToken() async {
+    try {
+      await Supabase.instance.client.auth.verifyOTP(
+        tokenHash: widget.tokenHash!,
+        type: OtpType.recovery,
+      );
+      if (!mounted) return;
+      setState(() {
+        _verifyingToken = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _verifyingToken = false;
+        _tokenInvalid = true;
+      });
+    }
   }
 
   void _handleChange() {
@@ -68,7 +99,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -92,7 +123,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
               child: Text(
                 'OK',
                 style: AppTextStyles.boldText.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),
@@ -113,9 +144,10 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
 
     final passwordResult = _passwordResult;
     if (!passwordResult.isValid) {
-      final errorMsg = passwordResult.unmetRequirements.isNotEmpty
-          ? passwordResult.unmetRequirements.first
-          : 'Password does not meet security requirements.';
+      final errorMsg =
+          passwordResult.unmetRequirements.isNotEmpty
+              ? passwordResult.unmetRequirements.first
+              : 'Password does not meet security requirements.';
       await _showErrorDialog(errorMsg);
       return;
     }
@@ -172,9 +204,98 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
     final adaptiveHeight =
         defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
+    if (_verifyingToken) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  height: 28,
+                  width: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Checking your reset link…',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: textTheme.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_tokenInvalid) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: errorColor,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'This reset link has expired',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.headingText.copyWith(
+                        color: textTheme,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Request a new reset link, then open the new email.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            Navigator.popUntil(context, (route) => route.isFirst),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.textSecondary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text('Return to login'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
-            !_passwordResult.isValid;
+        !_passwordResult.isValid;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -186,169 +307,177 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
         titleSpacing: 16,
         title: Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+          child: IconButton(
+            tooltip: 'Back',
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              alignment: Alignment.centerLeft,
-            ),
             icon: Icon(Icons.arrow_back_ios, color: textTheme, size: 16),
-            label: Text('', style: TextStyle(color: textTheme, fontSize: 16)),
           ),
         ),
       ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  'Reset your password',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.headingText.copyWith(color: textTheme),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Enter your new password below.',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.8),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Reset your password',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.headingText.copyWith(color: textTheme),
                   ),
-                ),
-                const SizedBox(height: 32),
-                TopLabeledField(
-                  label: 'Password',
-                  controller: _passwordController,
-                  focusNode: _passwordFocusNode,
-                  obscureText: _isPasswordObscured,
-                  keyboardType: TextInputType.visiblePassword,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.newPassword],
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(
-                      Validators.maxPasswordLength,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Enter your new password below.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textTheme.withValues(alpha: 0.8),
                     ),
-                  ],
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isPasswordObscured
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: textTheme.withAlpha((0.8 * 255).round()),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordObscured = !_isPasswordObscured;
-                      });
-                    },
                   ),
-                ),
-                if (showPasswordChecklist)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6, left: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _passwordResult.unmetRequirements.map((req) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.circle,
-                                size: 5,
-                                color: errorColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  req,
-                                  style: AppTextStyles.regularText.copyWith(
-                                    color: errorColor,
-                                    fontSize: 12,
+                  const SizedBox(height: 32),
+                  TopLabeledField(
+                    label: 'Password',
+                    controller: _passwordController,
+                    focusNode: _passwordFocusNode,
+                    obscureText: _isPasswordObscured,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.newPassword],
+                    inputFormatters: [
+                      LengthLimitingTextInputFormatter(
+                        Validators.maxPasswordLength,
+                      ),
+                    ],
+                    suffixIcon: IconButton(
+                      tooltip:
+                          _isPasswordObscured
+                              ? 'Show password'
+                              : 'Hide password',
+                      icon: Icon(
+                        _isPasswordObscured
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: textTheme.withAlpha((0.8 * 255).round()),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordObscured = !_isPasswordObscured;
+                        });
+                      },
+                    ),
+                  ),
+                  if (showPasswordChecklist)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children:
+                            _passwordResult.unmetRequirements.map((req) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      size: 5,
+                                      color: errorColor,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        req,
+                                        style: AppTextStyles.regularText
+                                            .copyWith(
+                                              color: errorColor,
+                                              fontSize: 12,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  TopLabeledField(
+                    label: 'Confirm password',
+                    controller: _confirmPasswordController,
+                    focusNode: _confirmPasswordFocusNode,
+                    obscureText: _isConfirmPasswordObscured,
+                    keyboardType: TextInputType.visiblePassword,
+                    textInputAction: TextInputAction.done,
+                    autofillHints: const [AutofillHints.newPassword],
+                    inputFormatters: [
+                      LengthLimitingTextInputFormatter(
+                        Validators.maxPasswordLength,
+                      ),
+                    ],
+                    suffixIcon: IconButton(
+                      tooltip:
+                          _isConfirmPasswordObscured
+                              ? 'Show confirmation password'
+                              : 'Hide confirmation password',
+                      icon: Icon(
+                        _isConfirmPasswordObscured
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: textTheme.withAlpha((0.8 * 255).round()),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isConfirmPasswordObscured =
+                              !_isConfirmPasswordObscured;
+                        });
+                      },
+                    ),
+                  ),
+                  if (_confirmPasswordError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 4),
+                      child: Text(
+                        _confirmPasswordError!,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: errorColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? () {} : _resetPassword,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: AppTextStyles.boldText,
+                        foregroundColor: AppColors.textSecondary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.textSecondary,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                              )
+                              : const Text('Reset Password'),
                     ),
                   ),
-                const SizedBox(height: 16),
-                TopLabeledField(
-                  label: 'Confirm password',
-                  controller: _confirmPasswordController,
-                  focusNode: _confirmPasswordFocusNode,
-                  obscureText: _isConfirmPasswordObscured,
-                  keyboardType: TextInputType.visiblePassword,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: const [AutofillHints.newPassword],
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(
-                      Validators.maxPasswordLength,
-                    ),
-                  ],
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _isConfirmPasswordObscured
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: textTheme.withAlpha((0.8 * 255).round()),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isConfirmPasswordObscured =
-                            !_isConfirmPasswordObscured;
-                      });
-                    },
-                  ),
-                ),
-                if (_confirmPasswordError != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4, left: 4),
-                    child: Text(
-                      _confirmPasswordError!,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: errorColor,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? () {} : _resetPassword,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      textStyle: AppTextStyles.boldText,
-                      foregroundColor: AppColors.textSecondary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.textSecondary,
-                              ),
-                            ),
-                          )
-                        : const Text('Reset Password'),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

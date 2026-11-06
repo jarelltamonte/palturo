@@ -1,14 +1,24 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:palturo/main.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/local_notification_service.dart';
 import 'package:palturo/services/auth_service.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:palturo/screen/block_list.dart';
+import 'package:palturo/authentication/legal_dialogs.dart';
+import 'package:palturo/screen/account/account_settings_page.dart';
+import 'package:palturo/screen/settings/notification_preferences_page.dart';
+import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/user_avatar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final ButtonStyle _noSplashButtonStyle = TextButton.styleFrom(
   splashFactory: NoSplash.splashFactory,
@@ -22,19 +32,11 @@ class Settings extends StatefulWidget {
 }
 
 class _SettingsState extends State<Settings> {
-  bool _notificationsEnabled = true;
-  bool _soundEnabled = true;
-  bool _vibrationEnabled = true;
-  bool _isLoggingOut = false;
-  bool _isDeleting = false;
-  bool _userChangedSettings = false;
-  String _version = '…';
-
-  static const _notificationsKey = 'notifications_enabled';
-  static const _soundKey = 'sound_enabled';
-  static const _vibrationKey = 'vibration_enabled';
-  static const _feedbackKey = 'feedback_entries';
-  static const _reportKey = 'problem_reports';
+  String _version = '...';
+  ProfileData? _profile;
+  String? _email;
+  String? _authName;
+  bool _loggingOut = false;
 
   final TextEditingController _reportController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
@@ -63,8 +65,8 @@ class _SettingsState extends State<Settings> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
     _loadVersion();
+    _loadAccountSummary();
   }
 
   Future<void> _loadVersion() async {
@@ -81,48 +83,30 @@ class _SettingsState extends State<Settings> {
     }
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = PreferencesService.instance;
-    final notifications = await prefs.getBool(_notificationsKey);
-    final sound = await prefs.getBool(_soundKey);
-    final vibration = await prefs.getBool(_vibrationKey);
-    if (!mounted || _userChangedSettings) return;
-    setState(() {
-      _notificationsEnabled = notifications ?? true;
-      _soundEnabled = sound ?? true;
-      _vibrationEnabled = vibration ?? true;
-    });
+  Future<void> _loadAccountSummary() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final first = user?.userMetadata?['first_name']?.toString().trim() ?? '';
+    final last = user?.userMetadata?['last_name']?.toString().trim() ?? '';
+    final authName = [first, last].where((part) => part.isNotEmpty).join(' ');
+    if (mounted) {
+      setState(() {
+        _email = user?.email;
+        _authName = authName.isEmpty ? null : authName;
+      });
+    }
+    ProfileData? profile;
+    try {
+      profile = await ProfileService().getCurrentUserProfile();
+    } catch (_) {
+      // Identity is optional; the account page still exposes auth details.
+    }
+    if (!mounted) return;
+    setState(() => _profile = profile);
   }
 
-  void _setToggle(String key, bool value, VoidCallback apply) {
-    _userChangedSettings = true;
-    setState(apply);
-    PreferencesService.instance.setBool(key, value);
-  }
-
-  Future<void> _appendLocalEntry(String key, Map<String, dynamic> entry) async {
-    final prefs = PreferencesService.instance;
-    final raw = await prefs.getString(key);
-    final entries = <Map<String, dynamic>>[];
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is List) {
-          for (final item in decoded) {
-            if (item is Map) {
-              entries.add(Map<String, dynamic>.from(item));
-            }
-          }
-        }
-      } catch (_) {
-        entries.clear();
-      }
-    }
-    entries.add(entry);
-    if (entries.length > 50) {
-      entries.removeRange(0, entries.length - 50);
-    }
-    await prefs.setString(key, jsonEncode(entries));
+  String _deliveryError(Object error) {
+    debugPrint('[Settings] delivery failed: $error');
+    return "Couldn't send this right now. Please try again.";
   }
 
   @override
@@ -135,11 +119,16 @@ class _SettingsState extends State<Settings> {
   void _showFeedbackDialog() {
     int currentStep = 0;
     final Map<int, int> ratings = {};
+    final Set<int> preferNot = {};
+    final ScrollController surveyScroll = ScrollController();
+    final GlobalKey commentFieldKey = GlobalKey();
+    var submitting = false;
 
     _feedbackController.clear();
 
     showAdaptiveDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) {
         final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -150,6 +139,9 @@ class _SettingsState extends State<Settings> {
             final bool isCommentStep =
                 currentStep == _feedbackStatements.length;
             final int selectedRating = ratings[currentStep] ?? 0;
+            final bool preferNotSelected = preferNot.contains(currentStep);
+            final bool canAdvance =
+                isCommentStep || selectedRating > 0 || preferNotSelected;
 
             Widget buildOption(int index) {
               final int value = index + 1;
@@ -181,6 +173,7 @@ class _SettingsState extends State<Settings> {
                     onTap: () {
                       setDialogState(() {
                         ratings[currentStep] = value;
+                        preferNot.remove(currentStep);
                       });
                     },
                     child: Padding(
@@ -200,10 +193,10 @@ class _SettingsState extends State<Settings> {
                             ),
                           ),
                           if (selected)
-                            const Icon(
+                            Icon(
                               Icons.check_circle,
                               size: 18,
-                              color: AppColors.primary,
+                              color: AppColors.accentText(context),
                             ),
                         ],
                       ),
@@ -213,13 +206,64 @@ class _SettingsState extends State<Settings> {
               );
             }
 
+            var confirming = false;
+
+            void previousStep() {
+              if (submitting || currentStep == 0) return;
+              if (surveyScroll.hasClients) surveyScroll.jumpTo(0);
+              setDialogState(() => currentStep--);
+            }
+
+            Future<void> confirmCancel() async {
+              if (submitting || confirming) return;
+              confirming = true;
+              final discard = await showConfirmDialog(
+                dialogContext,
+                title: 'Discard feedback?',
+                message: 'Your answers will be lost.',
+                confirmLabel: 'Discard',
+                cancelLabel: 'Keep writing',
+              );
+              confirming = false;
+              if (discard && dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+            }
+
+            Widget guard(Widget child) {
+              return PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (!didPop) confirmCancel();
+                },
+                child: child,
+              );
+            }
+
             final Widget ratingContent = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (currentStep > 0)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: submitting ? null : previousStep,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: Text(
+                        'Back',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.accentText(context),
+                        ),
+                      ),
+                    ),
+                  ),
                 Text(
                   'Step ${currentStep + 1} of ${_feedbackStatements.length + 1}',
                   style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.5),
+                    color: AppColors.mutedText(context),
                     fontSize: 12,
                   ),
                 ),
@@ -235,7 +279,16 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+                Text(
+                  'Responses are stored securely with your PalTuro account.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(context),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 18),
                 if (!isCommentStep) ...[
                   Text(
                     _feedbackStatements[currentStep],
@@ -245,7 +298,35 @@ class _SettingsState extends State<Settings> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () {
+                      setDialogState(() {
+                        if (preferNot.contains(currentStep)) {
+                          preferNot.remove(currentStep);
+                        } else {
+                          preferNot.add(currentStep);
+                          ratings.remove(currentStep);
+                        }
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                    ),
+                    child: Text(
+                      'Prefer not to answer',
+                      style: AppTextStyles.regularText.copyWith(
+                        color:
+                            preferNotSelected
+                                ? AppColors.accentText(context)
+                                : AppColors.mutedText(context),
+                        decoration:
+                            preferNotSelected
+                                ? TextDecoration.underline
+                                : TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   for (int i = 0; i < _agreementLabels.length; i++)
                     buildOption(i),
                 ] else ...[
@@ -257,22 +338,31 @@ class _SettingsState extends State<Settings> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tell us about your experience or how we can improve.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textTheme.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextField(
+                    key: commentFieldKey,
                     controller: _feedbackController,
-                    minLines: 4,
-                    maxLines: 6,
+                    minLines: 1,
+                    maxLines: 3,
                     keyboardType: TextInputType.multiline,
                     textInputAction: TextInputAction.newline,
+                    scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 180),
+                    onTap: () {
+                      Future<void>.delayed(
+                        const Duration(milliseconds: 250),
+                        () {
+                          final target = commentFieldKey.currentContext;
+                          if (target != null && target.mounted) {
+                            Scrollable.ensureVisible(
+                              target,
+                              alignment: 0.15,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        },
+                      );
+                    },
                     style: AppTextStyles.regularText.copyWith(
                       color: textTheme,
                       fontSize: 14,
@@ -280,11 +370,11 @@ class _SettingsState extends State<Settings> {
                     decoration: InputDecoration(
                       hintText: 'Write your feedback here...',
                       hintStyle: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.45),
+                        color: AppColors.mutedText(context),
                         fontSize: 14,
                       ),
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surface,
+                      fillColor: AppColors.mutedSurface(context),
                       contentPadding: const EdgeInsets.all(14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -307,12 +397,23 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tell us about your experience or how we can improve.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ],
             );
 
             Future<void> nextOrSubmit() async {
+              if (submitting) return;
               if (!isCommentStep) {
+                if (surveyScroll.hasClients) surveyScroll.jumpTo(0);
                 setDialogState(() {
                   currentStep++;
                 });
@@ -322,16 +423,28 @@ class _SettingsState extends State<Settings> {
               final Map<String, dynamic> feedbackData = {
                 'ratings': {
                   for (int i = 0; i < _feedbackStatements.length; i++)
-                    _feedbackStatements[i]: ratings[i],
+                    _feedbackStatements[i]:
+                        preferNot.contains(i) ? null : ratings[i],
                 },
                 'comment': _feedbackController.text.trim(),
                 'submitted_at': DateTime.now().toIso8601String(),
               };
 
+              submitting = true;
+              setDialogState(() {});
               try {
-                await _appendLocalEntry(_feedbackKey, feedbackData);
-              } catch (_) {
-                // Keep the dialog usable if local storage is unavailable.
+                await MatchApi.submitAppFeedback(
+                  kind: 'survey',
+                  payload: feedbackData,
+                );
+              } catch (e) {
+                if (!mounted) return;
+                submitting = false;
+                if (dialogContext.mounted) setDialogState(() {});
+                ScaffoldMessenger.of(
+                  this.context,
+                ).showSnackBar(SnackBar(content: Text(_deliveryError(e))));
+                return;
               }
 
               if (!mounted) return;
@@ -342,8 +455,69 @@ class _SettingsState extends State<Settings> {
               );
             }
 
-            if (isIOS) {
-              return CupertinoAlertDialog(
+            if (isIOS && MediaQuery.viewInsetsOf(context).bottom == 0) {
+              return guard(
+                CupertinoTheme(
+                  data: CupertinoThemeData(
+                    brightness: Theme.of(context).brightness,
+                  ),
+                  child: CupertinoAlertDialog(
+                    scrollController: surveyScroll,
+                    title: Center(
+                      child: Text(
+                        'Send Feedback',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textTheme,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    content: Material(
+                      color: Colors.transparent,
+                      child: ratingContent,
+                    ),
+                    actions: [
+                      CupertinoDialogAction(
+                        onPressed: submitting ? null : confirmCancel,
+                        child: Text(
+                          'Cancel',
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                submitting
+                                    ? textTheme.withValues(alpha: 0.38)
+                                    : textTheme,
+                          ),
+                        ),
+                      ),
+                      CupertinoDialogAction(
+                        onPressed:
+                            submitting || !canAdvance ? null : nextOrSubmit,
+                        child: Text(
+                          submitting
+                              ? 'Sending...'
+                              : isCommentStep
+                              ? 'Submit'
+                              : 'Next',
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                canAdvance
+                                    ? AppColors.accentText(context)
+                                    : textTheme.withValues(alpha: 0.38),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return guard(
+              AlertDialog(
+                backgroundColor: AppColors.elevatedSurface(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 title: Center(
                   child: Text(
                     'Send Feedback',
@@ -353,95 +527,59 @@ class _SettingsState extends State<Settings> {
                     ),
                   ),
                 ),
-                content: Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Material(
-                    color: Colors.transparent,
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: SingleChildScrollView(
+                    controller: surveyScroll,
                     child: ratingContent,
                   ),
                 ),
                 actions: [
-                  CupertinoDialogAction(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                    },
+                  TextButton(
+                    style: _noSplashButtonStyle,
+                    onPressed: submitting ? null : confirmCancel,
                     child: Text(
                       'Cancel',
                       style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
+                        color:
+                            submitting
+                                ? textTheme.withValues(alpha: 0.38)
+                                : textTheme,
                       ),
                     ),
                   ),
-                  CupertinoDialogAction(
-                    onPressed:
-                        !isCommentStep && selectedRating == 0
-                            ? null
-                            : nextOrSubmit,
+                  TextButton(
+                    style: _noSplashButtonStyle,
+                    onPressed: submitting || !canAdvance ? null : nextOrSubmit,
                     child: Text(
-                      isCommentStep ? 'Submit' : 'Next',
+                      submitting
+                          ? 'Sending...'
+                          : isCommentStep
+                          ? 'Submit'
+                          : 'Next',
                       style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.primary,
+                        color:
+                            canAdvance
+                                ? AppColors.accentText(context)
+                                : textTheme.withValues(alpha: 0.38),
                       ),
                     ),
                   ),
                 ],
-              );
-            }
-
-            return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
               ),
-              title: Center(
-                child: Text(
-                  'Send Feedback',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(child: ratingContent),
-              ),
-              actions: [
-                TextButton(
-                  style: _noSplashButtonStyle,
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
-                  child: Text(
-                    'Cancel',
-                    style: AppTextStyles.regularText.copyWith(color: textTheme),
-                  ),
-                ),
-                TextButton(
-                  style: _noSplashButtonStyle,
-                  onPressed:
-                      !isCommentStep && selectedRating == 0
-                          ? null
-                          : nextOrSubmit,
-                  child: Text(
-                    isCommentStep ? 'Submit' : 'Next',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ],
             );
           },
         );
       },
-    );
+    ).whenComplete(surveyScroll.dispose);
   }
 
-  void _showReportDialog() {
+  Future<void> _showReportDialog() async {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final submitting = ValueNotifier<bool>(false);
+    var dialogOpen = true;
 
-    showAdaptiveDialog(
+    await showAdaptiveDialog(
       context: context,
       builder: (dialogContext) {
         final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
@@ -458,12 +596,14 @@ class _SettingsState extends State<Settings> {
           ),
           decoration: InputDecoration(
             hintText: 'Tell us what went wrong...',
+            helperText: 'Stored securely with your account for review.',
+            helperMaxLines: 2,
             hintStyle: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.45),
               fontSize: 14,
             ),
             filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
+            fillColor: AppColors.mutedSurface(context),
             contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -481,16 +621,27 @@ class _SettingsState extends State<Settings> {
         );
 
         Future<void> submitReport() async {
+          if (submitting.value) return;
           final report = _reportController.text.trim();
           if (report.isEmpty) return;
 
+          submitting.value = true;
           try {
-            await _appendLocalEntry(_reportKey, {
-              'text': report,
-              'submitted_at': DateTime.now().toIso8601String(),
-            });
-          } catch (_) {
-            // Keep the dialog usable if local storage is unavailable.
+            await MatchApi.submitAppFeedback(
+              kind: 'problem',
+              payload: {
+                'text': report,
+                'submitted_at': DateTime.now().toIso8601String(),
+              },
+            );
+          } catch (e) {
+            if (!dialogOpen) return;
+            submitting.value = false;
+            if (!mounted) return;
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(_deliveryError(e))));
+            return;
           }
 
           if (!mounted) return;
@@ -520,6 +671,7 @@ class _SettingsState extends State<Settings> {
             actions: [
               CupertinoDialogAction(
                 onPressed: () {
+                  if (submitting.value) return;
                   _reportController.clear();
                   Navigator.pop(dialogContext);
                 },
@@ -528,21 +680,34 @@ class _SettingsState extends State<Settings> {
                   style: AppTextStyles.regularText.copyWith(color: textTheme),
                 ),
               ),
-              CupertinoDialogAction(
-                onPressed: submitReport,
-                child: Text(
-                  'Submit',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _reportController,
+                builder: (context, value, _) {
+                  final canSubmit = value.text.trim().isNotEmpty;
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: submitting,
+                    builder:
+                        (context, busy, _) => CupertinoDialogAction(
+                          onPressed: canSubmit && !busy ? submitReport : null,
+                          child: Text(
+                            busy ? 'Sending...' : 'Submit',
+                            style: AppTextStyles.regularText.copyWith(
+                              color:
+                                  canSubmit && !busy
+                                      ? AppColors.accentText(context)
+                                      : textTheme.withValues(alpha: 0.38),
+                            ),
+                          ),
+                        ),
+                  );
+                },
               ),
             ],
           );
         }
 
         return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
+          backgroundColor: AppColors.elevatedSurface(context),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -560,6 +725,7 @@ class _SettingsState extends State<Settings> {
             TextButton(
               style: _noSplashButtonStyle,
               onPressed: () {
+                if (submitting.value) return;
                 _reportController.clear();
                 Navigator.pop(dialogContext);
               },
@@ -568,662 +734,348 @@ class _SettingsState extends State<Settings> {
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
             ),
-            TextButton(
-              style: _noSplashButtonStyle,
-              onPressed: submitReport,
-              child: Text(
-                'Submit',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _reportController,
+              builder: (context, value, _) {
+                final canSubmit = value.text.trim().isNotEmpty;
+                return ValueListenableBuilder<bool>(
+                  valueListenable: submitting,
+                  builder:
+                      (context, busy, _) => TextButton(
+                        style: _noSplashButtonStyle,
+                        onPressed: canSubmit && !busy ? submitReport : null,
+                        child: Text(
+                          busy ? 'Sending...' : 'Submit',
+                          style: AppTextStyles.regularText.copyWith(
+                            color:
+                                canSubmit && !busy
+                                    ? AppColors.accentText(context)
+                                    : textTheme.withValues(alpha: 0.38),
+                          ),
+                        ),
+                      ),
+                );
+              },
             ),
           ],
         );
       },
     );
+    dialogOpen = false;
+    submitting.dispose();
   }
 
-  Future<void> _handleLogout() async {
-    setState(() => _isLoggingOut = true);
-
+  Future<void> _logout() async {
+    if (_loggingOut) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Log out',
+      message: 'Are you sure you want to log out of PalTuro?',
+      confirmLabel: 'Log out',
+      destructive: false,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _loggingOut = true);
     try {
       await AuthService().logout();
-
-      if (mounted) {
-        Navigator.of(
-          context,
-          rootNavigator: true,
-        ).popUntil((route) => route.isFirst);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoggingOut = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to log out: $e')));
-      }
-    }
-  }
-
-  void _showLogoutDialog() {
-    final textTheme = Theme.of(context).colorScheme.secondary;
-
-    showAdaptiveDialog(
-      context: context,
-      builder: (dialogContext) {
-        final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-
-        final message = Text(
-          'Are you sure you want to log out of PalTuro?',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
-          ),
-        );
-
-        if (isIOS) {
-          return CupertinoAlertDialog(
-            title: Center(
-              child: Text(
-                'Log Out',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            content: Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Material(color: Colors.transparent, child: message),
-            ),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: Text(
-                  'Cancel',
-                  style: AppTextStyles.regularText.copyWith(color: textTheme),
-                ),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                  _handleLogout();
-                },
-                child: Text(
-                  'Log Out',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        return AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Center(
-            child: Text(
-              'Log Out',
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-                fontSize: 18,
-              ),
-            ),
-          ),
-          content: SizedBox(width: double.maxFinite, child: message),
-          actions: [
-            TextButton(
-              style: _noSplashButtonStyle,
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: AppTextStyles.regularText.copyWith(color: textTheme),
-              ),
-            ),
-            TextButton(
-              style: _noSplashButtonStyle,
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _handleLogout();
-              },
-              child: Text(
-                'Log Out',
-                style: AppTextStyles.regularText.copyWith(
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _handleDeleteAccount() async {
-    if (_isDeleting) return;
-    setState(() => _isDeleting = true);
-
-    try {
-      await AuthService().deleteAccount();
-
       if (!mounted) return;
       Navigator.of(
         context,
         rootNavigator: true,
       ).popUntil((route) => route.isFirst);
-      // Keep the busy overlay until this route is disposed, so it cannot
-      // flash away during the exit animation.
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isDeleting = false);
+      setState(() => _loggingOut = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        const SnackBar(content: Text("Couldn't log out. Please try again.")),
       );
     }
   }
 
-  void _showDeleteAccountDialog() {
-    showAdaptiveDialog(
+  void _openAccount() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
+    );
+    if (mounted) _loadAccountSummary();
+  }
+
+  void _showHelpDialog() {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return _DeleteAccountDialog(
-          onConfirm: () {
-            Navigator.pop(dialogContext);
-            _handleDeleteAccount();
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).colorScheme.secondary;
-    final surfaceColor = Theme.of(context).colorScheme.surface;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return PopScope(
-      canPop: !_isLoggingOut && !_isDeleting,
-      child: Stack(
-        children: [
-          Scaffold(
-            appBar: AppBar(
-              toolbarHeight: adaptiveHeight,
-              backgroundColor: Colors.transparent,
-              scrolledUnderElevation: 0,
-              elevation: 0,
-              automaticallyImplyLeading: false,
-              leadingWidth: 60,
-              leading: Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap:
-                      (_isLoggingOut || _isDeleting)
-                          ? null
-                          : () => Navigator.pop(context),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Icon(Icons.close, color: textTheme, size: 24),
-                  ),
-                ),
-              ),
-              title: Text(
-                'Settings',
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            body: Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(splashFactory: NoSplash.splashFactory),
-              child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 24.0,
-                ),
-                children: [
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Notifications',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    value: _notificationsEnabled,
-                    onChanged: (bool value) {
-                      _setToggle(
-                        _notificationsKey,
-                        value,
-                        () => _notificationsEnabled = value,
-                      );
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Sound',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    value: _soundEnabled,
-                    onChanged: (bool value) {
-                      _setToggle(_soundKey, value, () => _soundEnabled = value);
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Vibration',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    value: _vibrationEnabled,
-                    onChanged: (bool value) {
-                      _setToggle(
-                        _vibrationKey,
-                        value,
-                        () => _vibrationEnabled = value,
-                      );
-                    },
-                  ),
-                  SwitchListTile.adaptive(
-                    title: Text(
-                      'Dark Mode',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    activeTrackColor: AppColors.primary,
-                    activeThumbColor: AppColors.white,
-                    value: isDarkMode,
-                    onChanged: (bool value) {
-                      MyApp.of(context).setThemeMode(value);
-                    },
-                  ),
-                  Divider(
-                    height: 20,
-                    color: AppColors.black.withValues(alpha: 0.2),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.feedback_outlined, color: textTheme),
-                    title: Text(
-                      'Send Feedback',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: _showFeedbackDialog,
-                  ),
-                  ListTile(
-                    leading: Icon(
-                      Icons.report_problem_outlined,
-                      color: textTheme,
-                    ),
-                    title: Text(
-                      'Report a Problem',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: _showReportDialog,
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.block, color: textTheme),
-                    title: Text(
-                      'Blocked Users',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme,
-                      ),
-                    ),
-                    trailing: Icon(Icons.chevron_right, color: textTheme),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const BlockListPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            bottomNavigationBar: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        splashFactory: NoSplash.splashFactory,
-                        onTap: _showLogoutDialog,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.logout_rounded, color: textTheme),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Logout',
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        splashFactory: NoSplash.splashFactory,
-                        onTap: _showDeleteAccountDialog,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.delete_forever,
-                                color: Colors.red,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Delete Account',
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: Colors.red,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Image.asset(
-                      isDarkMode
-                          ? 'assets/images/vlogo_white.png'
-                          : 'assets/images/vlogo_black.png',
-                      height: 60,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Version $_version',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.5),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (_isLoggingOut || _isDeleting)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.5),
-                alignment: Alignment.center,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 24,
-                    ),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primary,
-                          ),
-                          strokeWidth: 3.5,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _isDeleting
-                              ? 'Deleting account...'
-                              : 'Logging out...',
-                          style: AppTextStyles.boldText.copyWith(
-                            color: textTheme,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DeleteAccountDialog extends StatefulWidget {
-  final VoidCallback onConfirm;
-
-  const _DeleteAccountDialog({required this.onConfirm});
-
-  @override
-  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
-}
-
-class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  static const String _keyword = 'DELETE';
-
-  final TextEditingController _controller = TextEditingController();
-
-  bool get _canConfirm => _controller.text.trim().toUpperCase() == _keyword;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).colorScheme.secondary;
-    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'This permanently deletes your profile, matches, and chats. This can’t be undone.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Type $_keyword to confirm',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme.withValues(alpha: 0.5),
-            fontSize: 12,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _controller,
-          textCapitalization: TextCapitalization.characters,
-          textInputAction: TextInputAction.done,
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 14,
-          ),
-          decoration: InputDecoration(
-            hintText: _keyword,
-            hintStyle: AppTextStyles.regularText.copyWith(
-              color: textTheme.withValues(alpha: 0.45),
-              fontSize: 14,
-            ),
-            filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
-            contentPadding: const EdgeInsets.all(14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: textTheme.withValues(alpha: 0.2)),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-              borderSide: BorderSide(color: Colors.red, width: 1.5),
-            ),
-          ),
-        ),
-      ],
-    );
-
-    if (isIOS) {
-      return CupertinoAlertDialog(
-        title: Center(
-          child: Text(
-            'Delete Account',
-            style: AppTextStyles.regularText.copyWith(
-              color: textTheme,
-              fontSize: 18,
-            ),
-          ),
-        ),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Material(color: Colors.transparent, child: content),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Cancel',
-              style: AppTextStyles.regularText.copyWith(color: textTheme),
-            ),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: _canConfirm ? widget.onConfirm : null,
-            child: Text(
-              'I agree',
-              style: AppTextStyles.regularText.copyWith(
-                color: Colors.red.withValues(alpha: _canConfirm ? 1 : 0.4),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return AlertDialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Center(
-        child: Text(
-          'Delete Account',
-          style: AppTextStyles.regularText.copyWith(
-            color: textTheme,
-            fontSize: 18,
-          ),
-        ),
-      ),
-      content: SizedBox(width: double.maxFinite, child: content),
-      actions: [
-        TextButton(
-          style: _noSplashButtonStyle,
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          child: Text(
-            'Cancel',
-            style: AppTextStyles.regularText.copyWith(color: textTheme),
-          ),
-        ),
-        TextButton(
-          onPressed: _canConfirm ? widget.onConfirm : null,
-          style: TextButton.styleFrom(
-            splashFactory: NoSplash.splashFactory,
-            backgroundColor: Colors.red.withValues(
-              alpha: _canConfirm ? 0.12 : 0.06,
-            ),
-            foregroundColor: Colors.red,
-            disabledForegroundColor: Colors.red.withValues(alpha: 0.4),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(context),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
             ),
+            title: Text(
+              'Help',
+              style: AppTextStyles.boldText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
+            ),
+            content: Text(
+              'Use Report a Problem to send an issue to the PalTuro team. For account access problems, include the email address on your account so the team can identify you.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'Close',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.accentText(context),
+                  ),
+                ),
+              ),
+            ],
           ),
-          child: Text(
-            'I agree',
-            style: AppTextStyles.regularText.copyWith(
-              color: Colors.red.withValues(alpha: _canConfirm ? 1 : 0.4),
-            ),
+    );
+  }
+
+  Widget _sectionLabel(String label) => Padding(
+    padding: const EdgeInsets.only(top: 20, bottom: 4),
+    child: Semantics(
+      header: true,
+      child: Text(
+        label.toUpperCase(),
+        style: AppTextStyles.regularText.copyWith(
+          color: AppColors.mutedText(context),
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.4,
+        ),
+      ),
+    ),
+  );
+
+  Widget _settingsTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+    Color? color,
+  }) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final c = color ?? textTheme;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: c),
+      title: Text(title, style: AppTextStyles.regularText.copyWith(color: c)),
+      subtitle:
+          subtitle == null
+              ? null
+              : Text(
+                subtitle,
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+      trailing: trailing ?? Icon(Icons.chevron_right, color: c),
+      onTap: onTap,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final accountName = _profile?.name ?? _authName ?? _email ?? 'Your account';
+    final accountSubtitle =
+        _profile == null
+            ? (_email ?? 'Account & security')
+            : (_email ?? 'Password, blocked users, privacy');
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppChrome.appBar(
+        leading: AppChrome.backButton(context, color: textTheme),
+        title: Text(
+          'Settings',
+          style: AppTextStyles.headingText.copyWith(
+            color: textTheme,
+            fontSize: 20,
           ),
         ),
-      ],
+      ),
+      body: Theme(
+        data: Theme.of(context).copyWith(splashFactory: NoSplash.splashFactory),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+          children: [
+            _sectionLabel('Preferences'),
+            ListenableBuilder(
+              listenable: PreferencesService.instance,
+              builder: (context, _) {
+                final prefs = PreferencesService.instance;
+                final active = <String>[
+                  if (prefs.messageNotificationsEnabled) 'messages',
+                  if (prefs.requestNotificationsEnabled) 'requests',
+                  if (prefs.activityNotificationsEnabled) 'activity',
+                ];
+                final summary =
+                    prefs.notificationsEnabled
+                        ? (active.isEmpty
+                            ? 'On - no categories selected'
+                            : 'On - ${active.join(', ')}')
+                        : 'Off';
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Notifications',
+                    style: AppTextStyles.regularText.copyWith(color: textTheme),
+                  ),
+                  subtitle: Text(
+                    summary,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: AppColors.mutedText(context),
+                  ),
+                  onTap: () async {
+                    Haptics.selection();
+                    await LocalNotificationService.instance
+                        .refreshPermissionStatus();
+                    if (!context.mounted) return;
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationPreferencesPage(),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                );
+              },
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Dark Mode',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              subtitle: Text(
+                'Switch to the charcoal PalTuro theme.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+              activeTrackColor: AppColors.primary,
+              activeThumbColor: AppColors.white,
+              inactiveTrackColor: AppColors.switchOffTrack(context),
+              inactiveThumbColor: AppColors.white,
+              value: isDarkMode,
+              onChanged: (bool value) {
+                MyApp.of(context).setThemeMode(value);
+              },
+            ),
+
+            _sectionLabel('Account & security'),
+            Semantics(
+              container: true,
+              button: true,
+              label:
+                  'Account and security, $accountName'
+                  '${_email == null ? '' : ', $_email'}',
+              excludeSemantics: true,
+              onTap: _openAccount,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: UserAvatar(
+                  name: accountName,
+                  image:
+                      _profile?.avatarUrl != null
+                          ? NetworkImage(_profile!.avatarUrl!)
+                          : null,
+                  size: 44,
+                ),
+                title: Text(
+                  accountName,
+                  style: AppTextStyles.boldText.copyWith(color: textTheme),
+                ),
+                subtitle: Text(
+                  accountSubtitle,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(context),
+                    fontSize: 12,
+                  ),
+                ),
+                trailing: Icon(Icons.chevron_right, color: textTheme),
+                onTap: _openAccount,
+              ),
+            ),
+            _settingsTile(
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              onTap: _loggingOut ? null : _logout,
+            ),
+
+            _sectionLabel('Support'),
+            _settingsTile(
+              icon: Icons.feedback_outlined,
+              title: 'Send feedback',
+              onTap: _showFeedbackDialog,
+            ),
+            _settingsTile(
+              icon: Icons.report_problem_outlined,
+              title: 'Report a problem',
+              onTap: _showReportDialog,
+            ),
+            _settingsTile(
+              icon: Icons.help_outline,
+              title: 'Help',
+              onTap: _showHelpDialog,
+            ),
+
+            _sectionLabel('Legal & about'),
+            _settingsTile(
+              icon: Icons.description_outlined,
+              title: 'Terms of Service',
+              onTap: () => LegalDialogs.showTermsOfService(context),
+            ),
+            _settingsTile(
+              icon: Icons.shield_outlined,
+              title: 'Data Policy',
+              onTap: () => LegalDialogs.showDataPolicy(context),
+            ),
+            _settingsTile(
+              icon: Icons.cookie_outlined,
+              title: 'Cookies Policy',
+              onTap: () => LegalDialogs.showCookiesPolicy(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.info_outline, color: textTheme),
+              title: Text(
+                'Version',
+                style: AppTextStyles.regularText.copyWith(color: textTheme),
+              ),
+              trailing: Text(
+                _version,
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom),
+          ],
+        ),
+      ),
     );
   }
 }

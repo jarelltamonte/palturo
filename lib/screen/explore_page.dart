@@ -2,9 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
-import 'package:palturo/screen/explore_expand.dart';
+import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/screen/explore_category_page.dart';
+import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/services/profile_service.dart';
 
 enum ExploreRole { learner, mentor }
 
@@ -20,8 +29,8 @@ class _ExplorePageState extends State<ExplorePage> {
   bool _loading = true;
   String? _error;
 
-  // TODO: default to the user's primary role / last saved choice
-  // (e.g. read from shared_preferences in initState before loading).
+  static const _roleKey = 'browse_mentor_mode';
+
   ExploreRole _role = ExploreRole.learner;
 
   int _requestId = 0;
@@ -64,6 +73,20 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   void initState() {
     super.initState();
+    _loadSavedRole();
+  }
+
+  Future<void> _loadSavedRole() async {
+    var mentor = false;
+    try {
+      mentor = await PreferencesService.instance.getBool(_roleKey) ?? false;
+    } catch (_) {
+      // Preference failure falls back to the learner view.
+    }
+    if (!mounted) return;
+    setState(() {
+      _role = mentor ? ExploreRole.mentor : ExploreRole.learner;
+    });
     _loadTaxonomy();
   }
 
@@ -91,12 +114,15 @@ class _ExplorePageState extends State<ExplorePage> {
     }).toList();
   }
 
-  Future<void> _loadTaxonomy() async {
+  Future<void> _loadTaxonomy({bool notifyFailure = false}) async {
     final requestId = ++_requestId;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    final hadData = _roots.isNotEmpty;
+    if (!hadData) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final nodes = await MatchApi.taxonomyVisible();
       final roots =
@@ -109,65 +135,91 @@ class _ExplorePageState extends State<ExplorePage> {
       });
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load categories. Please try again.",
+      );
       setState(() {
-        _error = e.toString();
         _loading = false;
+        if (!hadData) _error = message;
       });
+      if (notifyFailure && hadData) showAppError(context, message);
     }
   }
+
+  Future<void> _refreshTaxonomy() => _loadTaxonomy(notifyFailure: true);
 
   void _onRoleChanged(ExploreRole role) {
     if (role == _role) return;
     setState(() => _role = role);
+    PreferencesService.instance.setBool(_roleKey, role == ExploreRole.mentor);
     _loadTaxonomy();
   }
 
   void _openCategory(Map<String, dynamic> root) {
+    final path = (root['path'] ?? '').toString();
+    final label = (root['name'] ?? '').toString();
+    if (path.isEmpty || label.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
-            (context) => ExploreExpand(
-              nodePath: (root['path'] ?? '') as String,
-              nodeLabel: (root['name'] ?? '') as String,
-              kind: _role == ExploreRole.learner ? 'teach' : 'learn',
+            (context) => ExploreCategoryPage(
+              nodePath: path,
+              nodeLabel: label,
+              description: _descriptionFor(root),
+              mentor: _role == ExploreRole.mentor,
+              onRoleChanged: (mentor) {
+                if (!mounted) return;
+                setState(() {
+                  _role = mentor ? ExploreRole.mentor : ExploreRole.learner;
+                });
+                _loadTaxonomy();
+              },
             ),
       ),
     );
   }
 
+  Future<void> _openProfileEditor() async {
+    final profile = await ProfileService().getCurrentUserProfile();
+    if (!mounted) return;
+    if (profile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t load your profile. Please try again.'),
+        ),
+      );
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
+    );
+    if (mounted) _loadTaxonomy();
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
+      appBar: AppChrome.appBar(
+        titleSpacing: AppSpacing.titleSpacing,
         title: Padding(
-          padding: const EdgeInsets.only(left: 16),
+          padding: EdgeInsets.zero,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Explore',
+                'Browse',
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
-              IconButton(
-                icon: Icon(
-                  CupertinoIcons.question_circle,
-                  color: textTheme,
-                  size: 24,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              AppChrome.iconAction(
+                icon: CupertinoIcons.question_circle,
+                tooltip: 'How Browse works',
+                color: textTheme,
                 onPressed: () {
                   showAdaptiveDialog(
                     context: context,
@@ -202,10 +254,10 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildCaption(Color textTheme) {
-    return SizedBox(
-      height: 18,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 18),
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
+        duration: AppMotion.base,
         child: Text(
           _role == ExploreRole.mentor
               ? 'Showing only categories that match your mentor skills.'
@@ -222,7 +274,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
   Widget _buildContent(Color textTheme) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ExploreGridSkeleton();
     }
     if (_error != null) return _buildErrorState(textTheme);
     if (_roots.isEmpty) return _buildEmptyState(textTheme);
@@ -236,37 +288,49 @@ class _ExplorePageState extends State<ExplorePage> {
       builder: (context, constraints) {
         const spacing = 16.0;
         const topInset = 8.0;
-        const bottomInset = 90.0;
+        final bottomInset = AppSpacing.bottomNavClearanceFor(context);
         final itemHeight =
             (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
-        return GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: spacing,
-            mainAxisSpacing: spacing,
-            mainAxisExtent: itemHeight,
+        if (itemHeight < 172) return _buildGridAuto(textTheme);
+        return RefreshIndicator(
+          onRefresh: _refreshTaxonomy,
+          child: GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              mainAxisExtent: itemHeight,
+            ),
+            itemCount: _roots.length,
+            itemBuilder: (context, index) => _buildCard(index),
           ),
-          itemCount: _roots.length,
-          itemBuilder: (context, index) => _buildCard(index),
         );
       },
     );
   }
 
   Widget _buildGridAuto(Color textTheme) {
-    return GridView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        mainAxisExtent: 190,
+    return RefreshIndicator(
+      onRefresh: _refreshTaxonomy,
+      child: GridView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          AppSpacing.bottomNavClearanceFor(context),
+        ),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          mainAxisExtent: 190,
+        ),
+        itemCount: _roots.length,
+        itemBuilder: (context, index) => _buildCard(index),
       ),
-      itemCount: _roots.length,
-      itemBuilder: (context, index) => _buildCard(index),
     );
   }
 
@@ -285,12 +349,30 @@ class _ExplorePageState extends State<ExplorePage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Text(
-          _role == ExploreRole.mentor
-              ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
-              : 'No categories available right now.',
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(color: textTheme),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _role == ExploreRole.mentor
+                  ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
+                  : 'No categories available right now.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+            ),
+            if (_role == ExploreRole.mentor) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _openProfileEditor,
+                child: const Text('Update your teaching skills'),
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _loadTaxonomy,
+                child: const Text('Refresh categories'),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -302,7 +384,7 @@ class _ExplorePageState extends State<ExplorePage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Couldn\'t load categories.\nPlease check your connection.',
+            _error ?? "Couldn't load categories. Please try again.",
             style: AppTextStyles.regularText.copyWith(color: textTheme),
             textAlign: TextAlign.center,
           ),
@@ -335,19 +417,28 @@ class _RoleToggle extends StatelessWidget {
     Widget segment(String label, ExploreRole role) {
       final selected = value == role;
       return Expanded(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: '$label role',
+          excludeSemantics: true,
           onTap: () => onChanged(role),
-          child: Center(
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: AppTextStyles.regularText.copyWith(
-                fontSize: 14,
-                color:
-                    selected ? Colors.black : textColor.withValues(alpha: 0.7),
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          child: InkWell(
+            onTap: () => onChanged(role),
+            borderRadius: BorderRadius.circular(999),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: AppMotion.base,
+                style: AppTextStyles.regularText.copyWith(
+                  fontSize: 14,
+                  color:
+                      selected
+                          ? Colors.black
+                          : textColor.withValues(alpha: 0.7),
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+                child: Text(label),
               ),
-              child: Text(label),
             ),
           ),
         ),
@@ -355,7 +446,7 @@ class _RoleToggle extends StatelessWidget {
     }
 
     return Container(
-      height: 40,
+      height: AppSpacing.iconTarget,
       decoration: BoxDecoration(
         color: textColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
@@ -363,7 +454,7 @@ class _RoleToggle extends StatelessWidget {
       child: Stack(
         children: [
           AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
+            duration: AppMotion.base,
             curve: Curves.easeOut,
             alignment: isMentor ? Alignment.centerRight : Alignment.centerLeft,
             child: FractionallySizedBox(
@@ -398,11 +489,11 @@ class _ExploreInfoDialog extends StatefulWidget {
 }
 
 class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
-  static const _titles = ['Explore', 'Heads up'];
+  static const _titles = ['Browse', 'Heads up'];
 
   static const _messages = [
     'Browse categories to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a category and swipe through people who are teaching or learning in it.',
-    'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Explore is for discovering something new, so keep an open mind.',
+    'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Browse is for discovering something new, so keep an open mind.',
   ];
 
   static const _icons = [CupertinoIcons.compass, CupertinoIcons.lightbulb];
@@ -432,17 +523,17 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           child: Icon(
             _icons[_page],
             key: ValueKey('icon_$_page'),
             size: 42,
-            color: AppColors.primary,
+            color: AppColors.accentText(context),
           ),
         ),
         const SizedBox(height: 12),
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           child: Text(
             _titles[_page],
             key: ValueKey('title_$_page'),
@@ -470,7 +561,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
           borderRadius: BorderRadius.circular(8),
           child: TweenAnimationBuilder<double>(
             tween: Tween(end: (_page + 1) / _titles.length),
-            duration: const Duration(milliseconds: 250),
+            duration: AppMotion.screen,
             curve: Curves.easeOut,
             builder: (context, value, _) {
               return LinearProgressIndicator(
@@ -486,10 +577,10 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
         ),
         const SizedBox(height: 24),
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
+          duration: AppMotion.base,
           alignment: Alignment.topCenter,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
+            duration: AppMotion.base,
             child: Text(
               _messages[_page],
               key: ValueKey('message_$_page'),
@@ -525,7 +616,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
             child: Text(
               _isLastPage ? 'Okay' : 'Next',
               style: AppTextStyles.regularText.copyWith(
-                color: AppColors.primary,
+                color: AppColors.accentText(context),
               ),
             ),
           ),
@@ -534,7 +625,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
     }
 
     return AlertDialog(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: title,
       content: SizedBox(width: double.maxFinite, child: content),
@@ -551,7 +642,9 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
           onPressed: _next,
           child: Text(
             _isLastPage ? 'Okay' : 'Next',
-            style: AppTextStyles.regularText.copyWith(color: AppColors.primary),
+            style: AppTextStyles.regularText.copyWith(
+              color: AppColors.accentText(context),
+            ),
           ),
         ),
       ],
@@ -575,9 +668,13 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final cardColor = Theme.of(context).colorScheme.surface;
+    final cardColor = AppColors.elevatedSurface(context);
 
     return Container(
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border(context)),
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         boxShadow: [

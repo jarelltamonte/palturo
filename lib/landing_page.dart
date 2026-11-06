@@ -25,7 +25,9 @@ class _IntroScreenState extends State<IntroScreen> {
   void initState() {
     super.initState();
 
-    _timer = Timer(const Duration(seconds: 3), () {
+    // A short brand handoff, not a second splash screen. Route only when this
+    // page is still current so recovery/confirmation links keep ownership.
+    _timer = Timer(const Duration(milliseconds: 600), () {
       if (!mounted) return;
       // Never replace a route that was pushed above the splash (deep links,
       // recovery screens). Only advance when this route is still on top.

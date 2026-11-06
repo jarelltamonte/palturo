@@ -1,11 +1,11 @@
 {
-    "name": "palturo",
-    "short_name": "palturo",
+    "name": "PalTuro",
+    "short_name": "PalTuro",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FFFFFF",
+    "theme_color": "#262626",
+    "description": "PalTuro - exchange skills, not fees.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

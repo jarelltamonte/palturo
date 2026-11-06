@@ -34,6 +34,8 @@ class MatchedUser {
   final String? lastMessage;
   final String? lastMessageTime;
   final bool hasUnread;
+  final String? presence;
+
   /// Live-data extras: the connection row + counterpart profile id (null for
   /// the static dump catalog).
   final String? connectionId;
@@ -53,6 +55,7 @@ class MatchedUser {
     this.lastMessage,
     this.lastMessageTime,
     this.hasUnread = false,
+    this.presence,
     this.connectionId,
     this.otherUserId,
   });
@@ -62,9 +65,7 @@ class MatchedUser {
 
   Person toPerson() {
     return Person(
-      id: (otherUserId != null && otherUserId!.isNotEmpty)
-          ? otherUserId!
-          : id,
+      id: (otherUserId != null && otherUserId!.isNotEmpty) ? otherUserId! : id,
       name: name,
       schedule: schedule,
       language: language,
@@ -112,7 +113,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Sat/Sun',
     language: 'English',
     learningStyle: 'Visual Demonstration',
-    bio: 'Love lettering and journaling. Looking for someone to polish my strokes.',
+    bio:
+        'Love lettering and journaling. Looking for someone to polish my strokes.',
   ),
   MatchedUser(
     id: '4',
@@ -137,7 +139,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Tue/Thu/Sat',
     language: 'Tagalog',
     learningStyle: 'Visual Demonstration',
-    bio: 'Fascinated by Inabel patterns from Ilocos. Eager to learn the loom basics.',
+    bio:
+        'Fascinated by Inabel patterns from Ilocos. Eager to learn the loom basics.',
     lastMessage: 'Sent you the notes from class',
     lastMessageTime: '23m',
   ),
@@ -150,7 +153,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Wed/Sat',
     language: 'English, Tagalog',
     learningStyle: 'Hands-on Practice',
-    bio: 'Third-generation woodcarver. I teach with patience and lots of sawdust.',
+    bio:
+        'Third-generation woodcarver. I teach with patience and lots of sawdust.',
   ),
   MatchedUser(
     id: '7',
@@ -199,7 +203,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Mon/Thu',
     language: 'Tagalog',
     learningStyle: 'Hands-on Practice',
-    bio: 'Fresh pandesal every morning is the dream. Teach me the dough secrets!',
+    bio:
+        'Fresh pandesal every morning is the dream. Teach me the dough secrets!',
   ),
   MatchedUser(
     id: '11',
@@ -210,7 +215,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Fri/Sat/Sun',
     language: 'English',
     learningStyle: 'Visual Demonstration',
-    bio: 'I chase golden hour. Let me show you how to frame everyday Pinoy life.',
+    bio:
+        'I chase golden hour. Let me show you how to frame everyday Pinoy life.',
     lastMessage: 'Haha that was so funny',
     lastMessageTime: 'Yesterday',
   ),
@@ -234,7 +240,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Sat/Sun',
     language: 'Tagalog',
     learningStyle: 'Hands-on Practice',
-    bio: 'Lumaki akong nangingisda sa Batangas. Tara, magbitaw tayo ng pamingwit!',
+    bio:
+        'Lumaki akong nangingisda sa Batangas. Tara, magbitaw tayo ng pamingwit!',
   ),
   MatchedUser(
     id: '14',
@@ -348,7 +355,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Mon/Wed/Fri',
     language: 'English',
     learningStyle: 'Discussion',
-    bio: 'Learning Tagalog to talk with my lola. Slow and simple lessons, please!',
+    bio:
+        'Learning Tagalog to talk with my lola. Slow and simple lessons, please!',
   ),
   MatchedUser(
     id: '24',
@@ -359,7 +367,8 @@ const List<MatchedUser> dumpUsers = [
     schedule: 'Thu/Sun',
     language: 'English, Tagalog',
     learningStyle: 'Visual Demonstration',
-    bio: 'Crochet keeps my hands busy and my heart calm. Let us make something cute.',
+    bio:
+        'Crochet keeps my hands busy and my heart calm. Let us make something cute.',
   ),
   MatchedUser(
     id: '25',

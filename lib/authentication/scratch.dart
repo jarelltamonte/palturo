@@ -195,7 +195,7 @@ class _ScratchWidgetState extends State<ScratchWidget> {
                       borderRadius: BorderRadius.circular(24),
                     ),
                   ),
-                  child: const Text('Continue to Login'),
+                  child: const Text('Continue'),
                 )
               else ...[
                 OutlinedButton(

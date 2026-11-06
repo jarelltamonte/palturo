@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/widgets/swipe_deck.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 class ExploreExpand extends StatefulWidget {
   final String nodePath;
@@ -34,7 +40,11 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
   int _currentIndex = 0;
   final List<int> _history = [];
+  final List<String?> _historyConnectionIds = [];
   bool _actionInFlight = false;
+  bool _undoing = false;
+  bool _sendingRequest = false;
+  final GlobalKey<SwipeDeckState> _deckKey = GlobalKey();
 
   @override
   void initState() {
@@ -48,6 +58,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       _error = null;
       _currentIndex = 0;
       _history.clear();
+      _historyConnectionIds.clear();
     });
 
     try {
@@ -69,59 +80,136 @@ class _ExploreExpandState extends State<ExploreExpand> {
       if (!mounted) return;
 
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback:
+              _error ??
+              "Couldn't load users for ${widget.nodeLabel}. Please try again.",
+        );
         _loading = false;
       });
     }
   }
 
-  void _next() {
-    if (_currentIndex >= _people.length) return;
+  void _next({String? connectionId}) {
+    if (_currentIndex >= _people.length || _undoing) return;
 
     setState(() {
       _history.add(_currentIndex);
+      _historyConnectionIds.add(connectionId);
       _currentIndex++;
     });
   }
 
   /// Advance only if [person] is still the visible card. This makes a late
   /// swipe/dismiss callback and a button callback idempotent for one card.
-  void _advanceFrom(Person person) {
+  void _advanceFrom(Person person, {String? connectionId}) {
     if (!mounted) return;
     if (_currentIndex < 0 || _currentIndex >= _people.length) return;
     if (_people[_currentIndex].id != person.id) return;
-    _next();
+    _next(connectionId: connectionId);
   }
 
-  void _undo() {
-    if (_history.isEmpty) return;
+  void _dismissCard(Person person, {bool right = false}) {
+    if (!mounted) return;
+    if (_currentIndex < 0 || _currentIndex >= _people.length) return;
+    if (_people[_currentIndex].id != person.id) return;
+    _deckKey.currentState?.dismiss(right: right);
+  }
 
+  Future<void> _handleSwipe(Person person, bool right) async {
+    if (!right) {
+      _advanceFrom(person);
+      return;
+    }
+    final connectionId = await _sendRequest(person);
+    if (!mounted) return;
+    if (connectionId == null) {
+      _deckKey.currentState?.reset();
+      return;
+    }
+    _advanceFrom(person, connectionId: connectionId);
+    showAppSnackBar(
+      context,
+      'Connection request sent to ${person.name}',
+      actionLabel: 'Undo',
+      onAction: () => _undoRequest(connectionId),
+      duration: const Duration(seconds: 5),
+      tone: AppFeedbackTone.success,
+    );
+  }
+
+  Future<void> _undoRequest(String connectionId) async {
+    if (_historyConnectionIds.isEmpty ||
+        _historyConnectionIds.last != connectionId) {
+      showAppSnackBar(context, 'That request is no longer the latest action.');
+      return;
+    }
+    await _undo();
+  }
+
+  Future<void> _undo() async {
+    if (_history.isEmpty || _undoing || _actionInFlight) return;
+    _undoing = true;
+
+    final index = _history.last;
+    final connectionId = _historyConnectionIds.last;
+    if (connectionId != null) {
+      try {
+        await MatchApi.cancelConnectionRequest(connectionId);
+      } catch (e) {
+        _undoing = false;
+        if (!mounted) return;
+        showAppError(
+          context,
+          friendlyError(
+            e,
+            fallback: 'Could not withdraw this request. Please try again.',
+          ),
+        );
+        return;
+      }
+    }
+
+    _undoing = false;
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     setState(() {
-      _currentIndex = _history.removeLast();
+      _history.removeLast();
+      _historyConnectionIds.removeLast();
+      _currentIndex = index;
     });
   }
 
-  Future<void> _confirmAdd(Person person) async {
-    if (_actionInFlight) return;
+  Future<String?> _sendRequest(Person person) async {
+    if (_actionInFlight || _undoing) return null;
     _actionInFlight = true;
-
+    if (mounted) setState(() => _sendingRequest = true);
     try {
-      await MatchApi.sendConnectionRequest(person.id);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection request sent to ${person.name}')),
+      final connectionId = await MatchApi.sendConnectionRequest(
+        person.id,
+        skillName: person.skillName,
+        skillPath: person.skillPath,
       );
-      _advanceFrom(person);
+      if (connectionId == null || connectionId.isEmpty) {
+        throw Exception('The server did not confirm the request.');
+      }
+      Haptics.success();
+      return connectionId;
     } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
+      if (mounted) {
+        showAppError(
+          context,
+          friendlyError(
+            e,
+            fallback: 'Could not send this request. Please try again.',
+          ),
+        );
+      }
+      return null;
     } finally {
       _actionInFlight = false;
+      if (mounted) setState(() => _sendingRequest = false);
     }
   }
 
@@ -141,19 +229,22 @@ class _ExploreExpandState extends State<ExploreExpand> {
     _actionInFlight = true;
     try {
       await MatchApi.blockUser(person.id);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
-      _advanceFrom(person);
+      showAppSuccess(context, 'You blocked ${person.name}');
+      _dismissCard(person, right: false);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }
@@ -172,16 +263,18 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
-      _advanceFrom(person);
+      showAppSuccess(context, 'Thanks for your report.');
+      _dismissCard(person, right: false);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }
@@ -202,11 +295,18 @@ class _ExploreExpandState extends State<ExploreExpand> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Nothing more to show',
+              _people.isEmpty
+                  ? 'No people in this category yet.'
+                  : 'You’ve seen everyone in this category.',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor.withValues(alpha: 0.7),
               ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Back to category'),
             ),
           ],
         ),
@@ -214,43 +314,25 @@ class _ExploreExpandState extends State<ExploreExpand> {
     );
   }
 
-  Widget _swipeBackground({
-    required Alignment alignment,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Icon(icon, color: color, size: 36),
-    );
-  }
-
-  Widget _buildDeckCard(Person person) {
-    return Dismissible(
-      key: ValueKey(person.id),
-      direction: DismissDirection.horizontal,
-      background: _swipeBackground(
-        alignment: Alignment.centerLeft,
-        color: AppColors.primary,
-        icon: Icons.check,
-      ),
-      secondaryBackground: _swipeBackground(
-        alignment: Alignment.centerRight,
-        color: Colors.red,
-        icon: Icons.close,
-      ),
-      onDismissed: (_) => _advanceFrom(person),
+  Widget _buildDeck() {
+    final current = _people[_currentIndex];
+    return SwipeDeck(
+      key: _deckKey,
+      cardKey: current.id,
+      enabled: !_sendingRequest,
+      busy: _sendingRequest,
+      rightLabel: 'Send request',
+      leftLabel: 'Pass',
+      onSwiped: (right) => _handleSwipe(current, right),
       child: PersonCardOverlay(
-        person: person,
-        onAdd: () => _confirmAdd(person),
-        onSkip: () => _advanceFrom(person),
-        onBlock: () => _confirmBlock(person),
-        onReport: () => _confirmReport(person),
+        person: current,
+        onAdd: () => _deckKey.currentState?.dismiss(right: true),
+        onSkip: () => _deckKey.currentState?.dismiss(right: false),
+        onBlock: () => _confirmBlock(current),
+        onReport: () => _confirmReport(current),
+        onOpenProfile: () => showPersonProfileDialog(context, current),
+        skipLabel: 'Pass',
+        addLabel: 'Send request',
       ),
     );
   }
@@ -258,8 +340,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
 
     final hasMore = _currentIndex < _people.length;
 
@@ -271,18 +352,27 @@ class _ExploreExpandState extends State<ExploreExpand> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: AppSpacing.titleSpacing,
         title: Row(
           children: [
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.pop(context),
-              child: Padding(
-                padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  color: textTheme,
-                  size: 16,
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Back',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.pop(context),
+                child: SizedBox(
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Icon(
+                      Icons.arrow_back_ios_new,
+                      color: textTheme,
+                      size: 16,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -293,25 +383,31 @@ class _ExploreExpandState extends State<ExploreExpand> {
                 overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.headingText.copyWith(
                   color: textTheme,
-                  fontSize: 18,
+                  fontSize: 20,
                 ),
               ),
             ),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _history.isEmpty ? null : _undo,
-              child: SizedBox(
-                width: 40,
-                height: 44,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Icon(
-                    CupertinoIcons.arrow_uturn_left,
-                    color:
-                        _history.isEmpty
-                            ? textTheme.withValues(alpha: 0.3)
-                            : textTheme,
-                    size: 24,
+            Semantics(
+              container: true,
+              button: true,
+              enabled: _history.isNotEmpty,
+              label: 'Undo last person',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _history.isEmpty ? null : _undo,
+                child: SizedBox(
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Icon(
+                      CupertinoIcons.arrow_uturn_left,
+                      color:
+                          _history.isEmpty
+                              ? textTheme.withValues(alpha: 0.3)
+                              : textTheme,
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
@@ -321,16 +417,33 @@ class _ExploreExpandState extends State<ExploreExpand> {
       ),
       body: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-          child:
-              _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? _buildErrorState(textTheme)
-                  : hasMore
-                  ? _buildDeckCard(_people[_currentIndex])
-                  : _buildEmptyState(textTheme),
+        child: Column(
+          children: [
+            if (_sendingRequest)
+              const LinearProgressIndicator(
+                minHeight: 2,
+                color: AppColors.primary,
+                backgroundColor: Colors.transparent,
+              ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+                ),
+                child:
+                    _loading
+                        ? const PersonCardSkeleton()
+                        : _error != null
+                        ? _buildErrorState(textTheme)
+                        : hasMore
+                        ? _buildDeck()
+                        : _buildEmptyState(textTheme),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -342,7 +455,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Couldn’t load users for ${widget.nodeLabel}.\nPlease check your connection.',
+            _error ??
+                "Couldn't load users for ${widget.nodeLabel}. Please try again.",
             style: AppTextStyles.regularText.copyWith(color: textTheme2),
             textAlign: TextAlign.center,
           ),

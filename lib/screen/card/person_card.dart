@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/widgets/showcase_media.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 
 enum PersonRole { learner, mentor }
 
@@ -15,8 +19,12 @@ class Person {
   final String language;
   final String learningStyle;
   final String skillName;
+  final String skillPath;
   final PersonRole role;
   final String bio;
+
+  /// Approved, role-specific note for the skill shown on the card.
+  final String skillNote;
   final List<String?> photoUrls;
 
   /// FR-5 short-form showcase media (image/video thumbnails) — shown first on
@@ -26,6 +34,9 @@ class Person {
   /// Reciprocal compatibility (0..1) from the pipeline — spec §6.3 indicator.
   final double? compatibility;
 
+  /// 'full' or 'basic_bi'. Basic mode is one-way similarity.
+  final String pipeline;
+
   const Person({
     required this.id,
     required this.name,
@@ -33,11 +44,14 @@ class Person {
     required this.language,
     required this.learningStyle,
     required this.skillName,
+    this.skillPath = '',
     required this.role,
     this.bio = '',
+    this.skillNote = '',
     this.photoUrls = const [null],
-    this.showcaseUrls = const [null],
+    this.showcaseUrls = const [],
     this.compatibility,
+    this.pipeline = 'full',
   });
 
   /// Card page media: showcase content first, profile photos after.
@@ -51,10 +65,15 @@ class PersonCardOverlay extends StatefulWidget {
   final VoidCallback? onBlock;
   final VoidCallback? onReport;
   final VoidCallback? onUnmatch;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onWhyMatch;
   final String skipLabel;
   final String addLabel;
   final bool showActions;
   final bool showMenu;
+  final bool showProfilePill;
+  final bool showShadow;
+  final bool showSkillNote;
 
   const PersonCardOverlay({
     super.key,
@@ -64,10 +83,15 @@ class PersonCardOverlay extends StatefulWidget {
     this.onBlock,
     this.onReport,
     this.onUnmatch,
+    this.onOpenProfile,
+    this.onWhyMatch,
     this.skipLabel = 'Skip',
-    this.addLabel = 'Add',
+    this.addLabel = 'Send request',
     this.showActions = true,
     this.showMenu = true,
+    this.showProfilePill = true,
+    this.showShadow = true,
+    this.showSkillNote = false,
   });
 
   @override
@@ -154,7 +178,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               const SizedBox(width: 6),
               Expanded(
                 child: AnimatedSize(
-                  duration: const Duration(milliseconds: 200),
+                  duration: AppMotion.base,
                   curve: Curves.easeOut,
                   alignment: Alignment.topLeft,
                   child:
@@ -190,6 +214,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         photoUrls.isNotEmpty && _photoIndex < photoUrls.length
             ? photoUrls[_photoIndex]
             : null;
+    final hasVideo = isVideoUrl(currentPhoto);
 
     final roleIconAsset =
         widget.person.role == PersonRole.learner
@@ -199,52 +224,125 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         widget.person.role == PersonRole.learner
             ? 'Wants to learn'
             : 'Wants to teach';
-    final bio = widget.person.bio.trim();
+    final bodyText =
+        (widget.showSkillNote ? widget.person.skillNote : widget.person.bio)
+            .trim();
+    final language = widget.person.language.trim();
+    final learningStyle = widget.person.learningStyle.trim();
     final scheduleText = formatSchedule(widget.person.schedule);
 
-    return Container(
+    final card = Container(
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow:
+            widget.showShadow
+                ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ]
+                : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
         fit: StackFit.expand,
         children: [
+          if (widget.onOpenProfile != null && hasVideo)
+            Positioned.fill(
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'Open ${widget.person.name} profile',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onOpenProfile,
+                ),
+              ),
+            ),
           currentPhoto != null
-              ? Image.network(
-                currentPhoto,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, __, ___) => Container(color: Colors.grey[400]),
+              ? ShowcaseMedia(
+                url: currentPhoto,
+                fallback: _CardFallback(name: widget.person.name),
+                alignment: Alignment.topCenter,
+                onOpenProfile: widget.onOpenProfile,
               )
-              : Container(color: Colors.grey[400]),
-          Row(
-            children: [
-              Expanded(
+              : _CardFallback(name: widget.person.name),
+          if (widget.onOpenProfile != null && !hasVideo)
+            Positioned.fill(
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'Open ${widget.person.name} profile',
                 child: GestureDetector(
-                  key: const ValueKey('card-previous'),
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _previousPhoto,
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onOpenProfile,
                 ),
               ),
-              Expanded(
-                child: GestureDetector(
-                  key: const ValueKey('card-next'),
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _nextPhoto,
-                ),
+            ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 64,
+            child: Semantics(
+              container: true,
+              button: true,
+              label: 'Previous photo',
+              child: GestureDetector(
+                key: const ValueKey('card-previous'),
+                behavior: HitTestBehavior.translucent,
+                onTap: _previousPhoto,
               ),
-            ],
+            ),
           ),
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 64,
+            child: Semantics(
+              container: true,
+              button: true,
+              label: 'Next photo',
+              child: GestureDetector(
+                key: const ValueKey('card-next'),
+                behavior: HitTestBehavior.translucent,
+                onTap: _nextPhoto,
+              ),
+            ),
+          ),
+          if (photoUrls.length > 1) ...[
+            Positioned(
+              left: 6,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: _PhotoChevron(
+                    icon: Icons.chevron_left,
+                    visible: _photoIndex > 0,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 6,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: _PhotoChevron(
+                    icon: Icons.chevron_right,
+                    visible: _photoIndex < photoUrls.length - 1,
+                  ),
+                ),
+              ),
+            ),
+          ],
           IgnorePointer(
             child: Container(
               decoration: BoxDecoration(
@@ -260,6 +358,39 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
           ),
+          if (widget.person.compatibility != null ||
+              widget.onOpenProfile != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.person.compatibility != null &&
+                      widget.onWhyMatch != null)
+                    _GlassPill(
+                      onTap: widget.onWhyMatch,
+                      icon: Icons.auto_awesome,
+                      label:
+                          '${((widget.person.compatibility! * 100).clamp(0, 100)).round()}% match',
+                      semanticsLabel:
+                          '${((widget.person.compatibility! * 100).clamp(0, 100)).round()} percent match. Why this match?',
+                    ),
+                  if (widget.person.compatibility != null &&
+                      widget.onWhyMatch != null &&
+                      widget.onOpenProfile != null &&
+                      widget.showProfilePill)
+                    const SizedBox(height: 6),
+                  if (widget.onOpenProfile != null && widget.showProfilePill)
+                    _GlassPill(
+                      onTap: widget.onOpenProfile,
+                      icon: Icons.person_outline,
+                      label: 'View profile',
+                      semanticsLabel: 'View ${widget.person.name} profile',
+                    ),
+                ],
+              ),
+            ),
           if (widget.showMenu)
             Positioned(
               top: 16,
@@ -269,7 +400,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                color: Theme.of(context).colorScheme.surface,
+                color: AppColors.elevatedSurface(context),
                 elevation: 6,
                 offset: const Offset(0, 40),
                 onSelected: (value) {
@@ -288,14 +419,14 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           value: 'unmatch',
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.remove_circle_outline,
-                                color: Colors.red,
+                                color: AppColors.dangerText(context),
                                 size: 20,
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                'Unmatch',
+                                'Remove pal',
                                 style: AppTextStyles.regularText.copyWith(
                                   color:
                                       Theme.of(context).colorScheme.secondary,
@@ -308,9 +439,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         value: 'report',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.flag_outlined,
-                              color: Colors.red,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -327,9 +458,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         value: 'block',
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.block,
-                              color: Colors.red,
+                              color: AppColors.dangerText(context),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -343,16 +474,22 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ],
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.more_horiz,
-                    color: Colors.white,
-                    size: 22,
+                child: SizedBox(
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.more_horiz,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -417,6 +554,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     Expanded(
                       child: Text(
                         widget.person.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.boldText.copyWith(
                           color: Colors.white,
                           fontSize: 22,
@@ -437,40 +576,15 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         color: Colors.white,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        scheduleText,
-                        style: AppTextStyles.regularText.copyWith(
-                          color: Colors.white,
-                          fontSize: 14,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 16,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.translate,
-                          size: 15,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          widget.person.language,
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 150),
+                        child: Text(
+                          scheduleText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white70,
-                            fontSize: 13,
+                            color: Colors.white,
+                            fontSize: 14,
                             shadows: [
                               Shadow(
                                 color: Colors.black.withValues(alpha: 0.6),
@@ -479,42 +593,82 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.psychology,
-                          size: 15,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            widget.person.learningStyle.isNotEmpty
-                                ? widget.person.learningStyle
-                                : 'No learning styles set',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
-                if (bio.isNotEmpty) ...[
+                if (language.isNotEmpty || learningStyle.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 16,
+                    children: [
+                      if (language.isNotEmpty)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.translate,
+                              size: 15,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                language,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (learningStyle.isNotEmpty)
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.psychology,
+                              size: 15,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                learningStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+                if (bodyText.isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  _buildBio(context, bio),
+                  _buildBio(context, bodyText),
                 ],
               ],
             ),
@@ -526,26 +680,52 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (int i = 0; i < photoUrls.length; i++) ...[
-                  GestureDetector(
-                    key: ValueKey('card-dot-$i'),
-                    onTap: () => setState(() => _photoIndex = i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      width: i == _photoIndex ? 24 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color:
-                            i == _photoIndex
-                                ? AppColors.primary
-                                : Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(4),
+                if (photoUrls.length > 10)
+                  Semantics(
+                    label: 'Photo ${_photoIndex + 1} of ${photoUrls.length}',
+                    excludeSemantics: true,
+                    child: Text(
+                      '${_photoIndex + 1} / ${photoUrls.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                       ),
                     ),
-                  ),
-                  if (i != photoUrls.length - 1) const SizedBox(width: 6),
-                ],
+                  )
+                else
+                  for (int i = 0; i < photoUrls.length; i++) ...[
+                    Semantics(
+                      button: true,
+                      selected: i == _photoIndex,
+                      label: 'Show photo ${i + 1}',
+                      child: GestureDetector(
+                        key: ValueKey('card-dot-$i'),
+                        onTap: () => setState(() => _photoIndex = i),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: Center(
+                            child: AnimatedContainer(
+                              duration: AppMotion.base,
+                              curve: Curves.easeOut,
+                              width: i == _photoIndex ? 20 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color:
+                                    i == _photoIndex
+                                        ? AppColors.primary
+                                        : Colors.black.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (i != photoUrls.length - 1) const SizedBox(width: 4),
+                  ],
               ],
             ),
           ),
@@ -557,39 +737,50 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: widget.onSkip,
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.textPrimary),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: widget.onSkip,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.textPrimary),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(32),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        widget.skipLabel,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 16,
+                        child: Text(
+                          widget.skipLabel,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: widget.onAdd,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: widget.onAdd,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(32),
+                          ),
+                          elevation: 0,
                         ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        widget.addLabel,
-                        style: TextStyle(color: AppColors.black, fontSize: 16),
+                        child: Text(
+                          widget.addLabel,
+                          style: TextStyle(
+                            color: AppColors.black,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -597,6 +788,134 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
         ],
+      ),
+    );
+
+    final openProfile = widget.onOpenProfile;
+    if (openProfile == null) return card;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      excludeFromSemantics: true,
+      onTap: openProfile,
+      child: card,
+    );
+  }
+}
+
+class _PhotoChevron extends StatelessWidget {
+  final IconData icon;
+  final bool visible;
+
+  const _PhotoChevron({required this.icon, required this.visible});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: visible ? 1 : 0,
+      duration: const Duration(milliseconds: 160),
+      child: Container(
+        width: 28,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
+class _GlassPill extends StatelessWidget {
+  final VoidCallback? onTap;
+  final IconData icon;
+  final String label;
+  final String semanticsLabel;
+
+  const _GlassPill({
+    required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.semanticsLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.primary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (onTap == null) return pill;
+
+    return Semantics(
+      container: true,
+      button: true,
+      excludeSemantics: true,
+      label: semanticsLabel,
+      onTap: onTap,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: SizedBox(height: 44, child: Center(child: pill)),
+        ),
+      ),
+    );
+  }
+}
+
+class _CardFallback extends StatelessWidget {
+  final String name;
+
+  const _CardFallback({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF3A3A3A), Color(0xFF1F1F1F)],
+        ),
+      ),
+      child: Center(
+        child: CircleAvatar(
+          radius: 56,
+          backgroundColor: Colors.white.withValues(alpha: 0.1),
+          child: Text(
+            UserAvatar.initialsFor(name),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 38,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -637,10 +956,10 @@ void showPersonProfileDialog(
                         : () async {
                           final confirmed = await showConfirmDialog(
                             dialogContext,
-                            title: 'Unmatch',
+                            title: 'Remove pal',
                             message:
-                                'Unmatch ${person.name}? You’ll lose this match and your chat history.',
-                            confirmLabel: 'Unmatch',
+                                'Remove ${person.name} from your Pals? You’ll lose this pal and your chat history.',
+                            confirmLabel: 'Remove pal',
                           );
                           if (!confirmed || !dialogContext.mounted) return;
                           Navigator.pop(dialogContext);
@@ -665,7 +984,7 @@ void showPersonProfileDialog(
                             dialogContext,
                             title: 'Block',
                             message:
-                                '${person.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+                                '${person.name} won’t be able to find or message you, and will be removed from your Pals. You can unblock them anytime in Settings.',
                             confirmLabel: 'Block',
                           );
                           if (!confirmed || !dialogContext.mounted) return;
@@ -676,18 +995,29 @@ void showPersonProfileDialog(
               Positioned(
                 top: 16,
                 left: 16,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(dialogContext),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 18,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Close profile',
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(dialogContext),
+                    child: SizedBox(
+                      width: AppSpacing.iconTarget,
+                      height: AppSpacing.iconTarget,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

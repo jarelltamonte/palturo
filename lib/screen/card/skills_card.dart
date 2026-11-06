@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 
 const kOtherId = 'other';
@@ -256,6 +258,7 @@ class SkillsCard extends StatefulWidget {
   final ValueChanged<String>? onSkillRemoved;
   final ValueChanged<String>? onAttachFile;
   final ValueChanged<String>? onRemoveAttachment;
+  final VoidCallback? onAddSkills;
 
   const SkillsCard({
     super.key,
@@ -274,6 +277,7 @@ class SkillsCard extends StatefulWidget {
     this.onSkillRemoved,
     this.onAttachFile,
     this.onRemoveAttachment,
+    this.onAddSkills,
   });
 
   factory SkillsCard.toLearn({
@@ -285,6 +289,7 @@ class SkillsCard extends StatefulWidget {
         const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
     void Function(String skillId, String note)? onNoteChanged,
+    VoidCallback? onAddSkills,
   }) {
     return SkillsCard(
       key: key,
@@ -298,6 +303,7 @@ class SkillsCard extends StatefulWidget {
       suggestionService: suggestionService,
       onChanged: onChanged,
       onNoteChanged: onNoteChanged,
+      onAddSkills: onAddSkills,
     );
   }
 
@@ -315,6 +321,7 @@ class SkillsCard extends StatefulWidget {
     ValueChanged<String>? onSkillRemoved,
     ValueChanged<String>? onAttachFile,
     ValueChanged<String>? onRemoveAttachment,
+    VoidCallback? onAddSkills,
   }) {
     return SkillsCard(
       key: key,
@@ -333,6 +340,7 @@ class SkillsCard extends StatefulWidget {
       onSkillRemoved: onSkillRemoved,
       onAttachFile: onAttachFile,
       onRemoveAttachment: onRemoveAttachment,
+      onAddSkills: onAddSkills,
     );
   }
 
@@ -478,8 +486,8 @@ class _SkillsCardState extends State<SkillsCard> {
 
   @override
   Widget build(BuildContext context) {
-    const accentColor = AppColors.primary;
-    final themeColor = Theme.of(context).colorScheme.surface;
+    final accentColor = AppColors.accentText(context);
+    final themeColor = AppColors.elevatedSurface(context);
     final textColor = Theme.of(context).colorScheme.secondary;
     final canAddMore =
         _skillIds.length < widget.maxSkills && !_skillIds.contains('');
@@ -489,6 +497,7 @@ class _SkillsCardState extends State<SkillsCard> {
       decoration: BoxDecoration(
         color: themeColor,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -504,39 +513,79 @@ class _SkillsCardState extends State<SkillsCard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(fontSize: 16, color: textColor),
-                  children: [
-                    const TextSpan(text: 'Skills to '),
-                    TextSpan(
-                      text: widget.labelSuffix,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 16, color: textColor),
+                    children: [
+                      const TextSpan(text: 'Skills to '),
+                      TextSpan(
+                        text: widget.labelSuffix,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: accentColor,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+              if (widget.isEditing && canAddMore) const SizedBox(width: 4),
               if (widget.isEditing && canAddMore)
-                GestureDetector(
-                  onTap: _addSkill,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: textColor,
-                      shape: BoxShape.circle,
+                Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Add skill',
+                  child: GestureDetector(
+                    onTap: _addSkill,
+                    child: SizedBox(
+                      width: AppSpacing.iconTarget,
+                      height: AppSpacing.iconTarget,
+                      child: Center(
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: textColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.add, color: themeColor, size: 16),
+                        ),
+                      ),
                     ),
-                    child: Icon(Icons.add, color: themeColor, size: 16),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 16),
-          for (int i = 0; i < _skillIds.length; i++) ...[
-            _SkillRow(
+          if (_skillIds.isEmpty && !widget.isEditing) ...[
+            Text(
+              'No skills added yet',
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+              ),
+            ),
+            if (widget.onAddSkills != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: 'Add skills to ${widget.labelSuffix.toLowerCase()}',
+                  onTap: widget.onAddSkills,
+                  excludeSemantics: true,
+                  child: TextButton(
+                    onPressed: widget.onAddSkills,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: const Text('Add skills'),
+                  ),
+                ),
+              ),
+          ] else
+            for (int i = 0; i < _skillIds.length; i++) ...[
+              _SkillRow(
               key: ValueKey('skill_row_${_rowUids[i]}'),
               selectedId: _skillIds[i],
               alreadyUsedIds: _skillIds,
@@ -825,24 +874,30 @@ class _SkillRowState extends State<_SkillRow> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.primary,
+                  color: AppColors.accentText(context),
                 ),
               ),
             ),
           if (hasText)
-            InkWell(
-              customBorder: const CircleBorder(),
-              onTap: _clearQuery,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(Icons.close, size: 18, color: dim),
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Clear search',
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _clearQuery,
+                child: SizedBox(
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
+                  child: Icon(Icons.close, size: 18, color: dim),
+                ),
               ),
             ),
         ],
@@ -881,7 +936,7 @@ class _SkillRowState extends State<_SkillRow> {
           border: _border(dim, 1.5, 28),
           enabledBorder: _border(dim, 1.5, 28),
           disabledBorder: _border(dim, 1.5, 28),
-          focusedBorder: _border(AppColors.primary, 1.5, 28),
+          focusedBorder: _border(widget.accentColor, 1.5, 28),
         ),
       ),
     );
@@ -922,7 +977,7 @@ class _SkillRowState extends State<_SkillRow> {
   }
 
   Widget _buildSuggestionsOverlay(Color textColor) {
-    final surface = Theme.of(context).colorScheme.surface;
+    final surface = AppColors.mutedSurface(context);
     final ordered = _suggestions.reversed.toList();
     return CompositedTransformFollower(
       link: _layerLink,
@@ -959,7 +1014,7 @@ class _SkillRowState extends State<_SkillRow> {
                                 : (categoryById(s.categoryId)?.icon ??
                                     Icons.label_outline),
                             size: 20,
-                            color: s.isCustom ? AppColors.primary : textColor,
+                            color: s.isCustom ? widget.accentColor : textColor,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1074,9 +1129,9 @@ class _SkillRowState extends State<_SkillRow> {
           widget.attachmentPath != null && widget.attachmentPath!.isNotEmpty
               ? Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.mutedSurface(context),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary, width: 1.5),
+                  border: Border.all(color: widget.accentColor, width: 1.5),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.05),
@@ -1101,10 +1156,10 @@ class _SkillRowState extends State<_SkillRow> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.check_circle,
                               size: 16,
-                              color: AppColors.primary,
+                              color: widget.accentColor,
                             ),
                             const SizedBox(width: 6),
                             ConstrainedBox(
@@ -1113,8 +1168,8 @@ class _SkillRowState extends State<_SkillRow> {
                                 _getDisplayName(widget.attachmentPath!),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
+                                style: TextStyle(
+                                  color: widget.accentColor,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1125,22 +1180,32 @@ class _SkillRowState extends State<_SkillRow> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(right: 6.0),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: widget.onRemoveAttachment,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.close,
-                              size: 14,
-                              color: Colors.grey.shade700,
+                      padding: const EdgeInsets.only(right: 2.0),
+                      child: Semantics(
+                        button: true,
+                        label: 'Remove attachment',
+                        child: SizedBox(
+                          width: AppSpacing.iconTarget,
+                          height: AppSpacing.iconTarget,
+                          child: Center(
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: widget.onRemoveAttachment,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1149,26 +1214,41 @@ class _SkillRowState extends State<_SkillRow> {
                   ],
                 ),
               )
-              : GestureDetector(
+              : Semantics(
+                button: true,
+                label: 'Attach a file',
+                excludeSemantics: true,
                 onTap: widget.onAttachFile,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.attach_file,
-                      size: 16,
-                      color: widget.accentColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Attach a file',
-                      style: TextStyle(
-                        color: widget.accentColor,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onAttachFile,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: AppSpacing.iconTarget),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.attach_file,
+                            size: 16,
+                            color: widget.accentColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Attach a file',
+                              style: TextStyle(
+                                color: widget.accentColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
     );
@@ -1181,6 +1261,73 @@ class _SkillRowState extends State<_SkillRow> {
         widget.isEditing
             ? textColor.withValues(alpha: 0.7)
             : textColor.withValues(alpha: 0.5);
+
+    if (!widget.isEditing) {
+      if (widget.selectedId.trim().isEmpty) return const SizedBox.shrink();
+      final category = categoryById(_categoryIdFor(widget.selectedId));
+      final note = widget.initialNote.trim();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: widget.accentColor.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                category?.icon ?? Icons.check,
+                size: 16,
+                color: widget.accentColor,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _labelFor(widget.selectedId),
+                    style: AppTextStyles.regularText.copyWith(
+                      color: textColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (category != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        category.label,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  if (note.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        note,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor.withValues(alpha: 0.75),
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final hasSelection = widget.selectedId.isNotEmpty;
     final category =
         hasSelection ? categoryById(_categoryIdFor(widget.selectedId)) : null;
@@ -1234,18 +1381,23 @@ class _SkillRowState extends State<_SkillRow> {
             ),
             if (widget.isEditing) ...[
               const SizedBox(width: 12),
-              Material(
-                color: Colors.transparent,
-                shape: CircleBorder(
-                  side: BorderSide(color: textColor, width: 1.5),
-                ),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: widget.onRemove,
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(Icons.close, color: textColor, size: 20),
+              Semantics(
+                container: true,
+                button: true,
+                label: 'Remove skill',
+                child: Material(
+                  color: Colors.transparent,
+                  shape: CircleBorder(
+                    side: BorderSide(color: textColor, width: 1.5),
+                  ),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: widget.onRemove,
+                    child: SizedBox(
+                      width: AppSpacing.iconTarget,
+                      height: AppSpacing.iconTarget,
+                      child: Icon(Icons.close, color: textColor, size: 20),
+                    ),
                   ),
                 ),
               ),

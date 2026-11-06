@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/theme/app_spacing.dart';
 
 class RequestDetailDialog extends StatelessWidget {
   final Person person;
@@ -36,30 +37,32 @@ class RequestDetailDialog extends StatelessWidget {
               person: person,
               skipLabel: 'Decline',
               addLabel: 'Accept',
-              onBlock: blockCallback == null
-                  ? null
-                  : () async {
-                      final confirmed = await showConfirmDialog(
-                        context,
-                        title: 'Block',
-                        message:
-                            '${person.name} won’t be able to find or message you. You can unblock them anytime in Settings.',
-                        confirmLabel: 'Block',
-                      );
-                      if (!confirmed || !context.mounted) return;
-                      Navigator.pop(context);
-                      blockCallback();
-                    },
-              onReport: reportCallback == null
-                  ? null
-                  : () async {
-                      final reason = await showReportReasonDialog(
-                        context,
-                        name: person.name,
-                      );
-                      if (reason == null || !context.mounted) return;
-                      reportCallback(reason);
-                    },
+              onBlock:
+                  blockCallback == null
+                      ? null
+                      : () async {
+                        final confirmed = await showConfirmDialog(
+                          context,
+                          title: 'Block',
+                          message:
+                              '${person.name} won’t be able to find or message you. You can unblock them anytime in Settings.',
+                          confirmLabel: 'Block',
+                        );
+                        if (!confirmed || !context.mounted) return;
+                        Navigator.pop(context);
+                        blockCallback();
+                      },
+              onReport:
+                  reportCallback == null
+                      ? null
+                      : () async {
+                        final reason = await showReportReasonDialog(
+                          context,
+                          name: person.name,
+                        );
+                        if (reason == null || !context.mounted) return;
+                        reportCallback(reason);
+                      },
               onAdd: () {
                 onAccept();
                 Navigator.pop(context);
@@ -72,18 +75,29 @@ class RequestDetailDialog extends StatelessWidget {
             Positioned(
               top: 16,
               left: 16,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 18,
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'Close request',
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: SizedBox(
+                    width: AppSpacing.iconTarget,
+                    height: AppSpacing.iconTarget,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

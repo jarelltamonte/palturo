@@ -35,7 +35,10 @@ class _AuthGateState extends State<AuthGate> {
       if (data.session == null) {
         await _evaluateUserStatus(null);
         try {
-          await PreferencesService.instance.setBool('skipped_onboarding', false);
+          await PreferencesService.instance.setBool(
+            'skipped_onboarding',
+            false,
+          );
         } catch (_) {}
         if (mounted) {
           setState(() {
@@ -206,7 +209,12 @@ class _AuthGateState extends State<AuthGate> {
         _evaluateUserStatus(_session);
       },
       onSkip: () async {
+        final uid = Supabase.instance.client.auth.currentUser?.id;
         await PreferencesService.instance.setBool('skipped_onboarding', true);
+        await PreferencesService.instance.setBool(
+          onboardingResumeDismissedKey(uid),
+          false,
+        );
         if (mounted) {
           setState(() {
             _hasSkipped = true;

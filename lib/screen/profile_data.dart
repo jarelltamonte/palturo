@@ -17,12 +17,15 @@ class ProfileData {
   final List<String> teachingSkillIds;
   final List<String> skillCategories;
   final Map<String, String> teachingSkillImages;
+
   /// Per-placement notes keyed by taxonomy leaf id (DEV-22).
   final Map<String, String> learningNotes;
   final Map<String, String> teachingNotes;
+
   /// True only when the notes query succeeded. A save must not overwrite
   /// stored notes with empty values after a transient read failure.
   final bool notesLoaded;
+
   /// Note ids edited in this session (so only those are re-moderated).
   final Set<String> changedLearningNotes;
   final Set<String> changedTeachingNotes;
@@ -108,10 +111,8 @@ class ProfileData {
       learningNotes: learningNotes ?? this.learningNotes,
       teachingNotes: teachingNotes ?? this.teachingNotes,
       notesLoaded: notesLoaded ?? this.notesLoaded,
-      changedLearningNotes:
-          changedLearningNotes ?? this.changedLearningNotes,
-      changedTeachingNotes:
-          changedTeachingNotes ?? this.changedTeachingNotes,
+      changedLearningNotes: changedLearningNotes ?? this.changedLearningNotes,
+      changedTeachingNotes: changedTeachingNotes ?? this.changedTeachingNotes,
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,

@@ -17,32 +17,39 @@ class _ForgotPasswordCompleteState extends State<ForgotPasswordComplete> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Lottie.asset(
-                'assets/lottie/lottie_finished.json',
-                width: 350,
-                repeat: false,
-                animate: true,
-              ),
-              Text(
-                'Password Reset Complete!',
-                style: AppTextStyles.headingText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Lottie.asset(
+                    'assets/lottie/lottie_finished.json',
+                    width: 260,
+                    repeat: false,
+                    animate: true,
+                  ),
+                  Text(
+                    'Password Reset Complete!',
+                    style: AppTextStyles.headingText.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
 
-              const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-              Text(
-                'Your password has been reset successfully.\nContinue to login.',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.regularText.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
+                  Text(
+                    'Your password has been reset successfully.\nContinue to login.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

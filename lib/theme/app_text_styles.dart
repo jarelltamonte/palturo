@@ -13,10 +13,11 @@ class AppTextStyles {
     fontFamily: 'Comfortaa',
     fontWeight: FontWeight.w700,
     fontSize: 40,
-    foreground: Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3
-      ..color = AppColors.textPrimary, 
+    foreground:
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.3
+          ..color = AppColors.textPrimary,
   );
 
   static const TextStyle subtitle = TextStyle(

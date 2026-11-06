@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../onboarding_models.dart';
@@ -23,7 +25,24 @@ class RoleCardGroup extends StatelessWidget {
     final visibleOptions =
         isEditing ? options : options.where((o) => o.role == selected).toList();
 
-    final isCompact = visibleOptions.length == 1;
+    if (!isEditing) {
+      if (visibleOptions.isEmpty) return const SizedBox.shrink();
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: IntrinsicWidth(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _RoleCard(
+              option: visibleOptions.single,
+              selected: true,
+              compact: true,
+              isEditing: false,
+              onTap: () {},
+            ),
+          ),
+        ),
+      );
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,8 +54,8 @@ class RoleCardGroup extends StatelessWidget {
               child: _RoleCard(
                 option: option,
                 selected: selected == option.role,
-                compact: isCompact,
-                isEditing: isEditing,
+                compact: false,
+                isEditing: true,
                 onTap: () => onSelect(option.role),
               ),
             ),
@@ -68,91 +87,115 @@ class _RoleCard extends StatelessWidget {
             ? AppColors.textSecondary
             : Theme.of(context).colorScheme.secondary;
 
-    final cardColor = Theme.of(context).colorScheme.surface;
+    final cardColor = AppColors.elevatedSurface(context);
 
     final labelParts = option.label.split('\n');
     final firstLine = labelParts.first;
     final secondLine = labelParts.length > 1 ? labelParts[1] : '';
 
-    return GestureDetector(
+    return Semantics(
+      container: true,
+      button: isEditing,
+      selected: selected,
+      label: option.label.replaceAll('\n', ' '),
+      excludeSemantics: true,
       onTap: isEditing ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: compact ? 56 : 120,
-        alignment: Alignment.center,
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 16 : 8,
-          vertical: compact ? 8 : 4,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : cardColor,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              spreadRadius: 0,
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+      child: GestureDetector(
+        onTap: isEditing ? onTap : null,
+        child: AnimatedContainer(
+          duration: AppMotion.micro,
+          constraints: BoxConstraints(
+            minHeight:
+                compact
+                    ? AppSpacing.onboardingRoleCardCompactHeight
+                    : AppSpacing.onboardingRoleCardHeight,
+          ),
+          // Narrow horizontal padding keeps three cards readable at 390 px.
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 16 : 8,
+            vertical: compact ? 8 : 16,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color:
+                  selected
+                      ? AppColors.textSecondary
+                      : AppColors.border(context),
+              width: selected ? 2 : 1,
             ),
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                spreadRadius: 0,
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child:
+              compact
+                  ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        option.iconAsset,
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                      ),
+                      const SizedBox(width: 8),
+                      RichText(
+                        text: TextSpan(
+                          style: AppTextStyles.regularText.copyWith(color: fg),
+                          children: [
+                            TextSpan(text: '$firstLine '),
+                            TextSpan(
+                              text: secondLine,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                  : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        option.iconAsset,
+                        width: 24,
+                        height: 24,
+                        colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                      ),
+                      const SizedBox(height: 8),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: '$firstLine\n'),
+                            TextSpan(
+                              text: secondLine,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: fg,
+                          height: 1.1,
+                          leadingDistribution: TextLeadingDistribution.even,
+                        ),
+                      ),
+                    ],
+                  ),
         ),
-        child:
-            compact
-                ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SvgPicture.asset(
-                      option.iconAsset,
-                      width: 20,
-                      height: 20,
-                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                    ),
-                    const SizedBox(width: 8),
-                    RichText(
-                      text: TextSpan(
-                        style: AppTextStyles.regularText.copyWith(color: fg),
-                        children: [
-                          TextSpan(text: '$firstLine '),
-                          TextSpan(
-                            text: secondLine,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                )
-                : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SvgPicture.asset(
-                      option.iconAsset,
-                      width: 24,
-                      height: 24,
-                      colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                    ),
-                    const SizedBox(height: 8),
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: '$firstLine\n'),
-                          TextSpan(
-                            text: secondLine,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: fg,
-                        height: 1.1,
-                        leadingDistribution: TextLeadingDistribution.even,
-                      ),
-                    ),
-                  ],
-                ),
       ),
     );
   }

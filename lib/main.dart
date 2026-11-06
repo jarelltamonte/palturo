@@ -1,20 +1,30 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:palturo/authentication/email_confirmation_expired.dart';
 import 'package:palturo/authentication/forgot_password_expired.dart';
 import 'package:palturo/authentication/auth_gate.dart';
+import 'package:palturo/services/app_badge_service.dart';
+import 'package:palturo/services/app_shell_state.dart';
+import 'package:palturo/services/chat_privacy_service.dart';
+import 'package:palturo/services/connectivity_service.dart';
+import 'package:palturo/services/draft_service.dart';
+import 'package:palturo/services/local_notification_service.dart';
+import 'package:palturo/services/sound_service.dart';
+import 'package:palturo/services/notification_presenter.dart';
+import 'package:palturo/services/notification_service.dart';
+import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/app_banner.dart';
+import 'package:palturo/widgets/offline_banner.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/authentication/scratch.dart';
 import 'package:palturo/root_gate.dart';
 import 'package:palturo/authentication/forgot_password_3.dart';
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+import 'package:palturo/widgets/responsive_shell.dart';
 
 // Compile-time configuration. Pass these with
 //   flutter run --dart-define-from-file=.env
@@ -23,16 +33,6 @@ const String kSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const String kSupabasePublishableKey = String.fromEnvironment(
   'SUPABASE_PUBLISHABLE_KEY',
 );
-
-Future<void> playSplashSound() async {
-  final player = AudioPlayer();
-  try {
-    player.onPlayerComplete.listen((_) => player.dispose());
-    await player.play(AssetSource('sounds/splash.wav'));
-  } catch (_) {
-    await player.dispose();
-  }
-}
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -45,15 +45,24 @@ void main() async {
     return;
   }
 
-  playSplashSound();
-
   await Supabase.initialize(
     url: kSupabaseUrl,
     publishableKey: kSupabasePublishableKey,
   );
 
-  PreferencesService.instance.init();
+  await PreferencesService.instance.init();
+  await DraftService.instance.init();
+  unawaited(ConnectivityService.instance.init());
+  AppBadgeService.instance.init();
+  unawaited(ChatPrivacyService.instance.loadIfNeeded());
+  unawaited(SoundService.instance.init());
+  if (PreferencesService.instance.soundEnabled) {
+    unawaited(SoundService.instance.play(AppSound.success));
+  }
   ChatStateService.instance.init();
+  NotificationService.instance.init();
+  NotificationPresenter.instance.init();
+  unawaited(LocalNotificationService.instance.init());
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );
@@ -63,7 +72,7 @@ void main() async {
   runApp(
     MyApp(
       isOnboardingDone: isOnboardingDone ?? false,
-      initialDarkMode: darkMode ?? false,
+      initialDarkMode: darkMode,
     ),
   );
 }
@@ -126,11 +135,11 @@ class MyApp extends StatefulWidget {
   const MyApp({
     super.key,
     required this.isOnboardingDone,
-    this.initialDarkMode = false,
+    this.initialDarkMode,
   });
 
   final bool isOnboardingDone;
-  final bool initialDarkMode;
+  final bool? initialDarkMode;
 
   static MyAppThemeController of(BuildContext context) {
     return context.findAncestorStateOfType<_MyAppState>()!;
@@ -141,7 +150,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with MyAppThemeController {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void setThemeMode(bool isDark) {
@@ -160,6 +169,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   Uri? _lastHandledLink;
   WidgetBuilder? _pendingAuthScreen;
   int _authScreenRetry = 0;
+  bool _suppressRecoveryEvent = false;
 
   /// Replaces the whole stack with a fresh AuthGate root, then pushes the
   /// deep-link screen above it. This guarantees that `popUntil(isFirst)`
@@ -191,10 +201,15 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   @override
   void initState() {
     super.initState();
-    _themeMode = widget.initialDarkMode ? ThemeMode.dark : ThemeMode.light;
+    _themeMode = switch (widget.initialDarkMode) {
+      true => ThemeMode.dark,
+      false => ThemeMode.light,
+      null => ThemeMode.system,
+    };
 
+    // Keep the native splash only until Flutter paints its first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 3), FlutterNativeSplash.remove);
+      FlutterNativeSplash.remove();
     });
 
     _initAuthAndLinks();
@@ -222,10 +237,21 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
           _latestDeepLink = null;
           _latestDeepLinkAt = null;
           _lastHandledLink = null;
+          NotificationPresenter.instance.reset();
+          LocalNotificationService.instance.cancelAll();
+          AppBadgeService.instance.reset();
+          ConnectivityService.instance.reset();
+          DraftService.instance.clearAll();
+          ChatPrivacyService.instance.reset();
+          AppShellState.instance.reset();
           return;
         }
 
         if (event == AuthChangeEvent.passwordRecovery) {
+          if (_suppressRecoveryEvent) {
+            _suppressRecoveryEvent = false;
+            return;
+          }
           _latestDeepLink = null;
           _latestDeepLinkAt = null;
           _openAuthScreen((_) => const ForgotPasswordType());
@@ -307,6 +333,17 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
         fragment.contains('error=');
   }
 
+  String? _tokenHashFrom(Uri uri) {
+    final queryToken = uri.queryParameters['token_hash'];
+    if (queryToken != null && queryToken.isNotEmpty) return queryToken;
+    if (uri.fragment.isEmpty) return null;
+    final fragment = Uri.splitQueryString(uri.fragment);
+    final fragmentToken = fragment['token_hash'];
+    return (fragmentToken != null && fragmentToken.isNotEmpty)
+        ? fragmentToken
+        : null;
+  }
+
   /// A link can arrive after signedIn (cold start race); route it once.
   void _handleLateLink(Uri uri) {
     final isCallback = _isAuthLink(uri, '/callback');
@@ -324,6 +361,19 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
                 ? const ForgotPasswordExpired()
                 : const EmailConfirmationExpired(),
       );
+      return;
+    }
+
+    final tokenHash = _tokenHashFrom(uri);
+    if (isReset && tokenHash != null) {
+      _lastHandledLink = uri;
+      _latestDeepLink = null;
+      _latestDeepLinkAt = null;
+      _suppressRecoveryEvent = true;
+      Future<void>.delayed(const Duration(seconds: 3), () {
+        if (mounted) _suppressRecoveryEvent = false;
+      });
+      _openAuthScreen((_) => ForgotPasswordType(tokenHash: tokenHash));
       return;
     }
 
@@ -355,11 +405,28 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
+      navigatorObservers: [appRouteObserver],
       title: 'PalTuro',
       debugShowCheckedModeBanner: false,
       theme: lightMode,
       darkTheme: darkMode,
       themeMode: _themeMode,
+      builder: (context, child) {
+        final systemDark =
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+        final effectiveDark =
+            _themeMode == ThemeMode.dark ||
+            (_themeMode == ThemeMode.system && systemDark);
+        return Theme(
+          data: effectiveDark ? darkMode : lightMode,
+          child: ResponsiveShell(
+            child: AppBannerHost(
+              isDark: effectiveDark,
+              child: OfflineBannerHost(child: child ?? const SizedBox.shrink()),
+            ),
+          ),
+        );
+      },
       home: AppRootDecider(isOnboardingDone: widget.isOnboardingDone),
     );
   }

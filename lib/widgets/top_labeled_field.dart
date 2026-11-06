@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -17,6 +18,7 @@ class TopLabeledField extends StatefulWidget {
   final Iterable<String>? autofillHints;
   final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   const TopLabeledField({
     super.key,
@@ -33,6 +35,7 @@ class TopLabeledField extends StatefulWidget {
     this.autofillHints,
     this.focusNode,
     this.onChanged,
+    this.onSubmitted,
   });
 
   @override
@@ -46,7 +49,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   late final bool _ownsFocusNode;
 
   static const double _height = 58;
-  static const Duration _duration = Duration(milliseconds: 180);
+  static const Duration _duration = AppMotion.base;
   static const Curve _curve = Curves.easeOut;
 
   bool get _isFloating => _focusNode.hasFocus || _controller.text.isNotEmpty;
@@ -79,8 +82,13 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
   Widget build(BuildContext context) {
     final double suffixWidth = widget.suffixIcon != null ? 48 : 16;
     final bool floating = _isFloating;
-    final bgColor = Theme.of(context).colorScheme.onPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor =
+        isDark ? AppColors.inputBackground : AppColors.binputBackground;
     final textColor = Theme.of(context).colorScheme.secondary;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final floatingHeight = textScaler.scale(16);
+    final contentTop = floating ? (8 + textScaler.scale(12) + 8) : 28.0;
 
     final field = GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -91,14 +99,17 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
           color: bgColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _focusNode.hasFocus ? AppColors.primary : textColor.withValues(alpha: 0.7),
+            color:
+                _focusNode.hasFocus
+                    ? AppColors.primary
+                    : textColor.withValues(alpha: 0.7),
             width: _focusNode.hasFocus ? 1.5 : 1,
           ),
         ),
         child: Stack(
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(16, 28, suffixWidth, 8),
+              padding: EdgeInsets.fromLTRB(16, contentTop, suffixWidth, 8),
               child: AnimatedOpacity(
                 duration: _duration,
                 curve: _curve,
@@ -115,17 +126,19 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                     inputFormatters: widget.inputFormatters,
                     autofillHints: widget.autofillHints,
                     onChanged: widget.onChanged,
+                    onSubmitted: widget.onSubmitted,
                     minLines: 1,
                     maxLines: widget.obscureText ? 1 : widget.maxLines,
                     maxLength: widget.maxLength,
                     maxLengthEnforcement: MaxLengthEnforcement.enforced,
                     cursorColor: textColor,
-                    buildCounter: (
-                      context, {
-                      required int currentLength,
-                      required bool isFocused,
-                      required int? maxLength,
-                    }) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required int currentLength,
+                          required bool isFocused,
+                          required int? maxLength,
+                        }) => null,
                     style: AppTextStyles.regularText.copyWith(
                       color: textColor,
                       fontSize: 16,
@@ -147,7 +160,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
               left: 16,
               right: suffixWidth,
               top: floating ? 8 : 0,
-              height: floating ? 16 : _height,
+              height: floating ? floatingHeight : _height,
               child: IgnorePointer(
                 child: Align(
                   alignment: Alignment.centerLeft,

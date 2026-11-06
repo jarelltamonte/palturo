@@ -1,23 +1,75 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_spacing.dart';
+import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/services/app_navigation.dart';
+import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/notification_service.dart';
+import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/profile_service.dart';
-import 'package:palturo/onboarding/onboarding_models.dart';
+import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/app_banner.dart';
+import 'package:palturo/widgets/person_card_skeleton.dart';
+import 'package:palturo/widgets/swipe_deck.dart';
+import 'package:palturo/widgets/profile_update_link.dart';
+import 'package:palturo/utils/friendly_error.dart';
 
 enum RoleFilter { all, learner, mentor }
 
+/// How long a cold deck load may look idle before the UI admits it is slow.
+@visibleForTesting
+const kDeckSlowThreshold = Duration(seconds: 4);
+
+/// Hard cap for a cold deck load. After this the UI offers a retry.
+@visibleForTesting
+const kDeckTimeout = Duration(seconds: 12);
+
+/// Hard cap for sending a connection request. A hanging request must not leave
+/// the deck stuck on its "Sending request…" surface forever.
+@visibleForTesting
+const kSendRequestTimeout = Duration(seconds: 12);
+
+typedef SendConnectionRequest =
+    Future<String?> Function(
+      String userId, {
+      String? skillName,
+      String? skillPath,
+    });
+
+/// Sends a request with a hard cap so a stalled network call cannot leave the
+/// deck on its busy surface forever.
+@visibleForTesting
+Future<String?> sendRequestWithTimeout(
+  SendConnectionRequest send,
+  Person person, {
+  Duration timeout = kSendRequestTimeout,
+}) => send(
+  person.id,
+  skillName: person.skillName,
+  skillPath: person.skillPath,
+).timeout(timeout);
+
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  /// Test hook: replaces the real deck fetch. Production leaves this null.
+  final Future<List<Person>> Function({bool force})? deckLoader;
+
+  /// Test hook: replaces the real request send. Production leaves this null.
+  final SendConnectionRequest? sendRequest;
+
+  const HomePage({super.key, this.deckLoader, this.sendRequest});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -26,36 +78,29 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Person> _people = const [];
   bool _loading = true;
+  bool _slowLoad = false;
+  Timer? _slowTimer;
+  Timer? _timeoutTimer;
   String? _error;
   ProfileData? _myProfile;
-
-  late final TapGestureRecognizer _settingsTap =
-      TapGestureRecognizer()..onTap = _openSettings;
-
-  static const List<FilterSection> _filterSections = [
-    FilterSection(
-      key: 'role',
-      title: 'Role',
-      options: [
-        FilterOption('All', 'all'),
-        FilterOption('Learner', 'learner'),
-        FilterOption('Mentor', 'mentor'),
-      ],
-    ),
-    FilterSection(key: 'skills', title: 'Skills'),
-  ];
+  bool _profileNudgeShown = false;
 
   RoleFilter _roleFilter = RoleFilter.all;
+  String _skillFilter = 'all';
   int _currentIndex = 0;
   final List<int> _history = [];
   final List<bool> _historyRight = [];
+  final List<String?> _historyConnectionIds = [];
   bool _undoActive = false;
   bool _undoRight = false;
+  bool _undoing = false;
   int _undoToken = 0;
   bool _openingEditor = false;
   bool _actionInFlight = false;
+  bool _sendingRequest = false;
   bool _discovering = false;
   int _deckGeneration = 0;
+  final GlobalKey<SwipeDeckState> _swipeKey = GlobalKey();
 
   @override
   void initState() {
@@ -63,38 +108,100 @@ class _HomePageState extends State<HomePage> {
     _loadDeck();
   }
 
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadDeck({bool force = false}) async {
-    final cached = MatchApi.hasCachedDeck(_roleKey);
+    final cached = _cachedDeck();
     final generation = ++_deckGeneration;
 
+    _slowTimer?.cancel();
+    _timeoutTimer?.cancel();
     setState(() {
-      _loading = !cached && _people.isEmpty;
+      if (_people.isEmpty && cached != null) {
+        _people = List<Person>.of(cached);
+        _currentIndex = 0;
+      }
+      _loading = _people.isEmpty;
+      _slowLoad = false;
       _error = null;
       _discovering = false;
     });
 
+    if (_loading) {
+      _slowTimer = Timer(kDeckSlowThreshold, () {
+        if (mounted && _loading) setState(() => _slowLoad = true);
+      });
+    }
+
     try {
-      final deck = await _fetchDeck(force: force);
+      final result = Completer<List<Person>>();
+      _timeoutTimer = Timer(kDeckTimeout, () {
+        if (!result.isCompleted) {
+          result.completeError(TimeoutException('deck load timed out'));
+        }
+      });
+      unawaited(
+        _fetchDeck(force: force).then(
+          (deck) {
+            if (!result.isCompleted) result.complete(deck);
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!result.isCompleted) result.completeError(error, stack);
+          },
+        ),
+      );
+
+      final deck = await result.future;
+      if (!mounted || generation != _deckGeneration) return;
+      _timeoutTimer?.cancel();
+      _slowTimer?.cancel();
       debugPrint('[People] deck loaded: ${deck.length} people');
 
-      if (!mounted || generation != _deckGeneration) return;
-
       setState(() {
+        final sameDeck = _sameDeck(_people, deck);
         _people = deck;
         _loading = false;
-        _currentIndex = 0;
-        _history.clear();
-        _historyRight.clear();
-        _undoActive = false;
+        _slowLoad = false;
+        if (!sameDeck) {
+          _currentIndex = 0;
+          _history.clear();
+          _historyRight.clear();
+          _historyConnectionIds.clear();
+          _undoActive = false;
+        }
+        if (_skillFilter != 'all' &&
+            !deck.any((person) => person.skillName == _skillFilter)) {
+          _skillFilter = 'all';
+        }
+      });
+    } on TimeoutException {
+      if (!mounted || generation != _deckGeneration) return;
+      _slowTimer?.cancel();
+      _timeoutTimer?.cancel();
+      setState(() {
+        _error =
+            'This is taking longer than expected. Check your connection and try again.';
+        _loading = false;
+        _slowLoad = false;
       });
     } catch (e, st) {
+      if (!mounted || generation != _deckGeneration) return;
+      _slowTimer?.cancel();
+      _timeoutTimer?.cancel();
       debugPrint('[People] _loadDeck ERROR: $e\n$st');
 
-      if (!mounted || generation != _deckGeneration) return;
-
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(
+          e,
+          fallback: "Couldn't load recommendations. Please try again.",
+        );
         _loading = false;
+        _slowLoad = false;
       });
     }
   }
@@ -102,19 +209,68 @@ class _HomePageState extends State<HomePage> {
   String get _roleKey => switch (_roleFilter) {
     RoleFilter.learner => 'learner',
     RoleFilter.mentor => 'mentor',
-    RoleFilter.all => _oppositeRoleKey,
+    RoleFilter.all => 'all',
   };
 
-  String get _oppositeRoleKey {
-    final role = _myProfile?.role;
-    return role == OnboardingRole.teach ? 'learner' : 'mentor';
+  /// Cached deck for the current filter, if one is already in memory. This
+  /// paints the previous deck instantly on a cold open instead of flashing an
+  /// empty state while the profile and network calls settle.
+  List<Person>? _cachedDeck() {
+    if (widget.deckLoader != null) return null;
+    if (_roleFilter == RoleFilter.all) {
+      final learner = MatchApi.peekDeck('learner');
+      final mentor = MatchApi.peekDeck('mentor');
+      if (learner == null || mentor == null) return null;
+      return _mergeDecks([learner, mentor]);
+    }
+    return MatchApi.peekDeck(_roleKey);
+  }
+
+  bool _sameDeck(List<Person> a, List<Person> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
+
+  List<Person> _mergeDecks(Iterable<List<Person>> decks) {
+    final byId = <String, Person>{};
+    for (final person in decks.expand((deck) => deck)) {
+      final existing = byId[person.id];
+      if (existing == null ||
+          (person.compatibility ?? 0) > (existing.compatibility ?? 0)) {
+        byId[person.id] = person;
+      }
+    }
+    return byId.values.toList()..sort(
+      (a, b) => (b.compatibility ?? 0).compareTo(a.compatibility ?? 0),
+    );
   }
 
   Future<List<Person>> _fetchDeck({bool force = false}) async {
+    if (widget.deckLoader != null) return widget.deckLoader!(force: force);
+
     final me = await ProfileService().getCurrentUserProfile();
 
     if (mounted && me != null) {
       setState(() => _myProfile = me);
+    }
+
+    if (_roleFilter == RoleFilter.all) {
+      final decks = await Future.wait([
+        MatchApi.getMatchDeck(
+          asRoleDb: 'learner',
+          force: force,
+          enrichLimit: 10,
+        ),
+        MatchApi.getMatchDeck(
+          asRoleDb: 'mentor',
+          force: force,
+          enrichLimit: 10,
+        ),
+      ]);
+      return _mergeDecks(decks);
     }
 
     return MatchApi.getMatchDeck(
@@ -124,34 +280,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _confirmAdd(Person person) async {
-    if (_actionInFlight) return;
-    _actionInFlight = true;
-
-    try {
-      await MatchApi.sendConnectionRequest(person.id);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection request sent to ${person.name}')),
-      );
-      _advanceFrom(person, right: true);
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Request failed: $e')));
-    } finally {
-      _actionInFlight = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    _settingsTap.dispose();
-    super.dispose();
+  void _confirmAdd(Person person) {
+    if (_actionInFlight || _sendingRequest || _undoing) return;
+    // The request is committed by _handleSwiped after the card exits, so the
+    // button and a right swipe share exactly one network path.
+    _dismissCard(person, right: true);
   }
 
   Future<void> _openSettings() async {
@@ -167,10 +300,9 @@ class _HomePageState extends State<HomePage> {
         final fetched = await ProfileService().getCurrentUserProfile();
         if (!mounted) return;
         if (fetched == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Couldn’t load your profile. Please try again.'),
-            ),
+          showAppError(
+            context,
+            'Couldn’t load your profile. Please try again.',
           );
           return;
         }
@@ -193,42 +325,83 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
+  bool get _hasActiveFilter =>
+      _roleFilter != RoleFilter.all || _skillFilter != 'all';
 
-  List<Person> get _filteredPeople => _people;
+  List<Person> get _filteredPeople {
+    if (_skillFilter == 'all') return _people;
+    return _people
+        .where((person) => person.skillName == _skillFilter)
+        .toList(growable: false);
+  }
+
+  List<FilterSection> get _filterSections {
+    final skills =
+        _people
+            .map((person) => person.skillName.trim())
+            .where((skill) => skill.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    return [
+      const FilterSection(
+        key: 'role',
+        title: 'Show',
+        options: [
+          FilterOption('All roles', 'all'),
+          FilterOption('Learners', 'learner'),
+          FilterOption('Mentors', 'mentor'),
+        ],
+      ),
+      if (skills.isNotEmpty)
+        FilterSection(
+          key: 'skill',
+          title: 'Skill',
+          options: [
+            const FilterOption('All skills', 'all'),
+            for (final skill in skills) FilterOption(toTitleCase(skill), skill),
+          ],
+        ),
+    ];
+  }
 
   void _openFilterSheet() {
     FilterBottomSheet.show(
       context,
       sections: _filterSections,
-      selected: {'role': _roleFilter.name},
+      selected: {'role': _roleFilter.name, 'skill': _skillFilter},
       onApply: (result) {
         final newRole = RoleFilter.values.firstWhere(
           (r) => r.name == result['role'],
           orElse: () => RoleFilter.all,
         );
+        final newSkill = result['skill'] ?? 'all';
+        final roleChanged = newRole != _roleFilter;
 
-        if (newRole != _roleFilter) {
-          setState(() {
-            _roleFilter = newRole;
-            _currentIndex = 0;
-            _history.clear();
-            _historyRight.clear();
-            _undoActive = false;
-          });
+        setState(() {
+          _roleFilter = newRole;
+          _skillFilter = newSkill;
+          if (roleChanged) _people = const [];
+          _currentIndex = 0;
+          _history.clear();
+          _historyRight.clear();
+          _historyConnectionIds.clear();
+          _undoActive = false;
+        });
 
-          _loadDeck();
-        }
+        if (roleChanged) _loadDeck();
       },
     );
   }
 
-  void _next({bool right = false}) {
-    if (_currentIndex >= _filteredPeople.length) return;
+  void _next({bool right = false, String? connectionId}) {
+    if (_currentIndex >= _filteredPeople.length || _undoing) return;
 
     setState(() {
       _history.add(_currentIndex);
       _historyRight.add(right);
+      _historyConnectionIds.add(connectionId);
       _undoActive = false;
       _currentIndex++;
     });
@@ -236,20 +409,137 @@ class _HomePageState extends State<HomePage> {
 
   /// Advance only if [person] is still the card on screen. A swipe animation
   /// and a button/request callback can otherwise both advance the same card.
-  void _advanceFrom(Person person, {bool right = false}) {
+  void _advanceFrom(Person person, {bool right = false, String? connectionId}) {
     if (!mounted) return;
     final people = _filteredPeople;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
     if (people[_currentIndex].id != person.id) return;
-    _next(right: right);
+    _next(right: right, connectionId: connectionId);
   }
 
-  void _undo() {
-    if (_history.isEmpty) return;
+  /// A right swipe and the Connect button both land here. The request is the
+  /// commit action: failure restores the card instead of pretending success.
+  Future<void> _handleSwiped(Person person, bool right) async {
+    if (!right) {
+      _advanceFrom(person);
+      return;
+    }
+    if (_actionInFlight || _undoing) {
+      _resetCard();
+      return;
+    }
 
+    _actionInFlight = true;
+    setState(() => _sendingRequest = true);
+    try {
+      final send = widget.sendRequest ?? MatchApi.sendConnectionRequest;
+      final connectionId = await sendRequestWithTimeout(send, person);
+      if (!mounted) return;
+      if (connectionId == null || connectionId.isEmpty) {
+        throw Exception('The server did not confirm the request.');
+      }
+      _advanceFrom(person, right: true, connectionId: connectionId);
+      Haptics.success();
+      showAppSuccess(context, 'Connection request sent to ${person.name}');
+      unawaited(_maybeShowProfileNudge());
+    } on TimeoutException {
+      if (!mounted) return;
+      Haptics.error();
+      _resetCard();
+      showAppError(
+        context,
+        'Sending the request took too long. Check your connection and try again.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Haptics.error();
+      _resetCard();
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this request. Please try again.',
+        ),
+      );
+    } finally {
+      _actionInFlight = false;
+      if (mounted) setState(() => _sendingRequest = false);
+    }
+  }
+
+  Future<void> _maybeShowProfileNudge() async {
+    if (_profileNudgeShown) return;
+    final profile = _myProfile;
+    if (profile == null || profile.isProfileCompleted) return;
+    _profileNudgeShown = true;
+    AppBannerController.instance.show(
+      AppBannerData(
+        id: 'profile-nudge',
+        title: 'Finish your profile',
+        body: 'Add a photo, bio, and languages so Pals can match with you.',
+        icon: Icons.auto_awesome_outlined,
+        actionLabel: 'Complete profile',
+        onAction: _openSettings,
+        duration: const Duration(seconds: 10),
+      ),
+    );
+  }
+
+  void _resetCard() {
+    if (!mounted) return;
+    _swipeKey.currentState?.reset();
+  }
+
+  void _dismissCard(Person person, {bool right = false}) {
+    final people = _filteredPeople;
+    if (_currentIndex < 0 || _currentIndex >= people.length) return;
+    if (people[_currentIndex].id != person.id) return;
+
+    final state = _swipeKey.currentState;
+    if (state == null || state.widget.cardKey != person.id) {
+      _handleSwiped(person, right);
+      return;
+    }
+    state.dismiss(right: right);
+  }
+
+  Future<void> _undo() async {
+    if (_history.isEmpty || _undoing || _sendingRequest) return;
+
+    final index = _history.last;
+    final right = _historyRight.last;
+    final connectionId = _historyConnectionIds.last;
+
+    if (right && connectionId != null) {
+      _undoing = true;
+      try {
+        await MatchApi.cancelConnectionRequest(connectionId);
+      } catch (e) {
+        if (!mounted) return;
+        _undoing = false;
+        showAppError(
+          context,
+          friendlyError(
+            e,
+            fallback: 'Could not withdraw this request. Please try again.',
+          ),
+        );
+        return;
+      }
+      _undoing = false;
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+      showAppSnackBar(context, 'Connection request withdrawn');
+    }
+
+    if (!mounted) return;
+    Haptics.selection();
     setState(() {
-      _currentIndex = _history.removeLast();
-      _undoRight = _historyRight.removeLast();
+      _history.removeLast();
+      _historyRight.removeLast();
+      _historyConnectionIds.removeLast();
+      _currentIndex = index;
+      _undoRight = right;
       _undoActive = true;
       _undoToken++;
     });
@@ -264,7 +554,7 @@ class _HomePageState extends State<HomePage> {
     return TweenAnimationBuilder<double>(
       key: ValueKey('undo$_undoToken'),
       tween: Tween(begin: 1.0, end: 0.0),
-      duration: const Duration(milliseconds: 350),
+      duration: AppMotion.feedback,
       curve: Curves.easeOutCubic,
       child: child,
       builder:
@@ -281,19 +571,40 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildDeckCard(Person person) {
+  Widget _buildDeck(List<Person> people) {
+    final current = people[_currentIndex];
+
     return _wrapUndo(
-      _SwipeableCard(
-        key: ValueKey(person.id),
-        onSwiped: (right) => _advanceFrom(person, right: right),
+      SwipeDeck(
+        key: _swipeKey,
+        cardKey: current.id,
+        enabled: !_sendingRequest,
+        busy: _sendingRequest,
+        rightLabel: 'Send request',
+        leftLabel: 'Skip',
+        onSwiped: (right) => _handleSwiped(current, right),
         child: PersonCardOverlay(
-          person: person,
-          onAdd: () => _confirmAdd(person),
-          onSkip: () => _advanceFrom(person),
-          onBlock: () => _confirmBlock(person),
-          onReport: () => _confirmReport(person),
+          person: current,
+          addLabel: 'Send request',
+          onAdd: () => _confirmAdd(current),
+          onSkip: () => _dismissCard(current),
+          onBlock: () => _confirmBlock(current),
+          onReport: () => _confirmReport(current),
+          onOpenProfile: () => _openProfile(current),
+          showProfilePill: false,
+          showShadow: false,
+          showSkillNote: true,
         ),
       ),
+    );
+  }
+
+  void _openProfile(Person person) {
+    showPersonProfileDialog(
+      context,
+      person,
+      onBlock: () => _confirmBlock(person),
+      onReport: (reason) => _confirmReport(person),
     );
   }
 
@@ -304,7 +615,10 @@ class _HomePageState extends State<HomePage> {
     setState(() => _discovering = true);
 
     try {
-      final people = await MatchApi.getRandomDeck(limit: 20, role: _roleKey);
+      final people = await MatchApi.getRandomDeck(
+        limit: 20,
+        role: _roleFilter == RoleFilter.all ? null : _roleKey,
+      );
 
       if (!mounted || generation != _deckGeneration) return;
 
@@ -313,18 +627,17 @@ class _HomePageState extends State<HomePage> {
 
       if (fresh.isEmpty) {
         setState(() => _discovering = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No more people to discover right now.'),
-          ),
-        );
+        showAppSnackBar(context, 'No more matches to discover right now.');
         return;
       }
 
       setState(() {
-        final start = _people.length;
         _people = [..._people, ...fresh];
-        _currentIndex = start;
+        final freshIds = fresh.map((person) => person.id).toSet();
+        final nextIndex = _filteredPeople.indexWhere(
+          (person) => freshIds.contains(person.id),
+        );
+        _currentIndex = nextIndex < 0 ? 0 : nextIndex;
         _undoActive = false;
         _discovering = false;
       });
@@ -333,11 +646,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted || generation != _deckGeneration) return;
 
       setState(() => _discovering = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Couldn’t find more people. Please try again.'),
-        ),
-      );
+      showAppError(context, 'Couldn’t find more matches. Please try again.');
     }
   }
 
@@ -357,19 +666,22 @@ class _HomePageState extends State<HomePage> {
     _actionInFlight = true;
     try {
       await MatchApi.blockUser(person.id);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('You blocked ${person.name}')));
-      _advanceFrom(person);
+      showAppSuccess(context, 'You blocked ${person.name}');
+      _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Block failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }
@@ -388,16 +700,18 @@ class _HomePageState extends State<HomePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Thanks for your report.')));
-      _advanceFrom(person);
+      showAppSuccess(context, 'Thanks for your report.');
+      _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      showAppError(
         context,
-      ).showSnackBar(SnackBar(content: Text('Report failed: $e')));
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
+        ),
+      );
     } finally {
       _actionInFlight = false;
     }
@@ -407,9 +721,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
-
     final people = _filteredPeople;
     final hasMore = _currentIndex < people.length;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -417,13 +728,16 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
+        toolbarHeight: AppSpacing.topBarHeight(),
         backgroundColor: Colors.transparent,
         titleSpacing: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.only(
+            left: AppSpacing.pageHorizontal,
+            right: AppSpacing.trailingInset,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -438,52 +752,132 @@ class _HomePageState extends State<HomePage> {
               ),
               Row(
                 children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _history.isEmpty ? null : _undo,
-                    child: SizedBox(
-                      width: 40,
-                      height: 44,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Icon(
-                          CupertinoIcons.arrow_uturn_left,
-                          color:
-                              _history.isEmpty
-                                  ? textTheme.withValues(alpha: 0.3)
-                                  : textTheme,
-                          size: 24,
+                  ListenableBuilder(
+                    listenable: NotificationService.instance,
+                    builder: (context, _) {
+                      final unread =
+                          PreferencesService.instance.notificationsEnabled
+                              ? NotificationService.instance.unread
+                              : 0;
+                      final label =
+                          unread > 0 ? 'Activity, $unread unread' : 'Activity';
+                      return Semantics(
+                        button: true,
+                        label: label,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => AppRouter.openActivity(),
+                          child: SizedBox(
+                            width: AppSpacing.iconTarget,
+                            height: AppSpacing.iconTarget,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Align(
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    Icons.notifications_none_rounded,
+                                    color: textTheme,
+                                    size: 24,
+                                  ),
+                                ),
+                                if (unread > 0)
+                                  Positioned(
+                                    right: -2,
+                                    top: 8,
+                                    child: Container(
+                                      constraints: const BoxConstraints(
+                                        minWidth: 16,
+                                      ),
+                                      height: 16,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        unread > 99 ? '99+' : '$unread',
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  Semantics(
+                    button: true,
+                    enabled: _history.isNotEmpty,
+                    label: 'Undo last person',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap:
+                          _history.isEmpty || _sendingRequest || _undoing
+                              ? null
+                              : _undo,
+                      child: SizedBox(
+                        width: AppSpacing.iconTarget,
+                        height: AppSpacing.iconTarget,
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: Icon(
+                            CupertinoIcons.arrow_uturn_left,
+                            color:
+                                _history.isEmpty || _sendingRequest || _undoing
+                                    ? textTheme.withValues(alpha: 0.3)
+                                    : textTheme,
+                            size: 24,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _openFilterSheet,
-                    child: SizedBox(
-                      width: 40,
-                      height: 44,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Icon(Icons.tune, color: textTheme, size: 24),
-                          ),
-                          if (_hasActiveFilter)
-                            Positioned(
-                              right: -2,
-                              top: 8,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                ),
+                  Semantics(
+                    button: true,
+                    label: 'Filter recommendations',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _openFilterSheet,
+                      child: SizedBox(
+                        width: AppSpacing.iconTarget,
+                        height: AppSpacing.iconTarget,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Align(
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.tune,
+                                color: textTheme,
+                                size: 24,
                               ),
                             ),
-                        ],
+                            if (_hasActiveFilter)
+                              Positioned(
+                                right: -2,
+                                top: 8,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accentText(context),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -494,16 +888,63 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+        ),
         child:
             _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
+                ? _buildLoadingState()
+                : _error != null && _people.isEmpty
                 ? _buildErrorState(textTheme)
                 : hasMore
-                ? _buildDeckCard(people[_currentIndex])
+                ? _buildDeck(people)
                 : _buildEmptyState(textTheme),
       ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const PersonCardSkeleton(),
+        if (_slowLoad)
+          Positioned(
+            left: AppSpacing.pageHorizontal,
+            right: AppSpacing.pageHorizontal,
+            bottom: 16,
+            child: Semantics(
+              liveRegion: true,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                decoration: BoxDecoration(
+                  color: AppColors.elevatedSurface(context),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border(context)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Still looking for matches…',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _loadDeck(force: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -511,32 +952,33 @@ class _HomePageState extends State<HomePage> {
     final raw =
         (_error ?? '').replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
     final message =
-        raw.contains('Too many deck requests')
-            ? raw
-            : 'Couldn’t load recommendations.\nPlease check your connection.';
+        raw.isEmpty ? "Couldn't load recommendations. Please try again." : raw;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              style: AppTextStyles.regularText.copyWith(color: textColor),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadDeck,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+        child: Semantics(
+          liveRegion: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                message,
+                style: AppTextStyles.regularText.copyWith(color: textColor),
+                textAlign: TextAlign.center,
               ),
-              child: const Text(
-                'Retry',
-                style: TextStyle(color: Colors.black, fontSize: 16),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadDeck,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(color: Colors.black, fontSize: 16),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -547,229 +989,87 @@ class _HomePageState extends State<HomePage> {
       builder:
           (context, constraints) => SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight:
-                    (constraints.maxHeight - 48)
-                        .clamp(0.0, double.infinity)
-                        .toDouble(),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Lottie.asset(
-                    'assets/lottie/empty.json',
-                    width: 220,
-                    height: 220,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'You have seen all the top results',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textColor.withValues(alpha: 0.7),
+            child: SizedBox(
+              width: double.infinity,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      (constraints.maxHeight - 48)
+                          .clamp(0.0, double.infinity)
+                          .toDouble(),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Lottie.asset(
+                      'assets/lottie/empty.json',
+                      width: 220,
+                      height: 220,
+                      fit: BoxFit.contain,
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _discovering ? null : _discoverRandom,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                    ),
-                    icon:
-                        _discovering
-                            ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.black,
-                              ),
-                            )
-                            : const Icon(Icons.explore),
-                    label: Text(
-                      _discovering ? 'Finding people…' : 'Discover more',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(text: 'Update your '),
-                        TextSpan(
-                          text: 'settings',
-                          recognizer: _settingsTap,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'You have seen all the top results',
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.regularText.copyWith(
                         color: textColor.withValues(alpha: 0.7),
                       ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _discovering ? null : _discoverRandom,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                      ),
+                      icon:
+                          _discovering
+                              ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.black,
+                                ),
+                              )
+                              : const Icon(Icons.explore),
+                      label: Text(
+                        _discovering ? 'Finding matches…' : 'Discover more',
+                      ),
+                    ),
+                    if (_hasActiveFilter) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _roleFilter = RoleFilter.all;
+                            _skillFilter = 'all';
+                            _currentIndex = 0;
+                            _history.clear();
+                            _historyRight.clear();
+                            _historyConnectionIds.clear();
+                            _undoActive = false;
+                          });
+                          _loadDeck();
+                        },
+                        child: const Text('Clear filters'),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    ProfileUpdateLink(onTap: _openSettings),
+                  ],
+                ),
               ),
             ),
           ),
-    );
-  }
-}
-
-class _SwipeableCard extends StatefulWidget {
-  final Widget child;
-  final ValueChanged<bool> onSwiped;
-
-  const _SwipeableCard({
-    super.key,
-    required this.child,
-    required this.onSwiped,
-  });
-
-  @override
-  State<_SwipeableCard> createState() => _SwipeableCardState();
-}
-
-class _SwipeableCardState extends State<_SwipeableCard>
-    with SingleTickerProviderStateMixin {
-  static const double _maxAngle = 0.25;
-  static const double _exitFactor = 1.1;
-
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 280),
-  )..addListener(_onTick);
-
-  double _dx = 0;
-  double _from = 0;
-  double _to = 0;
-  double _width = 1;
-  bool _exiting = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onTick() {
-    setState(() {
-      _dx =
-          _from +
-          (_to - _from) * Curves.easeOutCubic.transform(_controller.value);
-    });
-  }
-
-  void _animateTo(double target, {VoidCallback? onDone}) {
-    _from = _dx;
-    _to = target;
-
-    _controller.forward(from: 0).whenComplete(() {
-      if (mounted) onDone?.call();
-    });
-  }
-
-  void _onDragStart(DragStartDetails d) {
-    if (_exiting) return;
-    _controller.stop();
-  }
-
-  void _onDragUpdate(DragUpdateDetails d) {
-    if (_exiting) return;
-    setState(() => _dx += d.delta.dx);
-  }
-
-  void _onDragEnd(DragEndDetails d) {
-    if (_exiting) return;
-
-    final velocity = d.velocity.pixelsPerSecond.dx;
-    final flung = velocity.abs() > 800 && velocity.sign == _dx.sign;
-    final passed = _dx.abs() > _width * 0.35 || flung;
-
-    if (!passed) {
-      _animateTo(0);
-      return;
-    }
-
-    final right = _dx > 0;
-    _exiting = true;
-
-    _animateTo(
-      (right ? 1 : -1) * _width * _exitFactor,
-      onDone: () => widget.onSwiped(right),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screen = MediaQuery.of(context).size;
-    final driftRatio = (0.35 * screen.height) / (0.7 * screen.width);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _width = constraints.maxWidth;
-
-        final angle = (_dx / (_width * 0.7)) * _maxAngle;
-        final dy = _dx.abs() * driftRatio;
-        final fade = (_dx.abs() / (_width * _exitFactor)).clamp(0.0, 1.0);
-
-        final goingRight = _dx > 0;
-        final tint = goingRight ? AppColors.primary : Colors.red;
-
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onHorizontalDragStart: _onDragStart,
-          onHorizontalDragUpdate: _onDragUpdate,
-          onHorizontalDragEnd: _onDragEnd,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (_dx != 0)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: tint.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    alignment:
-                        goingRight
-                            ? Alignment.centerLeft
-                            : Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Icon(
-                      goingRight ? Icons.check : Icons.close,
-                      color: tint,
-                      size: 36,
-                    ),
-                  ),
-                ),
-              Opacity(
-                opacity: 1 - fade,
-                child: Transform.translate(
-                  offset: Offset(_dx, dy),
-                  child: Transform.rotate(
-                    angle: angle,
-                    child: IgnorePointer(
-                      ignoring: _exiting,
-                      child: widget.child,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

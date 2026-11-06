@@ -1,17 +1,25 @@
-﻿import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/screen/utils/pals_count.dart';
+import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 
 enum RoleFilter { all, learner, mentor }
 
@@ -26,19 +34,32 @@ class Matches extends StatefulWidget {
 
 class _MatchesState extends State<Matches> {
   static const List<String> _alphabet = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  ];
-
-  static const List<Color> _avatarColors = [
-    Color(0xFFE57373),
-    Color(0xFFBA68C8),
-    Color(0xFF7986CB),
-    Color(0xFF4FC3F7),
-    Color(0xFF4DB6AC),
-    Color(0xFF81C784),
-    Color(0xFFFFB74D),
-    Color(0xFFA1887F),
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'H',
+    'I',
+    'J',
+    'K',
+    'L',
+    'M',
+    'N',
+    'O',
+    'P',
+    'Q',
+    'R',
+    'S',
+    'T',
+    'U',
+    'V',
+    'W',
+    'X',
+    'Y',
+    'Z',
   ];
 
   final Map<String, GlobalKey> _sectionKeys = {};
@@ -57,25 +78,52 @@ class _MatchesState extends State<Matches> {
   @override
   void initState() {
     super.initState();
+    ChatStateService.instance.addListener(_onPalsChanged);
     _loadPals();
   }
 
-  /// Live data: accepted connections as an alphabetical "Your Pals" list.
+  /// Single source of truth: ChatStateService accepted conversations.
   Future<void> _loadPals() async {
     setState(() {
       _loadingPals = true;
       _palsError = null;
     });
-    try {
-      final convos = await MatchApi.getConversations();
-      final pals = convos
-          .where((c) => c.status == 'accepted')
-          .map((c) => MatchedUser(
+    await ChatStateService.instance.loadConversations(showSpinner: false);
+    if (!mounted) return;
+    if (ChatStateService.instance.error != null) {
+      setState(() {
+        _palsError = friendlyError(
+          ChatStateService.instance.error ?? '',
+          fallback: "Couldn't load your pals. Please try again.",
+        );
+        _loadingPals = false;
+      });
+      return;
+    }
+    _applyConversations(ChatStateService.instance.conversations);
+  }
+
+  void _onPalsChanged() {
+    if (!mounted) return;
+    if (ChatStateService.instance.loading) {
+      setState(() => _loadingPals = true);
+      return;
+    }
+    _applyConversations(ChatStateService.instance.conversations);
+  }
+
+  void _applyConversations(List<ConversationLite> conversations) {
+    final pals =
+        conversations
+            .where((c) => c.status == 'accepted')
+            .map(
+              (c) => MatchedUser(
                 id: '${c.connectionId}|${c.otherUserId}',
                 name: c.otherName,
-                role: c.otherRole == 'learner'
-                    ? PersonRole.learner
-                    : PersonRole.mentor,
+                role:
+                    c.otherRole == 'learner'
+                        ? PersonRole.learner
+                        : PersonRole.mentor,
                 skillName: c.otherSkill ?? '',
                 category: SkillCategory.everydayPractical,
                 schedule: '',
@@ -84,33 +132,36 @@ class _MatchesState extends State<Matches> {
                 avatarUrl: c.otherAvatar,
                 connectionId: c.connectionId,
                 otherUserId: c.otherUserId,
-              ))
-          .toList();
-      if (!mounted) return;
-      setState(() {
-        _pals = pals;
-        _loadingPals = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _palsError = e.toString();
-        _loadingPals = false;
-      });
-    }
+              ),
+            )
+            .toList();
+    setState(() {
+      _pals = pals;
+      _loadingPals = false;
+      _palsError = null;
+    });
   }
 
-  late final TapGestureRecognizer _swipeTap = TapGestureRecognizer()
-    ..onTap = _startSwiping;
+  late final TapGestureRecognizer _swipeTap =
+      TapGestureRecognizer()..onTap = _startSwiping;
 
   void _startSwiping() {
     final callback = widget.onStartSwiping;
     Navigator.of(context).popUntil((route) => route.isFirst);
-    callback?.call();
+    if (!mounted) return;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
   }
 
   @override
   void dispose() {
+    ChatStateService.instance.removeListener(_onPalsChanged);
     _swipeTap.dispose();
     _searchController.dispose();
     _searchFocus.dispose();
@@ -142,21 +193,6 @@ class _MatchesState extends State<Matches> {
       grouped.putIfAbsent(letter, () => []).add(pal);
     }
     return grouped;
-  }
-
-  String _initials(String name) {
-    final parts = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return (parts.first[0] + parts.last[0]).toUpperCase();
-  }
-
-  Color _colorFor(String name) {
-    return _avatarColors[name.hashCode.abs() % _avatarColors.length];
   }
 
   void _startSearch() {
@@ -198,11 +234,7 @@ class _MatchesState extends State<Matches> {
 
     final context = _sectionKeys[target]?.currentContext;
     if (context != null) {
-      Scrollable.ensureVisible(
-        context,
-        alignment: 0,
-        duration: Duration.zero,
-      );
+      Scrollable.ensureVisible(context, alignment: 0, duration: Duration.zero);
     }
   }
 
@@ -211,9 +243,7 @@ class _MatchesState extends State<Matches> {
 
     final connectionId = pal.connectionId;
     if (connectionId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This match isn’t available.')),
-      );
+      showAppSnackBar(context, 'This match isn’t available.');
       return;
     }
 
@@ -221,8 +251,12 @@ class _MatchesState extends State<Matches> {
       await MatchApi.unmatch(connectionId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unmatch failed: $e')),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not remove this Pal. Please try again.',
+        ),
       );
       return;
     }
@@ -236,9 +270,7 @@ class _MatchesState extends State<Matches> {
 
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You unmatched ${pal.name}')),
-    );
+    showAppSuccess(context, 'You removed ${pal.name} from your Pals');
   }
 
   Future<void> _blockPal(MatchedUser pal) async {
@@ -246,9 +278,7 @@ class _MatchesState extends State<Matches> {
 
     final target = pal.otherUserId;
     if (target == null || target.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This profile is unavailable right now.')),
-      );
+      showAppSnackBar(context, 'This profile is unavailable right now.');
       return;
     }
 
@@ -256,16 +286,19 @@ class _MatchesState extends State<Matches> {
       await MatchApi.blockUser(target);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Block failed: $e')),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not block this person. Please try again.',
+        ),
       );
       return;
     }
+    await ChatStateService.instance.loadConversations(showSpinner: false);
     if (!mounted) return;
     setState(() => _pals.removeWhere((p) => p.id == pal.id));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You blocked ${pal.name}')),
-    );
+    showAppSuccess(context, 'You blocked ${pal.name}');
   }
 
   Future<void> _reportPal(MatchedUser pal, String reason) async {
@@ -273,22 +306,22 @@ class _MatchesState extends State<Matches> {
 
     final target = pal.otherUserId;
     if (target == null || target.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This profile is unavailable right now.')),
-      );
+      showAppSnackBar(context, 'This profile is unavailable right now.');
       return;
     }
 
     try {
       await MatchApi.reportUser(target, reason);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thanks for your report.')),
-      );
+      showAppSuccess(context, 'Thanks for your report.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Report failed: $e')),
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not send this report. Please try again.',
+        ),
       );
     }
   }
@@ -297,10 +330,10 @@ class _MatchesState extends State<Matches> {
     if (action == 'unmatch') {
       final confirmed = await showConfirmDialog(
         context,
-        title: 'Unmatch',
+        title: 'Remove pal',
         message:
-            'Unmatch ${pal.name}? You’ll lose this match and your chat history.',
-        confirmLabel: 'Unmatch',
+            'Remove ${pal.name} from your Pals? You’ll lose this pal and your chat history.',
+        confirmLabel: 'Remove pal',
       );
       if (!confirmed) return;
       _unmatchPal(pal);
@@ -313,7 +346,7 @@ class _MatchesState extends State<Matches> {
         context,
         title: 'Block',
         message:
-            '${pal.name} won’t be able to find or message you, and will be removed from your matches. You can unblock them anytime in Settings.',
+            '${pal.name} won’t be able to find or message you, and will be removed from your Pals. You can unblock them anytime in Settings.',
         confirmLabel: 'Block',
       );
       if (!confirmed) return;
@@ -326,14 +359,15 @@ class _MatchesState extends State<Matches> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ChatRoom(
-          name: pal.name,
-          avatarImage: pal.avatarImage,
-          skillName: pal.skillName,
-          role: pal.role,
-          person: pal.toPerson(),
-          connectionId: pal.connectionId,
-        ),
+        builder:
+            (context) => ChatRoom(
+              name: pal.name,
+              avatarImage: pal.avatarImage,
+              skillName: pal.skillName,
+              role: pal.role,
+              person: pal.toPerson(),
+              connectionId: pal.connectionId,
+            ),
       ),
     );
   }
@@ -348,188 +382,50 @@ class _MatchesState extends State<Matches> {
     );
   }
 
-  Widget _sheetSectionLabel(String label, Color textColor) {
-    return Text(
-      label,
-      style: AppTextStyles.regularText.copyWith(
-        color: textColor.withValues(alpha: 0.6),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _filterChip(
-    String label,
-    bool selected,
-    VoidCallback onTap,
-    Color primaryColor,
-    Color textColor,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? primaryColor : textColor.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.regularText.copyWith(
-            color: selected ? Colors.black : textColor,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showFilterSheet() {
-    final bgColor = Theme.of(context).colorScheme.surface;
-    final textColor = Theme.of(context).colorScheme.secondary;
-    RoleFilter draftRole = _roleFilter;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: bgColor,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Filters',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textColor,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () =>
-                              setModalState(() => draftRole = RoleFilter.all),
-                          child: Text(
-                            'Reset',
-                            style: AppTextStyles.regularText.copyWith(
-                              color: textColor.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _sheetSectionLabel('Role', textColor),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _filterChip(
-                          'All',
-                          draftRole == RoleFilter.all,
-                          () => setModalState(() => draftRole = RoleFilter.all),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Learner',
-                          draftRole == RoleFilter.learner,
-                          () => setModalState(
-                              () => draftRole = RoleFilter.learner),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                        _filterChip(
-                          'Mentor',
-                          draftRole == RoleFilter.mentor,
-                          () => setModalState(
-                              () => draftRole = RoleFilter.mentor),
-                          AppColors.primary,
-                          textColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    _sheetSectionLabel('Skills', textColor),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coming soon',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.4),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          setState(() => _roleFilter = draftRole);
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
+    FilterBottomSheet.show(
+      context,
+      sections: const [
+        FilterSection(
+          key: 'role',
+          title: 'Role',
+          options: [
+            FilterOption('All', 'all'),
+            FilterOption('Learner', 'learner'),
+            FilterOption('Mentor', 'mentor'),
+          ],
+        ),
+      ],
+      selected: {'role': _roleFilter.name},
+      onApply: (result) {
+        setState(() {
+          _roleFilter = RoleFilter.values.firstWhere(
+            (r) => r.name == result['role'],
+            orElse: () => RoleFilter.all,
+          );
+        });
       },
     );
   }
 
   Widget _buildPalTile(MatchedUser pal, Color textTheme) {
     return InkWell(
-      onTap: () => _openChatRoom(pal),
+      onTap: () => _openProfile(pal),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            GestureDetector(
-              onTap: () => _openProfile(pal),
-              child: CircleAvatar(
-                radius: 24,
-                backgroundColor: _colorFor(pal.name),
-                backgroundImage: pal.avatarImage,
-                child:
-                    pal.avatarImage == null
-                        ? Text(
-                          _initials(pal.name),
-                          style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                        : null,
+            Semantics(
+              container: true,
+              button: true,
+              label: 'View ${pal.name} profile',
+              child: GestureDetector(
+                onTap: () => _openProfile(pal),
+                child: UserAvatar(
+                  name: pal.name,
+                  image: pal.avatarImage,
+                  size: 48,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -548,62 +444,90 @@ class _MatchesState extends State<Matches> {
                 ],
               ),
             ),
-            PopupMenuButton<String>(
-              icon: Icon(Icons.more_horiz, color: textTheme),
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+            Semantics(
+              button: true,
+              label: 'Chat with ${pal.name}',
+              child: IconButton(
+                tooltip: 'Chat with ${pal.name}',
+                onPressed: () => _openChatRoom(pal),
+                icon: Icon(
+                  Icons.chat_bubble_outline,
+                  color: textTheme,
+                  size: 22,
+                ),
               ),
-              onSelected: (value) => _handleAction(value, pal),
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'unmatch',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.remove_circle_outline,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Unmatch',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
+            ),
+            SizedBox(
+              width: AppSpacing.iconTarget,
+              height: AppSpacing.iconTarget,
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.more_horiz, color: textTheme),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                onSelected: (value) => _handleAction(value, pal),
+                itemBuilder:
+                    (context) => [
+                      PopupMenuItem<String>(
+                        value: 'unmatch',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.remove_circle_outline,
+                              color: AppColors.dangerText(context),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Remove pal',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'report',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.flag_outlined,
+                              color: AppColors.dangerText(context),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Report',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'block',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.block,
+                              color: AppColors.dangerText(context),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Block',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: textTheme,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'report',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flag_outlined,
-                          color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Report',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'block',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, color: Colors.red, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Block',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
@@ -617,53 +541,70 @@ class _MatchesState extends State<Matches> {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final letterHeight =
-            (constraints.maxHeight / _alphabet.length).clamp(12.0, 20.0);
-        final totalHeight = letterHeight * _alphabet.length;
+        const laneHeight = 28.0;
+        final maxRows = (constraints.maxHeight / laneHeight).floor().clamp(
+          1,
+          _alphabet.length,
+        );
+        final columnCount = (_alphabet.length / maxRows).ceil();
+        final usedRows = (_alphabet.length / columnCount).ceil();
 
-        void handleOffset(double dy) {
-          final index =
-              (dy / letterHeight).floor().clamp(0, _alphabet.length - 1);
-          _jumpToLetter(_alphabet[index], grouped);
+        Widget letterTile(String letter) {
+          final hasItems = grouped.containsKey(letter);
+          final isActive = _activeLetter == letter;
+          return Semantics(
+            button: true,
+            label: 'Jump to $letter',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _jumpToLetter(letter, grouped);
+                Future<void>.delayed(const Duration(milliseconds: 700), () {
+                  if (mounted && _activeLetter == letter) {
+                    setState(() => _activeLetter = null);
+                  }
+                });
+              },
+              child: SizedBox(
+                width: 44,
+                height: laneHeight,
+                child: Center(
+                  child: Text(
+                    letter,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                      color:
+                          isActive
+                              ? AppColors.accentText(context)
+                              : textTheme.withValues(
+                                alpha: hasItems ? 0.9 : 0.5,
+                              ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
         }
 
         return Center(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (details) => handleOffset(details.localPosition.dy),
-            onVerticalDragStart: (details) =>
-                handleOffset(details.localPosition.dy),
-            onVerticalDragUpdate: (details) =>
-                handleOffset(details.localPosition.dy),
-            onTapUp: (_) => setState(() => _activeLetter = null),
-            onVerticalDragEnd: (_) => setState(() => _activeLetter = null),
-            onVerticalDragCancel: () => setState(() => _activeLetter = null),
-            child: SizedBox(
-              width: 28,
-              height: totalHeight,
-              child: Column(
-                children: _alphabet.map((letter) {
-                  final hasItems = grouped.containsKey(letter);
-                  final isActive = _activeLetter == letter;
-                  return SizedBox(
-                    height: letterHeight,
-                    child: Center(
-                      child: Text(
-                        letter,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight:
-                              isActive ? FontWeight.w800 : FontWeight.w600,
-                          color: isActive
-                              ? Theme.of(context).colorScheme.primary
-                              : textTheme.withValues(
-                                  alpha: hasItems ? 0.9 : 0.3),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+          child: SizedBox(
+            width: columnCount * 44,
+            height: usedRows * laneHeight,
+            child: Column(
+              children: [
+                for (var row = 0; row < usedRows; row++)
+                  Row(
+                    children: [
+                      for (var col = 0; col < columnCount; col++)
+                        if (row * columnCount + col < _alphabet.length)
+                          letterTile(_alphabet[row * columnCount + col])
+                        else
+                          const SizedBox(width: 44, height: laneHeight),
+                    ],
+                  ),
+              ],
             ),
           ),
         );
@@ -686,24 +627,25 @@ class _MatchesState extends State<Matches> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.7),
-                  ),
-                  children: [
-                    const TextSpan(text: 'Start '),
-                    TextSpan(
-                      text: 'Swiping',
-                      recognizer: _swipeTap,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: textTheme,
-                      ),
-                    ),
-                  ],
+              Text(
+                'No pals yet',
+                style: AppTextStyles.boldText.copyWith(
+                  color: textTheme,
+                  fontSize: 16,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Find someone who wants to exchange skills.',
                 textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textTheme.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: _startSwiping,
+                child: const Text('Find people'),
               ),
             ],
           ),
@@ -726,10 +668,23 @@ class _MatchesState extends State<Matches> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No pals found',
+              'No pals match your filters',
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme.withValues(alpha: 0.6),
               ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                _searchController.clear();
+                _searchFocus.unfocus();
+                setState(() {
+                  _query = '';
+                  _roleFilter = RoleFilter.all;
+                  _isSearching = false;
+                });
+              },
+              child: const Text('Clear filters'),
             ),
           ],
         ),
@@ -741,11 +696,16 @@ class _MatchesState extends State<Matches> {
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final adaptiveHeight =
-        defaultTargetPlatform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final adaptiveHeight = AppSpacing.topBarHeight();
     final filtered = _filteredPals();
     final grouped = _groupedPals(filtered);
+    final isFiltered =
+        (_hasActiveFilter || _query.trim().isNotEmpty) &&
+        filtered.length != _pals.length;
+    final countText =
+        isFiltered
+            ? '${filtered.length} of ${_pals.length}'
+            : '${filtered.length}';
 
     return Scaffold(
       backgroundColor: bgTheme,
@@ -755,214 +715,246 @@ class _MatchesState extends State<Matches> {
         elevation: 0,
         scrolledUnderElevation: 0,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
-        title: _isSearching
-            ? Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: textTheme.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      CupertinoIcons.search,
-                      size: 18,
-                      color: textTheme.withValues(alpha: 0.6),
+        leadingWidth: AppSpacing.leadingWidth,
+        titleSpacing: AppSpacing.titleSpacing,
+        leading:
+            _isSearching
+                ? null
+                : AppChrome.backButton(context, color: textTheme),
+        title:
+            _isSearching
+                ? Padding(
+                  padding: EdgeInsets.zero,
+                  child: Container(
+                    height: AppSpacing.iconTarget,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: textTheme.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocus,
-                        onChanged: (value) => setState(() => _query = value),
-                        textInputAction: TextInputAction.search,
-                        style: AppTextStyles.regularText
-                            .copyWith(color: textTheme),
-                        cursorColor: primaryColor,
-                        decoration: InputDecoration(
-                          hintText: 'Search pals',
-                          hintStyle: AppTextStyles.regularText.copyWith(
-                            color: textTheme.withValues(alpha: 0.4),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ),
-                    if (_query.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                        child: Icon(
-                          Icons.cancel,
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.search,
                           size: 18,
-                          color: textTheme.withValues(alpha: 0.5),
+                          color: textTheme.withValues(alpha: 0.6),
                         ),
-                      ),
-                  ],
-                ),
-              )
-            : Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.pop(context),
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      top: 12,
-                      bottom: 12,
-                      right: 24,
-                    ),
-                    child: Icon(
-                      Icons.arrow_back_ios_new,
-                      color: textTheme,
-                      size: 16,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            onChanged:
+                                (value) => setState(() => _query = value),
+                            textInputAction: TextInputAction.search,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: textTheme,
+                            ),
+                            cursorColor: AppColors.accentText(context),
+                            decoration: InputDecoration(
+                              hintText: 'Search pals',
+                              hintStyle: AppTextStyles.regularText.copyWith(
+                                color: textTheme.withValues(alpha: 0.4),
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                        if (_query.isNotEmpty)
+                          Semantics(
+                            container: true,
+                            button: true,
+                            label: 'Clear search',
+                            child: GestureDetector(
+                              onTap: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              child: SizedBox(
+                                width: AppSpacing.iconTarget,
+                                height: AppSpacing.iconTarget,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.cancel,
+                                    size: 18,
+                                    color: textTheme.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                )
+                : Text(
+                  'Pals',
+                  style: AppTextStyles.headingText.copyWith(
+                    color: textTheme,
+                    fontSize: 20,
+                  ),
                 ),
-              ),
+        actionsPadding: const EdgeInsets.only(right: AppSpacing.trailingInset),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          if (_isSearching)
+            AppChrome.iconAction(
+              icon: Icons.close,
+              tooltip: 'Cancel search',
+              color: textTheme,
+              onPressed: _stopSearch,
+            )
+          else ...[
+            AppChrome.iconAction(
+              icon: CupertinoIcons.search,
+              tooltip: 'Search pals',
+              color: textTheme,
+              onPressed: _startSearch,
+            ),
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                if (_isSearching)
-                  TextButton(
-                    onPressed: _stopSearch,
-                    child: Text(
-                      'Cancel',
+                AppChrome.iconAction(
+                  icon: Icons.tune,
+                  tooltip: 'Filter pals',
+                  color: textTheme,
+                  onPressed: _showFilterSheet,
+                ),
+                if (_hasActiveFilter)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentText(context),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+      body:
+          _loadingPals
+              ? const MatchesSkeleton()
+              : _palsError != null
+              ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _palsError!,
                       style: AppTextStyles.regularText.copyWith(
                         color: textTheme,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                else
-                  IconButton(
-                    icon: Icon(CupertinoIcons.search, color: textTheme),
-                    onPressed: _startSearch,
-                  ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.tune, color: textTheme),
-                      onPressed: _showFilterSheet,
-                    ),
-                    if (_hasActiveFilter)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadPals,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
                       ),
+                      child: const Text(
+                        'Retry',
+                        style: TextStyle(color: Colors.black, fontSize: 16),
+                      ),
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      body: _loadingPals
-          ? const Center(child: CircularProgressIndicator())
-          : _palsError != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Couldn’t load your pals.\nPlease check your connection.',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadPals,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                        ),
-                        child: const Text(
-                          'Retry',
-                          style: TextStyle(color: Colors.black, fontSize: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              )
               : _pals.isEmpty
-          ? _buildNoPalsState(textTheme)
-          : SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ? _buildNoPalsState(textTheme)
+              : SafeArea(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16.0),
-                      child: Text(
-                        'Your Pals',
-                        style: AppTextStyles.headingText
-                            .copyWith(color: textTheme),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16.0, top: 4),
-                      child: Text(
-                        '${filtered.length} matches',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: textTheme.withValues(alpha: 0.6),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 16.0),
+                              child: Semantics(
+                                label:
+                                    isFiltered
+                                        ? '${filtered.length} of ${palCountLabel(_pals.length)}'
+                                        : palCountLabel(filtered.length),
+                                excludeSemantics: true,
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      _pals.length > 1
+                                          ? 'Your Pals'
+                                          : 'Your Pal',
+                                      style: AppTextStyles.headingText.copyWith(
+                                        color: textTheme,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      countText,
+                                      style: AppTextStyles.regularText.copyWith(
+                                        color: AppColors.mutedText(context),
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (filtered.isEmpty) _buildEmptyState(textTheme),
+                            for (final entry in grouped.entries) ...[
+                              Padding(
+                                key: _sectionKeys.putIfAbsent(
+                                  entry.key,
+                                  () => GlobalKey(),
+                                ),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  4,
+                                ),
+                                child: Text(
+                                  entry.key,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: textTheme.withValues(alpha: 0.6),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              for (final pal in entry.value)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 16,
+                                    right: 4,
+                                  ),
+                                  child: _buildPalTile(pal, textTheme),
+                                ),
+                            ],
+                            const SizedBox(height: 24),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    if (filtered.isEmpty) _buildEmptyState(textTheme),
-                    for (final entry in grouped.entries) ...[
-                      Padding(
-                        key: _sectionKeys.putIfAbsent(
-                            entry.key, () => GlobalKey()),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                        child: Text(
-                          entry.key,
-                          style: AppTextStyles.regularText.copyWith(
-                            color: textTheme.withValues(alpha: 0.6),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      for (final pal in entry.value)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16, right: 4),
-                          child: _buildPalTile(pal, textTheme),
-                        ),
-                    ],
-                    const SizedBox(height: 24),
+                    _buildAlphabetIndex(grouped, textTheme),
+                    const SizedBox(width: 4),
                   ],
                 ),
               ),
-            ),
-            _buildAlphabetIndex(grouped, textTheme),
-            const SizedBox(width: 4),
-          ],
-        ),
-      ),
     );
   }
 }

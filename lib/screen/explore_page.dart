@@ -217,16 +217,25 @@ class _ExplorePageState extends State<ExplorePage> {
                 'Browse',
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
-              AppChrome.iconAction(
-                icon: CupertinoIcons.question_circle,
-                tooltip: 'How Browse works',
-                color: textTheme,
-                onPressed: () {
-                  showAdaptiveDialog(
-                    context: context,
-                    builder: (context) => const _ExploreInfoDialog(),
-                  );
-                },
+              SizedBox(
+                width: AppSpacing.iconTarget,
+                height: AppSpacing.iconTarget,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerRight,
+                  tooltip: 'How Browse works',
+                  icon: Icon(
+                    CupertinoIcons.question_circle,
+                    color: textTheme,
+                    size: 24,
+                  ),
+                  onPressed: () {
+                    showAdaptiveDialog(
+                      context: context,
+                      builder: (context) => const _ExploreInfoDialog(),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -493,7 +502,11 @@ class _RoleToggle extends StatelessWidget {
           ),
           Row(
             children: [
-              segment('Learner', 'assets/icons/rlearner.svg', ExploreRole.learner),
+              segment(
+                'Learner',
+                'assets/icons/rlearner.svg',
+                ExploreRole.learner,
+              ),
               segment('Mentor', 'assets/icons/rmentor.svg', ExploreRole.mentor),
             ],
           ),

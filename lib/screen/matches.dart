@@ -21,9 +21,13 @@ import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 
+/// Role filter options for the pals list.
 enum RoleFilter { all, learner, mentor }
 
+/// "Pals" screen: shows all accepted connections, grouped alphabetically,
+/// with search, role filtering and an A-Z quick-jump index.
 class Matches extends StatefulWidget {
+  /// Optional callback used by the empty state to send the user back to swiping.
   final VoidCallback? onStartSwiping;
 
   const Matches({super.key, this.onStartSwiping});
@@ -33,6 +37,7 @@ class Matches extends StatefulWidget {
 }
 
 class _MatchesState extends State<Matches> {
+  // Letters shown in the side index.
   static const List<String> _alphabet = [
     'A',
     'B',
@@ -62,13 +67,14 @@ class _MatchesState extends State<Matches> {
     'Z',
   ];
 
+  // One GlobalKey per letter section, used to scroll to that section.
   final Map<String, GlobalKey> _sectionKeys = {};
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
 
-  String? _activeLetter;
-  bool _isSearching = false;
-  String _query = '';
+  String? _activeLetter; // Letter currently highlighted in the index.
+  bool _isSearching = false; // Whether the app bar shows the search field.
+  String _query = ''; // Current search text.
   RoleFilter _roleFilter = RoleFilter.all;
 
   List<MatchedUser> _pals = const [];
@@ -78,6 +84,7 @@ class _MatchesState extends State<Matches> {
   @override
   void initState() {
     super.initState();
+    // Rebuild the list whenever the shared chat state changes.
     ChatStateService.instance.addListener(_onPalsChanged);
     _loadPals();
   }
@@ -103,6 +110,7 @@ class _MatchesState extends State<Matches> {
     _applyConversations(ChatStateService.instance.conversations);
   }
 
+  /// Listener for ChatStateService updates.
   void _onPalsChanged() {
     if (!mounted) return;
     if (ChatStateService.instance.loading) {
@@ -112,6 +120,7 @@ class _MatchesState extends State<Matches> {
     _applyConversations(ChatStateService.instance.conversations);
   }
 
+  /// Converts accepted conversations into [MatchedUser] items for display.
   void _applyConversations(List<ConversationLite> conversations) {
     final pals =
         conversations
@@ -142,9 +151,11 @@ class _MatchesState extends State<Matches> {
     });
   }
 
+  // Tap recognizer (kept for tappable text spans / "start swiping" actions).
   late final TapGestureRecognizer _swipeTap =
       TapGestureRecognizer()..onTap = _startSwiping;
 
+  /// Sends the user back to the swiping screen.
   void _startSwiping() {
     final callback = widget.onStartSwiping;
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -168,8 +179,10 @@ class _MatchesState extends State<Matches> {
     super.dispose();
   }
 
+  // True when any non-default filter is applied.
   bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
 
+  /// Applies the role filter and the search query to the pals list.
   List<MatchedUser> _filteredPals() {
     final q = _query.trim().toLowerCase();
     return _pals.where((pal) {
@@ -183,6 +196,7 @@ class _MatchesState extends State<Matches> {
     }).toList();
   }
 
+  /// Sorts pals by name and groups them by first letter ('#' for empty names).
   Map<String, List<MatchedUser>> _groupedPals(List<MatchedUser> pals) {
     final sorted = [...pals]
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -195,6 +209,7 @@ class _MatchesState extends State<Matches> {
     return grouped;
   }
 
+  /// Switches the app bar into search mode and focuses the field.
   void _startSearch() {
     setState(() => _isSearching = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -202,6 +217,7 @@ class _MatchesState extends State<Matches> {
     });
   }
 
+  /// Leaves search mode and clears the query.
   void _stopSearch() {
     _searchController.clear();
     _searchFocus.unfocus();
@@ -211,15 +227,19 @@ class _MatchesState extends State<Matches> {
     });
   }
 
+  /// Scrolls to the given letter's section. If that letter has no pals, falls
+  /// forward to the next letter that does, then backward if none is found.
   void _jumpToLetter(String letter, Map<String, List<MatchedUser>> grouped) {
     final startIndex = _alphabet.indexOf(letter);
     String? target;
+    // Look forward first.
     for (int i = startIndex; i < _alphabet.length; i++) {
       if (grouped.containsKey(_alphabet[i])) {
         target = _alphabet[i];
         break;
       }
     }
+    // Otherwise look backward.
     if (target == null) {
       for (int i = startIndex; i >= 0; i--) {
         if (grouped.containsKey(_alphabet[i])) {
@@ -238,6 +258,7 @@ class _MatchesState extends State<Matches> {
     }
   }
 
+  /// Removes the pal (deletes the connection) and refreshes local state.
   Future<void> _unmatchPal(MatchedUser pal) async {
     if (!mounted) return;
 
@@ -273,6 +294,7 @@ class _MatchesState extends State<Matches> {
     showAppSuccess(context, 'You removed ${pal.name} from your Pals');
   }
 
+  /// Blocks the pal's user account and removes them from the list.
   Future<void> _blockPal(MatchedUser pal) async {
     if (!mounted) return;
 
@@ -301,6 +323,7 @@ class _MatchesState extends State<Matches> {
     showAppSuccess(context, 'You blocked ${pal.name}');
   }
 
+  /// Reports the pal's user account with the chosen reason.
   Future<void> _reportPal(MatchedUser pal, String reason) async {
     if (!mounted) return;
 
@@ -326,6 +349,7 @@ class _MatchesState extends State<Matches> {
     }
   }
 
+  /// Handles a selection from the "..." popup menu (with confirmations).
   Future<void> _handleAction(String action, MatchedUser pal) async {
     if (action == 'unmatch') {
       final confirmed = await showConfirmDialog(
@@ -354,6 +378,7 @@ class _MatchesState extends State<Matches> {
     }
   }
 
+  /// Opens the chat room with the given pal.
   void _openChatRoom(MatchedUser pal) {
     _searchFocus.unfocus();
     Navigator.push(
@@ -372,6 +397,7 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  /// Opens the pal's profile dialog (with unmatch / block / report callbacks).
   void _openProfile(MatchedUser pal) {
     showPersonProfileDialog(
       context,
@@ -382,6 +408,7 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  /// Shows the filter bottom sheet and applies the selected role filter.
   void _showFilterSheet() {
     FilterBottomSheet.show(
       context,
@@ -408,13 +435,21 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  /// One row in the pals list.
+  /// - Tapping the avatar opens the profile.
+  /// - Tapping anywhere else on the row opens the chat room.
+  /// - The "..." menu handles its own taps (remove / report / block).
   Widget _buildPalTile(MatchedUser pal, Color textTheme) {
     return InkWell(
-      onTap: () => _openProfile(pal),
+      // CHANGED: the whole row now opens the chat room (was: open profile).
+      onTap: () => _openChatRoom(pal),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
+            // Avatar: the only part of the row that opens the profile.
+            // Its own GestureDetector wins over the row's InkWell, so the
+            // tap won't also trigger the chat room.
             Semantics(
               container: true,
               button: true,
@@ -429,6 +464,7 @@ class _MatchesState extends State<Matches> {
               ),
             ),
             const SizedBox(width: 12),
+            // Name + skill tag (taps fall through to the row -> chat room).
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,19 +480,10 @@ class _MatchesState extends State<Matches> {
                 ],
               ),
             ),
-            Semantics(
-              button: true,
-              label: 'Chat with ${pal.name}',
-              child: IconButton(
-                tooltip: 'Chat with ${pal.name}',
-                onPressed: () => _openChatRoom(pal),
-                icon: Icon(
-                  Icons.chat_bubble_outline,
-                  color: textTheme,
-                  size: 22,
-                ),
-              ),
-            ),
+            // REMOVED: the chat bubble IconButton. The row itself now opens
+            // the chat room.
+
+            // "..." menu with remove / report / block actions.
             SizedBox(
               width: AppSpacing.iconTarget,
               height: AppSpacing.iconTarget,
@@ -469,6 +496,7 @@ class _MatchesState extends State<Matches> {
                 onSelected: (value) => _handleAction(value, pal),
                 itemBuilder:
                     (context) => [
+                      // Remove pal
                       PopupMenuItem<String>(
                         value: 'unmatch',
                         child: Row(
@@ -488,6 +516,7 @@ class _MatchesState extends State<Matches> {
                           ],
                         ),
                       ),
+                      // Report
                       PopupMenuItem<String>(
                         value: 'report',
                         child: Row(
@@ -507,6 +536,7 @@ class _MatchesState extends State<Matches> {
                           ],
                         ),
                       ),
+                      // Block
                       PopupMenuItem<String>(
                         value: 'block',
                         child: Row(
@@ -535,6 +565,8 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  /// A-Z side index. Lays letters out in as many columns as needed so they
+  /// all fit in the available height.
   Widget _buildAlphabetIndex(
     Map<String, List<MatchedUser>> grouped,
     Color textTheme,
@@ -542,6 +574,7 @@ class _MatchesState extends State<Matches> {
     return LayoutBuilder(
       builder: (context, constraints) {
         const laneHeight = 28.0;
+        // How many letters fit vertically in one column.
         final maxRows = (constraints.maxHeight / laneHeight).floor().clamp(
           1,
           _alphabet.length,
@@ -549,6 +582,7 @@ class _MatchesState extends State<Matches> {
         final columnCount = (_alphabet.length / maxRows).ceil();
         final usedRows = (_alphabet.length / columnCount).ceil();
 
+        // A single tappable letter. Dimmed when that section has no pals.
         Widget letterTile(String letter) {
           final hasItems = grouped.containsKey(letter);
           final isActive = _activeLetter == letter;
@@ -559,6 +593,7 @@ class _MatchesState extends State<Matches> {
               behavior: HitTestBehavior.opaque,
               onTap: () {
                 _jumpToLetter(letter, grouped);
+                // Clear the highlight shortly after the jump.
                 Future<void>.delayed(const Duration(milliseconds: 700), () {
                   if (mounted && _activeLetter == letter) {
                     setState(() => _activeLetter = null);
@@ -612,6 +647,7 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  /// Empty state shown when the user has no pals at all.
   Widget _buildNoPalsState(Color textTheme) {
     return SafeArea(
       child: Center(
@@ -654,6 +690,7 @@ class _MatchesState extends State<Matches> {
     );
   }
 
+  /// Empty state shown when pals exist but none match the search/filter.
   Widget _buildEmptyState(Color textTheme) {
     return Padding(
       padding: const EdgeInsets.only(top: 80),
@@ -674,6 +711,7 @@ class _MatchesState extends State<Matches> {
               ),
             ),
             const SizedBox(height: 8),
+            // Resets search text, role filter and search mode.
             TextButton(
               onPressed: () {
                 _searchController.clear();
@@ -699,9 +737,11 @@ class _MatchesState extends State<Matches> {
     final adaptiveHeight = AppSpacing.topBarHeight();
     final filtered = _filteredPals();
     final grouped = _groupedPals(filtered);
+    // True when the visible list is smaller than the full list due to filters.
     final isFiltered =
         (_hasActiveFilter || _query.trim().isNotEmpty) &&
         filtered.length != _pals.length;
+    // e.g. "3 of 10" when filtered, otherwise just the count.
     final countText =
         isFiltered
             ? '${filtered.length} of ${_pals.length}'
@@ -717,10 +757,12 @@ class _MatchesState extends State<Matches> {
         automaticallyImplyLeading: false,
         leadingWidth: AppSpacing.leadingWidth,
         titleSpacing: AppSpacing.titleSpacing,
+        // Hide the back button while searching.
         leading:
             _isSearching
                 ? null
                 : AppChrome.backButton(context, color: textTheme),
+        // Title is either the search field or the "Pals" heading.
         title:
             _isSearching
                 ? Padding(
@@ -762,6 +804,7 @@ class _MatchesState extends State<Matches> {
                             ),
                           ),
                         ),
+                        // Clear-text button, only visible when there's text.
                         if (_query.isNotEmpty)
                           Semantics(
                             container: true,
@@ -796,9 +839,10 @@ class _MatchesState extends State<Matches> {
                     fontSize: 20,
                   ),
                 ),
-        actionsPadding: const EdgeInsets.only(right: AppSpacing.trailingInset),
+        actionsPadding: EdgeInsets.zero,
         actions: [
           if (_isSearching)
+            // Cancel search.
             AppChrome.iconAction(
               icon: Icons.close,
               tooltip: 'Cancel search',
@@ -806,12 +850,14 @@ class _MatchesState extends State<Matches> {
               onPressed: _stopSearch,
             )
           else ...[
+            // Start search.
             AppChrome.iconAction(
               icon: CupertinoIcons.search,
               tooltip: 'Search pals',
               color: textTheme,
               onPressed: _startSearch,
             ),
+            // Filter button with a small dot when a filter is active.
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -839,6 +885,7 @@ class _MatchesState extends State<Matches> {
           ],
         ],
       ),
+      // Body states: loading -> error -> no pals -> list.
       body:
           _loadingPals
               ? const MatchesSkeleton()
@@ -874,6 +921,7 @@ class _MatchesState extends State<Matches> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Scrollable list of grouped pals.
                     Expanded(
                       child: SingleChildScrollView(
                         keyboardDismissBehavior:
@@ -881,6 +929,7 @@ class _MatchesState extends State<Matches> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Header: "Your Pals" + count.
                             Padding(
                               padding: const EdgeInsets.only(left: 16.0),
                               child: Semantics(
@@ -915,9 +964,12 @@ class _MatchesState extends State<Matches> {
                               ),
                             ),
                             const SizedBox(height: 8),
+                            // Shown when search/filter yields no results.
                             if (filtered.isEmpty) _buildEmptyState(textTheme),
+                            // One section per letter: header + pal tiles.
                             for (final entry in grouped.entries) ...[
                               Padding(
+                                // Key used by _jumpToLetter to scroll here.
                                 key: _sectionKeys.putIfAbsent(
                                   entry.key,
                                   () => GlobalKey(),
@@ -950,6 +1002,7 @@ class _MatchesState extends State<Matches> {
                         ),
                       ),
                     ),
+                    // A-Z quick-jump index on the right.
                     _buildAlphabetIndex(grouped, textTheme),
                     const SizedBox(width: 4),
                   ],

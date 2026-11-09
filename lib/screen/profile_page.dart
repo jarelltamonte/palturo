@@ -338,6 +338,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: bgTheme,
       appBar: AppChrome.appBar(
+        actionsPadding: EdgeInsets.zero,
         title: Text(
           'Profile',
           style: AppTextStyles.headingText.copyWith(color: textTheme),

@@ -298,6 +298,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
+        centerTitle: false,
         leadingWidth: AppSpacing.leadingWidth,
         leading: AppChrome.backButton(context, color: textTheme),
         title: Text(

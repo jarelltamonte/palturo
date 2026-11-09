@@ -734,9 +734,9 @@ class _HomePageState extends State<HomePage> {
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Padding(
-          padding: const EdgeInsets.only(
+          padding: EdgeInsets.only(
             left: AppSpacing.pageHorizontal,
-            right: AppSpacing.trailingInset,
+            right: (16.0 - (AppSpacing.iconTarget - 24) / 2).clamp(0.0, 16.0),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

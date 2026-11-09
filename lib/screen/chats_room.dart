@@ -1263,7 +1263,11 @@ class _ChatRoomState extends State<ChatRoom> {
               ),
             ] else
               const Spacer(),
-            PopupMenuButton<String>(
+          ],
+        ),
+        actionsPadding: EdgeInsets.zero,
+        actions: [
+          PopupMenuButton<String>(
               tooltip: 'Chat options',
               padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
@@ -1353,9 +1357,8 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       body: Column(
         children: [

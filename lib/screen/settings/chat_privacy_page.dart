@@ -64,6 +64,7 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
     final textColor = Theme.of(context).colorScheme.secondary;
     return Scaffold(
       appBar: AppBar(
+        centerTitle: false,
         leading: IconButton(
           tooltip: 'Back',
           onPressed: () => Navigator.pop(context),

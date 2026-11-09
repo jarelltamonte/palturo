@@ -12,6 +12,7 @@ class AppChrome {
     Color? backgroundColor,
     double? toolbarHeight,
     double? titleSpacing,
+    EdgeInsets? actionsPadding,
   }) {
     return AppBar(
       toolbarHeight: toolbarHeight ?? AppSpacing.topBarHeight(),
@@ -27,9 +28,10 @@ class AppChrome {
       title: title,
       actions: actions,
       actionsPadding:
-          actions == null
+          actionsPadding ??
+          (actions == null
               ? null
-              : const EdgeInsets.only(right: AppSpacing.trailingInset),
+              : const EdgeInsets.only(right: AppSpacing.trailingInset)),
     );
   }
 

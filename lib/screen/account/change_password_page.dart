@@ -51,6 +51,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final textColor = Theme.of(context).colorScheme.secondary;
     return Scaffold(
       appBar: AppBar(
+        centerTitle: false,
         leading: IconButton(
           tooltip: 'Back',
           onPressed: _busy ? null : () => Navigator.pop(context),

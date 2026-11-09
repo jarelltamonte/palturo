@@ -516,8 +516,7 @@ class _ChatsPageState extends State<ChatsPage> {
   Widget _buildNoMatchesState() {
     return AppEmptyState(
       title: 'No chats yet',
-      message:
-          'Send a request or start swiping to meet your first Pal.',
+      message: 'Send a request or start swiping to meet your first Pal.',
       actionLabel: 'Start swiping',
       onAction: _startSwiping,
       bottomPadding: AppSpacing.bottomNavClearanceFor(context),
@@ -610,64 +609,69 @@ class _ChatsPageState extends State<ChatsPage> {
                         color: textTheme,
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: 'Search chats',
-                          onPressed: _startSearch,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: AppSpacing.iconTarget,
-                            minHeight: AppSpacing.iconTarget,
+                    Transform.translate(
+                      offset: Offset((AppSpacing.iconTarget - 24) / 2, 0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Search chats',
+                            onPressed: _startSearch,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.iconTarget,
+                              minHeight: AppSpacing.iconTarget,
+                            ),
+                            icon: Icon(
+                              CupertinoIcons.search,
+                              color: textTheme,
+                              size: 24,
+                            ),
                           ),
-                          icon: Icon(
-                            CupertinoIcons.search,
-                            color: textTheme,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Semantics(
-                          container: true,
-                          button: true,
-                          label: 'Filter chats',
-                          child: GestureDetector(
-                            onTap: _openFilterSheet,
-                            behavior: HitTestBehavior.opaque,
-                            child: SizedBox(
-                              width: AppSpacing.iconTarget,
-                              height: AppSpacing.iconTarget,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Align(
-                                    alignment: Alignment.center,
-                                    child: Icon(
-                                      Icons.tune,
-                                      color: textTheme,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  if (_hasActiveFilter)
-                                    Positioned(
-                                      right: 6,
-                                      top: 6,
-                                      child: Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: AppColors.accentText(context),
-                                          shape: BoxShape.circle,
-                                        ),
+                          const SizedBox(width: 4),
+                          Semantics(
+                            container: true,
+                            button: true,
+                            label: 'Filter chats',
+                            child: GestureDetector(
+                              onTap: _openFilterSheet,
+                              behavior: HitTestBehavior.opaque,
+                              child: SizedBox(
+                                width: AppSpacing.iconTarget,
+                                height: AppSpacing.iconTarget,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        Icons.tune,
+                                        color: textTheme,
+                                        size: 24,
                                       ),
                                     ),
-                                ],
+                                    if (_hasActiveFilter)
+                                      Positioned(
+                                        right: 6,
+                                        top: 6,
+                                        child: Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.accentText(
+                                              context,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -795,8 +799,7 @@ class _ChatsPageState extends State<ChatsPage> {
                   child: _buildNoMatchesState(),
                 )
               else ...[
-                if (nothingFound)
-                  SliverToBoxAdapter(child: _buildEmptyState()),
+                if (nothingFound) SliverToBoxAdapter(child: _buildEmptyState()),
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height:

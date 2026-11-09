@@ -1096,18 +1096,14 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                 ? AppChrome.backButton(context, color: textTheme)
                 : null,
         titleSpacing: AppSpacing.titleSpacing,
-        title: Padding(
-          padding: EdgeInsets.zero,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _view == RequestView.sent ? 'Sent requests' : 'Requests',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.headingText.copyWith(color: textTheme),
-                ),
-              ),
+        title: Text(
+          _view == RequestView.sent ? 'Sent requests' : 'Requests',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.headingText.copyWith(color: textTheme),
+        ),
+        actionsPadding: EdgeInsets.zero,
+        actions: [
               AppChrome.iconAction(
                 icon: Icons.notifications_none_rounded,
                 tooltip: 'Activity',
@@ -1132,7 +1128,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                         right: -1,
                         top: -1,
                         child: Container(
-                          width: 8,
+                    width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
                             color: AppColors.primary,
@@ -1184,8 +1180,6 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                 ),
               ),
             ],
-          ),
-        ),
       ),
       body: Column(
         children: [

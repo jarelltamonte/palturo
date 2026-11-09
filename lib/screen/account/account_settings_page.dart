@@ -12,6 +12,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/top_labeled_field.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/utils/validators.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -544,24 +545,23 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            TextField(
+            TopLabeledField(
+              label: 'First name',
               controller: _first,
-              autofocus: true,
               textInputAction: TextInputAction.next,
               textCapitalization: TextCapitalization.words,
               maxLength: 50,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(labelText: 'First name'),
             ),
             const SizedBox(height: 12),
-            TextField(
+            TopLabeledField(
+              label: 'Last name',
               controller: _last,
               textInputAction: TextInputAction.done,
               textCapitalization: TextCapitalization.words,
               maxLength: 50,
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _save(),
-              decoration: const InputDecoration(labelText: 'Last name'),
             ),
             if (_error != null) ...[
               const SizedBox(height: 4),

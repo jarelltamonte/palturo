@@ -6,6 +6,7 @@ import '../../theme/app_text_styles.dart';
 class OnboardingScaffold extends StatelessWidget {
   final String title;
   final String? highlightWord;
+  final Color? highlightColor;
   final String? subtitle;
   final String? stepLabel;
   final Widget child;
@@ -30,6 +31,7 @@ class OnboardingScaffold extends StatelessWidget {
     super.key,
     required this.title,
     this.highlightWord,
+    this.highlightColor,
     this.subtitle,
     this.stepLabel,
     required this.child,
@@ -48,8 +50,14 @@ class OnboardingScaffold extends StatelessWidget {
     final secondary = Theme.of(context).colorScheme.secondary;
     final surface = Theme.of(context).colorScheme.surface;
     // Keep the back target at 48 even on iOS; the toolbar grows to fit it.
-    final adaptiveHeight =
-        AppSpacing.topBarHeight();
+    final adaptiveHeight = AppSpacing.topBarHeight();
+
+    const double backIconSize = 18;
+    final double backInset =
+        (AppSpacing.pageHorizontal -
+                (AppSpacing.iconTarget - backIconSize) / 2)
+            .clamp(0.0, double.infinity)
+            .toDouble();
 
     return Scaffold(
       backgroundColor: surface,
@@ -63,45 +71,51 @@ class OnboardingScaffold extends StatelessWidget {
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   automaticallyImplyLeading: false,
-                  titleSpacing: AppSpacing.titleSpacing,
-                  title: Row(
-                    children: [
-                      if (showBackButton)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: IconButton(
-                            tooltip: 'Back',
-                            onPressed:
-                                onBack ?? () => Navigator.maybePop(context),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: AppSpacing.iconTarget,
-                              minHeight: AppSpacing.iconTarget,
-                            ),
-                            icon: Icon(
-                              Icons.arrow_back_ios_new,
-                              size: 18,
-                              color: secondary,
-                            ),
-                          ),
-                        ),
-                      if (progress > 0)
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 4,
-                              backgroundColor: AppColors.primary.withValues(
-                                alpha: 0.15,
+                  titleSpacing: 0,
+                  title: Padding(
+                    padding: EdgeInsets.only(
+                      left: showBackButton ? backInset : AppSpacing.pageHorizontal,
+                      right: AppSpacing.pageHorizontal,
+                    ),
+                    child: Row(
+                      children: [
+                        if (showBackButton)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: IconButton(
+                              tooltip: 'Back',
+                              onPressed:
+                                  onBack ?? () => Navigator.maybePop(context),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.iconTarget,
+                                minHeight: AppSpacing.iconTarget,
                               ),
-                              valueColor: const AlwaysStoppedAnimation(
-                                AppColors.primary,
+                              icon: Icon(
+                                Icons.arrow_back_ios_new,
+                                size: backIconSize,
+                                color: secondary,
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                        if (progress > 0)
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 4,
+                                backgroundColor: AppColors.primary.withValues(
+                                  alpha: 0.15,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               )
@@ -218,7 +232,7 @@ class OnboardingScaffold extends StatelessWidget {
 
   List<Widget> _header(BuildContext context, Color secondary) {
     return [
-      if (stepLabel != null) ...[
+      if (stepLabel != null && stepLabel!.isNotEmpty) ...[
         Semantics(
           header: true,
           label: stepLabel,
@@ -234,7 +248,12 @@ class OnboardingScaffold extends StatelessWidget {
         ),
         const SizedBox(height: 6),
       ],
-      _Title(title: title, highlightWord: highlightWord, color: secondary),
+      _Title(
+        title: title,
+        highlightWord: highlightWord,
+        highlightColor: highlightColor,
+        color: secondary,
+      ),
       if (subtitle != null) ...[
         const SizedBox(height: 16),
         Text(
@@ -250,9 +269,15 @@ class OnboardingScaffold extends StatelessWidget {
 class _Title extends StatelessWidget {
   final String title;
   final String? highlightWord;
+  final Color? highlightColor;
   final Color color;
 
-  const _Title({required this.title, this.highlightWord, required this.color});
+  const _Title({
+    required this.title,
+    this.highlightWord,
+    this.highlightColor,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +303,9 @@ class _Title extends StatelessWidget {
           TextSpan(text: parts.first),
           TextSpan(
             text: highlightWord,
-            style: style.copyWith(color: AppColors.accentText(context)),
+            style: style.copyWith(
+              color: highlightColor ?? AppColors.accentText(context),
+            ),
           ),
           if (parts.length > 1)
             TextSpan(text: parts.sublist(1).join(highlightWord!)),

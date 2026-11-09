@@ -11,6 +11,15 @@ import 'package:palturo/widgets/user_avatar.dart';
 
 enum _RequestOutcome { none, accepted, declined }
 
+String _titleCase(String value) {
+  return value
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
+}
+
 class RequestCard extends StatefulWidget {
   final String skillName;
   final String requesterName;
@@ -60,6 +69,8 @@ class _RequestCardState extends State<RequestCard>
   late final AnimationController _controller;
   late final Animation<double> _animation;
   _RequestOutcome _outcome = _RequestOutcome.none;
+
+  String get _skill => _titleCase(widget.skillName);
 
   @override
   void initState() {
@@ -132,7 +143,7 @@ class _RequestCardState extends State<RequestCard>
               connectionId: widget.connectionId,
               name: widget.requesterName,
               avatarImage: widget.avatarImage,
-              skillName: widget.skillName,
+              skillName: _skill,
               role: widget.role,
               person: widget.person,
             ),
@@ -290,7 +301,7 @@ class _RequestCardState extends State<RequestCard>
               ),
             ),
             const SizedBox(height: 6),
-            SkillTag(skillName: widget.skillName, role: widget.role),
+            SkillTag(skillName: _skill, role: widget.role),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -421,7 +432,7 @@ class _RequestCardState extends State<RequestCard>
             children: [
               Expanded(
                 child: Text(
-                  widget.skillName,
+                  _skill,
                   style: AppTextStyles.boldText.copyWith(
                     color: accentColor,
                     fontSize: 20,

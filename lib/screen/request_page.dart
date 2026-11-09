@@ -984,7 +984,14 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                         minimumSize: const Size(44, 44),
                         padding: EdgeInsets.zero,
                       ),
-                      child: const Text('View Pals'),
+                      child: Text(
+                        'View pals',
+                        style: AppTextStyles.regularText.copyWith(
+                          color: AppColors.accentText(context),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1035,10 +1042,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     final filteredOut = _requests.isNotEmpty;
     return AppEmptyState(
       bottomPadding: AppSpacing.bottomNavClearanceFor(context),
-      title:
-          filteredOut
-              ? 'No requests match your filters'
-              : 'No requests yet',
+      title: filteredOut ? 'No requests match your filters' : 'No requests yet',
       actionLabel:
           filteredOut
               ? 'Clear filters'
@@ -1060,9 +1064,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                     context,
                     MaterialPageRoute(
                       builder:
-                          (_) => const RequestPage(
-                            initialView: RequestView.sent,
-                          ),
+                          (_) =>
+                              const RequestPage(initialView: RequestView.sent),
                     ),
                   )
                   : _loadRequests),

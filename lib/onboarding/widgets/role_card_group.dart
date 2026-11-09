@@ -121,7 +121,7 @@ class _RoleCard extends StatelessWidget {
             border: Border.all(
               color:
                   selected
-                      ? AppColors.textSecondary
+                      ? AppColors.primary
                       : AppColors.border(context),
               width: selected ? 2 : 1,
             ),

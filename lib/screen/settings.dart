@@ -812,7 +812,8 @@ class _SettingsState extends State<Settings> {
             ),
             title: Text(
               'Help',
-              style: AppTextStyles.boldText.copyWith(
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
                 color: textTheme,
                 fontSize: 18,
               ),
@@ -830,7 +831,7 @@ class _SettingsState extends State<Settings> {
                 onPressed: () => Navigator.pop(dialogContext),
                 child: Text(
                   'Close',
-                  style: AppTextStyles.boldText.copyWith(
+                  style: AppTextStyles.regularText.copyWith(
                     color: AppColors.accentText(context),
                   ),
                 ),

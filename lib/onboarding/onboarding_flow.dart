@@ -202,26 +202,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  String _stepLabel(OnboardingStep step) {
-    final both = _controller.role == OnboardingRole.both;
-    final total = both ? 5 : 4;
-    switch (step) {
-      case OnboardingStep.role:
-        return 'Step 1 of 4 – Role';
-      case OnboardingStep.learningInterests:
-        return 'Step 2 of $total – Learning skills';
-      case OnboardingStep.teachingInterests:
-        return 'Step ${both ? 3 : 2} of $total – Teaching skills';
-      case OnboardingStep.finalDetails:
-        return 'Step ${both ? 4 : 3} of $total – Availability';
-      case OnboardingStep.review:
-        return 'Step $total of $total – Review';
-      case OnboardingStep.intro:
-      case OnboardingStep.complete:
-        return '';
-    }
-  }
-
   double _progress(OnboardingStep step) {
     final both = _controller.role == OnboardingRole.both;
     final total = both ? 5 : 4;
@@ -246,7 +226,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     final baseSkillsWithoutOthers =
         kBaseOptions.where((o) => o.id != 'others').toList();
 
-    final baseLabels = baseSkillsWithoutOthers.map((e) => e.label).toList();
+    final baseLabels = kBaseOptions.map((e) => e.label).toList();
 
     final dbSkills = await _profileService.getRandomDistinctSkills(
       excludeSkills: baseLabels,
@@ -254,10 +234,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     );
 
     final dbOptions =
-        dbSkills.map((skill) {
-          final slug = skill.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
-          return OnboardingOption(slug, skill);
-        }).toList();
+        dbSkills
+            .map((skill) {
+              final slug = skill.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+              return OnboardingOption(slug, skill);
+            })
+            .where((option) => option.id != 'others')
+            .toList();
 
     final Map<String, OnboardingOption> uniqueMap = {};
     for (final opt in [...baseSkillsWithoutOthers, ...dbOptions]) {
@@ -401,7 +384,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           onContinue: () => _goTo(_next(step)),
           onBack: _backOrSkip,
           onSkip: _confirmSkip,
-          stepLabel: _stepLabel(step),
+          stepLabel: '',
           progress: _progress(step),
         );
 
@@ -410,14 +393,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           animation: _controller,
           builder:
               (context, _) => OnboardingInterestsScreen(
-                highlightWord: 'Learning',
+                highlightWord: 'Learning?',
                 options: _dynamicOptions,
                 selected: _controller.learningInterests,
                 maxSelections: 3,
                 onToggle:
                     (id) => _controller.toggleLearningInterest(id, max: 3),
                 progress: _progress(step),
-                stepLabel: _stepLabel(step),
+                stepLabel: '',
                 onContinue: () => _goTo(_next(step)),
                 onBack: _backOrSkip,
                 onSkip: _confirmSkip,
@@ -429,14 +412,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           animation: _controller,
           builder:
               (context, _) => OnboardingInterestsScreen(
-                highlightWord: 'Teaching',
+                highlightWord: 'Teaching?',
                 options: _dynamicOptions,
                 selected: _controller.teachingInterests,
                 maxSelections: 2,
                 onToggle:
                     (id) => _controller.toggleTeachingInterest(id, max: 2),
                 progress: _progress(step),
-                stepLabel: _stepLabel(step),
+                stepLabel: '',
                 onContinue: () => _goTo(_next(step)),
                 onBack: _backOrSkip,
                 onSkip: _confirmSkip,
@@ -452,7 +435,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 onDone: () => _goTo(OnboardingStep.review),
                 onBack: _backOrSkip,
                 onSkip: _confirmSkip,
-                stepLabel: _stepLabel(step),
                 progress: _progress(step),
               ),
         );
@@ -463,7 +445,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           onSave: _saveAndProceed,
           onBack: _backOrSkip,
           onSkip: _confirmSkip,
-          stepLabel: _stepLabel(step),
+          stepLabel: '',
           onEditRole: () => _editFromReview(OnboardingStep.role),
           onEditLearning:
               () => _editFromReview(OnboardingStep.learningInterests),

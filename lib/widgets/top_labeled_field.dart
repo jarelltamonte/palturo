@@ -17,6 +17,7 @@ class TopLabeledField extends StatefulWidget {
   final List<TextInputFormatter>? inputFormatters;
   final Iterable<String>? autofillHints;
   final FocusNode? focusNode;
+  final bool autofocus;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -34,6 +35,7 @@ class TopLabeledField extends StatefulWidget {
     this.inputFormatters,
     this.autofillHints,
     this.focusNode,
+    this.autofocus = false,
     this.onChanged,
     this.onSubmitted,
   });
@@ -119,6 +121,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                   child: TextField(
                     controller: _controller,
                     focusNode: _focusNode,
+                    autofocus: widget.autofocus,
                     obscureText: widget.obscureText,
                     keyboardType: widget.keyboardType,
                     textInputAction: widget.textInputAction,

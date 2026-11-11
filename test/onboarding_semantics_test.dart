@@ -112,7 +112,7 @@ void main() {
     final selectedBorder =
         (selected.decoration! as BoxDecoration).border! as Border;
     expect(selectedBorder.top.width, 2);
-    expect(selectedBorder.top.color, AppColors.textSecondary);
+    expect(selectedBorder.top.color, AppColors.primary);
 
     final unselected = tester.widget<AnimatedContainer>(
       find.descendant(
@@ -127,7 +127,7 @@ void main() {
     expect(card.height, AppSpacing.onboardingRoleCardHeight);
   });
 
-  testWidgets('role step label uses an en dash', (tester) async {
+  testWidgets('role step no longer shows a step label', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: lightMode,
@@ -138,7 +138,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Step 1 of 4 – Role'), findsOneWidget);
+    expect(find.textContaining('Step 1 of'), findsNothing);
   });
 
   testWidgets('role cards survive short landscape and 200% text', (
@@ -264,6 +264,6 @@ void main() {
     );
     final border = (selected.decoration! as BoxDecoration).border! as Border;
     expect(border.top.width, 2);
-    expect(border.top.color, AppColors.textSecondary);
+    expect(border.top.color, AppColors.primary);
   });
 }

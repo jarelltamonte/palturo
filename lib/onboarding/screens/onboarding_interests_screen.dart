@@ -38,7 +38,7 @@ class OnboardingInterestsScreen extends StatelessWidget {
     return OnboardingScaffold(
       title: 'What are you interested in $highlightWord',
       highlightWord: highlightWord,
-      highlightColor: AppColors.primary,
+      highlightColor: AppColors.accentText(context),
       subtitle: 'Select up to $maxSelections that apply',
       progress: progress,
       showBackButton: true,

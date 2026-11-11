@@ -661,6 +661,29 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     );
   }
 
+  Future<void> _openSentProfile(OutgoingRequestLite request) async {
+    try {
+      final person = await MatchApi.getPersonFromPublicProfile(
+        request.recipientId,
+      );
+      if (!mounted) return;
+      if (person == null) {
+        showAppError(context, 'This profile is no longer available.');
+        return;
+      }
+      showPersonProfileDialog(context, person);
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not load this profile. Please try again.',
+        ),
+      );
+    }
+  }
+
   void _openFilterSheet() {
     if (_view == RequestView.sent) {
       FilterBottomSheet.show(
@@ -1001,6 +1024,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
           final request = requests[index - 1];
           return _SentRequestCard(
             request: request,
+            onTap: () => _openSentProfile(request),
             onWithdraw:
                 request.isPending ? () => _cancelOutgoing(request) : null,
           );
@@ -1229,8 +1253,13 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
 class _SentRequestCard extends StatelessWidget {
   final OutgoingRequestLite request;
   final VoidCallback? onWithdraw;
+  final VoidCallback? onTap;
 
-  const _SentRequestCard({required this.request, this.onWithdraw});
+  const _SentRequestCard({
+    required this.request,
+    this.onWithdraw,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1241,111 +1270,120 @@ class _SentRequestCard extends StatelessWidget {
             : AppColors.dangerText(context);
     final statusLabel = request.isPending ? 'Waiting for reply' : 'Declined';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.elevatedSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border(context)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+    return Semantics(
+      container: true,
+      button: onTap != null,
+      label: 'Open ${request.recipientName} profile',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.elevatedSurface(context),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.border(context)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          UserAvatar(
-            name: request.recipientName,
-            image:
-                request.avatarUrl == null
-                    ? null
-                    : NetworkImage(request.avatarUrl!),
-            size: 48,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UserAvatar(
+                name: request.recipientName,
+                image:
+                    request.avatarUrl == null
+                        ? null
+                        : NetworkImage(request.avatarUrl!),
+                size: 48,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        request.recipientName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.boldText.copyWith(
-                          color: textColor,
-                          fontSize: 15,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            request.recipientName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textColor,
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: statusColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      request.skills.isEmpty
+                          ? 'Skill exchange'
+                          : request.skills.first,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textColor.withValues(alpha: 0.7),
+                        fontSize: 13,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        statusLabel,
-                        style: AppTextStyles.regularText.copyWith(
-                          color: statusColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    const SizedBox(height: 4),
+                    Text(
+                      timeAgo(request.createdAt),
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
                       ),
                     ),
+                    if (onWithdraw != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: onWithdraw,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.dangerText(context),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            minimumSize: const Size(0, 36),
+                          ),
+                          child: const Text('Withdraw request'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  request.skills.isEmpty
-                      ? 'Skill exchange'
-                      : request.skills.first,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textColor.withValues(alpha: 0.7),
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  timeAgo(request.createdAt),
-                  style: AppTextStyles.regularText.copyWith(
-                    color: AppColors.mutedText(context),
-                    fontSize: 12,
-                  ),
-                ),
-                if (onWithdraw != null) ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: onWithdraw,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.dangerText(context),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        minimumSize: const Size(0, 36),
-                      ),
-                      child: const Text('Withdraw request'),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

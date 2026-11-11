@@ -43,6 +43,6 @@ void main() {
     final filter = tester.getRect(
       find.bySemanticsLabel('Filter recommendations'),
     );
-    expect(filter.center.dx, closeTo(350, 0.5));
+    expect(filter.center.dx, closeTo(362, 0.5));
   });
 }

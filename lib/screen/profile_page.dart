@@ -79,7 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String? get _uid => Supabase.instance.client.auth.currentUser?.id;
 
-  String get _palsWord => (_friendCount ?? 2) <= 1 ? 'Pal' : 'Pals';
+  String get _palsWord => _friendCount == 1 ? 'Pal' : 'Pals';
 
   Future<void> _loadResumeState() async {
     final prefs = PreferencesService.instance;

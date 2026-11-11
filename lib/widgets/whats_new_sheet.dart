@@ -11,7 +11,10 @@ const List<String> whatsNewBullets = [
 ];
 
 /// Shows the one-time "what's new" sheet once per app version.
+bool _whatsNewShowing = false;
+
 Future<void> maybeShowWhatsNew(BuildContext context) async {
+  if (_whatsNewShowing) return;
   String version;
   try {
     final info = await PackageInfo.fromPlatform();
@@ -24,16 +27,22 @@ Future<void> maybeShowWhatsNew(BuildContext context) async {
   );
   if (seen == version || !context.mounted) return;
 
-  await showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: AppColors.elevatedSurface(context),
-    isScrollControlled: true,
-    builder: (_) => const WhatsNewSheet(),
-  );
+  _whatsNewShowing = true;
   await PreferencesService.instance.setString(
     'whats_new_seen_version',
     version,
   );
+  try {
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.elevatedSurface(context),
+      isScrollControlled: true,
+      builder: (_) => const WhatsNewSheet(),
+    );
+  } finally {
+    _whatsNewShowing = false;
+  }
 }
 
 class WhatsNewSheet extends StatelessWidget {

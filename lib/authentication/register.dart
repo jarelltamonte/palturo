@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -31,16 +30,6 @@ class _RegisterPageState extends State<RegisterPage> {
   final _confirmPasswordFocusNode = FocusNode();
 
   final AuthService _authService = AuthService();
-
-  late final TapGestureRecognizer _termsTap =
-      TapGestureRecognizer()
-        ..onTap = () => LegalDialogs.showTermsOfService(context);
-  late final TapGestureRecognizer _dataTap =
-      TapGestureRecognizer()
-        ..onTap = () => LegalDialogs.showDataPolicy(context);
-  late final TapGestureRecognizer _cookiesTap =
-      TapGestureRecognizer()
-        ..onTap = () => LegalDialogs.showCookiesPolicy(context);
 
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
@@ -93,10 +82,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
-    _termsTap.dispose();
-    _dataTap.dispose();
-    _cookiesTap.dispose();
-
     _firstNameFocusNode.dispose();
     _lastNameFocusNode.dispose();
     _emailFocusNode.dispose();
@@ -698,22 +683,68 @@ class _RegisterPageState extends State<RegisterPage> {
                               const TextSpan(
                                 text: 'By signing up, you agree to our ',
                               ),
-                              TextSpan(
-                                text: 'Terms of Service',
-                                style: legalLinkStyle,
-                                recognizer: _termsTap,
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showTermsOfService(
+                                        context,
+                                      ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Terms of Service'),
+                                ),
                               ),
                               const TextSpan(text: ',\n'),
-                              TextSpan(
-                                text: 'Data Policy',
-                                style: legalLinkStyle,
-                                recognizer: _dataTap,
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showDataPolicy(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Data Policy'),
+                                ),
                               ),
                               const TextSpan(text: ', and '),
-                              TextSpan(
-                                text: 'Cookies Policy',
-                                style: legalLinkStyle,
-                                recognizer: _cookiesTap,
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showCookiesPolicy(
+                                        context,
+                                      ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Cookies Policy'),
+                                ),
                               ),
                               const TextSpan(text: '.'),
                             ],

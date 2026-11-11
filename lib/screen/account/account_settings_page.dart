@@ -549,6 +549,7 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
             TopLabeledField(
               label: 'First name',
               controller: _first,
+              autofocus: true,
               textInputAction: TextInputAction.next,
               textCapitalization: TextCapitalization.words,
               maxLength: 50,

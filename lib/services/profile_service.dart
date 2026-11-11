@@ -11,6 +11,7 @@ import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
 import '../screen/utils/schedule_format.dart';
+import '../utils/media_url.dart';
 
 bool isProfileComplete({
   required String? avatarUrl,
@@ -661,8 +662,19 @@ class ProfileService {
           : updatedProfile.schedule,
     );
 
-    final primaryAvatar =
-        uploadedPhotoUrls.isNotEmpty ? uploadedPhotoUrls[0] : null;
+    final primaryAvatar = MediaUrl.sanitize(
+      uploadedPhotoUrls.isNotEmpty ? uploadedPhotoUrls[0] : null,
+    );
+    final safePhotos = uploadedPhotoUrls
+        .map(MediaUrl.sanitize)
+        .whereType<String>()
+        .toList();
+    final safeSkillImages = <String, String>{};
+    uploadedSkillImages.forEach((key, value) {
+      if (MediaUrl.isAllowedOrPath(value)) {
+        safeSkillImages[key] = value;
+      }
+    });
 
     final bool hasSkillsForRole;
     if (updatedProfile.role == OnboardingRole.teach) {
@@ -692,8 +704,8 @@ class ProfileService {
         .update({
           'bio': updatedProfile.bio,
           'avatar_url': primaryAvatar,
-          'photos': uploadedPhotoUrls.whereType<String>().toList(),
-          'teaching_skill_images': uploadedSkillImages,
+          'photos': safePhotos,
+          'teaching_skill_images': safeSkillImages,
           'role': updatedProfile.role?.dbValue ?? 'learner',
           'skill_categories': allCategorySlugs.toList(),
           'learning_styles': updatedProfile.interests,

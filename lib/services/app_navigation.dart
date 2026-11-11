@@ -8,6 +8,7 @@ import 'package:palturo/screen/profile_page.dart';
 import 'package:palturo/screen/request_page.dart';
 import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/sound_service.dart';
+import 'package:palturo/utils/media_url.dart';
 
 /// Routes opened from notifications, banners, and deep links.
 ///
@@ -46,10 +47,7 @@ class AppRouter {
     Person? person,
     String? avatarUrl,
   }) {
-    final avatar =
-        (avatarUrl?.trim().isNotEmpty ?? false)
-            ? NetworkImage(avatarUrl!.trim())
-            : null;
+    final avatar = MediaUrl.image(avatarUrl);
     return _push(
       (_) => ChatRoom(
         connectionId: connectionId,

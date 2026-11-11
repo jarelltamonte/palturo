@@ -3,6 +3,8 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:video_player/video_player.dart';
 
+import '../utils/media_url.dart';
+
 bool isVideoUrl(String? url) {
   if (url == null) return false;
   return RegExp(
@@ -62,7 +64,12 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
 
   Future<void> _openVideo() async {
     _failed = false;
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    final uri = MediaUrl.tryParse(widget.url);
+    if (uri == null) {
+      if (mounted) setState(() => _failed = true);
+      return;
+    }
+    final controller = VideoPlayerController.networkUrl(uri);
     _controller = controller;
     try {
       await controller.initialize();
@@ -113,8 +120,10 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
   @override
   Widget build(BuildContext context) {
     if (!_isVideo) {
+      final uri = MediaUrl.tryParse(widget.url);
+      if (uri == null) return widget.fallback;
       return Image.network(
-        widget.url,
+        uri.toString(),
         fit: widget.fit,
         alignment: widget.alignment,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {

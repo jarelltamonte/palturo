@@ -263,7 +263,10 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     _channelSubscribed = false;
 
     _channel = client
-        .channel('notifications:${user.id}')
+        .channel(
+          'notifications:${user.id}',
+          opts: const RealtimeChannelConfig(private: true),
+        )
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',

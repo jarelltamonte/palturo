@@ -234,7 +234,10 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
     _realtimeSubscribed = false;
     _realtimeChannel = client
-        .channel('chat_state_global_messages')
+        .channel(
+          'chat_state_global_messages',
+          opts: const RealtimeChannelConfig(private: true),
+        )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',

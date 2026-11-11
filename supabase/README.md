@@ -25,6 +25,10 @@ Run against a Supabase Postgres instance (the base `anon`, `authenticated`,
    public schema.
 6. Configure `pipeline_config` (worker URL / embedding weights) and auth
    redirect settings for the new environment.
+7. In Supabase Realtime settings, turn **off** "Allow public access". Private
+   chat/notification topics are enforced by
+   `migrations/20261107000300_realtime_topic_acl.sql`; with public access on, a
+   modified client could still join a public topic.
 
 ## Important
 

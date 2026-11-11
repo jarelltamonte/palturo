@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -520,6 +521,7 @@ class ProfileService {
     ProfileData updatedProfile, {
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
@@ -536,6 +538,7 @@ class ProfileService {
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
         try {
+          onClassifyingSkill?.call(custom.text);
           resolved =
               await _classifyCustomSkill(
                 custom.text,
@@ -578,6 +581,7 @@ class ProfileService {
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
         try {
+          onClassifyingSkill?.call(custom.text);
           formatted =
               await _classifyCustomSkill(
                 custom.text,
@@ -821,7 +825,10 @@ class ProfileService {
 
     final refreshed = await getCurrentUserProfile();
 
-    await refreshEmbeddings();
+    // Re-vectorization is not part of the save contract: get-matches heals
+    // stale embeddings on the next read. Awaiting it here made edits feel
+    // stuck for tens of seconds after the profile had already been written.
+    unawaited(refreshEmbeddings());
 
     return refreshed ?? updatedProfile;
   }

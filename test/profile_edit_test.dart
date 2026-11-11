@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
@@ -20,8 +22,28 @@ class _RejectingProfileService implements ProfileService {
     ProfileData updatedProfile, {
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
   }) async {
     throw SkillModerationException.rejected([rejected]);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Holds the save open so the progress copy can be asserted.
+class _SlowProfileService implements ProfileService {
+  final Completer<ProfileData> completer = Completer<ProfileData>();
+
+  @override
+  Future<ProfileData> updateProfile(
+    ProfileData updatedProfile, {
+    List<String?>? newPhotoLocalPaths,
+    Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
+  }) {
+    onClassifyingSkill?.call('Weaving Sleeping Mat');
+    return completer.future;
   }
 
   @override
@@ -177,6 +199,29 @@ void main() {
 
     expect(find.text('Skill not added'), findsNothing);
     expect(find.text('everyday_skills'), findsNothing);
+  });
+
+  testWidgets('save overlay says when a new skill is being added', (
+    tester,
+  ) async {
+    final service = _SlowProfileService();
+    await pumpEdit(tester, service: service);
+
+    await tester.enterText(find.byType(TextField).first, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+
+    expect(find.textContaining('Weaving Sleeping Mat'), findsOneWidget);
+    expect(find.textContaining('30 seconds'), findsOneWidget);
+    expect(find.text('Saving profile…'), findsNothing);
+
+    // Fail the save so the page stays mounted and the state is cleaned up.
+    service.completer.completeError(Exception('network down'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
   });
 
   testWidgets('role change preview keeps hidden skill counts', (tester) async {

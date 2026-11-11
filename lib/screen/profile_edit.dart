@@ -41,6 +41,7 @@ class ProfileEditPage extends StatefulWidget {
 class _ProfileEditPageState extends State<ProfileEditPage> {
   late final ProfileService _profileService;
   bool _isSaving = false;
+  String? _saveStatus;
   bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
@@ -659,13 +660,24 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       changedTeachingNotes: Set<String>.from(_changedTeachingNotes),
     );
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _saveStatus = null;
+    });
 
     try {
       final savedProfile = await _profileService.updateProfile(
         updated,
         newPhotoLocalPaths: _photos,
         teachingSkillImages: teachingSkillImages,
+        onClassifyingSkill: (skillName) {
+          if (!mounted) return;
+          setState(() {
+            _saveStatus =
+                'Adding “$skillName” to PalTuro…\n'
+                'This can take up to 30 seconds.';
+          });
+        },
       );
       if (mounted) {
         Haptics.success();
@@ -680,7 +692,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         _dropRejectedSkills(e);
         // Rejected skills never reach the database, so the form must stop
         // showing them and explain why the save did not go through.
-        setState(() => _isSaving = false);
+        setState(() {
+          _isSaving = false;
+          _saveStatus = null;
+        });
         await _showSkillRejectedDialog(e.message);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -690,7 +705,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveStatus = null;
+        });
+      }
     }
   }
 
@@ -1088,6 +1108,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       horizontal: 28,
                       vertical: 24,
                     ),
+                    constraints: const BoxConstraints(maxWidth: 300),
                     decoration: BoxDecoration(
                       color: lightColor,
                       borderRadius: BorderRadius.circular(20),
@@ -1109,11 +1130,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           strokeWidth: 3.5,
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          'Saving profile...',
-                          style: AppTextStyles.boldText.copyWith(
-                            color: textTheme,
-                            fontSize: 15,
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _saveStatus ?? 'Saving profile…',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textTheme,
+                              fontSize: 15,
+                              height: 1.35,
+                            ),
                           ),
                         ),
                       ],

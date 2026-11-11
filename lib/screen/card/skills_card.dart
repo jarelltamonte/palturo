@@ -749,18 +749,31 @@ class _SkillRowState extends State<_SkillRow> {
   void _onFocusChanged() {
     if (!_focusNode.hasFocus) return;
     widget.onActivate();
+    // Do not surface a default list of skills: an empty field shows the
+    // "Choose a skill" placeholder until the user actually types.
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      if (_suggestions.isNotEmpty) {
+        setState(() => _suggestions = const []);
+      }
+      return;
+    }
     if (_suggestions.isEmpty) {
-      _search(_searchController.text);
+      _search(query);
     }
   }
 
   void _onQueryChanged(String query) {
-    setState(() {});
     _debounce?.cancel();
     if (query.trim().isEmpty) {
-      _search('');
+      _requestId++;
+      setState(() {
+        _suggestions = const [];
+        _loading = false;
+      });
       return;
     }
+    setState(() {});
     _debounce = Timer(const Duration(milliseconds: 250), () => _search(query));
   }
 
@@ -771,6 +784,16 @@ class _SkillRowState extends State<_SkillRow> {
   }
 
   Future<void> _search(String query) async {
+    if (query.trim().isEmpty) {
+      _requestId++;
+      if (mounted) {
+        setState(() {
+          _suggestions = const [];
+          _loading = false;
+        });
+      }
+      return;
+    }
     final requestId = ++_requestId;
     if (mounted) setState(() => _loading = true);
 
@@ -927,7 +950,7 @@ class _SkillRowState extends State<_SkillRow> {
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
-          hintText: 'Search a skill to ${widget.labelSuffix.toLowerCase()}',
+          hintText: 'Choose a skill',
           hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
           counterText: '',
           prefixIcon: Icon(Icons.search, size: 20, color: dim),

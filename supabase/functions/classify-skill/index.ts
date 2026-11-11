@@ -26,11 +26,12 @@ const json = (body: unknown, status = 200) =>
 
 const normalize = (s: string) =>
   (s ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9_ ]/g, "")
-    .replace(/ +/g, "_")
+    // Keep letters from any script so Filipino/Tagalog names survive.
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
     .replace(/^_+|_+$/g, "");
 
 Deno.serve(async (req) => {
@@ -118,9 +119,25 @@ Deno.serve(async (req) => {
     const groups = nodes.filter((n) => n.depth === 2);
     const leaves = nodes.filter((n) => n.is_leaf && n.status === "approved");
 
+    // Semantic matching should see every real skill, including ones hidden
+    // from the picker and pending submissions from other users, so a Filipino
+    // name and its English equivalent land on the same node instead of
+    // creating duplicates.
+    const semanticByKey = new Map<string, (typeof nodes)[number]>();
+    for (const n of nodes) {
+      if (!n.is_leaf) continue;
+      if (n.status !== "approved" && n.status !== "pending") continue;
+      const key = normalize(n.name);
+      if (!key) continue;
+      const current = semanticByKey.get(key);
+      if (!current || (current.status !== "approved" && n.status === "approved")) {
+        semanticByKey.set(key, n);
+      }
+    }
+
     // ---------- Stage 1 fast path: exact match ----------
     const normalized = normalize(name);
-    const exact = leaves.find((n) => normalize(n.name) === normalized);
+    const exact = semanticByKey.get(normalized) ?? null;
     let skillDecision: {
       status: "attached" | "pending" | "queued" | "rejected" | "error";
       node: Record<string, unknown> | null;
@@ -139,9 +156,18 @@ Deno.serve(async (req) => {
       const state1 =
         `== SKILL RELEVANCY & SAFETY GUIDELINES ==\n${guidelines}\n\n` +
         `== TAXONOMY ==\n` +
-        nodes.filter((n) => n.is_visible).map((n) => `${"  ".repeat(n.depth - 1)}- ${n.name}${n.is_leaf ? " (skill)" : ""}`).join("\n") +
+        nodes
+          .filter((n) => n.is_visible || n.is_leaf)
+          .map(
+            (n) =>
+              `${"  ".repeat(n.depth - 1)}- ${n.name}${
+                n.is_leaf ? (n.status === "pending" ? " (skill, pending)" : " (skill)") : ""
+              }`,
+          )
+          .join("\n") +
         `\n\n== SUBMISSION ==\nSkill name: "${name}"\nIntent: the user wants to ${kind === "teach" ? "TEACH" : "LEARN"} this skill.\n\n` +
-        `Decide how to handle this submission. If a taxonomy skill already covers its meaning, prefer attach_existing and pick the fitting group. ` +
+        `Decide how to handle this submission. Match by MEANING, not spelling: the submission may be in Filipino/Tagalog or English, or use a synonym for a taxonomy skill. ` +
+        `If a taxonomy skill already covers its meaning, prefer attach_existing and pick both the fitting group and the exact taxonomy_skill. ` +
         `If it is a genuinely new teachable/learnable skill, choose create_new and pick the most specific visible group. ` +
         `Judge ONLY the skill name. There is no user note in this evaluation by design.`;
 
@@ -165,6 +191,21 @@ Deno.serve(async (req) => {
           type: "choice",
           instructions: "Which visible group within the taxonomy fits this skill best?",
           criteria: Object.fromEntries(groups.map((g) => [normalize(g.name), g.name])),
+        },
+        taxonomy_skill: {
+          type: "choice",
+          instructions:
+            "Which existing skill in the taxonomy means the same as this submission? Match across languages (Filipino/Tagalog or English) and synonyms. " +
+            "Choose none when no existing skill has the same meaning.",
+          criteria: {
+            ...Object.fromEntries(
+              [...semanticByKey.entries()].map(([key, n]) => [
+                key,
+                n.status === "pending" ? `${n.name} (pending)` : (n.name as string),
+              ]),
+            ),
+            none: "No existing skill has the same meaning",
+          },
         },
         is_skill: { type: "noul", instructions: "Is this a plausible teachable/learnable practical or cultural skill?" },
         is_safe: { type: "noul", instructions: "Is this submission free of unsafe, illegal, or inappropriate content per the safety guidelines?" },
@@ -198,39 +239,76 @@ Deno.serve(async (req) => {
       const groupNode = groups.find((g) => normalize(g.name) === a1.subgroup?.choice);
       const rootChoice = a1.root_category?.choice as string | undefined;
 
+      const semanticKey =
+        (a1.taxonomy_skill?.choice as string | undefined) ?? "";
+      const semanticConf = Number(a1.taxonomy_skill?.confidence ?? 0);
+      const semanticLeaf =
+        semanticKey && semanticKey !== "none"
+          ? semanticByKey.get(semanticKey) ?? null
+          : null;
+      const semanticMatch =
+        semanticLeaf !== null && semanticConf >= confThreshold ? semanticLeaf : null;
+
       if (actionChoice === "attach_existing") {
-        // token-overlap match among approved leaves under the suggested subtree
-        const subtree = groupNode
-          ? leaves.filter((n) => String(n.path).startsWith(`${groupNode.path}.`))
-          : leaves;
-        const toks = new Set(normalized.split("_").filter((t) => t.length > 2));
-        const best = subtree
-          .map((n) => ({
-            n,
-            overlap: normalize(n.name).split("_").filter((t) => toks.has(t)).length,
-          }))
-          .sort((a, b) => b.overlap - a.overlap)[0];
-        if (best && best.overlap > 0 && (actionConf ?? 0) >= confThreshold) {
-          const placed = await placeSkill(admin, user.id, best.n.id, kind, null);
+        if (semanticMatch) {
+          const placed = await placeSkill(admin, user.id, semanticMatch.id, kind, null);
           if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-          skillDecision = { status: "attached", node: pick(best.n), action: "attach_existing", confidence: actionConf, placementId: placed.id };
+          skillDecision = { status: "attached", node: pick(semanticMatch), action: "attach_existing", confidence: semanticConf, placementId: placed.id };
         } else {
-          skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+          // Fallback: lexical overlap among approved leaves in the suggested subtree.
+          const subtree = groupNode
+            ? leaves.filter((n) => String(n.path).startsWith(`${groupNode.path}.`))
+            : leaves;
+          const toks = new Set(normalized.split("_").filter((t) => t.length > 2));
+          const best = subtree
+            .map((n) => ({
+              n,
+              overlap: normalize(n.name).split("_").filter((t) => toks.has(t)).length,
+            }))
+            .sort((a, b) => b.overlap - a.overlap)[0];
+          if (best && best.overlap > 0 && (actionConf ?? 0) >= confThreshold) {
+            const placed = await placeSkill(admin, user.id, best.n.id, kind, null);
+            if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+            skillDecision = { status: "attached", node: pick(best.n), action: "attach_existing", confidence: actionConf, placementId: placed.id };
+          } else if (groupNode) {
+            // The model was confident the submission fits this group but could
+            // not name an equivalent skill: register it as a pending skill
+            // instead of silently dropping it as unresolved.
+            const { data: newNode, error: nodeErr } = await admin
+              .from("skill_nodes")
+              .insert({ name, parent_id: groupNode.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
+              .select("id,name,path,status")
+              .single();
+            if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
+            const placed = await placeSkill(admin, user.id, (newNode as any).id, kind, null);
+            if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+            skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+          } else {
+            skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+          }
         }
       } else if (actionChoice === "create_new") {
-        const parent = groupNode ?? roots.find((r) => r.name === rootChoice);
-        if (!parent) {
-          skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
-        } else {
-          const { data: newNode, error: nodeErr } = await admin
-            .from("skill_nodes")
-            .insert({ name, parent_id: parent.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
-            .select("id,name,path,status")
-            .single();
-          if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
-          const placed = await placeSkill(admin, user.id, (newNode as any).id, kind, null);
+        if (semanticMatch) {
+          // Same meaning already exists (often a Filipino/English variant):
+          // reuse that node instead of creating a duplicate.
+          const placed = await placeSkill(admin, user.id, semanticMatch.id, kind, null);
           if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-          skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+          skillDecision = { status: "attached", node: pick(semanticMatch), action: "attach_existing", confidence: semanticConf, placementId: placed.id };
+        } else {
+          const parent = groupNode ?? roots.find((r) => r.name === rootChoice);
+          if (!parent) {
+            skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+          } else {
+            const { data: newNode, error: nodeErr } = await admin
+              .from("skill_nodes")
+              .insert({ name, parent_id: parent.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
+              .select("id,name,path,status")
+              .single();
+            if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
+            const placed = await placeSkill(admin, user.id, (newNode as any).id, kind, null);
+            if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+            skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+          }
         }
       } else {
         skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };

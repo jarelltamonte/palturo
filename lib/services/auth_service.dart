@@ -3,6 +3,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
+  /// Public origin used in Supabase auth email links.
+  ///
+  /// Auth emails always point at the static auth page so the link is an HTTPS
+  /// URL on the owned domain, not an unverified `palturo://` custom scheme.
+  String _authRedirect(String webPath) {
+    const configured = String.fromEnvironment('APP_PUBLIC_URL');
+    final origin = configured.isEmpty ? 'https://palturo.app' : configured;
+    final base = origin.endsWith('/') ? origin : '$origin/';
+    return '$base$webPath';
+  }
+
   //login
   Future<AuthResponse> login(String email, String password) async {
     if (email.trim().isEmpty || password.trim().isEmpty) {
@@ -73,7 +84,7 @@ class AuthService {
         email: cleanEmail,
         password: cleanPassword,
         data: {'first_name': cleanFirstName, 'last_name': cleanLastName},
-        emailRedirectTo: 'palturo://auth/callback',
+        emailRedirectTo: _authRedirect('confirm'),
       );
 
       if (response.user != null &&
@@ -141,7 +152,7 @@ class AuthService {
     try {
       await _supabase.auth.resetPasswordForEmail(
         cleanEmail,
-        redirectTo: 'palturo://auth/reset-callback',
+        redirectTo: _authRedirect('reset'),
       );
     } on AuthException catch (e) {
       if (e.code == 'over_email_send_rate_limit') {

@@ -12,6 +12,52 @@ import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
 import '../screen/utils/schedule_format.dart';
 import '../utils/media_url.dart';
+import 'match_api.dart';
+
+/// A custom skill the Jev classifier refused to attach to the taxonomy.
+class RejectedSkill {
+  /// The editor row id, so the form can drop exactly this entry.
+  final String skillId;
+  final String name;
+
+  /// `learn` or `teach`.
+  final String kind;
+
+  const RejectedSkill({
+    required this.skillId,
+    required this.name,
+    required this.kind,
+  });
+}
+
+/// Raised when the Jev skill classifier rejects one or more custom skills.
+/// Nothing has been written when this is thrown, so the caller can drop the
+/// rejected entries and let the user retry.
+class SkillModerationException implements Exception {
+  final String message;
+  final List<RejectedSkill> skills;
+
+  const SkillModerationException(this.message, {this.skills = const []});
+
+  factory SkillModerationException.rejected(List<RejectedSkill> skills) {
+    final names = skills.map((skill) => '"${skill.name}"').toList();
+    final subject =
+        names.length == 1
+            ? names.first
+            : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+    return SkillModerationException(
+      names.length == 1
+          ? '$subject isn’t a skill PalTuro can add. Try naming a specific, '
+                'teachable skill instead.'
+          : '$subject aren’t skills PalTuro can add. Try naming specific, '
+                'teachable skills instead.',
+      skills: List.unmodifiable(skills),
+    );
+  }
+
+  @override
+  String toString() => message;
+}
 
 bool isProfileComplete({
   required String? avatarUrl,
@@ -442,6 +488,34 @@ class ProfileService {
     );
   }
 
+  Future<String?> _classifyCustomSkill(
+    String name,
+    String kind, {
+    String skillId = '',
+  }) async {
+    try {
+      final verdict = await MatchApi.classifySkill(name: name, kind: kind);
+      final status = verdict?['status']?.toString();
+      final node = verdict?['node'];
+      if ((status == 'attached' || status == 'pending') &&
+          node is Map &&
+          node['name'] is String) {
+        return node['name'] as String;
+      }
+      if (status == 'rejected') {
+        throw SkillModerationException.rejected([
+          RejectedSkill(skillId: skillId, name: name, kind: kind),
+        ]);
+      }
+      return null;
+    } catch (e) {
+      if (e is SkillModerationException) rethrow;
+      // The classifier may be unavailable; keep the existing custom-skill
+      // fallback rather than losing the user's work.
+      return null;
+    }
+  }
+
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
     List<String?>? newPhotoLocalPaths,
@@ -453,6 +527,7 @@ class ProfileService {
     }
 
     final Set<String> allCategorySlugs = {};
+    final List<RejectedSkill> rejectedSkills = [];
 
     final List<String> resolvedLearning = [];
     final List<Map<String, String>> learningPayload = [];
@@ -460,7 +535,18 @@ class ProfileService {
       String? resolved;
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
-        resolved = _toTitleCase(custom.text);
+        try {
+          resolved =
+              await _classifyCustomSkill(
+                custom.text,
+                'learn',
+                skillId: skill,
+              ) ??
+              _toTitleCase(custom.text);
+        } on SkillModerationException catch (e) {
+          rejectedSkills.addAll(e.skills);
+          continue;
+        }
         if (custom.categoryId.isNotEmpty) {
           allCategorySlugs.add(custom.categoryId);
         }
@@ -491,7 +577,18 @@ class ProfileService {
       String? formatted;
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
-        formatted = _toTitleCase(custom.text);
+        try {
+          formatted =
+              await _classifyCustomSkill(
+                custom.text,
+                'teach',
+                skillId: skill,
+              ) ??
+              _toTitleCase(custom.text);
+        } on SkillModerationException catch (e) {
+          rejectedSkills.addAll(e.skills);
+          continue;
+        }
         skillIdToResolvedName[skill] = formatted;
         skillIdToResolvedName[custom.text] = formatted;
         if (custom.categoryId.isNotEmpty) {
@@ -515,6 +612,12 @@ class ProfileService {
           if (changed) '_changed': '1',
         });
       }
+    }
+
+    // Nothing has been uploaded or written yet: fail before any side effect so
+    // the editor can drop the rejected rows and let the user retry.
+    if (rejectedSkills.isNotEmpty) {
+      throw SkillModerationException.rejected(rejectedSkills);
     }
 
     final predefinedCategories = resolveCategoriesForSkills([

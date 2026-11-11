@@ -8,6 +8,9 @@ additional_redirect_urls = ["http://localhost:5317", "http://localhost:5317/**",
 [auth.email]
 enable_confirmations = true
 
+[functions.classify-skill]
+verify_jwt = true
+
 [functions.moderate-notes]
 verify_jwt = false
 

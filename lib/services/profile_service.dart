@@ -66,13 +66,15 @@ bool isProfileComplete({
   required List<String> languages,
   required List<String> learningStyles,
   required bool hasRoleSkills,
+  bool hasShowcase = true,
 }) {
   return avatarUrl != null &&
       avatarUrl.trim().isNotEmpty &&
       bio.trim().isNotEmpty &&
       languages.isNotEmpty &&
       learningStyles.isNotEmpty &&
-      hasRoleSkills;
+      hasRoleSkills &&
+      hasShowcase;
 }
 
 class NameChangeStatus {
@@ -297,7 +299,7 @@ class ProfileService {
       existingProfile =
           await _supabase
               .from('profiles')
-              .select('avatar_url, bio')
+              .select('avatar_url, bio, teaching_skill_images')
               .eq('id', user.id)
               .maybeSingle();
     } catch (_) {
@@ -311,6 +313,13 @@ class ProfileService {
       _ => resolvedLearning.isNotEmpty,
     };
 
+    final existingShowcase = existingProfile?['teaching_skill_images'];
+    final hasExistingShowcase =
+        existingShowcase is Map &&
+        existingShowcase.values.any(
+          (value) => value is String && value.trim().isNotEmpty,
+        );
+
     final isComplete =
         !hasUnresolvedOthers &&
         isProfileComplete(
@@ -319,6 +328,11 @@ class ProfileService {
           languages: controller.languages.toList(),
           learningStyles: controller.learningStyles.toList(),
           hasRoleSkills: hasRoleSkills,
+          hasShowcase:
+              !(controller.role == OnboardingRole.teach ||
+                  (controller.role == OnboardingRole.both &&
+                      resolvedTeaching.isNotEmpty)) ||
+              hasExistingShowcase,
         );
 
     await _saveUserSkills(
@@ -799,6 +813,11 @@ class ProfileService {
       languages: updatedProfile.languages,
       learningStyles: updatedProfile.interests,
       hasRoleSkills: hasSkillsForRole,
+      hasShowcase:
+          !(updatedProfile.role == OnboardingRole.teach ||
+              (updatedProfile.role == OnboardingRole.both &&
+                  resolvedTeaching.isNotEmpty)) ||
+          safeSkillImages.isNotEmpty,
     );
 
     // The RPC owns the skill arrays. Run it first so the arrays and

@@ -404,7 +404,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (result != null) onSaved(result);
   }
 
-  Future<void> _showIncompleteSkillDialog(String message) async {
+  Future<void> _showIncompleteSkillDialog(
+    String message, {
+    String title = 'Skill Incomplete',
+  }) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
     await showDialog<void>(
@@ -423,11 +426,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   size: 26,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  'Skill Incomplete',
-                  style: AppTextStyles.boldText.copyWith(
-                    color: textTheme,
-                    fontSize: 18,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
               ],
@@ -636,6 +641,24 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       if (custom != null && !custom.isValid) {
         await _showIncompleteSkillDialog(
           'Please enter a skill name and select a category.',
+        );
+        return;
+      }
+    }
+
+    final teaches =
+        _role == OnboardingRole.teach ||
+        (_role == OnboardingRole.both && teachingSkills.isNotEmpty);
+    if (teaches) {
+      final hasShowcase = teachingSkills.any((id) {
+        final value =
+            teachingSkillImages[id] ?? _pendingTeachingImages[id] ?? '';
+        return value.trim().isNotEmpty;
+      });
+      if (!hasShowcase) {
+        await _showIncompleteSkillDialog(
+          'Add at least one showcase image to a teaching skill before saving.',
+          title: 'Showcase Required',
         );
         return;
       }

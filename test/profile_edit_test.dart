@@ -70,12 +70,17 @@ void main() {
     role: OnboardingRole.both,
     learningSkillIds: const ['other:Learning skill:arts_design'],
     teachingSkillIds: const ['other:Teaching skill:everyday_skills'],
+    teachingSkillImages: const {
+      'other:Teaching skill:everyday_skills':
+          'https://example.test/showcase.png',
+    },
   );
 
   Future<void> pumpEdit(
     WidgetTester tester, {
     ThemeData? theme,
     ProfileService? service,
+    ProfileData? data,
   }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -84,7 +89,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: theme ?? lightMode,
-        home: ProfileEditPage(profile: profile(), profileService: service),
+        home: ProfileEditPage(
+          profile: data ?? profile(),
+          profileService: service,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -222,6 +230,29 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
+  });
+
+  testWidgets('teaching profile requires a showcase before saving', (
+    tester,
+  ) async {
+    final service = _SlowProfileService();
+    await pumpEdit(
+      tester,
+      service: service,
+      data: profile().copyWith(teachingSkillImages: const {}),
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Showcase Required'), findsOneWidget);
+    expect(service.completer.isCompleted, isFalse);
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Showcase Required'), findsNothing);
   });
 
   testWidgets('role change preview keeps hidden skill counts', (tester) async {

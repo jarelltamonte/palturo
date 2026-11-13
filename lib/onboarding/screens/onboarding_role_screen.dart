@@ -44,10 +44,7 @@ class OnboardingRoleScreen extends StatelessWidget {
         return OnboardingScaffold(
           title: 'What describes\nyou best?',
           subtitle: 'Select one that applies',
-          stepLabel:
-              controller.role == OnboardingRole.both
-                  ? 'Step 1 of 5 – Role'
-                  : 'Step 1 of 4 – Role',
+          stepLabel:'',
           progress: controller.role == OnboardingRole.both ? 1 / 5 : 1 / 4,
           showBackButton: true,
           onBack: onBack,

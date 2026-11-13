@@ -69,6 +69,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
               backgroundColor: Colors.transparent,
               elevation: 0,
               scrolledUnderElevation: 0,
+              centerTitle: false,
               leading: IconButton(
                 tooltip: 'Back',
                 onPressed: _deleting ? null : () => Navigator.pop(context),

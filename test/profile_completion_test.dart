@@ -63,5 +63,16 @@ void main() {
       ),
       isFalse,
     );
+    expect(
+      isProfileComplete(
+        avatarUrl: 'https://example.test/avatar.jpg',
+        bio: 'Hello',
+        languages: const ['English'],
+        learningStyles: const ['Visual'],
+        hasRoleSkills: true,
+        hasShowcase: false,
+      ),
+      isFalse,
+    );
   });
 }

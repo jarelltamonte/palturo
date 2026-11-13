@@ -1,0 +1,6 @@
+# Copy this file to android/key.properties (gitignored) and fill the values
+# from your secret manager. Never commit the real file or the keystore.
+storePassword=REPLACE_WITH_SECRET
+keyPassword=REPLACE_WITH_SECRET
+keyAlias=palturo
+storeFile=../keystore/palturo-release.jks

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/services/match_api.dart';
-import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -36,9 +36,9 @@ class ExploreCategoryPage extends StatefulWidget {
 }
 
 class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
-  static const _roleKey = 'browse_mentor_mode';
+  static const double _navClearance = 88;
 
-  late bool _mentor = widget.mentor;
+  late final bool _mentor = widget.mentor;
   List<Map<String, dynamic>> _children = const [];
   List<Person> _people = const [];
   int _otherCount = 0;
@@ -47,8 +47,8 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   int _requestId = 0;
 
   String get _kind => _mentor ? 'learn' : 'teach';
-  String get _roleLabel => _mentor ? 'Mentor' : 'Learner';
-  String get _otherRoleLabel => _mentor ? 'mentors' : 'learners';
+
+  bool get _showCta => !_loading && _error == null && _people.isNotEmpty;
 
   @override
   void initState() {
@@ -112,15 +112,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     }
   }
 
-  Future<void> _switchRole() async {
-    final next = !_mentor;
-    await PreferencesService.instance.setBool(_roleKey, next);
-    if (!mounted) return;
-    setState(() => _mentor = next);
-    widget.onRoleChanged?.call(next);
-    _load();
-  }
-
   void _openChild(Map<String, dynamic> node) {
     final path = (node['path'] ?? '').toString();
     final label = (node['name'] ?? '').toString();
@@ -134,12 +125,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               nodeLabel: label,
               description: 'Explore $label in the PalTuro community.',
               mentor: _mentor,
-              onRoleChanged: (mentor) {
-                if (!mounted) return;
-                setState(() => _mentor = mentor);
-                _load();
-                widget.onRoleChanged?.call(mentor);
-              },
+              onRoleChanged: widget.onRoleChanged,
             ),
       ),
     );
@@ -164,10 +150,11 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final surface = Theme.of(context).colorScheme.surface;
     final adaptiveHeight = AppSpacing.topBarHeight();
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: surface,
       appBar: AppBar(
         toolbarHeight: adaptiveHeight,
         backgroundColor: Colors.transparent,
@@ -219,46 +206,47 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                 ? const _CategorySkeleton()
                 : _error != null
                 ? _buildError(textTheme)
-                : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                : Stack(
                   children: [
-                    _buildHeader(textTheme),
-                    if (_children.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      Text(
-                        'Skills in this category',
-                        style: AppTextStyles.boldText.copyWith(
-                          color: textTheme,
-                          fontSize: 14,
-                        ),
+                    ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        8,
+                        16,
+                        _showCta ? _navClearance + 88 : 120,
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final child in _children)
-                            _SkillChip(
-                              label: (child['name'] ?? '').toString(),
-                              onTap: () => _openChild(child),
+                      children: [
+                        _buildHeader(textTheme),
+                        if (_children.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            'Skills in this category',
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textTheme,
+                              fontSize: 14,
                             ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    if (_people.isEmpty)
-                      _buildEmpty(textTheme)
-                    else
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton.icon(
-                          onPressed: _startBrowsing,
-                          icon: const Icon(Icons.style_outlined),
-                          label: Text(
-                            'Start browsing ${_mentor ? 'learners' : 'mentors'}',
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final child in _children)
+                                _SkillChip(
+                                  label: (child['name'] ?? '').toString(),
+                                  onTap: () => _openChild(child),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (_showCta)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: _buildBottomCta(surface),
                       ),
                   ],
                 ),
@@ -266,102 +254,168 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     );
   }
 
-  Widget _buildHeader(Color textTheme) {
+  Widget _buildBottomCta(Color surface) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 14),
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, _navClearance),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [surface.withValues(alpha: 0), surface],
+          stops: const [0, 0.45],
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: ElevatedButton.icon(
+          onPressed: _startBrowsing,
+          icon: const Icon(Icons.style_outlined),
+          label: Text('Start browsing ${_mentor ? 'learners' : 'mentors'}'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRolePill() {
+    final roleName = _mentor ? 'Mentor' : 'Learner';
+    final svgAsset =
+        _mentor ? 'assets/icons/rmentor.svg' : 'assets/icons/rlearner.svg';
+
+    return Semantics(
+      label: 'Browsing as $roleName',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.mutedSurface(context),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              svgAsset,
+              width: 16,
+              height: 16,
+              colorFilter: ColorFilter.mode(
+                AppColors.accentText(context),
+                BlendMode.srcIn,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Browsing as $roleName',
+              style: AppTextStyles.boldText.copyWith(
+                color: Theme.of(context).colorScheme.secondary,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(Color textTheme) {
+    final noun = _mentor ? 'learner' : 'mentor';
+    final otherNoun = _mentor ? 'mentor' : 'learner';
+    final count = _people.length;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.elevatedSurface(context),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.description,
-                  style: AppTextStyles.regularText.copyWith(
-                    color: textTheme.withValues(alpha: 0.76),
-                    fontSize: 13,
-                    height: 1.4,
+          _buildRolePill(),
+          const SizedBox(height: 18),
+          Text(
+            widget.description,
+            style: AppTextStyles.regularText.copyWith(
+              color: textTheme.withValues(alpha: 0.76),
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (_people.isEmpty)
+            _buildEmpty(textTheme)
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  _countLabel(count),
+                  style: AppTextStyles.headingText.copyWith(
+                    color: AppColors.accentText(context),
+                    fontSize: 44,
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: AppSpacing.iconTarget,
-                child: TextButton(
-                  onPressed: _switchRole,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, AppSpacing.iconTarget),
-                  ),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Text(
-                    'Switch to ${_mentor ? 'Learner' : 'Mentor'}',
+                    '$noun${count == 1 ? '' : 's'} available',
                     style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.accentText(context),
-                      fontSize: 11,
+                      color: textTheme,
+                      fontSize: 16,
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _MetaPill(
-                icon:
-                    _mentor
-                        ? Icons.workspace_premium_outlined
-                        : Icons.menu_book_outlined,
-                label: '$_roleLabel view',
-              ),
-              _MetaPill(
-                icon: Icons.people_outline,
-                label:
-                    '${_countLabel(_people.length)} ${_mentor ? 'learners' : 'mentors'}',
-              ),
-              _MetaPill(
-                icon: Icons.swap_horiz,
-                label: '${_countLabel(_otherCount)} $_otherRoleLabel',
-              ),
-            ],
-          ),
+              ],
+            ),
+          if (_otherCount > 0) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.swap_horiz,
+                  size: 15,
+                  color: AppColors.mutedText(context),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${_countLabel(_otherCount)} fellow $otherNoun${_otherCount == 1 ? '' : 's'} here',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildEmpty(Color textTheme) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.mutedSurface(context),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border(context)),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.groups_outlined,
-            size: 30,
-            color: textTheme.withValues(alpha: 0.35),
-          ),
-          const SizedBox(height: 8),
-          Text(
+    return Row(
+      children: [
+        Icon(
+          Icons.groups_outlined,
+          size: 26,
+          color: textTheme.withValues(alpha: 0.35),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
             'No one is available in this category right now.',
-            textAlign: TextAlign.center,
             style: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.7),
-              fontSize: 13,
+              fontSize: 14,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -394,6 +448,8 @@ class _SkillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
     return Semantics(
       button: true,
       label: label,
@@ -403,53 +459,32 @@ class _SkillChip extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.45)),
+          padding: const EdgeInsets.fromLTRB(16, 0, 10, 0),
+          backgroundColor: Colors.transparent,
+          side: BorderSide(color: AppColors.border(context)),
           shape: const StadiumBorder(),
           elevation: 0,
         ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: AppTextStyles.regularText.copyWith(
-            color: AppColors.accentText(context),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MetaPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _MetaPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.mutedSurface(context),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppColors.mutedText(context)),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.mutedText(context),
-              fontSize: 10,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 2),
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: AppColors.mutedText(context),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -466,31 +501,25 @@ class _CategorySkeleton extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
           Container(
-            height: 142,
-            padding: const EdgeInsets.all(16),
+            height: 200,
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: AppColors.elevatedSurface(context),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(28),
               border: Border.all(color: AppColors.border(context)),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                SkeletonBox(width: 140, height: 28, radius: 14),
+                SizedBox(height: 18),
                 SkeletonBox(width: 220, height: 14),
-                SizedBox(height: 10),
-                SkeletonBox(width: 160, height: 12),
                 Spacer(),
-                Row(
-                  children: [
-                    SkeletonBox(width: 88, height: 28, radius: 14),
-                    SizedBox(width: 8),
-                    SkeletonBox(width: 96, height: 28, radius: 14),
-                  ],
-                ),
+                SkeletonBox(width: 170, height: 40),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           const SkeletonBox(width: 150, height: 14),
           const SizedBox(height: 10),
           const Wrap(
@@ -502,8 +531,6 @@ class _CategorySkeleton extends StatelessWidget {
               SkeletonBox(width: 90, height: 44, radius: 22),
             ],
           ),
-          const SizedBox(height: 16),
-          const SkeletonBox(height: 48, radius: 24),
         ],
       ),
     );

@@ -25,15 +25,23 @@ const kBioMaxLength = 100;
 class ProfileEditPage extends StatefulWidget {
   final ProfileData profile;
 
-  const ProfileEditPage({super.key, required this.profile});
+  /// Injectable for tests; production builds use the Supabase-backed service.
+  final ProfileService? profileService;
+
+  const ProfileEditPage({
+    super.key,
+    required this.profile,
+    this.profileService,
+  });
 
   @override
   State<ProfileEditPage> createState() => _ProfileEditPageState();
 }
 
 class _ProfileEditPageState extends State<ProfileEditPage> {
-  final ProfileService _profileService = ProfileService();
+  late final ProfileService _profileService;
   bool _isSaving = false;
+  String? _saveStatus;
   bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
@@ -75,6 +83,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       widget.profile.id.isNotEmpty,
       'ProfileEditPage requires a profile loaded from the server',
     );
+    _profileService = widget.profileService ?? ProfileService();
     _bioController = TextEditingController(text: widget.profile.bio);
     _availability = _parseAvailability(widget.profile);
     _languages = List.from(widget.profile.languages);
@@ -395,7 +404,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (result != null) onSaved(result);
   }
 
-  Future<void> _showIncompleteSkillDialog(String message) async {
+  Future<void> _showIncompleteSkillDialog(
+    String message, {
+    String title = 'Skill Incomplete',
+  }) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
     await showDialog<void>(
@@ -414,11 +426,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   size: 26,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  'Skill Incomplete',
-                  style: AppTextStyles.boldText.copyWith(
-                    color: textTheme,
-                    fontSize: 18,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
               ],
@@ -514,6 +528,88 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  /// Drops skills the classifier rejected so they cannot be saved later. A
+  /// fresh list/map instance is required: `SkillsCard` only reloads when the
+  /// `initialSkillIds` reference changes.
+  void _dropRejectedSkills(SkillModerationException error) {
+    if (error.skills.isEmpty) return;
+    final learning = List<String>.from(_learningSkillIds);
+    final teaching = List<String>.from(_teachingSkillIds);
+    final teachingImages = Map<String, String>.from(_teachingSkillImages);
+    for (final rejected in error.skills) {
+      final id = rejected.skillId;
+      if (id.isEmpty) continue;
+      if (rejected.kind == 'learn') {
+        learning.remove(id);
+        _learningNotes.remove(id);
+        _changedLearningNotes.remove(id);
+      } else {
+        teaching.remove(id);
+        _teachingNotes.remove(id);
+        _changedTeachingNotes.remove(id);
+        teachingImages.remove(id);
+        _pendingTeachingImages.remove(id);
+      }
+    }
+    setState(() {
+      _learningSkillIds = learning;
+      _teachingSkillIds = teaching;
+      _teachingSkillImages = teachingImages;
+    });
+  }
+
+  Future<void> _showSkillRejectedDialog(String message) async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(context),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.block_outlined,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Skill not added',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              message,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.accentText(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
   Future<void> _save() async {
     if (widget.profile.id.isEmpty) {
       if (_showingProfileError) return;
@@ -550,6 +646,24 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
+    final teaches =
+        _role == OnboardingRole.teach ||
+        (_role == OnboardingRole.both && teachingSkills.isNotEmpty);
+    if (teaches) {
+      final hasShowcase = teachingSkills.any((id) {
+        final value =
+            teachingSkillImages[id] ?? _pendingTeachingImages[id] ?? '';
+        return value.trim().isNotEmpty;
+      });
+      if (!hasShowcase) {
+        await _showIncompleteSkillDialog(
+          'Add at least one showcase image to a teaching skill before saving.',
+          title: 'Showcase Required',
+        );
+        return;
+      }
+    }
+
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
 
@@ -569,13 +683,24 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       changedTeachingNotes: Set<String>.from(_changedTeachingNotes),
     );
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _saveStatus = null;
+    });
 
     try {
       final savedProfile = await _profileService.updateProfile(
         updated,
         newPhotoLocalPaths: _photos,
         teachingSkillImages: teachingSkillImages,
+        onClassifyingSkill: (skillName) {
+          if (!mounted) return;
+          setState(() {
+            _saveStatus =
+                'Adding “$skillName” to PalTuro…\n'
+                'This can take up to 30 seconds.';
+          });
+        },
       );
       if (mounted) {
         Haptics.success();
@@ -585,7 +710,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     } catch (e) {
       Haptics.error();
       debugPrint('[ProfileEdit] save failed: $e');
-      if (mounted) {
+      if (!mounted) return;
+      if (e is SkillModerationException) {
+        _dropRejectedSkills(e);
+        // Rejected skills never reach the database, so the form must stop
+        // showing them and explain why the save did not go through.
+        setState(() {
+          _isSaving = false;
+          _saveStatus = null;
+        });
+        await _showSkillRejectedDialog(e.message);
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Couldn’t save your profile. Please try again.'),
@@ -593,7 +728,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveStatus = null;
+        });
+      }
     }
   }
 
@@ -991,6 +1131,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       horizontal: 28,
                       vertical: 24,
                     ),
+                    constraints: const BoxConstraints(maxWidth: 300),
                     decoration: BoxDecoration(
                       color: lightColor,
                       borderRadius: BorderRadius.circular(20),
@@ -1012,11 +1153,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           strokeWidth: 3.5,
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          'Saving profile...',
-                          style: AppTextStyles.boldText.copyWith(
-                            color: textTheme,
-                            fontSize: 15,
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _saveStatus ?? 'Saving profile…',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textTheme,
+                              fontSize: 15,
+                              height: 1.35,
+                            ),
                           ),
                         ),
                       ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -11,6 +12,53 @@ import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
 import '../screen/utils/schedule_format.dart';
+import '../utils/media_url.dart';
+import 'match_api.dart';
+
+/// A custom skill the Jev classifier refused to attach to the taxonomy.
+class RejectedSkill {
+  /// The editor row id, so the form can drop exactly this entry.
+  final String skillId;
+  final String name;
+
+  /// `learn` or `teach`.
+  final String kind;
+
+  const RejectedSkill({
+    required this.skillId,
+    required this.name,
+    required this.kind,
+  });
+}
+
+/// Raised when the Jev skill classifier rejects one or more custom skills.
+/// Nothing has been written when this is thrown, so the caller can drop the
+/// rejected entries and let the user retry.
+class SkillModerationException implements Exception {
+  final String message;
+  final List<RejectedSkill> skills;
+
+  const SkillModerationException(this.message, {this.skills = const []});
+
+  factory SkillModerationException.rejected(List<RejectedSkill> skills) {
+    final names = skills.map((skill) => '"${skill.name}"').toList();
+    final subject =
+        names.length == 1
+            ? names.first
+            : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+    return SkillModerationException(
+      names.length == 1
+          ? '$subject isn’t a skill PalTuro can add. Try naming a specific, '
+                'teachable skill instead.'
+          : '$subject aren’t skills PalTuro can add. Try naming specific, '
+                'teachable skills instead.',
+      skills: List.unmodifiable(skills),
+    );
+  }
+
+  @override
+  String toString() => message;
+}
 
 bool isProfileComplete({
   required String? avatarUrl,
@@ -18,13 +66,15 @@ bool isProfileComplete({
   required List<String> languages,
   required List<String> learningStyles,
   required bool hasRoleSkills,
+  bool hasShowcase = true,
 }) {
   return avatarUrl != null &&
       avatarUrl.trim().isNotEmpty &&
       bio.trim().isNotEmpty &&
       languages.isNotEmpty &&
       learningStyles.isNotEmpty &&
-      hasRoleSkills;
+      hasRoleSkills &&
+      hasShowcase;
 }
 
 class NameChangeStatus {
@@ -249,7 +299,7 @@ class ProfileService {
       existingProfile =
           await _supabase
               .from('profiles')
-              .select('avatar_url, bio')
+              .select('avatar_url, bio, teaching_skill_images')
               .eq('id', user.id)
               .maybeSingle();
     } catch (_) {
@@ -263,6 +313,13 @@ class ProfileService {
       _ => resolvedLearning.isNotEmpty,
     };
 
+    final existingShowcase = existingProfile?['teaching_skill_images'];
+    final hasExistingShowcase =
+        existingShowcase is Map &&
+        existingShowcase.values.any(
+          (value) => value is String && value.trim().isNotEmpty,
+        );
+
     final isComplete =
         !hasUnresolvedOthers &&
         isProfileComplete(
@@ -271,6 +328,11 @@ class ProfileService {
           languages: controller.languages.toList(),
           learningStyles: controller.learningStyles.toList(),
           hasRoleSkills: hasRoleSkills,
+          hasShowcase:
+              !(controller.role == OnboardingRole.teach ||
+                  (controller.role == OnboardingRole.both &&
+                      resolvedTeaching.isNotEmpty)) ||
+              hasExistingShowcase,
         );
 
     await _saveUserSkills(
@@ -441,10 +503,39 @@ class ProfileService {
     );
   }
 
+  Future<String?> _classifyCustomSkill(
+    String name,
+    String kind, {
+    String skillId = '',
+  }) async {
+    try {
+      final verdict = await MatchApi.classifySkill(name: name, kind: kind);
+      final status = verdict?['status']?.toString();
+      final node = verdict?['node'];
+      if ((status == 'attached' || status == 'pending') &&
+          node is Map &&
+          node['name'] is String) {
+        return node['name'] as String;
+      }
+      if (status == 'rejected') {
+        throw SkillModerationException.rejected([
+          RejectedSkill(skillId: skillId, name: name, kind: kind),
+        ]);
+      }
+      return null;
+    } catch (e) {
+      if (e is SkillModerationException) rethrow;
+      // The classifier may be unavailable; keep the existing custom-skill
+      // fallback rather than losing the user's work.
+      return null;
+    }
+  }
+
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
@@ -452,6 +543,7 @@ class ProfileService {
     }
 
     final Set<String> allCategorySlugs = {};
+    final List<RejectedSkill> rejectedSkills = [];
 
     final List<String> resolvedLearning = [];
     final List<Map<String, String>> learningPayload = [];
@@ -459,7 +551,19 @@ class ProfileService {
       String? resolved;
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
-        resolved = _toTitleCase(custom.text);
+        try {
+          onClassifyingSkill?.call(custom.text);
+          resolved =
+              await _classifyCustomSkill(
+                custom.text,
+                'learn',
+                skillId: skill,
+              ) ??
+              _toTitleCase(custom.text);
+        } on SkillModerationException catch (e) {
+          rejectedSkills.addAll(e.skills);
+          continue;
+        }
         if (custom.categoryId.isNotEmpty) {
           allCategorySlugs.add(custom.categoryId);
         }
@@ -490,7 +594,19 @@ class ProfileService {
       String? formatted;
       final custom = CustomSkill.tryParse(skill);
       if (custom != null && custom.isValid) {
-        formatted = _toTitleCase(custom.text);
+        try {
+          onClassifyingSkill?.call(custom.text);
+          formatted =
+              await _classifyCustomSkill(
+                custom.text,
+                'teach',
+                skillId: skill,
+              ) ??
+              _toTitleCase(custom.text);
+        } on SkillModerationException catch (e) {
+          rejectedSkills.addAll(e.skills);
+          continue;
+        }
         skillIdToResolvedName[skill] = formatted;
         skillIdToResolvedName[custom.text] = formatted;
         if (custom.categoryId.isNotEmpty) {
@@ -514,6 +630,12 @@ class ProfileService {
           if (changed) '_changed': '1',
         });
       }
+    }
+
+    // Nothing has been uploaded or written yet: fail before any side effect so
+    // the editor can drop the rejected rows and let the user retry.
+    if (rejectedSkills.isNotEmpty) {
+      throw SkillModerationException.rejected(rejectedSkills);
     }
 
     final predefinedCategories = resolveCategoriesForSkills([
@@ -661,8 +783,19 @@ class ProfileService {
           : updatedProfile.schedule,
     );
 
-    final primaryAvatar =
-        uploadedPhotoUrls.isNotEmpty ? uploadedPhotoUrls[0] : null;
+    final primaryAvatar = MediaUrl.sanitize(
+      uploadedPhotoUrls.isNotEmpty ? uploadedPhotoUrls[0] : null,
+    );
+    final safePhotos = uploadedPhotoUrls
+        .map(MediaUrl.sanitize)
+        .whereType<String>()
+        .toList();
+    final safeSkillImages = <String, String>{};
+    uploadedSkillImages.forEach((key, value) {
+      if (MediaUrl.isAllowedOrPath(value)) {
+        safeSkillImages[key] = value;
+      }
+    });
 
     final bool hasSkillsForRole;
     if (updatedProfile.role == OnboardingRole.teach) {
@@ -680,6 +813,11 @@ class ProfileService {
       languages: updatedProfile.languages,
       learningStyles: updatedProfile.interests,
       hasRoleSkills: hasSkillsForRole,
+      hasShowcase:
+          !(updatedProfile.role == OnboardingRole.teach ||
+              (updatedProfile.role == OnboardingRole.both &&
+                  resolvedTeaching.isNotEmpty)) ||
+          safeSkillImages.isNotEmpty,
     );
 
     // The RPC owns the skill arrays. Run it first so the arrays and
@@ -692,8 +830,8 @@ class ProfileService {
         .update({
           'bio': updatedProfile.bio,
           'avatar_url': primaryAvatar,
-          'photos': uploadedPhotoUrls.whereType<String>().toList(),
-          'teaching_skill_images': uploadedSkillImages,
+          'photos': safePhotos,
+          'teaching_skill_images': safeSkillImages,
           'role': updatedProfile.role?.dbValue ?? 'learner',
           'skill_categories': allCategorySlugs.toList(),
           'learning_styles': updatedProfile.interests,
@@ -706,7 +844,10 @@ class ProfileService {
 
     final refreshed = await getCurrentUserProfile();
 
-    await refreshEmbeddings();
+    // Re-vectorization is not part of the save contract: get-matches heals
+    // stale embeddings on the next read. Awaiting it here made edits feel
+    // stuck for tens of seconds after the profile had already been written.
+    unawaited(refreshEmbeddings());
 
     return refreshed ?? updatedProfile;
   }

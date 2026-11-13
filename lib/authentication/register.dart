@@ -230,7 +230,7 @@ class _RegisterPageState extends State<RegisterPage> {
         await _showAccountCreatedDialog(
           message:
               result.message ??
-              'If your account is ready, please log in to continue.',
+              'We sent a link to your email. Open it and click Confirm email to verify your account before logging in.',
         );
 
         if (!mounted) return;
@@ -254,7 +254,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _showAccountCreatedDialog({
-    String message = 'Successfully created account. You may now log in.',
+    String message = 'We sent a link to your email. Open it and click Confirm email to verify your account before logging in.',
   }) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
@@ -277,7 +277,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Next Step',
+                  'Check Your Email',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.boldText.copyWith(
                     color: textTheme,
@@ -299,7 +299,7 @@ class _RegisterPageState extends State<RegisterPage> {
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
                 child: Text(
-                  'Go to Log In',
+                  'Got It',
                   style: AppTextStyles.boldText.copyWith(
                     color: AppColors.accentText(context),
                   ),
@@ -395,6 +395,12 @@ class _RegisterPageState extends State<RegisterPage> {
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
         !_passwordResult.isValid;
+
+    final legalLinkStyle = AppTextStyles.boldText.copyWith(
+      color: textTheme,
+      fontSize: 12,
+      height: 1.5,
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -662,72 +668,88 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                           ),
                         ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'By signing up, you agree to our',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: textTheme.withAlpha((0.7 * 255).round()),
-                          fontSize: 12,
-                          height: 1.4,
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text.rich(
+                          textAlign: TextAlign.center,
+                          TextSpan(
+                            style: TextStyle(
+                              color: textTheme.withAlpha((0.7 * 255).round()),
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'By signing up, you agree to our ',
+                              ),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showTermsOfService(
+                                        context,
+                                      ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Terms of Service'),
+                                ),
+                              ),
+                              const TextSpan(text: ',\n'),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showDataPolicy(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Data Policy'),
+                                ),
+                              ),
+                              const TextSpan(text: ', and '),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showCookiesPolicy(
+                                        context,
+                                      ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Cookies Policy'),
+                                ),
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
+                          ),
                         ),
-                      ),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 2,
-                        children: [
-                          TextButton(
-                            onPressed:
-                                () => LegalDialogs.showTermsOfService(context),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                            ),
-                            child: Text(
-                              'Terms of Service',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed:
-                                () => LegalDialogs.showDataPolicy(context),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                            ),
-                            child: Text(
-                              'Data Policy',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed:
-                                () => LegalDialogs.showCookiesPolicy(context),
-                            style: TextButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                            ),
-                            child: Text(
-                              'Cookies Policy',
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),

@@ -49,6 +49,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android signing material must never be committed
+**/key.properties
+**/*.jks
+**/*.keystore
+
 # Supabase CLI machine-local state
 supabase/.temp/
 

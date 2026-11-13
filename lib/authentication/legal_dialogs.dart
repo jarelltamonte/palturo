@@ -100,6 +100,7 @@ PalTuro is primarily designed as a mobile application and does not rely on brows
           ),
           title: Text(
             title,
+            textAlign: TextAlign.center,
             style: AppTextStyles.regularText.copyWith(
               color: textColor,
               fontSize: 18,

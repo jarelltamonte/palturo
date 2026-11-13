@@ -261,7 +261,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final channel = Supabase.instance.client.channel(
       'chat:$connectionId',
-      opts: const RealtimeChannelConfig(self: true),
+      opts: const RealtimeChannelConfig(self: true, private: true),
     );
     channel.onPresenceSync((_) => _refreshPeerOnline(channel));
     channel.onBroadcast(event: 'typing', callback: _onTypingPayload);
@@ -567,7 +567,7 @@ class _ChatRoomState extends State<ChatRoom> {
     if (widget.connectionId == null) return;
     _messageStream = _client
         .from('messages')
-        .stream(primaryKey: ['id'])
+        .stream(primaryKey: ['id'], private: true)
         .eq('connection_id', widget.connectionId!)
         .listen((rows) {
           if (!mounted) return;
@@ -1263,7 +1263,11 @@ class _ChatRoomState extends State<ChatRoom> {
               ),
             ] else
               const Spacer(),
-            PopupMenuButton<String>(
+          ],
+        ),
+        actionsPadding: EdgeInsets.zero,
+        actions: [
+          PopupMenuButton<String>(
               tooltip: 'Chat options',
               padding: EdgeInsets.zero,
               shape: RoundedRectangleBorder(
@@ -1353,9 +1357,8 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       body: Column(
         children: [

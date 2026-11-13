@@ -34,8 +34,7 @@ the PKCE exchange without the original verifier.
 - Site URL: `https://palturo.app/`
 - Redirect URLs:
   `https://palturo.app/**`, `https://www.palturo.app/**`,
-  `http://localhost:5317/**`,
-  `palturo://auth/callback`, `palturo://auth/reset-callback`
+  `http://localhost:5317/**`
 
 **Authentication → Email Templates**
 
@@ -47,7 +46,7 @@ were replaced, so the app no longer depends on the GitHub Pages auth page.
 
 ## App configuration
 
-The app still sets `emailRedirectTo` to the auth page for compatibility:
+The app sets `emailRedirectTo` to the auth page for compatibility:
 
 ```
 https://palturo.app/reset
@@ -55,7 +54,9 @@ https://palturo.app/confirm
 ```
 
 `APP_PUBLIC_URL` defaults to `https://palturo.app` when it is not set, so a reset
-requested from localhost cannot produce a localhost email link.
+requested from localhost cannot produce a localhost email link. The app no
+longer consumes `token_hash` from `palturo://` links; the custom scheme is used
+only for the tokenless app-reopen hop after the browser flow completes.
 
 ## Email delivery
 

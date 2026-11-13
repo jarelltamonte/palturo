@@ -14,6 +14,7 @@ class SupportPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
+        centerTitle: false,
         leading: IconButton(
           tooltip: 'Back',
           onPressed: () => Navigator.pop(context),

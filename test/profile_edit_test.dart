@@ -1,12 +1,54 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
+import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Always rejects the given row, mirroring a `classify-skill` refusal.
+class _RejectingProfileService implements ProfileService {
+  const _RejectingProfileService(this.rejected);
+
+  final RejectedSkill rejected;
+
+  @override
+  Future<ProfileData> updateProfile(
+    ProfileData updatedProfile, {
+    List<String?>? newPhotoLocalPaths,
+    Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
+  }) async {
+    throw SkillModerationException.rejected([rejected]);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Holds the save open so the progress copy can be asserted.
+class _SlowProfileService implements ProfileService {
+  final Completer<ProfileData> completer = Completer<ProfileData>();
+
+  @override
+  Future<ProfileData> updateProfile(
+    ProfileData updatedProfile, {
+    List<String?>? newPhotoLocalPaths,
+    Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
+  }) {
+    onClassifyingSkill?.call('Weaving Sleeping Mat');
+    return completer.future;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   setUpAll(() async {
@@ -28,9 +70,18 @@ void main() {
     role: OnboardingRole.both,
     learningSkillIds: const ['other:Learning skill:arts_design'],
     teachingSkillIds: const ['other:Teaching skill:everyday_skills'],
+    teachingSkillImages: const {
+      'other:Teaching skill:everyday_skills':
+          'https://example.test/showcase.png',
+    },
   );
 
-  Future<void> pumpEdit(WidgetTester tester, {ThemeData? theme}) async {
+  Future<void> pumpEdit(
+    WidgetTester tester, {
+    ThemeData? theme,
+    ProfileService? service,
+    ProfileData? data,
+  }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -38,7 +89,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: theme ?? lightMode,
-        home: ProfileEditPage(profile: profile()),
+        home: ProfileEditPage(
+          profile: data ?? profile(),
+          profileService: service,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -119,6 +173,86 @@ void main() {
     expect(find.text('PROFILE PHOTOS'), findsOneWidget);
     expect(find.textContaining('Changing role hides skills'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('rejected skill is removed from the form with an error prompt', (
+    tester,
+  ) async {
+    const rejectedId = 'other:Teaching skill:everyday_skills';
+    await pumpEdit(
+      tester,
+      service: const _RejectingProfileService(
+        RejectedSkill(
+          skillId: rejectedId,
+          name: 'Thawing Ice',
+          kind: 'teach',
+        ),
+      ),
+    );
+    // `other:<categoryId>:<name>` is how custom rows are encoded.
+    expect(find.text('everyday_skills'), findsOneWidget);
+
+    // Make the draft dirty so Save is enabled.
+    await tester.enterText(find.byType(TextField).first, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Skill not added'), findsOneWidget);
+    expect(find.textContaining('Thawing Ice'), findsOneWidget);
+    expect(find.text('everyday_skills'), findsNothing);
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Skill not added'), findsNothing);
+    expect(find.text('everyday_skills'), findsNothing);
+  });
+
+  testWidgets('save overlay says when a new skill is being added', (
+    tester,
+  ) async {
+    final service = _SlowProfileService();
+    await pumpEdit(tester, service: service);
+
+    await tester.enterText(find.byType(TextField).first, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+
+    expect(find.textContaining('Weaving Sleeping Mat'), findsOneWidget);
+    expect(find.textContaining('30 seconds'), findsOneWidget);
+    expect(find.text('Saving profile…'), findsNothing);
+
+    // Fail the save so the page stays mounted and the state is cleaned up.
+    service.completer.completeError(Exception('network down'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
+  });
+
+  testWidgets('teaching profile requires a showcase before saving', (
+    tester,
+  ) async {
+    final service = _SlowProfileService();
+    await pumpEdit(
+      tester,
+      service: service,
+      data: profile().copyWith(teachingSkillImages: const {}),
+    );
+
+    await tester.enterText(find.byType(TextField).first, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Showcase Required'), findsOneWidget);
+    expect(service.completer.isCompleted, isFalse);
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Showcase Required'), findsNothing);
   });
 
   testWidgets('role change preview keeps hidden skill counts', (tester) async {

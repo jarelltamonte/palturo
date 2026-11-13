@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/theme/app_spacing.dart';
@@ -216,16 +217,25 @@ class _ExplorePageState extends State<ExplorePage> {
                 'Browse',
                 style: AppTextStyles.headingText.copyWith(color: textTheme),
               ),
-              AppChrome.iconAction(
-                icon: CupertinoIcons.question_circle,
-                tooltip: 'How Browse works',
-                color: textTheme,
-                onPressed: () {
-                  showAdaptiveDialog(
-                    context: context,
-                    builder: (context) => const _ExploreInfoDialog(),
-                  );
-                },
+              SizedBox(
+                width: AppSpacing.iconTarget,
+                height: AppSpacing.iconTarget,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerRight,
+                  tooltip: 'How Browse works',
+                  icon: Icon(
+                    CupertinoIcons.question_circle,
+                    color: textTheme,
+                    size: 24,
+                  ),
+                  onPressed: () {
+                    showAdaptiveDialog(
+                      context: context,
+                      builder: (context) => const _ExploreInfoDialog(),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -414,8 +424,11 @@ class _RoleToggle extends StatelessWidget {
     final textColor = Theme.of(context).colorScheme.secondary;
     final isMentor = value == ExploreRole.mentor;
 
-    Widget segment(String label, ExploreRole role) {
+    Widget segment(String label, String svgAsset, ExploreRole role) {
       final selected = value == role;
+      final contentColor =
+          selected ? Colors.black : textColor.withValues(alpha: 0.7);
+
       return Expanded(
         child: Semantics(
           button: true,
@@ -427,17 +440,35 @@ class _RoleToggle extends StatelessWidget {
             onTap: () => onChanged(role),
             borderRadius: BorderRadius.circular(999),
             child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: AppMotion.base,
-                style: AppTextStyles.regularText.copyWith(
-                  fontSize: 14,
-                  color:
-                      selected
-                          ? Colors.black
-                          : textColor.withValues(alpha: 0.7),
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
-                child: Text(label),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<Color?>(
+                    tween: ColorTween(end: contentColor),
+                    duration: AppMotion.base,
+                    builder: (context, color, _) {
+                      return SvgPicture.asset(
+                        svgAsset,
+                        width: 18,
+                        height: 18,
+                        colorFilter: ColorFilter.mode(
+                          color ?? contentColor,
+                          BlendMode.srcIn,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  AnimatedDefaultTextStyle(
+                    duration: AppMotion.base,
+                    style: AppTextStyles.regularText.copyWith(
+                      fontSize: 14,
+                      color: contentColor,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                    child: Text(label),
+                  ),
+                ],
               ),
             ),
           ),
@@ -471,8 +502,12 @@ class _RoleToggle extends StatelessWidget {
           ),
           Row(
             children: [
-              segment('Learner', ExploreRole.learner),
-              segment('Mentor', ExploreRole.mentor),
+              segment(
+                'Learner',
+                'assets/icons/rlearner.svg',
+                ExploreRole.learner,
+              ),
+              segment('Mentor', 'assets/icons/rmentor.svg', ExploreRole.mentor),
             ],
           ),
         ],

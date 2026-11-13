@@ -79,6 +79,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String? get _uid => Supabase.instance.client.auth.currentUser?.id;
 
+  String get _palsWord => _friendCount == 1 ? 'Pal' : 'Pals';
+
   Future<void> _loadResumeState() async {
     final prefs = PreferencesService.instance;
     final skipped = await prefs.getBool('skipped_onboarding') ?? false;
@@ -336,6 +338,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: bgTheme,
       appBar: AppChrome.appBar(
+        actionsPadding: EdgeInsets.zero,
         title: Text(
           'Profile',
           style: AppTextStyles.headingText.copyWith(color: textTheme),
@@ -444,10 +447,25 @@ class _ProfilePageState extends State<ProfilePage> {
                                                     _friendCount!,
                                                   ),
                                           excludeSemantics: true,
-                                          child: Text(
-                                            _friendCount == null
-                                                ? 'Pals'
-                                                : palCountLabel(_friendCount!),
+                                          child: Text.rich(
+                                            TextSpan(
+                                              children: [
+                                                TextSpan(text: _palsWord),
+                                                if (_friendCount != null)
+                                                  TextSpan(
+                                                    text: '  $_friendCount',
+                                                    style: AppTextStyles
+                                                        .boldText
+                                                        .copyWith(
+                                                          color: textTheme
+                                                              .withValues(
+                                                                alpha: 0.5,
+                                                              ),
+                                                          fontSize: 13,
+                                                        ),
+                                                  ),
+                                              ],
+                                            ),
                                             style: AppTextStyles.boldText
                                                 .copyWith(color: textTheme),
                                           ),

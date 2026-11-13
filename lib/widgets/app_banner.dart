@@ -5,6 +5,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/theme.dart';
+import 'package:palturo/utils/media_url.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
 enum AppBannerVariant { standard, match }
@@ -356,7 +357,7 @@ class _BannerLeading extends StatelessWidget {
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return UserAvatar(
         name: data.actorName ?? data.title,
-        image: NetworkImage(avatarUrl),
+        image: MediaUrl.image(avatarUrl),
         size: 38,
       );
     }

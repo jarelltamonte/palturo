@@ -21,18 +21,16 @@ import 'package:palturo/widgets/offline_banner.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:palturo/authentication/scratch.dart';
 import 'package:palturo/root_gate.dart';
 import 'package:palturo/authentication/forgot_password_3.dart';
 import 'package:palturo/widgets/responsive_shell.dart';
+import 'package:palturo/config/app_config.dart';
 
-// Compile-time configuration. Pass these with
-//   flutter run --dart-define-from-file=.env
-// or with individual --dart-define flags. They are never bundled as assets.
-const String kSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const String kSupabasePublishableKey = String.fromEnvironment(
-  'SUPABASE_PUBLISHABLE_KEY',
-);
+/// Only HTTPS links on the owned auth origin may inject a Supabase session.
+/// The custom `palturo://` scheme is used only for the tokenless app reopen.
+bool _isTrustedAuthCallback(Uri uri) =>
+    uri.scheme == 'https' &&
+    (uri.host == 'palturo.app' || uri.host == 'www.palturo.app');
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +46,9 @@ void main() async {
   await Supabase.initialize(
     url: kSupabaseUrl,
     publishableKey: kSupabasePublishableKey,
+    authOptions: const FlutterAuthClientOptions(
+      detectSessionInUriPredicate: _isTrustedAuthCallback,
+    ),
   );
 
   await PreferencesService.instance.init();
@@ -165,11 +166,9 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   final _appLinks = AppLinks();
 
   Uri? _latestDeepLink;
-  DateTime? _latestDeepLinkAt;
   Uri? _lastHandledLink;
   WidgetBuilder? _pendingAuthScreen;
   int _authScreenRetry = 0;
-  bool _suppressRecoveryEvent = false;
 
   /// Replaces the whole stack with a fresh AuthGate root, then pushes the
   /// deep-link screen above it. This guarantees that `popUntil(isFirst)`
@@ -220,22 +219,18 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
   Future<void> _initAuthAndLinks() async {
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       _latestDeepLink = uri;
-      _latestDeepLinkAt = DateTime.now();
       _handleLateLink(uri);
     });
 
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       (data) {
         final event = data.event;
-        final session = data.session;
-        final user = session?.user;
 
         if (event == AuthChangeEvent.initialSession) {
           return;
         }
         if (event == AuthChangeEvent.signedOut) {
           _latestDeepLink = null;
-          _latestDeepLinkAt = null;
           _lastHandledLink = null;
           NotificationPresenter.instance.reset();
           LocalNotificationService.instance.cancelAll();
@@ -248,37 +243,9 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
         }
 
         if (event == AuthChangeEvent.passwordRecovery) {
-          if (_suppressRecoveryEvent) {
-            _suppressRecoveryEvent = false;
-            return;
-          }
           _latestDeepLink = null;
-          _latestDeepLinkAt = null;
           _openAuthScreen((_) => const ForgotPasswordType());
           return;
-        }
-
-        if (event == AuthChangeEvent.signedIn ||
-            event == AuthChangeEvent.userUpdated) {
-          if (_latestDeepLinkAt != null &&
-              DateTime.now().difference(_latestDeepLinkAt!) >
-                  const Duration(minutes: 2)) {
-            _latestDeepLink = null;
-            _latestDeepLinkAt = null;
-          }
-
-          if (_isAuthLink(_latestDeepLink, '/callback') &&
-              user != null &&
-              user.emailConfirmedAt != null) {
-            final handled = _latestDeepLink;
-            _latestDeepLink = null;
-            _latestDeepLinkAt = null;
-            _lastHandledLink = handled;
-
-            _openAuthScreen(
-              (_) => ScratchWidget(email: user.email, isConfirmedInitial: true),
-            );
-          }
         }
       },
       onError: (error) {
@@ -291,14 +258,12 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
 
           if (isResetCallback) {
             _latestDeepLink = null;
-            _latestDeepLinkAt = null;
             _openAuthScreen((_) => const ForgotPasswordExpired());
             return;
           }
 
           if (isSignupCallback) {
             _latestDeepLink = null;
-            _latestDeepLinkAt = null;
             _openAuthScreen((_) => const EmailConfirmationExpired());
           }
         }
@@ -310,7 +275,6 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
         .then((uri) {
           if (!mounted || uri == null) return;
           _latestDeepLink = uri;
-          _latestDeepLinkAt = DateTime.now();
           _handleLateLink(uri);
         })
         .catchError((_) {});
@@ -325,23 +289,7 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
     }
     final q = uri.queryParameters;
     final fragment = uri.fragment;
-    return q.containsKey('code') ||
-        q.containsKey('token_hash') ||
-        q.containsKey('access_token') ||
-        q.containsKey('error') ||
-        fragment.contains('access_token=') ||
-        fragment.contains('error=');
-  }
-
-  String? _tokenHashFrom(Uri uri) {
-    final queryToken = uri.queryParameters['token_hash'];
-    if (queryToken != null && queryToken.isNotEmpty) return queryToken;
-    if (uri.fragment.isEmpty) return null;
-    final fragment = Uri.splitQueryString(uri.fragment);
-    final fragmentToken = fragment['token_hash'];
-    return (fragmentToken != null && fragmentToken.isNotEmpty)
-        ? fragmentToken
-        : null;
+    return q.containsKey('error') || fragment.contains('error=');
   }
 
   /// A link can arrive after signedIn (cold start race); route it once.
@@ -351,46 +299,16 @@ class _MyAppState extends State<MyApp> with MyAppThemeController {
     if (!isCallback && !isReset) return;
     if (_lastHandledLink == uri) return;
 
-    if (uri.queryParameters.containsKey('error')) {
+    if (uri.queryParameters.containsKey('error') ||
+        uri.fragment.contains('error=')) {
       _lastHandledLink = uri;
       _latestDeepLink = null;
-      _latestDeepLinkAt = null;
       _openAuthScreen(
         (_) =>
             isReset
                 ? const ForgotPasswordExpired()
                 : const EmailConfirmationExpired(),
       );
-      return;
-    }
-
-    final tokenHash = _tokenHashFrom(uri);
-    if (isReset && tokenHash != null) {
-      _lastHandledLink = uri;
-      _latestDeepLink = null;
-      _latestDeepLinkAt = null;
-      _suppressRecoveryEvent = true;
-      Future<void>.delayed(const Duration(seconds: 3), () {
-        if (mounted) _suppressRecoveryEvent = false;
-      });
-      _openAuthScreen((_) => ForgotPasswordType(tokenHash: tokenHash));
-      return;
-    }
-
-    final session = Supabase.instance.client.auth.currentSession;
-    if (isCallback && session?.user.emailConfirmedAt != null) {
-      _lastHandledLink = uri;
-      _latestDeepLink = null;
-      _latestDeepLinkAt = null;
-      _openAuthScreen(
-        (_) =>
-            ScratchWidget(email: session!.user.email, isConfirmedInitial: true),
-      );
-    } else if (isReset && session != null) {
-      _lastHandledLink = uri;
-      _latestDeepLink = null;
-      _latestDeepLinkAt = null;
-      _openAuthScreen((_) => const ForgotPasswordType());
     }
   }
 

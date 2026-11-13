@@ -65,6 +65,14 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
     ProfilePage(onStartSwiping: () => _onItemTapped(0)),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowWhatsNew(context);
+    });
+  }
+
   void _onItemTapped(int index) {
     Haptics.selection();
     AppShellState.instance.setSelectedTab(index);
@@ -335,9 +343,6 @@ class _NavItemState extends State<_NavItem>
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.92), weight: 1),
       TweenSequenceItem(tween: Tween(begin: 0.92, end: 1.0), weight: 1),
     ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) maybeShowWhatsNew(context);
-    });
   }
 
   @override

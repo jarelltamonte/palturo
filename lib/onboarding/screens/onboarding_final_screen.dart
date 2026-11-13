@@ -29,7 +29,6 @@ class OnboardingFinalScreen extends StatelessWidget {
   final VoidCallback onDone;
   final VoidCallback? onBack;
   final VoidCallback? onSkip;
-  final String stepLabel;
   final double progress;
 
   const OnboardingFinalScreen({
@@ -38,7 +37,6 @@ class OnboardingFinalScreen extends StatelessWidget {
     required this.onDone,
     this.onBack,
     this.onSkip,
-    this.stepLabel = 'Step 3 of 4 – Availability',
     this.progress = 0.85,
   });
 
@@ -63,7 +61,7 @@ class OnboardingFinalScreen extends StatelessWidget {
           title: 'One last thing',
           subtitle:
               'Help us personalize your matches by adding one final detail.',
-          stepLabel: stepLabel,
+          stepLabel: '',
           progress: progress,
           showBackButton: true,
           onBack: onBack,

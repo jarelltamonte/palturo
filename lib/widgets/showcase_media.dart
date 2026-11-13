@@ -69,7 +69,10 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
       if (mounted) setState(() => _failed = true);
       return;
     }
-    final controller = VideoPlayerController.networkUrl(uri);
+    final controller = VideoPlayerController.networkUrl(
+      uri,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     _controller = controller;
     try {
       await controller.initialize();
@@ -77,6 +80,9 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
       await controller.setLooping(true);
       await controller.setVolume(0);
       controller.addListener(_onControllerChanged);
+      // Discovery cards should show motion without a tap. The overlay button
+      // still pauses and resumes.
+      await controller.play();
       if (mounted) setState(() {});
     } catch (_) {
       if (mounted && identical(_controller, controller)) {

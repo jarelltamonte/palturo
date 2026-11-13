@@ -17,6 +17,7 @@ import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
 import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
 
@@ -114,25 +115,54 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late Map<String, String> _teachingSkillImages;
   final Map<String, String> _pendingTeachingImages = {};
 
+  /// Skill rows whose pending pick is a video. Web blob paths carry no
+  /// extension, so the editor has to remember what the picker returned.
+  final Set<String> _showcaseVideos = {};
+
   Future<void> _pickAttachmentForSkill(String skillId) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
+    final picked = await picker.pickMedia(
+      maxWidth: 1920,
+      maxHeight: 1920,
       imageQuality: 85,
     );
     if (picked == null || !mounted || !_teachingSkillIds.contains(skillId)) {
       return;
     }
 
+    final looksVideo =
+        RegExp(
+          r'\.(mp4|mov|webm|m4v)$',
+          caseSensitive: false,
+        ).hasMatch(picked.name) ||
+        (picked.mimeType ?? '').startsWith('video/');
+    final size = await picked.length();
+    final limit = looksVideo ? 50 * 1024 * 1024 : 20 * 1024 * 1024;
+    if (size > limit) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        '${looksVideo ? 'Video' : 'Image'} is too large. Choose one under '
+        '${looksVideo ? 50 : 20} MB.',
+      );
+      return;
+    }
+
     setState(() {
       _pendingTeachingImages.remove(skillId);
       _teachingSkillImages[skillId] = picked.path;
+      if (looksVideo) {
+        _showcaseVideos.add(skillId);
+      } else {
+        _showcaseVideos.remove(skillId);
+      }
     });
   }
 
   void _removeAttachmentForSkill(String skillId) {
     setState(() {
       _teachingSkillImages.remove(skillId);
+      _showcaseVideos.remove(skillId);
     });
   }
 
@@ -165,12 +195,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         _teachingSkillImages.remove(oldId);
     if (image != null && !_teachingSkillImages.containsKey(newId)) {
       _teachingSkillImages[newId] = image;
+      if (_showcaseVideos.remove(oldId)) _showcaseVideos.add(newId);
     }
   }
 
   void _removeTeachingImage(String skillId) {
     _teachingSkillImages.remove(skillId);
     _pendingTeachingImages.remove(skillId);
+    _showcaseVideos.remove(skillId);
   }
 
   Map<String, String> _parseAvailability(dynamic source) {
@@ -657,7 +689,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       });
       if (!hasShowcase) {
         await _showIncompleteSkillDialog(
-          'Add at least one showcase image to a teaching skill before saving.',
+          'Add a showcase photo or short video to a teaching skill. It is '
+          'required and appears on your discovery card.',
           title: 'Showcase Required',
         );
         return;
@@ -1021,6 +1054,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                               isEditing: true,
                               initialSkillIds: _teachingSkillIds,
                               attachments: _teachingSkillImages,
+                              videoAttachments: _showcaseVideos,
                               notes: _teachingNotes,
                               onNoteChanged: (id, note) {
                                 setState(() {
@@ -1089,8 +1123,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         Text(
                           _role == OnboardingRole.teach ||
                                   _role == OnboardingRole.both
-                              ? 'Showcase media is attached to a teaching skill. Use Attach a file on a teaching skill above to add it.'
-                              : 'Switch to Teach or Both to add showcase media to a teaching skill.',
+                              ? 'A showcase is required for every teaching skill. '
+                                  'It is the photo or short video people see on '
+                                  'your card in For You, Explore, and Browse.'
+                              : 'Switch to Teach or Both to add showcase media to '
+                                  'a teaching skill.',
                           style: AppTextStyles.regularText.copyWith(
                             color: AppColors.mutedText(context),
                             fontSize: 12,
@@ -1110,8 +1147,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                 curve: Curves.easeInOut,
                               );
                             },
-                            icon: const Icon(Icons.image_outlined, size: 18),
-                            label: const Text('Manage teaching showcase'),
+                            icon: const Icon(
+                              Icons.video_library_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Go to teaching skills'),
                           ),
                         ],
                       ],
@@ -1528,6 +1568,8 @@ class _PhotoPickerRow extends StatelessWidget {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
+      maxWidth: 1920,
+      maxHeight: 1920,
       imageQuality: 85,
     );
     if (picked == null) return;

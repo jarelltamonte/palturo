@@ -49,9 +49,9 @@ class SkillModerationException implements Exception {
     return SkillModerationException(
       names.length == 1
           ? '$subject isn’t a skill PalTuro can add. Try naming a specific, '
-                'teachable skill instead.'
+              'teachable skill instead.'
           : '$subject aren’t skills PalTuro can add. Try naming specific, '
-                'teachable skills instead.',
+              'teachable skills instead.',
       skills: List.unmodifiable(skills),
     );
   }
@@ -147,6 +147,63 @@ class ProfileService {
     return '';
   }
 
+  /// ISO base media files (mp4, mov, m4v) carry `ftyp` at byte 4; WebM starts
+  /// with the EBML header. The brand separates video from HEIC photos, which
+  /// share the same box.
+  static String _videoExtensionFromBytes(Uint8List bytes) {
+    if (bytes.length >= 12 &&
+        bytes[4] == 0x66 &&
+        bytes[5] == 0x74 &&
+        bytes[6] == 0x79 &&
+        bytes[7] == 0x70) {
+      final brand = String.fromCharCodes(bytes.sublist(8, 12));
+      if (brand == 'qt  ') return 'mov';
+      if (const {
+        'isom',
+        'iso2',
+        'iso4',
+        'iso5',
+        'mp41',
+        'mp42',
+        'avc1',
+        'M4V ',
+        'M4VH',
+        'M4VP',
+        'dash',
+      }.contains(brand)) {
+        return 'mp4';
+      }
+      return '';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x1A &&
+        bytes[1] == 0x45 &&
+        bytes[2] == 0xDF &&
+        bytes[3] == 0xA3) {
+      return 'webm';
+    }
+    return '';
+  }
+
+  static bool _looksLikeHeic(Uint8List bytes) {
+    if (bytes.length < 12 ||
+        bytes[4] != 0x66 ||
+        bytes[5] != 0x74 ||
+        bytes[6] != 0x79 ||
+        bytes[7] != 0x70) {
+      return false;
+    }
+    final brand = String.fromCharCodes(bytes.sublist(8, 12));
+    return const {
+      'heic',
+      'heix',
+      'hevc',
+      'heim',
+      'mif1',
+      'msf1',
+    }.contains(brand);
+  }
+
   static String _extensionFor(String path) {
     final name = path.split('?').first;
     final dot = name.lastIndexOf('.');
@@ -157,36 +214,99 @@ class ProfileService {
   static String _uploadNamePrefix(String base) =>
       base.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
 
+  static const Set<String> _imageExtensions = {'jpg', 'jpeg', 'png', 'webp'};
+  static const Set<String> _videoExtensions = {'mp4', 'mov', 'webm', 'm4v'};
+  static const int _maxImageBytes = 20 * 1024 * 1024;
+  static const int _maxVideoBytes = 50 * 1024 * 1024;
+
+  static String _contentTypeFor(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'mp4':
+      case 'm4v':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      case 'webm':
+        return 'video/webm';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  static bool isShowcaseVideo(String value) {
+    final path = value.split('?').first.toLowerCase();
+    return _videoExtensions.any((ext) => path.endsWith('.$ext'));
+  }
+
   /// Uploads [path] to [bucket] and returns a public URL or object path.
   Future<String> _uploadToBucket(
     String bucket,
     String path,
     String filePrefix, {
     required bool publicUrl,
+    bool allowVideo = false,
   }) async {
     final bytes = await _readUploadBytes(path);
     if (bytes == null) {
       throw Exception(
-        'Could not read the selected image. Please re-select it and try again.',
+        'Could not read the selected file. Please re-select it and try again.',
       );
     }
-    if (bytes.length > 5 * 1024 * 1024) {
-      throw Exception('Image is too large. Please choose one under 5 MB.');
+
+    if (_looksLikeHeic(bytes)) {
+      throw Exception(
+        'HEIC photos are not supported yet. Choose JPG, PNG, or WebP.',
+      );
     }
 
-    final detected = _extensionFromBytes(bytes);
-    final ext = detected.isNotEmpty ? detected : _extensionFor(path);
-    if (!const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext.toLowerCase())) {
-      throw Exception('Unsupported image type. Use JPG, PNG, or WebP.');
+    final pathExt = _extensionFor(path);
+    final videoExt = allowVideo ? _videoExtensionFromBytes(bytes) : '';
+    final detected =
+        videoExt.isNotEmpty
+            ? (_videoExtensions.contains(pathExt) ? pathExt : videoExt)
+            : _extensionFromBytes(bytes);
+    final ext = detected.isNotEmpty ? detected : pathExt;
+    final isVideo = _videoExtensions.contains(ext);
+
+    if (isVideo && !allowVideo) {
+      throw Exception(
+        'That file is a video. Add videos to a skill showcase instead.',
+      );
     }
+    if (!isVideo && !_imageExtensions.contains(ext)) {
+      throw Exception(
+        allowVideo
+            ? 'Unsupported file type. Use JPG, PNG, WebP, MP4, MOV, or WebM.'
+            : 'Unsupported image type. Use JPG, PNG, or WebP.',
+      );
+    }
+
+    final limit = isVideo ? _maxVideoBytes : _maxImageBytes;
+    if (bytes.length > limit) {
+      final mb = isVideo ? 50 : 20;
+      throw Exception(
+        '${isVideo ? 'Video' : 'Image'} is too large. Please choose one under '
+        '$mb MB.',
+      );
+    }
+
     final fileName = '$filePrefix.$ext';
-
     await _supabase.storage
         .from(bucket)
         .uploadBinary(
           fileName,
           bytes,
-          fileOptions: const FileOptions(upsert: true),
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: _contentTypeFor(ext),
+          ),
         );
     return publicUrl
         ? _supabase.storage.from(bucket).getPublicUrl(fileName)
@@ -196,8 +316,16 @@ class ProfileService {
   Future<String> _uploadToProfileMedia(String path, String filePrefix) =>
       _uploadToBucket('profile-media', path, filePrefix, publicUrl: true);
 
-  Future<String> _uploadToSkillProofs(String path, String filePrefix) =>
-      _uploadToBucket('skill-proofs', path, filePrefix, publicUrl: false);
+  /// Showcases are public because they render on discovery cards. The bucket
+  /// accepts images and short videos.
+  Future<String> _uploadToShowcase(String path, String filePrefix) =>
+      _uploadToBucket(
+        'skill-showcases',
+        path,
+        filePrefix,
+        publicUrl: true,
+        allowVideo: true,
+      );
 
   String _toTitleCase(String text) {
     final clean = text.replaceAll('_', ' ').trim();
@@ -392,9 +520,34 @@ class ProfileService {
         fallbackLast: metaLast,
       );
 
+      // Showcases written by the editor live in public.skill_showcases and are
+      // public URLs. Merge them over the legacy map so the editor shows what
+      // discovery actually sees.
+      final showcaseImages = <String, String>{};
+      try {
+        final rows = await _supabase
+            .from('skill_showcases')
+            .select('media_url, caption')
+            .eq('user_id', user.id);
+        for (final row in rows as List) {
+          if (row is! Map) continue;
+          final media = (row['media_url'] ?? '').toString();
+          final caption = (row['caption'] ?? '').toString().trim();
+          if (media.isNotEmpty && caption.isNotEmpty) {
+            showcaseImages[caption] = media;
+          }
+        }
+      } catch (_) {
+        // A read failure should not block opening the profile.
+      }
+
       // Private proof objects are stored as paths; sign them for display.
       final proofImages = <String, String>{};
-      for (final entry in profile.teachingSkillImages.entries) {
+      final sourceImages = <String, String>{
+        ...profile.teachingSkillImages,
+        ...showcaseImages,
+      };
+      for (final entry in sourceImages.entries) {
         final value = entry.value;
         if (value.startsWith('http')) {
           proofImages[entry.key] = value;
@@ -716,8 +869,8 @@ class ProfileService {
             uploadedSkillImages[targetSkillName] = localOrRemotePath;
           } else {
             final prefix =
-                '${user.id}/proof_${_uploadNamePrefix(targetSkillName)}_${DateTime.now().millisecondsSinceEpoch}';
-            uploadedSkillImages[targetSkillName] = await _uploadToSkillProofs(
+                '${user.id}/showcase_${_uploadNamePrefix(targetSkillName)}_${DateTime.now().millisecondsSinceEpoch}';
+            uploadedSkillImages[targetSkillName] = await _uploadToShowcase(
               localOrRemotePath,
               prefix,
             );
@@ -744,16 +897,19 @@ class ProfileService {
     };
 
     final List<String> mediaToDelete = [];
-    final List<String> proofToDelete = [];
+    final List<String> showcaseToDelete = [];
     for (final oldUrl in oldStorageUrls) {
-      // Private proof paths are stored as bare paths or signed URLs.
-      final proofPath =
+      // Showcase media is either a bare private path, a signed URL, or a
+      // public skill-showcases URL.
+      final showcasePath =
           oldUrl.startsWith('http')
-              ? _extractStoragePath(oldUrl, 'skill-proofs')
+              ? (_extractStoragePath(oldUrl, 'skill-proofs') ??
+                  _extractStoragePath(oldUrl, 'skill-showcases'))
               : (oldUrl.contains('://') ? null : oldUrl);
-      if (proofPath != null) {
-        if (!preservedProofPaths.contains(proofPath)) {
-          proofToDelete.add(proofPath);
+      if (showcasePath != null) {
+        if (!preservedProofPaths.contains(showcasePath) &&
+            !preservedMediaUrls.contains(oldUrl)) {
+          showcaseToDelete.add(showcasePath);
         }
         continue;
       }
@@ -771,10 +927,14 @@ class ProfileService {
         await _supabase.storage.from('profile-media').remove(mediaToDelete);
       } catch (_) {}
     }
-    if (proofToDelete.isNotEmpty) {
-      try {
-        await _supabase.storage.from('skill-proofs').remove(proofToDelete);
-      } catch (_) {}
+    if (showcaseToDelete.isNotEmpty) {
+      // New media lives in skill-showcases; legacy proofs live in skill-proofs.
+      // Removing from the wrong bucket is a no-op, so try both.
+      for (final bucket in const ['skill-showcases', 'skill-proofs']) {
+        try {
+          await _supabase.storage.from(bucket).remove(showcaseToDelete);
+        } catch (_) {}
+      }
     }
 
     final availableDays = parseAvailableDays(
@@ -786,10 +946,8 @@ class ProfileService {
     final primaryAvatar = MediaUrl.sanitize(
       uploadedPhotoUrls.isNotEmpty ? uploadedPhotoUrls[0] : null,
     );
-    final safePhotos = uploadedPhotoUrls
-        .map(MediaUrl.sanitize)
-        .whereType<String>()
-        .toList();
+    final safePhotos =
+        uploadedPhotoUrls.map(MediaUrl.sanitize).whereType<String>().toList();
     final safeSkillImages = <String, String>{};
     uploadedSkillImages.forEach((key, value) {
       if (MediaUrl.isAllowedOrPath(value)) {
@@ -841,6 +999,22 @@ class ProfileService {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', user.id);
+
+    // Discovery cards read public.skill_showcases, not
+    // profiles.teaching_skill_images. Keep the rows in step with the editor so
+    // an attached showcase actually appears on the card.
+    if (teachingSkillImages != null) {
+      final rows = <Map<String, dynamic>>[];
+      uploadedSkillImages.forEach((skill, media) {
+        if (!media.startsWith('http')) return;
+        rows.add({
+          'caption': skill,
+          'media_url': media,
+          'media_kind': isShowcaseVideo(media) ? 'video' : 'image',
+        });
+      });
+      await _supabase.rpc('set_skill_showcases', params: {'p_items': rows});
+    }
 
     final refreshed = await getCurrentUserProfile();
 

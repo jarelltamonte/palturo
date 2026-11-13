@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:flutter/foundation.dart' show kIsWeb, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
@@ -250,6 +251,7 @@ class SkillsCard extends StatefulWidget {
   final List<String> initialSkillIds;
   final bool showAttachFile;
   final Map<String, String>? attachments;
+  final Set<String> videoAttachments;
   final Map<String, String>? notes;
   final SkillSuggestionService suggestionService;
   final ValueChanged<List<String>>? onChanged;
@@ -269,6 +271,7 @@ class SkillsCard extends StatefulWidget {
     this.initialSkillIds = const [],
     this.showAttachFile = false,
     this.attachments,
+    this.videoAttachments = const {},
     this.notes,
     this.suggestionService = const LocalSkillSuggestionService(),
     this.onChanged,
@@ -312,6 +315,7 @@ class SkillsCard extends StatefulWidget {
     required bool isEditing,
     List<String> initialSkillIds = const [],
     Map<String, String>? attachments,
+    Set<String> videoAttachments = const {},
     Map<String, String>? notes,
     SkillSuggestionService suggestionService =
         const LocalSkillSuggestionService(),
@@ -332,6 +336,7 @@ class SkillsCard extends StatefulWidget {
       initialSkillIds: initialSkillIds,
       showAttachFile: true,
       attachments: attachments,
+      videoAttachments: videoAttachments,
       notes: notes,
       suggestionService: suggestionService,
       onChanged: onChanged,
@@ -586,43 +591,46 @@ class _SkillsCardState extends State<SkillsCard> {
           ] else
             for (int i = 0; i < _skillIds.length; i++) ...[
               _SkillRow(
-              key: ValueKey('skill_row_${_rowUids[i]}'),
-              selectedId: _skillIds[i],
-              alreadyUsedIds: _skillIds,
-              isEditing: widget.isEditing,
-              isActive: _activeUid == _rowUids[i],
-              accentColor: accentColor,
-              options: widget.options,
-              labelSuffix: widget.labelSuffix,
-              rowLabel: _skillIds.length > 1 ? 'Skill ${i + 1}' : null,
-              initialNote: _notes[i],
-              suggestionService: widget.suggestionService,
-              showAttachFile: widget.showAttachFile,
-              attachmentPath: _resolveAttachmentPath(_skillIds[i]),
-              onActivate: () => _activate(_rowUids[i]),
-              onChanged: (newId) => _updateSkill(i, newId),
-              onNoteChanged: (note) => _updateNote(i, note),
-              onReplaced: widget.onSkillReplaced,
-              onRemove: () => _removeSkill(i),
-              onAttachFile:
-                  widget.onAttachFile == null
-                      ? null
-                      : () => widget.onAttachFile!(_skillIds[i]),
-              onRemoveAttachment:
-                  widget.onRemoveAttachment == null
-                      ? null
-                      : () => widget.onRemoveAttachment!(_skillIds[i]),
-            ),
-            if (i != _skillIds.length - 1)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: textColor.withValues(alpha: 0.12),
+                key: ValueKey('skill_row_${_rowUids[i]}'),
+                selectedId: _skillIds[i],
+                alreadyUsedIds: _skillIds,
+                isEditing: widget.isEditing,
+                isActive: _activeUid == _rowUids[i],
+                accentColor: accentColor,
+                options: widget.options,
+                labelSuffix: widget.labelSuffix,
+                rowLabel: _skillIds.length > 1 ? 'Skill ${i + 1}' : null,
+                initialNote: _notes[i],
+                suggestionService: widget.suggestionService,
+                showAttachFile: widget.showAttachFile,
+                attachmentPath: _resolveAttachmentPath(_skillIds[i]),
+                attachmentIsVideo: widget.videoAttachments.contains(
+                  _skillIds[i],
                 ),
+                onActivate: () => _activate(_rowUids[i]),
+                onChanged: (newId) => _updateSkill(i, newId),
+                onNoteChanged: (note) => _updateNote(i, note),
+                onReplaced: widget.onSkillReplaced,
+                onRemove: () => _removeSkill(i),
+                onAttachFile:
+                    widget.onAttachFile == null
+                        ? null
+                        : () => widget.onAttachFile!(_skillIds[i]),
+                onRemoveAttachment:
+                    widget.onRemoveAttachment == null
+                        ? null
+                        : () => widget.onRemoveAttachment!(_skillIds[i]),
               ),
-          ],
+              if (i != _skillIds.length - 1)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: textColor.withValues(alpha: 0.12),
+                  ),
+                ),
+            ],
         ],
       ),
     );
@@ -642,6 +650,7 @@ class _SkillRow extends StatefulWidget {
   final SkillSuggestionService suggestionService;
   final bool showAttachFile;
   final String? attachmentPath;
+  final bool attachmentIsVideo;
   final VoidCallback onActivate;
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onNoteChanged;
@@ -664,6 +673,7 @@ class _SkillRow extends StatefulWidget {
     required this.suggestionService,
     required this.showAttachFile,
     this.attachmentPath,
+    this.attachmentIsVideo = false,
     required this.onActivate,
     required this.onChanged,
     required this.onNoteChanged,
@@ -867,19 +877,6 @@ class _SkillRowState extends State<_SkillRow> {
       }
     }
     return guessSkillCategory(_labelFor(id));
-  }
-
-  String _getDisplayName(String path) {
-    final cleanPath = path.split('?').first;
-    String rawName = cleanPath.split('/').last;
-    if (rawName.startsWith('scaled_')) {
-      rawName = rawName.substring('scaled_'.length);
-    }
-    if (rawName.startsWith('image_picker_')) {
-      rawName = rawName.substring('image_picker_'.length);
-    }
-    rawName = rawName.replaceAll(RegExp(r'_\d{10,}\.'), '.');
-    return rawName;
   }
 
   OutlineInputBorder _border(Color color, double width, double radius) =>
@@ -1145,89 +1142,132 @@ class _SkillRowState extends State<_SkillRow> {
     );
   }
 
+  bool _isVideoPath(String path) => RegExp(
+    r'\.(mp4|webm|mov|m4v)(\?|#|$)',
+    caseSensitive: false,
+  ).hasMatch(path);
+
+  Widget _showcaseThumb(String path, {required bool isVideo}) {
+    final isRemote = path.startsWith('http') || path.startsWith('blob:');
+    final fallback = Container(
+      color: Colors.black.withValues(alpha: 0.72),
+      child: Icon(
+        isVideo ? Icons.play_circle_fill_rounded : Icons.image_outlined,
+        color: Colors.white,
+        size: 26,
+      ),
+    );
+
+    Widget media;
+    if (isVideo) {
+      media = fallback;
+    } else if (isRemote || kIsWeb) {
+      media = Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      );
+    } else {
+      media = Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(width: 56, height: 56, child: media),
+    );
+  }
+
   Widget _buildAttachment() {
+    final path = widget.attachmentPath;
+    final hasAttachment = path != null && path.isNotEmpty;
+    final isVideo =
+        hasAttachment && (widget.attachmentIsVideo || _isVideoPath(path));
+
     return Padding(
-      padding: const EdgeInsets.only(top: 10.0, left: 4.0),
+      padding: const EdgeInsets.only(top: 12, left: 4, right: 4),
       child:
-          widget.attachmentPath != null && widget.attachmentPath!.isNotEmpty
+          hasAttachment
               ? Container(
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.mutedSurface(context),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: widget.accentColor, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.accentColor.withValues(alpha: 0.65),
+                  ),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    InkWell(
-                      onTap: widget.onAttachFile,
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(20),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle,
-                              size: 16,
+                    _showcaseThumb(path, isVideo: isVideo),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Showcase for ${_labelFor(widget.selectedId)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
                               color: widget.accentColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(width: 6),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 170),
-                              child: Text(
-                                _getDisplayName(widget.attachmentPath!),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: widget.accentColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Shown on your card in For You and Browse',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: widget.accentColor.withValues(alpha: 0.75),
+                              fontSize: 11,
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Semantics(
+                      button: true,
+                      label: 'Replace showcase',
+                      child: InkWell(
+                        onTap: widget.onAttachFile,
+                        customBorder: const CircleBorder(),
+                        child: SizedBox(
+                          width: AppSpacing.iconTarget,
+                          height: AppSpacing.iconTarget,
+                          child: Icon(
+                            Icons.swap_horiz_rounded,
+                            size: 20,
+                            color: widget.accentColor,
+                          ),
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 2.0),
-                      child: Semantics(
-                        button: true,
-                        label: 'Remove attachment',
+                    Semantics(
+                      button: true,
+                      label: 'Remove showcase',
+                      child: InkWell(
+                        onTap: widget.onRemoveAttachment,
+                        customBorder: const CircleBorder(),
                         child: SizedBox(
                           width: AppSpacing.iconTarget,
                           height: AppSpacing.iconTarget,
                           child: Center(
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: widget.onRemoveAttachment,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 14,
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.grey.shade700,
                               ),
                             ),
                           ),
@@ -1239,37 +1279,99 @@ class _SkillRowState extends State<_SkillRow> {
               )
               : Semantics(
                 button: true,
-                label: 'Attach a file',
+                label: 'Add a required skill showcase',
                 excludeSemantics: true,
                 onTap: widget.onAttachFile,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: widget.onAttachFile,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: AppSpacing.iconTarget),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.attach_file,
-                            size: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: widget.accentColor.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: widget.accentColor.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: widget.accentColor.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.video_library_outlined,
+                            size: 22,
                             color: widget.accentColor,
                           ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              'Attach a file',
-                              style: TextStyle(
-                                color: widget.accentColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    'Add a skill showcase',
+                                    style: TextStyle(
+                                      color: widget.accentColor,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: widget.accentColor.withValues(
+                                        alpha: 0.16,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'REQUIRED',
+                                      style: TextStyle(
+                                        color: widget.accentColor,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'A photo or short video that appears on your '
+                                'discovery card.',
+                                style: TextStyle(
+                                  color: widget.accentColor.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                  fontSize: 11,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.add_circle,
+                          size: 26,
+                          color: widget.accentColor,
+                        ),
+                      ],
                     ),
                   ),
                 ),

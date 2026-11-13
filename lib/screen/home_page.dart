@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
@@ -10,6 +9,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
+import 'package:palturo/screen/explore_deck_page.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
@@ -20,11 +20,12 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/services/seen_deck_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_banner.dart';
+import 'package:palturo/widgets/exhausted_deck_view.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/swipe_deck.dart';
-import 'package:palturo/widgets/profile_update_link.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
 enum RoleFilter { all, learner, mentor }
@@ -69,7 +70,25 @@ class HomePage extends StatefulWidget {
   /// Test hook: replaces the real request send. Production leaves this null.
   final SendConnectionRequest? sendRequest;
 
-  const HomePage({super.key, this.deckLoader, this.sendRequest});
+  /// Test hook: replaces the persisted seen set. Production leaves this null.
+  final Future<Set<String>> Function()? seenLoader;
+
+  /// Test hook: replaces the persisted seen writes. Production leaves these null.
+  final Future<void> Function(String personId)? markSeen;
+  final Future<void> Function(String personId)? unmarkSeen;
+
+  /// Switches the shell to Browse. Null when HomePage is used standalone.
+  final VoidCallback? onBrowse;
+
+  const HomePage({
+    super.key,
+    this.deckLoader,
+    this.sendRequest,
+    this.seenLoader,
+    this.markSeen,
+    this.unmarkSeen,
+    this.onBrowse,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -77,6 +96,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Person> _people = const [];
+  List<Person> _rawDeck = const [];
+  bool _replayAll = false;
   bool _loading = true;
   bool _slowLoad = false;
   Timer? _slowTimer;
@@ -98,7 +119,6 @@ class _HomePageState extends State<HomePage> {
   bool _openingEditor = false;
   bool _actionInFlight = false;
   bool _sendingRequest = false;
-  bool _discovering = false;
   int _deckGeneration = 0;
   final GlobalKey<SwipeDeckState> _swipeKey = GlobalKey();
 
@@ -115,24 +135,56 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  Future<Set<String>> _loadSeen() async {
+    try {
+      final loader = widget.seenLoader ?? SeenDeckService.instance.load;
+      return await loader();
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  List<Person> _visibleDeck(List<Person> deck, Set<String> seen) {
+    if (_replayAll) return List<Person>.of(deck);
+    return deck
+        .where((person) => !seen.contains(person.id))
+        .toList(growable: false);
+  }
+
   Future<void> _loadDeck({bool force = false}) async {
-    final cached = _cachedDeck();
     final generation = ++_deckGeneration;
 
     _slowTimer?.cancel();
+    _slowTimer = null;
     _timeoutTimer?.cancel();
+
+    // Arm the slow-state timer when the load starts, not after the local
+    // seen read, so the 4s promise still holds on a cold open.
+    if (_loading) {
+      _slowTimer = Timer(kDeckSlowThreshold, () {
+        if (mounted && _loading) setState(() => _slowLoad = true);
+      });
+    }
+
+    // Read the local seen set before painting the cached deck so a relogin
+    // never flashes cards that are already exhausted.
+    final seen = await _loadSeen();
+    if (!mounted || generation != _deckGeneration) return;
+
+    final cached = _cachedDeck();
     setState(() {
       if (_people.isEmpty && cached != null) {
-        _people = List<Person>.of(cached);
+        _people = _visibleDeck(cached, seen);
         _currentIndex = 0;
       }
       _loading = _people.isEmpty;
       _slowLoad = false;
       _error = null;
-      _discovering = false;
     });
 
-    if (_loading) {
+    // A retry from the error state starts with _loading false, so the cold
+    // timer above was skipped. Arm it now that the load is actually running.
+    if (_loading && _slowTimer == null) {
       _slowTimer = Timer(kDeckSlowThreshold, () {
         if (mounted && _loading) setState(() => _slowLoad = true);
       });
@@ -163,8 +215,9 @@ class _HomePageState extends State<HomePage> {
       debugPrint('[People] deck loaded: ${deck.length} people');
 
       setState(() {
-        final sameDeck = _sameDeck(_people, deck);
-        _people = deck;
+        final sameDeck = _sameDeck(_rawDeck, deck);
+        _rawDeck = deck;
+        _people = _visibleDeck(deck, seen);
         _loading = false;
         _slowLoad = false;
         if (!sameDeck) {
@@ -173,9 +226,11 @@ class _HomePageState extends State<HomePage> {
           _historyRight.clear();
           _historyConnectionIds.clear();
           _undoActive = false;
+        } else if (_currentIndex > _people.length) {
+          _currentIndex = _people.length;
         }
         if (_skillFilter != 'all' &&
-            !deck.any((person) => person.skillName == _skillFilter)) {
+            !_people.any((person) => person.skillName == _skillFilter)) {
           _skillFilter = 'all';
         }
       });
@@ -381,6 +436,7 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           _roleFilter = newRole;
           _skillFilter = newSkill;
+          _replayAll = false;
           if (roleChanged) _people = const [];
           _currentIndex = 0;
           _history.clear();
@@ -413,7 +469,11 @@ class _HomePageState extends State<HomePage> {
     final people = _filteredPeople;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
     if (people[_currentIndex].id != person.id) return;
+    final before = _currentIndex;
     _next(right: right, connectionId: connectionId);
+    if (_currentIndex == before) return;
+    final mark = widget.markSeen ?? SeenDeckService.instance.markSeen;
+    unawaited(mark(person.id));
   }
 
   /// A right swipe and the Connect button both land here. The request is the
@@ -542,6 +602,12 @@ class _HomePageState extends State<HomePage> {
       _undoActive = true;
       _undoToken++;
     });
+
+    final people = _filteredPeople;
+    if (index >= 0 && index < people.length) {
+      final unmark = widget.unmarkSeen ?? SeenDeckService.instance.unmarkSeen;
+      unawaited(unmark(people[index].id));
+    }
   }
 
   Widget _wrapUndo(Widget child) {
@@ -608,46 +674,30 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _discoverRandom() async {
-    if (_discovering) return;
+  void _openExploreDeck() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ExploreDeckPage()),
+    );
+  }
 
-    final generation = _deckGeneration;
-    setState(() => _discovering = true);
-
-    try {
-      final people = await MatchApi.getRandomDeck(
-        limit: 20,
-        role: _roleFilter == RoleFilter.all ? null : _roleKey,
-      );
-
-      if (!mounted || generation != _deckGeneration) return;
-
-      final seen = _people.map((person) => person.id).toSet();
-      final fresh = people.where((person) => seen.add(person.id)).toList();
-
-      if (fresh.isEmpty) {
-        setState(() => _discovering = false);
-        showAppSnackBar(context, 'No more matches to discover right now.');
-        return;
-      }
-
-      setState(() {
-        _people = [..._people, ...fresh];
-        final freshIds = fresh.map((person) => person.id).toSet();
-        final nextIndex = _filteredPeople.indexWhere(
-          (person) => freshIds.contains(person.id),
-        );
-        _currentIndex = nextIndex < 0 ? 0 : nextIndex;
-        _undoActive = false;
-        _discovering = false;
-      });
-    } catch (e) {
-      debugPrint('[People] _discoverRandom ERROR: $e');
-      if (!mounted || generation != _deckGeneration) return;
-
-      setState(() => _discovering = false);
-      showAppError(context, 'Couldn’t find more matches. Please try again.');
+  /// Replays the cards already fetched for this session. The persisted seen
+  /// set is left intact so the next relogin still opens on the exhausted view.
+  void _viewAgain() {
+    if (_rawDeck.isEmpty) {
+      _loadDeck(force: true);
+      return;
     }
+    Haptics.selection();
+    setState(() {
+      _replayAll = true;
+      _people = List<Person>.of(_rawDeck);
+      _currentIndex = 0;
+      _history.clear();
+      _historyRight.clear();
+      _historyConnectionIds.clear();
+      _undoActive = false;
+    });
   }
 
   Future<void> _confirmBlock(Person person) async {
@@ -733,7 +783,7 @@ class _HomePageState extends State<HomePage> {
             ? _buildErrorState(textTheme)
             : hasMore
             ? _buildDeck(people)
-            : _buildEmptyState(textTheme);
+            : _buildExhaustedState();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -1005,92 +1055,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildEmptyState(Color textColor) {
-    return LayoutBuilder(
-      builder:
-          (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-            child: SizedBox(
-              width: double.infinity,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight:
-                      (constraints.maxHeight - 48)
-                          .clamp(0.0, double.infinity)
-                          .toDouble(),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Lottie.asset(
-                      'assets/lottie/empty.json',
-                      width: 220,
-                      height: 220,
-                      fit: BoxFit.contain,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'You have seen all the top results',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textColor.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _discovering ? null : _discoverRandom,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.black,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
-                        ),
-                      ),
-                      icon:
-                          _discovering
-                              ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.black,
-                                ),
-                              )
-                              : const Icon(Icons.explore),
-                      label: Text(
-                        _discovering ? 'Finding matches…' : 'Discover more',
-                      ),
-                    ),
-                    if (_hasActiveFilter) ...[
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _roleFilter = RoleFilter.all;
-                            _skillFilter = 'all';
-                            _currentIndex = 0;
-                            _history.clear();
-                            _historyRight.clear();
-                            _historyConnectionIds.clear();
-                            _undoActive = false;
-                          });
-                          _loadDeck();
-                        },
-                        child: const Text('Clear filters'),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    ProfileUpdateLink(onTap: _openSettings),
-                  ],
-                ),
-              ),
-            ),
-          ),
+  Widget _buildExhaustedState() {
+    return ExhaustedDeckView(
+      onExplore: _openExploreDeck,
+      onViewAgain: _viewAgain,
+      onBrowse: widget.onBrowse,
+      onUpdateProfile: _openSettings,
     );
   }
 }

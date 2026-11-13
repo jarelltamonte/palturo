@@ -56,7 +56,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   late final List<Widget> _pages = [
-    const HomePage(),
+    HomePage(onBrowse: () => _onItemTapped(1)),
     _ExploreTab(
       navigatorKey: _exploreNavKey,
       isActive: () => _selectedIndex == _exploreIndex,
@@ -228,7 +228,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       builder: (context, _) {
         final badgesEnabled = PreferencesService.instance.notificationsEnabled;
         final requestUnread =
-            badgesEnabled ? NotificationService.instance.unread : 0;
+            badgesEnabled ? NotificationService.instance.unreadRequests : 0;
         final largeText = MediaQuery.textScalerOf(context).scale(12) > 16;
         return Container(
           height: largeText ? 74 : 60,
@@ -378,7 +378,7 @@ class _DesktopSidebar extends StatelessWidget {
         final chatUnread =
             badgesEnabled ? ChatStateService.instance.totalUnreadCount : 0;
         final requestUnread =
-            badgesEnabled ? NotificationService.instance.unread : 0;
+            badgesEnabled ? NotificationService.instance.unreadRequests : 0;
 
         return Container(
           width: 252,

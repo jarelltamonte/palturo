@@ -52,7 +52,10 @@ void main() {
     await tester.pump();
 
     expect(find.byType(PersonCardSkeleton), findsNothing);
-    expect(find.text('You have seen all the top results'), findsOneWidget);
+    expect(
+      find.textContaining('You have seen all the top matches'),
+      findsOneWidget,
+    );
     expect(find.text('Still looking for matches…'), findsNothing);
     expect(find.text('Retry'), findsNothing);
   });
@@ -91,5 +94,63 @@ void main() {
     await tester.pump(kDeckTimeout);
     await tester.pump();
     expect(find.textContaining('taking longer'), findsOneWidget);
+  });
+
+  testWidgets('a deck of already seen cards opens on the exhausted view', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const people = [
+      Person(
+        id: 'p1',
+        name: 'Alpha',
+        schedule: 'Weekends',
+        language: 'English',
+        learningStyle: 'Hands-on Practice',
+        skillName: 'Cooking',
+        role: PersonRole.mentor,
+      ),
+      Person(
+        id: 'p2',
+        name: 'Beta',
+        schedule: 'Weekends',
+        language: 'English',
+        learningStyle: 'Hands-on Practice',
+        skillName: 'Weaving',
+        role: PersonRole.mentor,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: HomePage(
+          deckLoader: ({bool force = false}) async => people,
+          seenLoader: () async => {'p1', 'p2'},
+          markSeen: (_) async {},
+          unmarkSeen: (_) async {},
+          onBrowse: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('You have seen all the top matches'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('View Again'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(
+      find.textContaining('You have seen all the top matches'),
+      findsNothing,
+    );
   });
 }

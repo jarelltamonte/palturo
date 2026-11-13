@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -11,6 +11,7 @@ import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/screen/explore_category_page.dart';
+import 'package:palturo/screen/explore_taxonomy.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -27,6 +28,8 @@ class ExplorePage extends StatefulWidget {
 
 class _ExplorePageState extends State<ExplorePage> {
   List<Map<String, dynamic>> _roots = const [];
+  Map<String, int> _rootCounts = const {};
+  bool _hasMentorSkills = false;
   bool _loading = true;
   String? _error;
 
@@ -35,18 +38,6 @@ class _ExplorePageState extends State<ExplorePage> {
   ExploreRole _role = ExploreRole.learner;
 
   int _requestId = 0;
-
-  static const Map<String, IconData> _rootIcons = {
-    'cooking_culinary': Icons.restaurant_outlined,
-    'traditional_crafts': Icons.palette_outlined,
-    'performing_arts': Icons.music_note_outlined,
-    'martial_arts': Icons.sports_martial_arts,
-    'language_writing': Icons.translate,
-    'household_skills': Icons.home_repair_service_outlined,
-    'agriculture_livelihood': Icons.agriculture_outlined,
-    'modern_practical_skills': Icons.handyman_outlined,
-    'visual_arts_design': Icons.brush_outlined,
-  };
 
   static const Map<String, String> _descriptionRules = {
     'cook': 'Recipes, flavors, and kitchen traditions',
@@ -96,7 +87,10 @@ class _ExplorePageState extends State<ExplorePage> {
   Future<List<Map<String, dynamic>>> _filterByRole(
     List<Map<String, dynamic>> roots,
   ) async {
-    if (_role == ExploreRole.learner) return roots;
+    if (_role == ExploreRole.learner) {
+      _hasMentorSkills = false;
+      return roots;
+    }
 
     final skills = await MatchApi.mySkills();
     final mentorPaths =
@@ -105,6 +99,7 @@ class _ExplorePageState extends State<ExplorePage> {
             .map((skill) => (skill['path'] ?? '') as String)
             .where((path) => path.isNotEmpty)
             .toList();
+    _hasMentorSkills = mentorPaths.isNotEmpty;
 
     return roots.where((root) {
       final rootPath = (root['path'] ?? '') as String;
@@ -113,6 +108,30 @@ class _ExplorePageState extends State<ExplorePage> {
         (path) => path == rootPath || path.startsWith('$rootPath.'),
       );
     }).toList();
+  }
+
+  /// Counts the people available under each root for the active role. Empty
+  /// branches are hidden and the counts make the remaining cards informative.
+  Future<Map<String, int>> _rootCountsFor(
+    List<Map<String, dynamic>> roots,
+  ) async {
+    if (roots.isEmpty) return const <String, int>{};
+    final kind = _role == ExploreRole.mentor ? 'learn' : 'teach';
+    final entries = await Future.wait(
+      roots.map((root) async {
+        final path = (root['path'] ?? '').toString();
+        if (path.isEmpty) return const MapEntry('', 0);
+        try {
+          final people = await MatchApi.browseSkillUsers(path, kind: kind);
+          return MapEntry(path, people.length);
+        } catch (e) {
+          // A failed count must not hide a valid category.
+          debugPrint('[Browse] count failed for $path: $e');
+          return MapEntry(path, 1);
+        }
+      }),
+    );
+    return Map<String, int>.fromEntries(entries);
   }
 
   Future<void> _loadTaxonomy({bool notifyFailure = false}) async {
@@ -129,9 +148,17 @@ class _ExplorePageState extends State<ExplorePage> {
       final roots =
           nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
       final filtered = await _filterByRole(roots);
+      final counts = await _rootCountsFor(filtered);
       if (!mounted || requestId != _requestId) return;
+      final visible =
+          filtered
+              .where(
+                (root) => (counts[(root['path'] ?? '').toString()] ?? 1) > 0,
+              )
+              .toList();
       setState(() {
-        _roots = filtered;
+        _roots = visible;
+        _rootCounts = counts;
         _loading = false;
       });
     } catch (e) {
@@ -270,8 +297,8 @@ class _ExplorePageState extends State<ExplorePage> {
         duration: AppMotion.base,
         child: Text(
           _role == ExploreRole.mentor
-              ? 'Showing only categories that match your mentor skills.'
-              : 'Showing all categories.',
+              ? 'Showing categories with learners available right now.'
+              : 'Showing categories with mentors available right now.',
           key: ValueKey(_role),
           style: TextStyle(
             fontSize: 12,
@@ -365,7 +392,9 @@ class _ExplorePageState extends State<ExplorePage> {
     return _CategoryCard(
       label: (node['name'] ?? '') as String,
       description: _descriptionFor(node),
-      icon: _rootIcons[path] ?? Icons.category_outlined,
+      icon: exploreRootIcon(path),
+      count: _rootCounts[path] ?? 0,
+      countLabel: _role == ExploreRole.mentor ? 'learner' : 'mentor',
       onTap: () => _openCategory(node),
     );
   }
@@ -379,7 +408,9 @@ class _ExplorePageState extends State<ExplorePage> {
           children: [
             Text(
               _role == ExploreRole.mentor
-                  ? 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
+                  ? _hasMentorSkills
+                      ? 'No learners are looking for your skills right now. Check back soon.'
+                      : 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
                   : 'No categories available right now.',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(color: textTheme),
@@ -387,8 +418,13 @@ class _ExplorePageState extends State<ExplorePage> {
             if (_role == ExploreRole.mentor) ...[
               const SizedBox(height: 8),
               TextButton(
-                onPressed: _openProfileEditor,
-                child: const Text('Update your teaching skills'),
+                onPressed:
+                    _hasMentorSkills ? _loadTaxonomy : _openProfileEditor,
+                child: Text(
+                  _hasMentorSkills
+                      ? 'Check again'
+                      : 'Update your teaching skills',
+                ),
               ),
             ] else ...[
               const SizedBox(height: 8),
@@ -707,12 +743,16 @@ class _CategoryCard extends StatelessWidget {
     required this.label,
     required this.description,
     required this.icon,
+    required this.count,
+    required this.countLabel,
     required this.onTap,
   });
 
   final String label;
   final String description;
   final IconData icon;
+  final int count;
+  final String countLabel;
   final VoidCallback onTap;
 
   @override
@@ -789,6 +829,19 @@ class _CategoryCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (count > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    count >= 50
+                        ? '50+ ${countLabel}s'
+                        : '$count $countLabel${count == 1 ? '' : 's'}',
+                    style: TextStyle(
+                      color: AppColors.accentText(context),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

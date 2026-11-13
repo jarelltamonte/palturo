@@ -254,7 +254,8 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _showAccountCreatedDialog({
-    String message = 'We sent a link to your email. Open it and click Confirm email to verify your account before logging in.',
+    String message =
+        'We sent a link to your email. Open it and click Confirm email to verify your account before logging in.',
   }) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
@@ -710,7 +711,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                 baseline: TextBaseline.alphabetic,
                                 child: TextButton(
                                   onPressed:
-                                      () => LegalDialogs.showDataPolicy(context),
+                                      () =>
+                                          LegalDialogs.showDataPolicy(context),
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
@@ -751,50 +753,42 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _register,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: AppTextStyles.boldText,
+                            foregroundColor: AppColors.textSecondary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                          child:
+                              _isSubmitting
+                                  ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  )
+                                  : const Text('Sign Up'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
               ),
             );
           },
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: AppTextStyles.boldText,
-                    foregroundColor: AppColors.textSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  child:
-                      _isSubmitting
-                          ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.textSecondary,
-                              ),
-                            ),
-                          )
-                          : const Text('Sign Up'),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

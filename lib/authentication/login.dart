@@ -202,9 +202,9 @@ class _LoginPageState extends State<LoginPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      // Web: do not relayout the whole page when the browser keyboard/insets
-      // fire on field focus — scroll instead (fixes the resize jump).
-      resizeToAvoidBottomInset: false,
+      // Web keeps the page height and scrolls. Mobile lets the Scaffold resize
+      // above the keyboard so the form and actions stay reachable.
+      resizeToAvoidBottomInset: !kIsWeb,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -220,7 +220,7 @@ class _LoginPageState extends State<LoginPage> {
                     16,
                     0,
                     16,
-                    MediaQuery.of(context).viewInsets.bottom,
+                    kIsWeb ? MediaQuery.of(context).viewInsets.bottom : 0,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -366,53 +366,50 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RegisterPage(),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: AppColors.accentText(context),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: AppTextStyles.boldText,
+                            side: BorderSide(
+                              color: AppColors.accentText(context),
+                              width: 1,
+                            ),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(24),
+                              ),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text('Create new account'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Image.asset(
+                          'assets/images/brand.png',
+                          width: 132,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             );
           },
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterPage(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: AppColors.accentText(context),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: AppTextStyles.boldText,
-                    side: BorderSide(
-                      color: AppColors.accentText(context),
-                      width: 1,
-                    ),
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(24)),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text('Create new account'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(child: Image.asset('assets/images/brand.png', width: 132)),
-            ],
-          ),
         ),
       ),
     );

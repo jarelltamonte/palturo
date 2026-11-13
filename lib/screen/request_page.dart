@@ -12,6 +12,7 @@ import 'package:palturo/screen/notifications_page.dart';
 import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/models/app_notification.dart';
 import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/haptics.dart';
@@ -23,6 +24,7 @@ import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/app_empty_state.dart';
+import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/theme/app_spacing.dart';
@@ -284,6 +286,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   bool _responding = false;
   bool _cancelling = false;
   final Set<String> _declinedIds = {};
+  StreamSubscription<AppNotification>? _notificationEvents;
+  StreamSubscription<AppNotification>? _notificationDeletions;
 
   @override
   void initState() {
@@ -292,6 +296,12 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     _restoreFilters();
     widget.refreshSignal?.addListener(_refreshFromShell);
     NotificationService.instance.addListener(_onActivityChanged);
+    _notificationEvents = NotificationService.instance.events.listen(
+      _onNotificationEvent,
+    );
+    _notificationDeletions = NotificationService.instance.deletions.listen(
+      _onNotificationDeleted,
+    );
     _loadRequests();
     _loadOutgoing();
   }
@@ -323,11 +333,35 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     if (_isPushedRequests) AppShellState.instance.setRequestsOpen(false);
     widget.refreshSignal?.removeListener(_refreshFromShell);
     NotificationService.instance.removeListener(_onActivityChanged);
+    _notificationEvents?.cancel();
+    _notificationDeletions?.cancel();
     super.dispose();
   }
 
   void _onActivityChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// A realtime request must appear in the list, not just the badge. Reload
+  /// the affected surface when the notification event arrives.
+  void _onNotificationEvent(AppNotification item) {
+    if (!mounted) return;
+    if (item.kind.isRequest) {
+      _loadRequests();
+    }
+    if (item.kind.isMatch || item.kind.isDecline) {
+      _loadOutgoing();
+    }
+  }
+
+  void _onNotificationDeleted(AppNotification item) {
+    if (!mounted) return;
+    if (item.kind.isRequest) {
+      _loadRequests();
+    }
+    if (item.kind.isMatch || item.kind.isDecline) {
+      _loadOutgoing();
+    }
   }
 
   void _refreshFromShell() {
@@ -574,7 +608,9 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       await ChatStateService.instance.loadConversations(showSpinner: false);
       if (!mounted) return false;
 
-      NotificationService.instance.refresh();
+      AppBannerController.instance.removeGroup(
+        'notification:connection_request:${request.id}',
+      );
 
       if (!accept) {
         setState(() => _declinedIds.add(request.id));
@@ -584,23 +620,30 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
           duration: const Duration(seconds: 3),
         );
         Future<void>.delayed(const Duration(seconds: 5), () {
-          if (!mounted || !_declinedIds.contains(request.id)) return;
+          if (!_declinedIds.contains(request.id)) return;
+          unawaited(
+            NotificationService.instance.markRequestHandled(request.id),
+          );
+          if (!mounted) return;
           setState(() => _declinedIds.remove(request.id));
           _removeRequest(request.id);
         });
-        return true;
+      } else {
+        _removeRequest(request.id);
+
+        NotificationPresenter.instance.showMatch(
+          connectionId: request.id,
+          name: request.requesterName,
+          skillName: request.skillName,
+          avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
+          role: request.role,
+          person: request.toPerson(),
+        );
+
+        await NotificationService.instance.markRequestHandled(request.id);
+        unawaited(NotificationService.instance.refresh());
       }
 
-      _removeRequest(request.id);
-
-      NotificationPresenter.instance.showMatch(
-        connectionId: request.id,
-        name: request.requesterName,
-        skillName: request.skillName,
-        avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
-        role: request.role,
-        person: request.toPerson(),
-      );
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -1128,34 +1171,70 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
         ),
         actionsPadding: EdgeInsets.zero,
         actions: [
-              AppChrome.iconAction(
-                icon: Icons.notifications_none_rounded,
-                tooltip: 'Activity',
-                onPressed:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationsPage(),
+          AppChrome.iconAction(
+            icon: Icons.notifications_none_rounded,
+            tooltip: 'Activity',
+            onPressed:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Icons.notifications_none_rounded,
+                  color: textTheme,
+                  size: 24,
+                ),
+                if (PreferencesService.instance.notificationsEnabled &&
+                    NotificationService.instance.unread > 0)
+                  Positioned(
+                    right: -1,
+                    top: -1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
                       ),
                     ),
+                  ),
+              ],
+            ),
+          ),
+          Semantics(
+            container: true,
+            button: true,
+            label:
+                _view == RequestView.incoming
+                    ? 'Filter requests'
+                    : 'Filter sent requests',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _openFilterSheet,
+              child: SizedBox(
+                width: AppSpacing.iconTarget,
+                height: AppSpacing.iconTarget,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Icon(
-                      Icons.notifications_none_rounded,
-                      color: textTheme,
-                      size: 24,
+                    Align(
+                      alignment: Alignment.center,
+                      child: Icon(Icons.tune, color: textTheme, size: 24),
                     ),
-                    if (PreferencesService.instance.notificationsEnabled &&
-                        NotificationService.instance.unread > 0)
+                    if (_view == RequestView.incoming
+                        ? _hasActiveFilter
+                        : _hasSentFilter)
                       Positioned(
-                        right: -1,
-                        top: -1,
+                        right: -2,
+                        top: 9,
                         child: Container(
-                    width: 8,
+                          width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
+                          decoration: BoxDecoration(
+                            color: AppColors.accentText(context),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1163,47 +1242,9 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                   ],
                 ),
               ),
-              Semantics(
-                container: true,
-                button: true,
-                label:
-                    _view == RequestView.incoming
-                        ? 'Filter requests'
-                        : 'Filter sent requests',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _openFilterSheet,
-                  child: SizedBox(
-                    width: AppSpacing.iconTarget,
-                    height: AppSpacing.iconTarget,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Align(
-                          alignment: Alignment.center,
-                          child: Icon(Icons.tune, color: textTheme, size: 24),
-                        ),
-                        if (_view == RequestView.incoming
-                            ? _hasActiveFilter
-                            : _hasSentFilter)
-                          Positioned(
-                            right: -2,
-                            top: 9,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: AppColors.accentText(context),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -1255,11 +1296,7 @@ class _SentRequestCard extends StatelessWidget {
   final VoidCallback? onWithdraw;
   final VoidCallback? onTap;
 
-  const _SentRequestCard({
-    required this.request,
-    this.onWithdraw,
-    this.onTap,
-  });
+  const _SentRequestCard({required this.request, this.onWithdraw, this.onTap});
 
   @override
   Widget build(BuildContext context) {

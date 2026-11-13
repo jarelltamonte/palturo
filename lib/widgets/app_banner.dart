@@ -127,6 +127,17 @@ class AppBannerController {
     current.value = null;
   }
 
+  /// Removes the visible and queued banners for [groupKey]. Used when the
+  /// event behind a banner is handled, so a stale request cannot pop back up.
+  void removeGroup(String groupKey) {
+    if (groupKey.isEmpty) return;
+    final visible = current.value;
+    if (visible != null && visible.groupKey == groupKey) {
+      dismiss(visible.id);
+    }
+    _queue.removeWhere((item) => item.groupKey == groupKey);
+  }
+
   void _present(AppBannerData data) {
     _timer?.cancel();
     current.value = data;
@@ -328,14 +339,21 @@ class _BannerCard extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                tooltip: 'Dismiss notification',
-                onPressed: () => AppBannerController.instance.dismiss(data.id),
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                icon: Icon(
-                  Icons.close,
-                  size: 18,
-                  color: AppColors.mutedText(context),
+              Semantics(
+                button: true,
+                label: 'Dismiss notification',
+                child: IconButton(
+                  onPressed:
+                      () => AppBannerController.instance.dismiss(data.id),
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  icon: Icon(
+                    Icons.close,
+                    size: 18,
+                    color: AppColors.mutedText(context),
+                  ),
                 ),
               ),
             ],

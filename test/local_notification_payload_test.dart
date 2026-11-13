@@ -109,6 +109,7 @@ void main() {
     expect(payload['skillName'], 'Binangkal');
     expect(payload['role'], 'mentor');
     expect(payload['avatarUrl'], contains('grace.png'));
+    expect(payload['notificationId'], 'n1');
   });
 
   test('request payload routes to the incoming list', () {

@@ -33,8 +33,8 @@ class RequestCard extends StatefulWidget {
   final ImageProvider? avatarImage;
   final Person? person;
   final PersonRole? role;
-  final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final Future<bool> Function() onAccept;
   final Future<bool> Function()? onConfirmDecline;
   final VoidCallback? onUndo;
   final VoidCallback? onStartChatting;
@@ -96,11 +96,17 @@ class _RequestCardState extends State<RequestCard>
     super.dispose();
   }
 
-  void _handleAccept() {
+  Future<void> _handleAccept() async {
     if (_controller.isAnimating || _outcome != _RequestOutcome.none) return;
     setState(() => _outcome = _RequestOutcome.accepted);
     _controller.forward();
-    widget.onAccept();
+    final accepted = await widget.onAccept();
+    if (!mounted) return;
+    if (!accepted) {
+      // The RPC failed or another request was already in flight. Flip back so
+      // the card never claims a request was accepted when it was not.
+      _controller.reverse();
+    }
   }
 
   Future<void> _handleDecline() async {

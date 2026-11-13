@@ -457,9 +457,13 @@ class LocalNotificationService extends ChangeNotifier
   ) {
     switch (view.destination) {
       case ActivityDestination.incomingRequests:
-        return {'route': 'requests', 'view': 'incoming'};
+        return {
+          'route': 'requests',
+          'view': 'incoming',
+          'notificationId': item.id,
+        };
       case ActivityDestination.sentRequests:
-        return {'route': 'requests', 'view': 'sent'};
+        return {'route': 'requests', 'view': 'sent', 'notificationId': item.id};
       case ActivityDestination.chat:
         return {
           'route': 'chat',
@@ -468,11 +472,12 @@ class LocalNotificationService extends ChangeNotifier
           'skillName': view.skillName,
           'role': item.role,
           'avatarUrl': item.actorAvatar,
+          'notificationId': item.id,
         };
       case ActivityDestination.none:
         return item.kind == AppNotificationKind.skillModeration
-            ? {'route': 'profile'}
-            : {'route': 'activity'};
+            ? {'route': 'profile', 'notificationId': item.id}
+            : {'route': 'activity', 'notificationId': item.id};
     }
   }
 
@@ -489,6 +494,10 @@ class LocalNotificationService extends ChangeNotifier
       payload = Map<String, dynamic>.from(decoded);
     } catch (_) {
       return;
+    }
+    final notificationId = payload['notificationId']?.toString();
+    if (notificationId != null && notificationId.isNotEmpty) {
+      unawaited(NotificationService.instance.markItemRead(notificationId));
     }
     final route = payload['route']?.toString();
     switch (route) {

@@ -18,6 +18,8 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
 
   final StreamController<AppNotification> _events =
       StreamController<AppNotification>.broadcast();
+  final StreamController<AppNotification> _deletions =
+      StreamController<AppNotification>.broadcast();
   final Set<String> _seenIds = <String>{};
 
   List<AppNotification> _items = const [];
@@ -37,11 +39,19 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
 
   int get unread => _unread;
 
+  /// Unread incoming-request updates only. The Requests tab badge must not
+  /// count feedback or accepted/declined activity.
+  int get unreadRequests => unreadRequestCount(_items);
+
   bool get loading => _loading;
 
   String? get error => _error;
 
   Stream<AppNotification> get events => _events.stream;
+
+  /// Emits the removed item when a notification disappears server-side (for
+  /// example, when a sender withdraws a request).
+  Stream<AppNotification> get deletions => _deletions.stream;
 
   AppLifecycleState get lifecycleState => _lifecycleState;
 
@@ -185,6 +195,27 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Clears the unread request notification that belongs to [connectionId].
+  /// Called when the user accepts or declines that request.
+  Future<void> markRequestHandled(String connectionId) async {
+    if (connectionId.isEmpty) return;
+    if (_items.isEmpty) {
+      await refresh();
+    }
+    final ids = _items
+        .where(
+          (item) =>
+              item.isUnread &&
+              item.kind == AppNotificationKind.connectionRequest &&
+              item.connectionId == connectionId,
+        )
+        .map((item) => item.id)
+        .toList(growable: false);
+    for (final id in ids) {
+      await markItemRead(id);
+    }
+  }
+
   /// Removes already-read items from Activity and the server.
   Future<bool> clearRead() async {
     final remaining = _items
@@ -278,6 +309,26 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
           ),
           callback: _handleInsert,
         )
+        // Withdrawn requests delete their notification server-side. Without a
+        // delete listener the recipient keeps a stale badge until a refresh.
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'notifications',
+          callback: _handleDelete,
+        )
+        // Read-state changes made on another device must update this badge.
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: _handleUpdate,
+        )
         .subscribe((status, error) {
           if (status == RealtimeSubscribeStatus.subscribed) {
             _channelSubscribed = true;
@@ -309,6 +360,36 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     _items = [item, ..._items.where((existing) => existing.id != item.id)];
     notifyListeners();
     unawaited(_emitEnriched(item));
+  }
+
+  void _handleDelete(PostgresChangePayload payload) {
+    final id = payload.oldRecord['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    final removed = _items[index];
+    final next = List<AppNotification>.of(_items)..removeAt(index);
+    _items = next;
+    if (removed.isUnread && _unread > 0) _unread--;
+    _deletions.add(removed);
+    notifyListeners();
+  }
+
+  void _handleUpdate(PostgresChangePayload payload) {
+    final record = payload.newRecord;
+    if (record.isEmpty) return;
+    final item = AppNotification.fromRow(record);
+    final index = _items.indexWhere((existing) => existing.id == item.id);
+    if (index == -1) return;
+    final previous = _items[index];
+    final next = List<AppNotification>.of(_items)..[index] = item;
+    _items = next;
+    if (previous.isUnread && !item.isUnread && _unread > 0) {
+      _unread--;
+    } else if (!previous.isUnread && item.isUnread) {
+      _unread++;
+    }
+    notifyListeners();
   }
 
   /// Realtime rows only contain the base table columns. Fetch the enriched
@@ -356,7 +437,18 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
       unawaited(Supabase.instance.client.removeChannel(channel));
     }
     _events.close();
+    _deletions.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 }
+
+@visibleForTesting
+int unreadRequestCount(Iterable<AppNotification> items) =>
+    items
+        .where(
+          (item) =>
+              item.isUnread &&
+              item.kind == AppNotificationKind.connectionRequest,
+        )
+        .length;

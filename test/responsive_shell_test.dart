@@ -27,14 +27,24 @@ void main() {
     return mediaWidth;
   }
 
-  testWidgets('wide surfaces get a 480 logical-width shell', (tester) async {
+  testWidgets('desktop passes the full width through', (tester) async {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final mediaWidth = await pumpShell(tester, const Size(1440, 900));
 
-    expect(mediaWidth, 480);
-    expect(tester.getSize(find.byKey(key)).width, closeTo(480, 3));
+    expect(mediaWidth, 1440);
+    expect(tester.getSize(find.byKey(key)).width, closeTo(1440, 3));
+  });
+
+  testWidgets('tablet-sized surface gets a readable column', (tester) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mediaWidth = await pumpShell(tester, const Size(800, 1000));
+
+    expect(mediaWidth, 600);
+    expect(tester.getSize(find.byKey(key)).width, closeTo(600, 3));
   });
 
   testWidgets('phone portrait passes through', (tester) async {
@@ -45,15 +55,5 @@ void main() {
 
     expect(mediaWidth, 390);
     expect(tester.getSize(find.byKey(key)).width, closeTo(390, 3));
-  });
-
-  testWidgets('phone landscape stays full width', (tester) async {
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final mediaWidth = await pumpShell(tester, const Size(844, 390));
-
-    expect(mediaWidth, 844);
-    expect(tester.getSize(find.byKey(key)).width, closeTo(844, 3));
   });
 }

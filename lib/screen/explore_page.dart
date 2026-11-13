@@ -299,16 +299,26 @@ class _ExplorePageState extends State<ExplorePage> {
         const spacing = 16.0;
         const topInset = 8.0;
         final bottomInset = AppSpacing.bottomNavClearanceFor(context);
-        final itemHeight =
+        final rawItemHeight =
             (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
-        if (itemHeight < 172) return _buildGridAuto(textTheme);
+        if (rawItemHeight < 172) return _buildGridAuto(textTheme);
+
+        // Wide desktop surfaces lay the four roots out in one row so the cards
+        // keep a comfortable aspect instead of stretching to half the viewport.
+        final columns = constraints.maxWidth >= 900 ? 4 : 2;
+        final itemHeight =
+            columns == 4
+                ? 210.0
+                : constraints.maxWidth >= 700
+                ? rawItemHeight.clamp(172.0, 300.0)
+                : rawItemHeight;
         return RefreshIndicator(
           onRefresh: _refreshTaxonomy,
           child: GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+              crossAxisCount: columns,
               crossAxisSpacing: spacing,
               mainAxisSpacing: spacing,
               mainAxisExtent: itemHeight,
@@ -322,25 +332,30 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildGridAuto(Color textTheme) {
-    return RefreshIndicator(
-      onRefresh: _refreshTaxonomy,
-      child: GridView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          AppSpacing.bottomNavClearanceFor(context),
-        ),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          mainAxisExtent: 190,
-        ),
-        itemCount: _roots.length,
-        itemBuilder: (context, index) => _buildCard(index),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 900 ? 3 : 2;
+        return RefreshIndicator(
+          onRefresh: _refreshTaxonomy,
+          child: GridView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              AppSpacing.bottomNavClearanceFor(context),
+            ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              mainAxisExtent: 190,
+            ),
+            itemCount: _roots.length,
+            itemBuilder: (context, index) => _buildCard(index),
+          ),
+        );
+      },
     );
   }
 

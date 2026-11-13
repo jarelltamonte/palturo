@@ -243,9 +243,8 @@ class _HomePageState extends State<HomePage> {
         byId[person.id] = person;
       }
     }
-    return byId.values.toList()..sort(
-      (a, b) => (b.compatibility ?? 0).compareTo(a.compatibility ?? 0),
-    );
+    return byId.values.toList()
+      ..sort((a, b) => (b.compatibility ?? 0).compareTo(a.compatibility ?? 0));
   }
 
   Future<List<Person>> _fetchDeck({bool force = false}) async {
@@ -549,6 +548,7 @@ class _HomePageState extends State<HomePage> {
     if (!_undoActive) return child;
 
     final size = MediaQuery.of(context).size;
+    final travelWidth = size.width > 600 ? 460.0 : size.width;
     final dir = _undoRight ? 1.0 : -1.0;
 
     return TweenAnimationBuilder<double>(
@@ -562,7 +562,7 @@ class _HomePageState extends State<HomePage> {
             opacity: 1 - v * 0.5,
             child: Transform.translate(
               offset: Offset(
-                dir * v * size.width * 0.7,
+                dir * v * travelWidth * 0.7,
                 v * size.height * 0.35,
               ),
               child: Transform.rotate(angle: dir * v * 0.25, child: child),
@@ -724,6 +724,16 @@ class _HomePageState extends State<HomePage> {
     final people = _filteredPeople;
     final hasMore = _currentIndex < people.length;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final desktop = MediaQuery.sizeOf(context).width >= 900;
+
+    final content =
+        _loading
+            ? _buildLoadingState()
+            : _error != null && _people.isEmpty
+            ? _buildErrorState(textTheme)
+            : hasMore
+            ? _buildDeck(people)
+            : _buildEmptyState(textTheme);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -735,21 +745,27 @@ class _HomePageState extends State<HomePage> {
         automaticallyImplyLeading: false,
         title: Padding(
           padding: EdgeInsets.only(
-            left: AppSpacing.pageHorizontal,
+            left: desktop ? AppSpacing.titleSpacing : AppSpacing.pageHorizontal,
             right: (16.0 - (AppSpacing.iconTarget - 24) / 2).clamp(0.0, 16.0),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Transform.translate(
-                offset: const Offset(-10, 0),
-                child: Image.asset(
-                  isDarkMode
-                      ? 'assets/images/hlogo_white.png'
-                      : 'assets/images/hlogo_black.png',
-                  height: 40,
+              if (desktop)
+                Text(
+                  'For You',
+                  style: AppTextStyles.headingText.copyWith(color: textTheme),
+                )
+              else
+                Transform.translate(
+                  offset: const Offset(-10, 0),
+                  child: Image.asset(
+                    isDarkMode
+                        ? 'assets/images/hlogo_white.png'
+                        : 'assets/images/hlogo_black.png',
+                    height: 40,
+                  ),
                 ),
-              ),
               Row(
                 children: [
                   ListenableBuilder(
@@ -892,16 +908,21 @@ class _HomePageState extends State<HomePage> {
           16,
           8,
           16,
-          MediaQuery.textScalerOf(context).scale(12) > 16 ? 112 : 90,
+          desktop
+              ? 24
+              : MediaQuery.textScalerOf(context).scale(12) > 16
+              ? 112
+              : 90,
         ),
         child:
-            _loading
-                ? _buildLoadingState()
-                : _error != null && _people.isEmpty
-                ? _buildErrorState(textTheme)
-                : hasMore
-                ? _buildDeck(people)
-                : _buildEmptyState(textTheme),
+            desktop
+                ? Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: content,
+                  ),
+                )
+                : content,
       ),
     );
   }

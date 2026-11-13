@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
@@ -101,6 +102,8 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 900;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -127,53 +130,91 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
           return;
         }
       },
-      child: Scaffold(
-        extendBody: true,
-        body: Stack(
-          children: List.generate(_pages.length, (index) {
-            final active = index == _selectedIndex;
-            final reducedMotion = MediaQuery.disableAnimationsOf(context);
-            return Positioned.fill(
-              child: ExcludeFocus(
+      child: desktop ? _buildDesktopShell(context) : _buildMobileShell(context),
+    );
+  }
+
+  Widget _buildPageStack() {
+    return Stack(
+      children: List.generate(_pages.length, (index) {
+        final active = index == _selectedIndex;
+        final reducedMotion = MediaQuery.disableAnimationsOf(context);
+        return Positioned.fill(
+          child: ExcludeFocus(
+            excluding: !active,
+            child: IgnorePointer(
+              ignoring: !active,
+              child: ExcludeSemantics(
                 excluding: !active,
-                child: IgnorePointer(
-                  ignoring: !active,
-                  child: ExcludeSemantics(
-                    excluding: !active,
-                    child: AnimatedSlide(
-                      duration: reducedMotion ? Duration.zero : AppMotion.base,
-                      curve: Curves.easeOut,
-                      offset:
-                          active
-                              ? Offset.zero
-                              : Offset(
-                                index < _selectedIndex ? -0.035 : 0.035,
-                                0,
-                              ),
-                      child: AnimatedOpacity(
-                        duration:
-                            !active || reducedMotion
-                                ? Duration.zero
-                                : AppMotion.base,
-                        curve: Curves.easeOut,
-                        opacity: active ? 1 : 0,
-                        child: TickerMode(
-                          enabled: active,
-                          child: _pages[index],
-                        ),
-                      ),
-                    ),
+                child: AnimatedSlide(
+                  duration: reducedMotion ? Duration.zero : AppMotion.base,
+                  curve: Curves.easeOut,
+                  offset:
+                      active
+                          ? Offset.zero
+                          : Offset(index < _selectedIndex ? -0.035 : 0.035, 0),
+                  child: AnimatedOpacity(
+                    duration:
+                        !active || reducedMotion
+                            ? Duration.zero
+                            : AppMotion.base,
+                    curve: Curves.easeOut,
+                    opacity: active ? 1 : 0,
+                    child: TickerMode(enabled: active, child: _pages[index]),
                   ),
                 ),
               ),
-            );
-          }),
-        ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          minimum: const EdgeInsets.only(bottom: 20),
-          child: _buildNavBar(),
-        ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildMobileShell(BuildContext context) {
+    return Scaffold(
+      extendBody: true,
+      body: _buildPageStack(),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 20),
+        child: _buildNavBar(),
+      ),
+    );
+  }
+
+  double get _desktopContentMaxWidth => switch (_selectedIndex) {
+    0 => 760,
+    1 => 1120,
+    _ => 820,
+  };
+
+  Widget _buildDesktopShell(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          _DesktopSidebar(
+            selectedIndex: _selectedIndex,
+            icons: _navigationIcons,
+            selectedIcons: _selectedIcons,
+            labels: _navigationLabels,
+            onSelected: _onItemTapped,
+          ),
+          Expanded(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: _desktopContentMaxWidth,
+                  ),
+                  child: SizedBox.expand(child: _buildPageStack()),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -306,6 +347,202 @@ class _ExploreObserver extends NavigatorObserver {
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
       onChanged();
+}
+
+class _DesktopSidebar extends StatelessWidget {
+  final int selectedIndex;
+  final List<IconData> icons;
+  final List<IconData> selectedIcons;
+  final List<String> labels;
+  final ValueChanged<int> onSelected;
+
+  const _DesktopSidebar({
+    required this.selectedIndex,
+    required this.icons,
+    required this.selectedIcons,
+    required this.labels,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        ChatStateService.instance,
+        NotificationService.instance,
+      ]),
+      builder: (context, _) {
+        final badgesEnabled = PreferencesService.instance.notificationsEnabled;
+        final chatUnread =
+            badgesEnabled ? ChatStateService.instance.totalUnreadCount : 0;
+        final requestUnread =
+            badgesEnabled ? NotificationService.instance.unread : 0;
+
+        return Container(
+          width: 252,
+          decoration: BoxDecoration(
+            color: AppColors.elevatedSurface(context),
+            border: Border(right: BorderSide(color: AppColors.border(context))),
+          ),
+          child: SafeArea(
+            right: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 46,
+                    child: Image.asset(
+                      isDark
+                          ? 'assets/images/hlogo_white.png'
+                          : 'assets/images/hlogo_black.png',
+                      width: 138,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    'SKILL EXCHANGE',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.accentText(context),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                  const SizedBox(height: 34),
+                  for (var index = 0; index < labels.length; index++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _DesktopNavItem(
+                        icon:
+                            selectedIndex == index
+                                ? selectedIcons[index]
+                                : icons[index],
+                        label: labels[index],
+                        selected: selectedIndex == index,
+                        unreadCount:
+                            index == 2
+                                ? chatUnread
+                                : index == 3
+                                ? requestUnread
+                                : 0,
+                        onTap: () => onSelected(index),
+                      ),
+                    ),
+                  const Spacer(),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.smartphone_outlined,
+                        size: 13,
+                        color: AppColors.mutedText(context),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'PalTuro is designed for mobile. This desktop layout is an adaptation.',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: AppColors.mutedText(context),
+                            fontSize: 10,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DesktopNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final int unreadCount;
+  final VoidCallback onTap;
+
+  const _DesktopNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground =
+        selected ? AppColors.black : Theme.of(context).colorScheme.secondary;
+    final badgeColor = selected ? AppColors.black : AppColors.primary;
+    final badgeText = selected ? AppColors.primary : AppColors.black;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: unreadCount > 0 ? '$label, $unreadCount unread' : label,
+      child: Material(
+        color: selected ? AppColors.primary : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            height: 48,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  Icon(icon, size: 20, color: foreground),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: AppTextStyles.boldText.copyWith(
+                        color: foreground,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  if (unreadCount > 0)
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeColor,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.boldText.copyWith(
+                          color: badgeText,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NavItem extends StatefulWidget {

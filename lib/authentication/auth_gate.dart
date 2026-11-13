@@ -5,6 +5,7 @@ import 'package:palturo/authentication/login.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/screen/navigation_bar.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/desktop_route_frame.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -197,30 +198,33 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (_session == null) {
-      return const LoginPage();
+      return const DesktopRouteFrame(maxWidth: 560, child: LoginPage());
     }
 
     if (_isProfileCompleted || _hasSkipped) {
       return const NavigationBarWidget();
     }
 
-    return OnboardingFlow(
-      onFinished: () {
-        _evaluateUserStatus(_session);
-      },
-      onSkip: () async {
-        final uid = Supabase.instance.client.auth.currentUser?.id;
-        await PreferencesService.instance.setBool('skipped_onboarding', true);
-        await PreferencesService.instance.setBool(
-          onboardingResumeDismissedKey(uid),
-          false,
-        );
-        if (mounted) {
-          setState(() {
-            _hasSkipped = true;
-          });
-        }
-      },
+    return DesktopRouteFrame(
+      maxWidth: 560,
+      child: OnboardingFlow(
+        onFinished: () {
+          _evaluateUserStatus(_session);
+        },
+        onSkip: () async {
+          final uid = Supabase.instance.client.auth.currentUser?.id;
+          await PreferencesService.instance.setBool('skipped_onboarding', true);
+          await PreferencesService.instance.setBool(
+            onboardingResumeDismissedKey(uid),
+            false,
+          );
+          if (mounted) {
+            setState(() {
+              _hasSkipped = true;
+            });
+          }
+        },
+      ),
     );
   }
 }

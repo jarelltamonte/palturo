@@ -6,11 +6,11 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 /
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://yjcrfgvenilptrnudvcb.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://yjcrfgvenilptrnudvcb.supabase.co wss://yjcrfgvenilptrnudvcb.supabase.co https://www.gstatic.com https://fonts.gstatic.com; media-src 'self' blob: data:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://yjcrfgvenilptrnudvcb.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://yjcrfgvenilptrnudvcb.supabase.co wss://yjcrfgvenilptrnudvcb.supabase.co https://www.gstatic.com https://fonts.gstatic.com; media-src 'self' blob: data: https://yjcrfgvenilptrnudvcb.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   Cache-Control: no-cache
 
 /index.html
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://yjcrfgvenilptrnudvcb.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://yjcrfgvenilptrnudvcb.supabase.co wss://yjcrfgvenilptrnudvcb.supabase.co https://www.gstatic.com https://fonts.gstatic.com; media-src 'self' blob: data:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://yjcrfgvenilptrnudvcb.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://yjcrfgvenilptrnudvcb.supabase.co wss://yjcrfgvenilptrnudvcb.supabase.co https://www.gstatic.com https://fonts.gstatic.com; media-src 'self' blob: data: https://yjcrfgvenilptrnudvcb.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   Cache-Control: no-cache
 
 /confirm/*

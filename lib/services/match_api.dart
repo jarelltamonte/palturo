@@ -374,7 +374,8 @@ class MatchApi {
   }
 
   /// Returns the cached deck without a network or profile call, or null.
-  static List<Person>? peekDeck(String asRoleDb) => _deckCache[_deckKey(asRoleDb)];
+  static List<Person>? peekDeck(String asRoleDb) =>
+      _deckCache[_deckKey(asRoleDb)];
 
   /// Cached deck instantly (no spinner); triggers a background refresh when
   /// stale. force bypasses both.
@@ -577,6 +578,7 @@ class MatchApi {
         'sender_id': m['sender_id'],
         'body': m['body'],
         'created_at': m['created_at'],
+        'deleted_at': m['deleted_at'],
       };
     }).toList();
   }
@@ -585,6 +587,19 @@ class MatchApi {
     await _Client.c.rpc(
       'send_message',
       params: {'p_connection': connectionId, 'p_body': body},
+    );
+  }
+
+  /// Deletes one of the caller's own messages.
+  static Future<void> deleteMessage(String messageId) async {
+    await _Client.c.rpc('delete_message', params: {'p_message': messageId});
+  }
+
+  /// Clears every message in a conversation without removing the Pal.
+  static Future<void> deleteConversation(String connectionId) async {
+    await _Client.c.rpc(
+      'delete_conversation',
+      params: {'p_connection': connectionId},
     );
   }
 

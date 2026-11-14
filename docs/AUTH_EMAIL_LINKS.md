@@ -3,8 +3,8 @@
 ## Short answer
 
 No separate backend is required. Supabase Auth creates the tokens and sends the
-mail through Resend. `https://palturo.app` is a small static auth page that
-verifies those tokens, shows the new-password form, and confirms signups.
+mail through Resend. `https://palturo.app` serves a small static auth page that
+verifies the token, shows the new-password form, and confirms signups.
 
 ## Current flow
 
@@ -17,31 +17,34 @@ Supabase token hash:
 | Signup confirmation | `https://palturo.app/confirm?token_hash={{ .TokenHash }}&type=signup` |
 
 `/reset` calls `verifyOtp({ type: 'recovery' })`, shows the new-password form,
-then calls `updateUser({ password })`. Password reset is completed in the browser
-on desktop and mobile. No app is required.
+then calls `updateUser({ password })`. Password reset is completed in the
+browser on desktop and mobile. No app is required.
 
 `/confirm` calls `verifyOtp({ type: 'signup' })` and shows the confirmation
 state.
 
 Legacy `{{ .ConfirmationURL }}` links that only carry a `code` or session
-fragment show a “request a new link” state because the browser cannot complete
+fragment show a "request a new link" state because the browser cannot complete
 the PKCE exchange without the original verifier.
 
 ## Supabase settings
 
-**Authentication → URL Configuration**
+Authentication -> URL Configuration:
 
 - Site URL: `https://palturo.app/`
 - Redirect URLs:
   `https://palturo.app/**`, `https://www.palturo.app/**`,
   `http://localhost:5317/**`
 
-**Authentication → Email Templates**
+The local web preview now runs on port 5319. Email links do not depend on the
+local port because the app always uses `APP_PUBLIC_URL` for the redirect.
+
+Authentication -> Email Templates:
 
 - Reset Password uses the `/reset` token-hash link.
 - Confirm signup uses the `/confirm` token-hash link.
 
-Both templates were updated in the project. The `{{ .ConfirmationURL }}` links
+Both templates are updated in the project. The `{{ .ConfirmationURL }}` links
 were replaced, so the app no longer depends on the GitHub Pages auth page.
 
 ## App configuration
@@ -53,10 +56,10 @@ https://palturo.app/reset
 https://palturo.app/confirm
 ```
 
-`APP_PUBLIC_URL` defaults to `https://palturo.app` when it is not set, so a reset
-requested from localhost cannot produce a localhost email link. The app no
-longer consumes `token_hash` from `palturo://` links; the custom scheme is used
-only for the tokenless app-reopen hop after the browser flow completes.
+`APP_PUBLIC_URL` defaults to `https://palturo.app` when it is not set, so a
+reset requested from localhost cannot produce a localhost email link. The app
+no longer consumes `token_hash` from `palturo://` links; the custom scheme is
+used only for the tokenless app-reopen hop after the browser flow completes.
 
 ## Email delivery
 
@@ -65,7 +68,8 @@ Resend is the SMTP host and `team@palturo.app` is the sender. Keep the
 
 ## Deployment
 
-The page is a separate project at `../palturo-auth-web`, served by Cloudflare:
+The auth page is a separate project at `../palturo-auth-web`, served by
+Cloudflare:
 
 ```powershell
 cd ..\palturo-auth-web
@@ -73,7 +77,9 @@ npx --yes wrangler@latest deploy
 ```
 
 Custom domains `palturo.app` and `www.palturo.app` are attached to the Worker
-`palturo-auth`. The Resend DNS records are untouched.
+`palturo-auth`. The app's own web build is merged into the same Worker assets
+directory, so `/reset` and `/confirm` must survive that merge. The Resend DNS
+records are untouched.
 
 ## Verification checklist
 

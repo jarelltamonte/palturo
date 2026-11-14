@@ -24,7 +24,7 @@ void main() {
     expect(ProfileService.isShowcaseVideo('user-id/proof_1.jpg'), isFalse);
   });
 
-  testWidgets('an empty teaching row explains the required showcase', (
+  testWidgets('an empty teaching row explains the discovery showcase', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -45,7 +45,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Add a skill showcase'), findsOneWidget);
-    expect(find.text('REQUIRED'), findsOneWidget);
+    expect(find.text('FOR DISCOVERY'), findsOneWidget);
     expect(
       find.text('A photo or short video that appears on your discovery card.'),
       findsOneWidget,

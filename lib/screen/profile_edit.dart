@@ -678,25 +678,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
-    final teaches =
-        _role == OnboardingRole.teach ||
-        (_role == OnboardingRole.both && teachingSkills.isNotEmpty);
-    if (teaches) {
-      final hasShowcase = teachingSkills.any((id) {
-        final value =
-            teachingSkillImages[id] ?? _pendingTeachingImages[id] ?? '';
-        return value.trim().isNotEmpty;
-      });
-      if (!hasShowcase) {
-        await _showIncompleteSkillDialog(
-          'Add a showcase photo or short video to a teaching skill. It is '
-          'required and appears on your discovery card.',
-          title: 'Showcase Required',
-        );
-        return;
-      }
-    }
-
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
 
@@ -1123,9 +1104,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         Text(
                           _role == OnboardingRole.teach ||
                                   _role == OnboardingRole.both
-                              ? 'A showcase is required for every teaching skill. '
-                                  'It is the photo or short video people see on '
-                                  'your card in For You, Explore, and Browse.'
+                              ? 'Add a showcase so you appear in For You, '
+                                  'Explore, and Browse. You can save now and '
+                                  'add it later; you will stay out of '
+                                  'discovery until you do.'
                               : 'Switch to Teach or Both to add showcase media to '
                                   'a teaching skill.',
                           style: AppTextStyles.regularText.copyWith(

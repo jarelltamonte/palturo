@@ -1279,7 +1279,7 @@ class _SkillRowState extends State<_SkillRow> {
               )
               : Semantics(
                 button: true,
-                label: 'Add a required skill showcase',
+                label: 'Add a skill showcase for discovery',
                 excludeSemantics: true,
                 onTap: widget.onAttachFile,
                 child: GestureDetector(
@@ -1339,7 +1339,7 @@ class _SkillRowState extends State<_SkillRow> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      'REQUIRED',
+                                      'FOR DISCOVERY',
                                       style: TextStyle(
                                         color: widget.accentColor,
                                         fontSize: 8,

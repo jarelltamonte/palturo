@@ -311,6 +311,12 @@ class _HomePageState extends State<HomePage> {
       setState(() => _myProfile = me);
     }
 
+    // No role or no skill means there is nothing to match on yet. Skip the
+    // matcher and let For You show the setup checklist instead.
+    if (me != null && me.needsSetup) {
+      return const [];
+    }
+
     if (_roleFilter == RoleFilter.all) {
       final decks = await Future.wait([
         MatchApi.getMatchDeck(
@@ -531,13 +537,18 @@ class _HomePageState extends State<HomePage> {
     final profile = _myProfile;
     if (profile == null || profile.isProfileCompleted) return;
     _profileNudgeShown = true;
+    final needsShowcase = profile.needsShowcase;
     AppBannerController.instance.show(
       AppBannerData(
         id: 'profile-nudge',
-        title: 'Finish your profile',
-        body: 'Add a photo, bio, and languages so Pals can match with you.',
+        title: needsShowcase ? 'Add a showcase' : 'Finish your profile',
+        body:
+            needsShowcase
+                ? 'A showcase is what people see on your card. Add one so '
+                    'you appear in For You and Browse.'
+                : 'Add a photo, bio, and languages so Pals can match with you.',
         icon: Icons.auto_awesome_outlined,
-        actionLabel: 'Complete profile',
+        actionLabel: needsShowcase ? 'Add showcase' : 'Complete profile',
         onAction: _openSettings,
         duration: const Duration(seconds: 10),
       ),
@@ -1056,11 +1067,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildExhaustedState() {
+    final needsSetup = _myProfile?.needsSetup ?? false;
     return ExhaustedDeckView(
       onExplore: _openExploreDeck,
       onViewAgain: _viewAgain,
       onBrowse: widget.onBrowse,
       onUpdateProfile: _openSettings,
+      message:
+          needsSetup
+              ? 'Complete your profile setup so we can find Pals for you. '
+                  'Add a role and at least one skill.'
+              : ExhaustedDeckView.note,
+      showViewAgain: !needsSetup,
+      showBrowse: !needsSetup,
     );
   }
 }

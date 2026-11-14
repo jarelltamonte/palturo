@@ -39,6 +39,42 @@ void main() {
     expect(calls, ['explore', 'view', 'browse', 'update']);
   });
 
+  testWidgets('setup variant shows only explore and update profile', (
+    tester,
+  ) async {
+    final calls = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Scaffold(
+          body: ExhaustedDeckView(
+            message:
+                'Complete your profile setup so we can find Pals for you. '
+                'Add a role and at least one skill.',
+            showViewAgain: false,
+            showBrowse: false,
+            onExplore: () => calls.add('explore'),
+            onViewAgain: () => calls.add('view'),
+            onUpdateProfile: () => calls.add('update'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Complete your profile setup'), findsOneWidget);
+    expect(find.text('Explore'), findsOneWidget);
+    expect(find.text('Update Profile'), findsOneWidget);
+    expect(find.text('View Again'), findsNothing);
+    expect(find.text('Browse'), findsNothing);
+
+    await tester.tap(find.text('Explore'));
+    await tester.tap(find.text('Update Profile'));
+    await tester.pump();
+    expect(calls, ['explore', 'update']);
+  });
+
   testWidgets('exhausted deck fits a small phone without overflow', (
     tester,
   ) async {

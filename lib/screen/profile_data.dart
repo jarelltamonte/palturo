@@ -68,6 +68,16 @@ class ProfileData {
     return full.isNotEmpty ? full : 'User';
   }
 
+  bool get hasAnySkill =>
+      learningSkillIds.isNotEmpty || teachingSkillIds.isNotEmpty;
+
+  /// True when For You should show the setup checklist instead of looking for
+  /// matches: no role chosen, or no skill picked on either side.
+  bool get needsSetup => role == null || !hasAnySkill;
+
+  bool get needsShowcase =>
+      teachingSkillIds.isNotEmpty && teachingSkillImages.isEmpty;
+
   ProfileData copyWith({
     String? id,
     String? firstName,

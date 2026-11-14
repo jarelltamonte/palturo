@@ -17,12 +17,24 @@ class ExhaustedDeckView extends StatefulWidget {
     required this.onViewAgain,
     required this.onUpdateProfile,
     this.onBrowse,
+    this.message = note,
+    this.showViewAgain = true,
+    this.showBrowse = true,
+    this.updateLabel = 'Update Profile',
   });
 
   final VoidCallback onExplore;
   final VoidCallback onViewAgain;
   final VoidCallback? onBrowse;
   final VoidCallback onUpdateProfile;
+
+  /// Default copy for a genuinely exhausted deck.
+  final String message;
+
+  /// The setup variant hides replay and browse; there is nothing to replay.
+  final bool showViewAgain;
+  final bool showBrowse;
+  final String updateLabel;
 
   static const String note =
       'You have seen all the top matches, we will notify you if a new match is found.';
@@ -176,7 +188,11 @@ class _ExhaustedDeckViewState extends State<ExhaustedDeckView>
         offset: Offset(dx, dy),
         child: Transform.rotate(
           angle: angle,
-          child: _FrontCard(width: width * 0.7, height: height * 0.9),
+          child: _FrontCard(
+            width: width * 0.7,
+            height: height * 0.9,
+            message: widget.message,
+          ),
         ),
       ),
     );
@@ -202,25 +218,30 @@ class _ExhaustedDeckViewState extends State<ExhaustedDeckView>
         ),
       ),
       const SizedBox(height: 10),
-      SizedBox(
-        width: width,
-        child: OutlinedButton(
-          onPressed: widget.onViewAgain,
-          child: const Text('View Again'),
+      if (widget.showViewAgain) ...[
+        SizedBox(
+          width: width,
+          child: OutlinedButton(
+            onPressed: widget.onViewAgain,
+            child: const Text('View Again'),
+          ),
         ),
-      ),
-      const SizedBox(height: 10),
-      SizedBox(
-        width: width,
-        child: OutlinedButton(
-          onPressed: widget.onBrowse,
-          child: const Text('Browse'),
+        const SizedBox(height: 10),
+      ],
+      if (widget.showBrowse && widget.onBrowse != null) ...[
+        SizedBox(
+          width: width,
+          child: OutlinedButton(
+            onPressed: widget.onBrowse,
+            child: const Text('Browse'),
+          ),
         ),
-      ),
-      const SizedBox(height: 4),
+        const SizedBox(height: 4),
+      ] else
+        const SizedBox(height: 4),
       TextButton(
         onPressed: widget.onUpdateProfile,
-        child: const Text('Update Profile'),
+        child: Text(widget.updateLabel),
       ),
     ];
   }
@@ -296,10 +317,15 @@ class _BackCard extends StatelessWidget {
 }
 
 class _FrontCard extends StatelessWidget {
-  const _FrontCard({required this.width, required this.height});
+  const _FrontCard({
+    required this.width,
+    required this.height,
+    required this.message,
+  });
 
   final double width;
   final double height;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +376,7 @@ class _FrontCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  ExhaustedDeckView.note,
+                  message,
                   textAlign: TextAlign.center,
                   style: AppTextStyles.regularText.copyWith(
                     color: textColor.withValues(alpha: 0.78),

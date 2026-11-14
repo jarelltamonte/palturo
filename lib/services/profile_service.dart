@@ -527,14 +527,21 @@ class ProfileService {
       try {
         final rows = await _supabase
             .from('skill_showcases')
-            .select('media_url, caption')
+            .select('media_url, caption, skill:skill_nodes(name)')
             .eq('user_id', user.id);
         for (final row in rows as List) {
           if (row is! Map) continue;
           final media = (row['media_url'] ?? '').toString();
+          final skill = row['skill'];
+          final skillName =
+              skill is Map ? (skill['name'] ?? '').toString().trim() : '';
           final caption = (row['caption'] ?? '').toString().trim();
-          if (media.isNotEmpty && caption.isNotEmpty) {
-            showcaseImages[caption] = media;
+          // Key by the selectable skill so the editor can match it to a row.
+          // Captions can stay specific ("Cooking Pinakbet") without breaking
+          // the depth-2 selection.
+          final key = skillName.isNotEmpty ? skillName : caption;
+          if (media.isNotEmpty && key.isNotEmpty) {
+            showcaseImages[key] = media;
           }
         }
       } catch (_) {

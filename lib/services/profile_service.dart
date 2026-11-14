@@ -330,6 +330,21 @@ class ProfileService {
 
   String _interestLabel(String id) => onboardingInterestLabel(id);
 
+  /// Every custom onboarding skill goes through the same classifier as the
+  /// profile editor. A rejection or an unavailable classifier blocks the save
+  /// instead of storing unmoderated text.
+  Future<String> _resolveOnboardingInterest(String id, String kind) async {
+    final label = _interestLabel(id);
+    if (!id.startsWith('other:') || label.toLowerCase() == 'others') {
+      return label;
+    }
+    final resolved = await _classifyCustomSkill(label, kind, skillId: id);
+    if (resolved == null || resolved.trim().isEmpty) {
+      throw Exception('Couldn\'t check "$label" right now. Please try again.');
+    }
+    return resolved;
+  }
+
   String _toTitleCase(String text) {
     final clean = text.replaceAll('_', ' ').trim();
     if (clean.isEmpty) return '';
@@ -403,15 +418,19 @@ class ProfileService {
           : controller.availability.keys,
     );
 
-    final resolvedLearning =
-        controller.learningInterests.map(_interestLabel).toList();
+    final resolvedLearning = <String>[];
+    for (final id in controller.learningInterests) {
+      resolvedLearning.add(await _resolveOnboardingInterest(id, 'learn'));
+    }
 
-    final resolvedTeaching =
-        controller.teachingInterests.map(_interestLabel).toList();
+    final resolvedTeaching = <String>[];
+    for (final id in controller.teachingInterests) {
+      resolvedTeaching.add(await _resolveOnboardingInterest(id, 'teach'));
+    }
 
     final calculatedCategories = resolveCategoriesForSkills([
-      ...controller.learningInterests,
-      ...controller.teachingInterests,
+      ...resolvedLearning,
+      ...resolvedTeaching,
     ]);
 
     final hasUnresolvedOthers = [
@@ -710,13 +729,17 @@ class ProfileService {
       if (custom != null && custom.isValid) {
         try {
           onClassifyingSkill?.call(custom.text);
-          resolved =
-              await _classifyCustomSkill(
-                custom.text,
-                'learn',
-                skillId: skill,
-              ) ??
-              _toTitleCase(custom.text);
+          final classified = await _classifyCustomSkill(
+            custom.text,
+            'learn',
+            skillId: skill,
+          );
+          if (classified == null || classified.trim().isEmpty) {
+            throw Exception(
+              'Couldn\'t check "${custom.text}" right now. Please try again.',
+            );
+          }
+          resolved = classified;
         } on SkillModerationException catch (e) {
           rejectedSkills.addAll(e.skills);
           continue;
@@ -753,13 +776,17 @@ class ProfileService {
       if (custom != null && custom.isValid) {
         try {
           onClassifyingSkill?.call(custom.text);
-          formatted =
-              await _classifyCustomSkill(
-                custom.text,
-                'teach',
-                skillId: skill,
-              ) ??
-              _toTitleCase(custom.text);
+          final classified = await _classifyCustomSkill(
+            custom.text,
+            'teach',
+            skillId: skill,
+          );
+          if (classified == null || classified.trim().isEmpty) {
+            throw Exception(
+              'Couldn\'t check "${custom.text}" right now. Please try again.',
+            );
+          }
+          formatted = classified;
         } on SkillModerationException catch (e) {
           rejectedSkills.addAll(e.skills);
           continue;

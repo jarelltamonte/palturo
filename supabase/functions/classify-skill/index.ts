@@ -423,18 +423,43 @@ async function placeSkill(
   kind: string,
   note: string | null,
 ): Promise<{ id: string | null; error: string | null }> {
+  // Selections live at depth 2. The classifier matches leaves, so place the
+  // parent and keep the leaf as the matching focus.
+  const { data: node } = await admin
+    .from("skill_nodes")
+    .select("id, parent_id, depth")
+    .eq("id", skillId)
+    .maybeSingle();
+  const leafId = node && (node as any).depth > 2 ? (node as any).id : null;
+  const selectableId =
+    leafId && (node as any).parent_id ? (node as any).parent_id : skillId;
+
   const { data: existing } = await admin
     .from("user_skills")
     .select("id")
     .eq("user_id", userId)
-    .eq("skill_id", skillId)
+    .eq("skill_id", selectableId)
     .eq("kind", kind)
     .maybeSingle();
-  if (existing) return { id: (existing as any).id, error: null };
+  if (existing) {
+    if (leafId) {
+      await admin
+        .from("user_skills")
+        .update({ focus_skill_id: leafId })
+        .eq("id", (existing as any).id);
+    }
+    return { id: (existing as any).id, error: null };
+  }
 
   const { data, error } = await admin
     .from("user_skills")
-    .insert({ user_id: userId, skill_id: skillId, kind, note })
+    .insert({
+      user_id: userId,
+      skill_id: selectableId,
+      focus_skill_id: leafId,
+      kind,
+      note,
+    })
     .select("id")
     .single();
   return { id: (data as any)?.id ?? null, error: error ? error.message : null };

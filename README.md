@@ -53,11 +53,19 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
   Programming, Sewing, Painting, and Philippine Script Writing.
 - The interests step has a search field. It filters the depth-2 chips, accepts
   Enter for an exact match, and offers `Create "<name>"` for a new skill.
-- Every custom skill goes through the `classify-skill` Edge Function before it
-  is saved. A rejection, or an unavailable classifier, blocks the save instead
-  of storing unmoderated text.
+- Creating a skill moderates it immediately through the `classify-skill` Edge
+  Function. A short dialog rotates skill facts while the check runs. A rejection
+  or an unavailable classifier keeps the skill out of the list and explains why
+  in the step, instead of waiting until save.
+- The create-time check is a dry run: it classifies without writing skills, so
+  an abandoned onboarding cannot fill the skill cap. Saving runs the check
+  again and performs the placement.
+- Moderation normalizes casing and spacing and attaches near-spellings of an
+  existing skill, so typo variants do not become duplicate taxonomy nodes.
 - Selected chips move to the top of the list. The step allows 3 learning skills
   and 2 teaching skills.
+- The review step shows the readable skill name, never the internal
+  `other:onboarding:...` id.
 - A mentor can save without a showcase. The editor explains that showcase media
   is what makes the profile discoverable; Browse, Explore, and For You exclude
   teaching profiles without media until one is added.
@@ -192,8 +200,13 @@ supabase functions deploy moderate-notes --no-verify-jwt
 
 `classify-skill` is the moderation gate for custom skill names. It judges the
 skill name, attaches an existing node or creates a pending node, and places the
-depth-2 parent in `user_skills` with the leaf as focus. Rejections are logged to
-`skill_moderation_log`.
+depth-2 parent in `user_skills` with the leaf as focus. It also cleans casing
+and spacing and treats a near-spelling of an existing node as that node.
+Rejections are logged to `skill_moderation_log`.
+
+Send `dry_run: true` to classify without writing `user_skills` or creating
+nodes. Onboarding uses this when a chip is created, then calls again without
+the flag on save.
 
 `moderate-notes` runs as a server-side queue worker, not from the app. It is
 deployed with `verify_jwt = false` and authenticates with `x-worker-secret`.

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
@@ -15,7 +17,7 @@ const _options = [
 Widget _host({
   required Set<String> selected,
   required ValueChanged<String> onToggle,
-  ValueChanged<String>? onCreate,
+  Future<OnboardingCreateResult> Function(String)? onCreate,
   int maxSelections = 3,
 }) {
   return MaterialApp(
@@ -63,7 +65,14 @@ void main() {
 
     final created = <String>[];
     await tester.pumpWidget(
-      _host(selected: {}, onToggle: (_) {}, onCreate: created.add),
+      _host(
+        selected: {},
+        onToggle: (_) {},
+        onCreate: (text) async {
+          created.add(text);
+          return OnboardingCreateResult.added(text);
+        },
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -75,6 +84,68 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(created, ['Sourdough Baking']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('create shows the moderation dialog with a skill fact', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final pending = Completer<OnboardingCreateResult>();
+    await tester.pumpWidget(
+      _host(selected: {}, onToggle: (_) {}, onCreate: (_) => pending.future),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'Sourdough Baking');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create "Sourdough Baking"'));
+    await tester.pump();
+
+    expect(find.text('Checking your skill'), findsOneWidget);
+    expect(find.text('DID YOU KNOW?'), findsOneWidget);
+
+    pending.complete(const OnboardingCreateResult.added('Sourdough Baking'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Checking your skill'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a rejected skill shows a reason and is not added', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _host(
+        selected: {},
+        onToggle: (_) {},
+        onCreate:
+            (_) async => const OnboardingCreateResult.failed(
+              'That name does not look like a skill we can add.',
+            ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'asdfghjkl');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create "asdfghjkl"'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('That name does not look like a skill we can add.'),
+      findsOneWidget,
+    );
+    expect(find.text('Create "asdfghjkl"'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -107,7 +178,7 @@ void main() {
       _host(
         selected: const {'farming', 'programming', 'filipino_cooking'},
         onToggle: (_) {},
-        onCreate: (_) {},
+        onCreate: (_) async => const OnboardingCreateResult.added('Farming'),
       ),
     );
     await tester.pumpAndSettle();
@@ -135,7 +206,7 @@ void main() {
           selected: const {},
           maxSelections: 3,
           onToggle: (_) {},
-          onCreate: (_) {},
+          onCreate: (_) async => const OnboardingCreateResult.added('Farming'),
           progress: 0.4,
           onContinue: () {},
         ),

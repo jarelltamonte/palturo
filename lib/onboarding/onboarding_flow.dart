@@ -235,24 +235,67 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  void _createInterest(String text, {required bool teaching}) {
+  Future<OnboardingCreateResult> _createInterest(
+    String text, {
+    required bool teaching,
+  }) async {
     final label = text.trim();
-    if (label.isEmpty) return;
-    final id = 'other:onboarding:$label';
-    setState(() {
-      if (!_dynamicOptions.any((option) => option.id == id)) {
-        _dynamicOptions = [
-          ..._dynamicOptions.where((option) => option.id != 'others'),
-          OnboardingOption(id, label),
-          const OnboardingOption('others', 'Others'),
-        ];
-      }
-    });
-    if (teaching) {
-      _controller.toggleTeachingInterest(id, max: 2);
-    } else {
-      _controller.toggleLearningInterest(id, max: 3);
+    if (label.isEmpty) {
+      return const OnboardingCreateResult.failed('Enter a skill name.');
     }
+
+    final SkillModerationResult verdict;
+    try {
+      verdict = await _profileService.moderateSkillName(
+        label,
+        teaching ? 'teach' : 'learn',
+      );
+    } on SkillModerationException {
+      return const OnboardingCreateResult.failed(
+        'That name does not look like a skill we can add. Try a clearer name, '
+        'like "Sourdough Baking".',
+      );
+    } catch (_) {
+      return const OnboardingCreateResult.failed(
+        'We could not check that skill right now. Please try again.',
+      );
+    }
+
+    // A depth-2 match becomes the canonical chip. A specific leaf stays as a
+    // custom chip so the review keeps the user's wording; save stores the
+    // depth-2 parent and keeps the leaf as the matching focus.
+    final pathParts =
+        verdict.path.split('.').where((part) => part.isNotEmpty).toList();
+    final canonicalId =
+        pathParts.length == 2 ? selectableSkillIdForPath(verdict.path) : null;
+    final id = canonicalId ?? 'other:onboarding:${verdict.name}';
+    final displayName = selectableSkillLabelForId(id) ?? verdict.name;
+
+    if (canonicalId == null) {
+      setState(() {
+        if (!_dynamicOptions.any((option) => option.id == id)) {
+          _dynamicOptions = [
+            ..._dynamicOptions.where((option) => option.id != 'others'),
+            OnboardingOption(id, verdict.name),
+            const OnboardingOption('others', 'Others'),
+          ];
+        }
+      });
+    }
+
+    final alreadySelected =
+        teaching
+            ? _controller.teachingInterests.contains(id)
+            : _controller.learningInterests.contains(id);
+    if (!alreadySelected) {
+      if (teaching) {
+        _controller.toggleTeachingInterest(id, max: 2);
+      } else {
+        _controller.toggleLearningInterest(id, max: 3);
+      }
+    }
+
+    return OnboardingCreateResult.added(displayName);
   }
 
   void _goTo(OnboardingStep step) => setState(() => _history.add(step));

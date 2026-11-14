@@ -61,6 +61,19 @@ class SkillModerationException implements Exception {
   String toString() => message;
 }
 
+/// The moderated name and taxonomy path returned by `classify-skill`.
+class SkillModerationResult {
+  final String name;
+  final String path;
+  final String status;
+
+  const SkillModerationResult({
+    required this.name,
+    this.path = '',
+    this.status = 'attached',
+  });
+}
+
 bool isProfileComplete({
   required String? avatarUrl,
   required String bio,
@@ -339,10 +352,10 @@ class ProfileService {
       return label;
     }
     final resolved = await _classifyCustomSkill(label, kind, skillId: id);
-    if (resolved == null || resolved.trim().isEmpty) {
+    if (resolved == null || resolved.name.trim().isEmpty) {
       throw Exception('Couldn\'t check "$label" right now. Please try again.');
     }
-    return resolved;
+    return resolved.name;
   }
 
   String _toTitleCase(String text) {
@@ -679,19 +692,45 @@ class ProfileService {
     );
   }
 
-  Future<String?> _classifyCustomSkill(
+  /// Moderates a custom skill name immediately, so the UI can show the checked
+  /// name (or a rejection) before the user reaches the review step.
+  ///
+  /// This is a dry run: the verdict is not written to `user_skills` yet. The
+  /// real placement happens when onboarding is saved, which keeps abandoned
+  /// onboarding from filling the skill cap.
+  Future<SkillModerationResult> moderateSkillName(
+    String name,
+    String kind,
+  ) async {
+    final result = await _classifyCustomSkill(name, kind, dryRun: true);
+    if (result == null || result.name.trim().isEmpty) {
+      throw Exception('Couldn\'t check "$name" right now. Please try again.');
+    }
+    return result;
+  }
+
+  Future<SkillModerationResult?> _classifyCustomSkill(
     String name,
     String kind, {
     String skillId = '',
+    bool dryRun = false,
   }) async {
     try {
-      final verdict = await MatchApi.classifySkill(name: name, kind: kind);
+      final verdict = await MatchApi.classifySkill(
+        name: name,
+        kind: kind,
+        dryRun: dryRun,
+      );
       final status = verdict?['status']?.toString();
       final node = verdict?['node'];
       if ((status == 'attached' || status == 'pending') &&
           node is Map &&
           node['name'] is String) {
-        return node['name'] as String;
+        return SkillModerationResult(
+          name: node['name'] as String,
+          path: (node['path'] ?? '').toString(),
+          status: status!,
+        );
       }
       if (status == 'rejected') {
         throw SkillModerationException.rejected([
@@ -701,8 +740,8 @@ class ProfileService {
       return null;
     } catch (e) {
       if (e is SkillModerationException) rethrow;
-      // The classifier may be unavailable; keep the existing custom-skill
-      // fallback rather than losing the user's work.
+      // The classifier may be unavailable; the caller fails closed rather
+      // than storing an unmoderated name.
       return null;
     }
   }
@@ -734,12 +773,12 @@ class ProfileService {
             'learn',
             skillId: skill,
           );
-          if (classified == null || classified.trim().isEmpty) {
+          if (classified == null || classified.name.trim().isEmpty) {
             throw Exception(
               'Couldn\'t check "${custom.text}" right now. Please try again.',
             );
           }
-          resolved = classified;
+          resolved = classified.name;
         } on SkillModerationException catch (e) {
           rejectedSkills.addAll(e.skills);
           continue;
@@ -781,12 +820,12 @@ class ProfileService {
             'teach',
             skillId: skill,
           );
-          if (classified == null || classified.trim().isEmpty) {
+          if (classified == null || classified.name.trim().isEmpty) {
             throw Exception(
               'Couldn\'t check "${custom.text}" right now. Please try again.',
             );
           }
-          formatted = classified;
+          formatted = classified.name;
         } on SkillModerationException catch (e) {
           rejectedSkills.addAll(e.skills);
           continue;

@@ -25,6 +25,18 @@ class OnboardingOption {
   const OnboardingOption(this.id, this.label);
 }
 
+/// Result of adding a custom skill during onboarding.
+///
+/// Moderation runs as soon as the chip is created, so the interests step can
+/// show the checked name (or a friendly reason) without waiting for save.
+class OnboardingCreateResult {
+  final String? label;
+  final String? message;
+
+  const OnboardingCreateResult.added(String this.label) : message = null;
+  const OnboardingCreateResult.failed(String this.message) : label = null;
+}
+
 class RoleOption {
   final OnboardingRole role;
   final String iconAsset;

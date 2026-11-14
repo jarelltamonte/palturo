@@ -102,6 +102,32 @@ String? selectableSkillLabelForId(String id) {
   return null;
 }
 
+/// The depth-2 option id for a canonical skill name, if one exists.
+///
+/// The classifier returns the node it matched, which may be a depth-3 leaf
+/// such as `Sourdough Baking`. This maps that name back to the selectable
+/// depth-2 chip.
+String? selectableSkillIdForLabel(String label) {
+  final value = label.trim().toLowerCase();
+  if (value.isEmpty) return null;
+  for (final option in kSelectableSkills) {
+    if (option.label.toLowerCase() == value) return option.id;
+  }
+  return null;
+}
+
+/// The depth-2 option id encoded in a taxonomy path such as
+/// `cooking_culinary.filipino_cooking.sourdough_baking`.
+String? selectableSkillIdForPath(String path) {
+  final parts = path.split('.').where((part) => part.isNotEmpty).toList();
+  if (parts.length < 2) return null;
+  final candidate = kLegacySkillIdAliases[parts[1]] ?? parts[1];
+  for (final option in kSelectableSkills) {
+    if (option.id == candidate) return option.id;
+  }
+  return null;
+}
+
 /// The label sent to `save_user_skills` for an onboarding selection.
 ///
 /// Custom options encode their text in the id, for example

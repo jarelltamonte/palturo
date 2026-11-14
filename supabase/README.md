@@ -70,8 +70,15 @@ supabase functions deploy moderate-notes --no-verify-jwt
 ```
 
 `classify-skill` moderates custom skill names, attaches or creates a node, and
-places the depth-2 parent in `user_skills` with the leaf as focus. Verdicts are
-written to `skill_moderation_log`.
+places the depth-2 parent in `user_skills` with the leaf as focus. It cleans
+casing and spacing, and a near-spelling of an existing node attaches to that
+node instead of creating a duplicate. Verdicts are written to
+`skill_moderation_log`.
+
+Pass `dry_run: true` to run the full decision without writing `user_skills` or
+new `skill_nodes`. Onboarding uses a dry run when a chip is created and repeats
+the call without the flag on save, so abandoned onboarding does not consume the
+skill cap.
 
 ## Important
 

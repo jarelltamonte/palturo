@@ -3,6 +3,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import '../onboarding_controller.dart';
 import '../onboarding_models.dart';
+import '../skill_options.dart';
 import '../widgets/onboarding_scaffold.dart';
 
 class OnboardingReviewScreen extends StatelessWidget {
@@ -36,17 +37,11 @@ class OnboardingReviewScreen extends StatelessWidget {
     null => 'Not set',
   };
 
-  String _pretty(String id) {
-    return id
-        .split('_')
-        .where((part) => part.isNotEmpty)
-        .map((part) => part[0].toUpperCase() + part.substring(1))
-        .join(' ');
-  }
-
   String _skills(Set<String> ids) {
     if (ids.isEmpty) return 'Not set';
-    return ids.map(_pretty).join(', ');
+    // Custom picks carry their text in the id, so resolve the label instead
+    // of showing the raw `other:onboarding:...` value.
+    return ids.map(onboardingInterestLabel).join(', ');
   }
 
   bool get _isValid =>
@@ -145,7 +140,7 @@ class OnboardingReviewScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Ready to meet your first Pal?',
+            'Ready to find your first Pal?',
             style: AppTextStyles.regularText.copyWith(
               color: textColor.withValues(alpha: 0.7),
               fontSize: 12,

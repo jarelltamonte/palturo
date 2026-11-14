@@ -34,6 +34,91 @@ const normalize = (s: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, "_")
     .replace(/^_+|_+$/g, "");
 
+// Stored names should look deliberate. This fixes casing and spacing, not
+// arbitrary typos; near-duplicates are caught by the spelling pre-pass below.
+const cleanSkillName = (raw: string): string => {
+  const trimmed = (raw ?? "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+  if (!trimmed) return "";
+  const smallWords = new Set([
+    "and", "or", "of", "the", "in", "for", "to", "with", "a", "an", "on", "at", "by",
+  ]);
+  return trimmed
+    .split(" ")
+    .map((word, index) =>
+      word
+        .split("-")
+        .map((part) => {
+          if (!part) return part;
+          const lower = part.toLowerCase();
+          if (/^[A-Z0-9&+]{2,}$/.test(part)) return part;
+          if (index > 0 && smallWords.has(lower)) return lower;
+          return lower.charAt(0).toUpperCase() + lower.slice(1);
+        })
+        .join("-"),
+    )
+    .join(" ");
+};
+
+// Damerau-Levenshtein distance over normalized keys. The taxonomy is small, so
+// comparing the submission with every key is cheap and keeps typo variants
+// from becoming duplicate nodes.
+const editDistance = (a: string, b: string): number => {
+  const s = a.replace(/_/g, "");
+  const t = b.replace(/_/g, "");
+  if (!s.length) return t.length;
+  if (!t.length) return s.length;
+  const d: number[][] = Array.from({ length: s.length + 1 }, () =>
+    Array(t.length + 1).fill(0),
+  );
+  for (let i = 0; i <= s.length; i++) d[i][0] = i;
+  for (let j = 0; j <= t.length; j++) d[0][j] = j;
+  for (let i = 1; i <= s.length; i++) {
+    for (let j = 1; j <= t.length; j++) {
+      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost,
+      );
+      if (
+        i > 1 && j > 1 &&
+        s[i - 1] === t[j - 2] && s[i - 2] === t[j - 1]
+      ) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[s.length][t.length];
+};
+
+const closestSpelling = (input: string, keys: string[]): string | null => {
+  const plain = input.replace(/_/g, "");
+  // Short names are too easy to collide with a different real skill.
+  if (plain.length < 7) return null;
+  const max = plain.length >= 14 ? 2 : 1;
+  let best: string | null = null;
+  let bestDistance = max + 1;
+  let tied = false;
+  for (const key of keys) {
+    if (Math.abs(key.replace(/_/g, "").length - plain.length) > max) continue;
+    const distance = editDistance(input, key);
+    if (distance < bestDistance) {
+      best = key;
+      bestDistance = distance;
+      tied = false;
+    } else if (distance === bestDistance) {
+      tied = true;
+    }
+  }
+  return best && bestDistance <= max && !tied ? best : null;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -74,7 +159,7 @@ Deno.serve(async (req) => {
     }
 
     // ---------- input ----------
-    let payload: { name?: string; note?: string; kind?: string };
+    let payload: { name?: string; note?: string; kind?: string; dry_run?: boolean };
     try {
       payload = await req.json();
     } catch {
@@ -83,6 +168,7 @@ Deno.serve(async (req) => {
     const name = (payload.name ?? "").toString().trim();
     const note = (payload.note ?? "").toString().trim().slice(0, 500);
     const kind = payload.kind === "teach" ? "teach" : "learn";
+    const dryRun = payload.dry_run === true;
     if (name.length < 2 || name.length > 80) {
       return json({ error: "Skill name must be 2-80 characters" }, 400);
     }
@@ -125,7 +211,9 @@ Deno.serve(async (req) => {
     // creating duplicates.
     const semanticByKey = new Map<string, (typeof nodes)[number]>();
     for (const n of nodes) {
-      if (!n.is_leaf) continue;
+      // Depth-2 nodes are selectable even when they have children, so they
+      // must be matchable by name too.
+      if (n.depth !== 2 && !n.is_leaf) continue;
       if (n.status !== "approved" && n.status !== "pending") continue;
       const key = normalize(n.name);
       if (!key) continue;
@@ -135,9 +223,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ---------- Stage 1 fast path: exact match ----------
+    // ---------- Stage 1 fast path: exact or near-spelling match ----------
     const normalized = normalize(name);
+    const cleanedName = cleanSkillName(name) || name;
     const exact = semanticByKey.get(normalized) ?? null;
+    const spellingKey = exact
+      ? null
+      : closestSpelling(normalized, [...semanticByKey.keys()]);
+    const spellingMatch = spellingKey ? semanticByKey.get(spellingKey) ?? null : null;
     let skillDecision: {
       status: "attached" | "pending" | "queued" | "rejected" | "error";
       node: Record<string, unknown> | null;
@@ -147,10 +240,39 @@ Deno.serve(async (req) => {
       stage1Answers?: unknown;
     };
 
+    // A dry run validates and classifies without writing user_skills or new
+    // skill_nodes, so abandoned onboarding cannot fill the skill cap.
+    const place = (skillId: string) =>
+      dryRun
+        ? Promise.resolve({ id: null as string | null, error: null as string | null })
+        : placeSkill(admin, user.id, skillId, kind, null);
+    const pendingNode = (parent: { path: string } | null, display: string) => ({
+      id: null,
+      name: display,
+      path: parent ? `${parent.path}.${normalize(display)}` : normalize(display),
+      status: "pending",
+    });
+
     if (exact) {
-      const placed = await placeSkill(admin, user.id, exact.id, kind, null);
+      const placed = await place(exact.id);
       if (placed.error) return json({ error: placed.error, status: "error" }, 409);
       skillDecision = { status: "attached", node: pick(exact), action: "attach_existing", confidence: 1.0, placementId: placed.id };
+    } else if (spellingMatch) {
+      // A close spelling of an existing node is the same skill, not a new one.
+      // Attaching keeps typo variants out of skill_nodes.
+      const placed = await place(spellingMatch.id);
+      if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+      skillDecision = { status: "attached", node: pick(spellingMatch), action: "attach_spelling", confidence: 1.0, placementId: placed.id };
+      await log(admin, {
+        user: user.id, name, note: null,
+        answers: {
+          corrected_from: name,
+          corrected_to: spellingMatch.name,
+          distance: editDistance(normalized, spellingKey!),
+        },
+        action: "attach_spelling", confidence: 1.0, model,
+        promptVersion, revision, stage: dryRun ? "stage1_spelling_dry_run" : "stage1_spelling",
+      });
     } else {
       // ---------- Stage 1: Jev call — skill ONLY (note excluded by design) ----------
       const state1 =
@@ -214,7 +336,7 @@ Deno.serve(async (req) => {
       const orRes = await jevCall(model, state1, questions1, admin);
 
       if (!orRes.ok) {
-        await log(admin, { user: user.id, name, note: null, answers: { http_error: orRes.status }, action: "queued", confidence: null, model, promptVersion, revision, stage: "stage1_skill" });
+        await log(admin, { user: user.id, name, note: null, answers: { http_error: orRes.status }, action: "queued", confidence: null, model, promptVersion, revision, stage: dryRun ? "stage1_dry_run" : "stage1_skill" });
         return json({ status: "queued", reason: `Decision service unavailable (${orRes.status})` });
       }
 
@@ -232,7 +354,7 @@ Deno.serve(async (req) => {
           isSafe < safetyFloor || actionChoice === "reject_unsafe"
             ? "safety"
             : "invalid_skill";
-        await log(admin, { user: user.id, name, note: null, answers: a1, action: actionChoice || "reject_invalid", confidence: actionConf, model, promptVersion, revision, cost: costTotal, stage: "stage1_skill" });
+        await log(admin, { user: user.id, name, note: null, answers: a1, action: actionChoice || "reject_invalid", confidence: actionConf, model, promptVersion, revision, cost: costTotal, stage: dryRun ? "stage1_dry_run" : "stage1_skill" });
         return json({ status: "rejected", reason, confidence: actionConf });
       }
 
@@ -251,7 +373,7 @@ Deno.serve(async (req) => {
 
       if (actionChoice === "attach_existing") {
         if (semanticMatch) {
-          const placed = await placeSkill(admin, user.id, semanticMatch.id, kind, null);
+          const placed = await place(semanticMatch.id);
           if (placed.error) return json({ error: placed.error, status: "error" }, 409);
           skillDecision = { status: "attached", node: pick(semanticMatch), action: "attach_existing", confidence: semanticConf, placementId: placed.id };
         } else {
@@ -267,22 +389,26 @@ Deno.serve(async (req) => {
             }))
             .sort((a, b) => b.overlap - a.overlap)[0];
           if (best && best.overlap > 0 && (actionConf ?? 0) >= confThreshold) {
-            const placed = await placeSkill(admin, user.id, best.n.id, kind, null);
+            const placed = await place(best.n.id);
             if (placed.error) return json({ error: placed.error, status: "error" }, 409);
             skillDecision = { status: "attached", node: pick(best.n), action: "attach_existing", confidence: actionConf, placementId: placed.id };
           } else if (groupNode) {
             // The model was confident the submission fits this group but could
             // not name an equivalent skill: register it as a pending skill
             // instead of silently dropping it as unresolved.
-            const { data: newNode, error: nodeErr } = await admin
-              .from("skill_nodes")
-              .insert({ name, parent_id: groupNode.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
-              .select("id,name,path,status")
-              .single();
-            if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
-            const placed = await placeSkill(admin, user.id, (newNode as any).id, kind, null);
-            if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-            skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+            if (dryRun) {
+              skillDecision = { status: "pending", node: pendingNode(groupNode, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
+            } else {
+              const { data: newNode, error: nodeErr } = await admin
+                .from("skill_nodes")
+                .insert({ name: cleanedName, parent_id: groupNode.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
+                .select("id,name,path,status")
+                .single();
+              if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
+              const placed = await place((newNode as any).id);
+              if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+              skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+            }
           } else {
             skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
           }
@@ -291,21 +417,23 @@ Deno.serve(async (req) => {
         if (semanticMatch) {
           // Same meaning already exists (often a Filipino/English variant):
           // reuse that node instead of creating a duplicate.
-          const placed = await placeSkill(admin, user.id, semanticMatch.id, kind, null);
+          const placed = await place(semanticMatch.id);
           if (placed.error) return json({ error: placed.error, status: "error" }, 409);
           skillDecision = { status: "attached", node: pick(semanticMatch), action: "attach_existing", confidence: semanticConf, placementId: placed.id };
         } else {
           const parent = groupNode ?? roots.find((r) => r.name === rootChoice);
           if (!parent) {
             skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+          } else if (dryRun) {
+            skillDecision = { status: "pending", node: pendingNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
           } else {
             const { data: newNode, error: nodeErr } = await admin
               .from("skill_nodes")
-              .insert({ name, parent_id: parent.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
+              .insert({ name: cleanedName, parent_id: parent.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
               .select("id,name,path,status")
               .single();
             if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
-            const placed = await placeSkill(admin, user.id, (newNode as any).id, kind, null);
+            const placed = await place((newNode as any).id);
             if (placed.error) return json({ error: placed.error, status: "error" }, 409);
             skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
           }
@@ -314,14 +442,14 @@ Deno.serve(async (req) => {
         skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
       }
 
-      await log(admin, { user: user.id, name, note: null, answers: a1, action: skillDecision.action, confidence: actionConf, model, promptVersion, revision, cost: costTotal, stage: "stage1_skill" });
+      await log(admin, { user: user.id, name, note: null, answers: a1, action: skillDecision.action, confidence: actionConf, model, promptVersion, revision, cost: costTotal, stage: dryRun ? "stage1_dry_run" : "stage1_skill" });
     }
 
     // ---------- Stage 2: note moderation (separate call; note never influences Stage 1) ----------
     let noteStored = false;
     let noteVerdict: Record<string, unknown> | null = null;
 
-    if (note.length > 0) {
+    if (!dryRun && note.length > 0) {
       const state2 =
         `== NOTE CONTEXT RULES ==\n` +
         `A note on a skill placement should describe the user's goals, teaching approach, background, schedule constraints, or expectations for THAT skill.\n` +
@@ -372,7 +500,10 @@ Deno.serve(async (req) => {
     return json({
       status: skillDecision.status,
       node: skillDecision.node,
+      corrected_name:
+        (skillDecision.node?.["name"] as string | undefined) ?? cleanedName,
       confidence: skillDecision.confidence,
+      dry_run: dryRun,
       note_stored: noteStored,
       note_verdict: noteVerdict,
     });

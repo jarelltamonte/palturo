@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -10,7 +12,7 @@ class OnboardingInterestsScreen extends StatefulWidget {
   final Set<String> selected;
   final int maxSelections;
   final ValueChanged<String> onToggle;
-  final ValueChanged<String>? onCreate;
+  final Future<OnboardingCreateResult> Function(String text)? onCreate;
   final double progress;
   final VoidCallback onContinue;
   final VoidCallback? onBack;
@@ -40,6 +42,7 @@ class OnboardingInterestsScreen extends StatefulWidget {
 class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  String? _error;
 
   @override
   void dispose() {
@@ -62,12 +65,18 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
   }
 
   void _onQueryChanged(String value) {
-    setState(() => _query = value.trim().toLowerCase());
+    setState(() {
+      _query = value.trim().toLowerCase();
+      _error = null;
+    });
   }
 
   void _clearQuery() {
     _searchController.clear();
-    setState(() => _query = '');
+    setState(() {
+      _query = '';
+      _error = null;
+    });
   }
 
   void _submit() {
@@ -83,11 +92,28 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
     _create();
   }
 
-  void _create() {
+  Future<void> _create() async {
     final text = _searchController.text.trim();
     if (text.isEmpty || !_canCreate) return;
-    widget.onCreate!(text);
-    _clearQuery();
+    final result = await showDialog<OnboardingCreateResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SkillCheckDialog(task: () => widget.onCreate!(text)),
+    );
+    if (!mounted || result == null) return;
+    if (result.label == null) {
+      setState(() => _error = result.message);
+      return;
+    }
+    final label = result.label!;
+    _searchController.text = label;
+    _searchController.selection = TextSelection.collapsed(offset: label.length);
+    setState(() {
+      _error = null;
+      // Keep the list focused on the checked skill instead of dropping back
+      // to the full taxonomy.
+      _query = label.trim().toLowerCase();
+    });
   }
 
   @override
@@ -191,6 +217,17 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
               ),
             ),
           ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                _error!,
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.dangerText(context),
+                  fontSize: 13,
+                ),
+              ),
+            ),
           const SizedBox(height: 14),
           Expanded(
             child: SingleChildScrollView(
@@ -244,6 +281,148 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Runs the moderation check while showing rotating skill facts, so a short
+/// network wait does not feel like a stall.
+class _SkillCheckDialog extends StatefulWidget {
+  final Future<OnboardingCreateResult> Function() task;
+
+  const _SkillCheckDialog({required this.task});
+
+  @override
+  State<_SkillCheckDialog> createState() => _SkillCheckDialogState();
+}
+
+class _SkillCheckDialogState extends State<_SkillCheckDialog> {
+  static const _facts = <String>[
+    'Filipino weavers passed patterns down through song, not written notes.',
+    'Baybayin is an ancient Philippine script with three vowel sounds.',
+    'Kakanin covers dozens of rice cakes, each tied to a region.',
+    'Adobo takes its name from a Spanish marinade, but the technique is older.',
+    'Parol lanterns began as bamboo frames lit by candles.',
+    'Arnis trains sticks, blades, and empty hands together.',
+    'Pinakbet comes from an Ilocano word for shriveled vegetables.',
+    "T'nalak cloth is woven from abaca by the T'boli people.",
+    'Burda embroidery once marked family status on clothing.',
+    'The kudyapi is a two-stringed lute played across Mindanao.',
+  ];
+
+  Timer? _timer;
+  int _fact = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      setState(() => _fact = (_fact + 1) % _facts.length);
+    });
+    _run();
+  }
+
+  Future<void> _run() async {
+    OnboardingCreateResult result;
+    try {
+      result = await widget.task();
+    } catch (_) {
+      result = const OnboardingCreateResult.failed(
+        'We could not check that skill right now. Please try again.',
+      );
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop(result);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        backgroundColor: AppColors.elevatedSurface(context),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: AppColors.accentText(context),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Checking your skill',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Making sure it lands in the right place.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.mutedSurface(context),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DID YOU KNOW?',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: Text(
+                        _facts[_fact],
+                        key: ValueKey(_fact),
+                        style: AppTextStyles.regularText.copyWith(
+                          color: textColor,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

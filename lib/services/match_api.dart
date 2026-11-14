@@ -921,6 +921,7 @@ class MatchApi {
     required String name,
     String? note,
     required String kind,
+    bool dryRun = false,
   }) async {
     final res = await _Client.c.functions.invoke(
       'classify-skill',
@@ -928,6 +929,7 @@ class MatchApi {
         'name': name,
         if (note != null && note.isNotEmpty) 'note': note,
         'kind': kind,
+        if (dryRun) 'dry_run': true,
       },
     );
     final dynamic raw = res.data;

@@ -22,9 +22,9 @@ Future<void> maybeShowWhatsNew(BuildContext context) async {
   } catch (_) {
     return;
   }
-  final seen = await PreferencesService.instance.getString(
-    'whats_new_seen_version',
-  );
+  final seen = await PreferencesService.instance
+      .getString('whats_new_seen_version')
+      .catchError((_) => null);
   if (seen == version || !context.mounted) return;
 
   _whatsNewShowing = true;

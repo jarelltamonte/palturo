@@ -4,6 +4,20 @@ import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/services/profile_service.dart';
 
 void main() {
+  test('fromMap drops null and blank skill entries', () {
+    final profile = ProfileData.fromMap({
+      'id': 'profile-1',
+      'teaching_skills': ['Programming', null, '   '],
+      'learning_skills': null,
+      'languages': ['English', null],
+      'learning_styles': ['Visual Demonstration', ''],
+    });
+    expect(profile.teachingSkillIds, ['Programming']);
+    expect(profile.learningSkillIds, isEmpty);
+    expect(profile.languages, ['English']);
+    expect(profile.interests, ['Visual Demonstration']);
+  });
+
   test('setup and showcase needs follow role, skills, and media', () {
     final empty = ProfileData(schedule: '', role: OnboardingRole.learn);
     expect(empty.needsSetup, isTrue);

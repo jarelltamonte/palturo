@@ -102,6 +102,28 @@ String? selectableSkillLabelForId(String id) {
   return null;
 }
 
+/// The label sent to `save_user_skills` for an onboarding selection.
+///
+/// Custom options encode their text in the id, for example
+/// `other:onboarding:Sourdough Baking`.
+String onboardingInterestLabel(String id) {
+  if (id.toLowerCase() == 'others') return 'Others';
+  if (id.startsWith('other:')) {
+    final parts = id.split(':');
+    if (parts.length >= 3) {
+      final label = parts.sublist(2).join(':').trim();
+      if (label.isNotEmpty) return label;
+    }
+  }
+  final known = selectableSkillLabelForId(id);
+  if (known != null) return known;
+  return id
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => part[0].toUpperCase() + part.substring(1))
+      .join(' ');
+}
+
 List<String> resolveCategoriesForSkills(Iterable<String> skills) {
   final categories = <String>{};
   for (final raw in skills) {

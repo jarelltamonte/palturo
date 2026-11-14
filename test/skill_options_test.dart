@@ -48,4 +48,14 @@ void main() {
     expect(selectableSkillLabelForId('programming'), 'Programming');
     expect(selectableSkillLabelForId('missing'), isNull);
   });
+
+  test('custom onboarding ids decode to their label', () {
+    expect(
+      onboardingInterestLabel('other:onboarding:Sourdough Baking'),
+      'Sourdough Baking',
+    );
+    expect(onboardingInterestLabel('other:arts_design:Parol Art'), 'Parol Art');
+    expect(onboardingInterestLabel('filipino_cooking'), 'Filipino Cooking');
+    expect(onboardingInterestLabel('others'), 'Others');
+  });
 }

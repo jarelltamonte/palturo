@@ -11,7 +11,7 @@ import '../onboarding/onboarding_models.dart'
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
-import '../onboarding/skill_options.dart' show selectableSkillLabelForId;
+import '../onboarding/skill_options.dart' show onboardingInterestLabel;
 import '../screen/utils/schedule_format.dart';
 import '../utils/media_url.dart';
 import 'match_api.dart';
@@ -328,10 +328,7 @@ class ProfileService {
         allowVideo: true,
       );
 
-  String _interestLabel(String id) {
-    if (id.toLowerCase() == 'others') return 'Others';
-    return selectableSkillLabelForId(id) ?? _toTitleCase(id);
-  }
+  String _interestLabel(String id) => onboardingInterestLabel(id);
 
   String _toTitleCase(String text) {
     final clean = text.replaceAll('_', ' ').trim();

@@ -65,7 +65,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   List<OnboardingOption> _dynamicOptions = List.from(kBaseOptions);
   bool _isSaving = false;
 
-  static const int _targetSkillsCount = 11;
   bool _returnToReview = false;
 
   OnboardingStep get _current => _history.last;
@@ -209,31 +208,50 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       uniqueMap.putIfAbsent(opt.label.toLowerCase(), () => opt);
     }
 
-    final pool = uniqueMap.values.toList()..shuffle();
-
-    final selectedSkills = pool.take(_targetSkillsCount).toList();
+    final selected = {
+      ..._controller.learningInterests,
+      ..._controller.teachingInterests,
+    };
+    final preserved =
+        selected
+            .where(
+              (id) =>
+                  id != 'others' &&
+                  !uniqueMap.values.any((option) => option.id == id),
+            )
+            .map(_optionForId)
+            .toList();
+    for (final option in preserved) {
+      uniqueMap.putIfAbsent(option.label.toLowerCase(), () => option);
+    }
 
     if (mounted) {
-      final selected = {
-        ..._controller.learningInterests,
-        ..._controller.teachingInterests,
-      };
-      final preserved =
-          selected
-              .where(
-                (id) =>
-                    id != 'others' &&
-                    !selectedSkills.any((option) => option.id == id),
-              )
-              .map(_optionForId)
-              .toList();
       setState(() {
         _dynamicOptions = [
-          ...preserved,
-          ...selectedSkills,
+          ...uniqueMap.values,
           const OnboardingOption('others', 'Others'),
         ];
       });
+    }
+  }
+
+  void _createInterest(String text, {required bool teaching}) {
+    final label = text.trim();
+    if (label.isEmpty) return;
+    final id = 'other:onboarding:$label';
+    setState(() {
+      if (!_dynamicOptions.any((option) => option.id == id)) {
+        _dynamicOptions = [
+          ..._dynamicOptions.where((option) => option.id != 'others'),
+          OnboardingOption(id, label),
+          const OnboardingOption('others', 'Others'),
+        ];
+      }
+    });
+    if (teaching) {
+      _controller.toggleTeachingInterest(id, max: 2);
+    } else {
+      _controller.toggleLearningInterest(id, max: 3);
     }
   }
 
@@ -355,12 +373,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           animation: _controller,
           builder:
               (context, _) => OnboardingInterestsScreen(
+                key: const ValueKey('onboarding-learning-interests'),
                 highlightWord: 'Learning?',
                 options: _dynamicOptions,
                 selected: _controller.learningInterests,
                 maxSelections: 3,
                 onToggle:
                     (id) => _controller.toggleLearningInterest(id, max: 3),
+                onCreate: (text) => _createInterest(text, teaching: false),
                 progress: _progress(step),
                 stepLabel: '',
                 onContinue: () => _goTo(_next(step)),
@@ -374,12 +394,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           animation: _controller,
           builder:
               (context, _) => OnboardingInterestsScreen(
+                key: const ValueKey('onboarding-teaching-interests'),
                 highlightWord: 'Teaching?',
                 options: _dynamicOptions,
                 selected: _controller.teachingInterests,
                 maxSelections: 2,
                 onToggle:
                     (id) => _controller.toggleTeachingInterest(id, max: 2),
+                onCreate: (text) => _createInterest(text, teaching: true),
                 progress: _progress(step),
                 stepLabel: '',
                 onContinue: () => _goTo(_next(step)),

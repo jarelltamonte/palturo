@@ -54,11 +54,11 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, 'cook');
+    await tester.enterText(find.byType(TextField).first, 'filipino');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cooking Pinakbet'), findsOneWidget);
+    expect(find.text('Filipino Mains'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

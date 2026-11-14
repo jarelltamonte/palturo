@@ -11,6 +11,7 @@ import '../onboarding/onboarding_models.dart'
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
+import '../onboarding/skill_options.dart' show selectableSkillLabelForId;
 import '../screen/utils/schedule_format.dart';
 import '../utils/media_url.dart';
 import 'match_api.dart';
@@ -327,6 +328,11 @@ class ProfileService {
         allowVideo: true,
       );
 
+  String _interestLabel(String id) {
+    if (id.toLowerCase() == 'others') return 'Others';
+    return selectableSkillLabelForId(id) ?? _toTitleCase(id);
+  }
+
   String _toTitleCase(String text) {
     final clean = text.replaceAll('_', ' ').trim();
     if (clean.isEmpty) return '';
@@ -401,16 +407,10 @@ class ProfileService {
     );
 
     final resolvedLearning =
-        controller.learningInterests.map((id) {
-          if (id.toLowerCase() == 'others') return 'Others';
-          return _toTitleCase(id);
-        }).toList();
+        controller.learningInterests.map(_interestLabel).toList();
 
     final resolvedTeaching =
-        controller.teachingInterests.map((id) {
-          if (id.toLowerCase() == 'others') return 'Others';
-          return _toTitleCase(id);
-        }).toList();
+        controller.teachingInterests.map(_interestLabel).toList();
 
     final calculatedCategories = resolveCategoriesForSkills([
       ...controller.learningInterests,

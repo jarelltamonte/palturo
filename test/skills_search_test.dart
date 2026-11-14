@@ -58,7 +58,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
-    expect(find.text('Filipino Mains'), findsOneWidget);
+    expect(find.text('Filipino Cooking'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

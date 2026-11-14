@@ -14,7 +14,7 @@ void main() {
           body: SingleChildScrollView(
             child: SkillsCard.toLearn(
               isEditing: false,
-              initialSkillIds: ['filipino_mains'],
+              initialSkillIds: ['filipino_cooking'],
             ),
           ),
         ),
@@ -22,7 +22,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Filipino Mains'), findsOneWidget);
+    expect(find.text('Filipino Cooking'), findsOneWidget);
     expect(find.text('Everyday Practical Skills'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
     expect(tester.takeException(), isNull);

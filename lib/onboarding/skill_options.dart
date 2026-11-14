@@ -11,14 +11,14 @@ const kSelectableSkills = <OnboardingOption>[
   OnboardingOption('fishing', 'Fishing'),
   OnboardingOption('local_trades', 'Local Trades'),
   // Cooking & Culinary
-  OnboardingOption('filipino_desserts_kakanin', 'Filipino Desserts & Kakanin'),
-  OnboardingOption('filipino_mains', 'Filipino Mains'),
+  OnboardingOption('filipino_dessert_making', 'Filipino Dessert Making'),
+  OnboardingOption('filipino_cooking', 'Filipino Cooking'),
   // Household Skills
   OnboardingOption('home_decorating', 'Home Decorating'),
-  OnboardingOption('kitchen_skills', 'Kitchen Skills'),
+  OnboardingOption('kitchen_basics', 'Kitchen Basics'),
   // Language & Writing
   OnboardingOption('calligraphy', 'Calligraphy'),
-  OnboardingOption('philippine_scripts', 'Philippine Scripts'),
+  OnboardingOption('philippine_script_writing', 'Philippine Script Writing'),
   // Martial Arts
   OnboardingOption('filipino_martial_arts', 'Filipino Martial Arts'),
   // Modern Practical Skills
@@ -51,10 +51,10 @@ const Map<String, String> kSkillToCategorySlug = {
   'fishing': 'agriculture_livelihood',
   'local_trades': 'agriculture_livelihood',
 
-  'filipino_desserts_kakanin': 'everyday_skills',
-  'filipino_mains': 'everyday_skills',
+  'filipino_dessert_making': 'everyday_skills',
+  'filipino_cooking': 'everyday_skills',
   'home_decorating': 'everyday_skills',
-  'kitchen_skills': 'everyday_skills',
+  'kitchen_basics': 'everyday_skills',
   'filipino_martial_arts': 'everyday_skills',
   'flairtending': 'everyday_skills',
   'graphic_design': 'everyday_skills',
@@ -66,7 +66,7 @@ const Map<String, String> kSkillToCategorySlug = {
   'woodworking': 'everyday_skills',
 
   'calligraphy': 'language_culture',
-  'philippine_scripts': 'language_culture',
+  'philippine_script_writing': 'language_culture',
   'folk_dance': 'language_culture',
   'traditional_music': 'language_culture',
   'vocal_music': 'language_culture',
@@ -78,9 +78,26 @@ const Map<String, String> kSkillToCategorySlug = {
   'painting': 'arts_design',
 };
 
+/// Drafts and cached selections can still carry the pre-rename ids. Map them
+/// so a resumed onboarding keeps the user's choices.
+const Map<String, String> kLegacySkillIdAliases = {
+  'filipino_mains': 'filipino_cooking',
+  'filipino_desserts_kakanin': 'filipino_dessert_making',
+  'kitchen_skills': 'kitchen_basics',
+  'philippine_scripts': 'philippine_script_writing',
+};
+
+const Map<String, String> kLegacySkillLabelAliases = {
+  'filipino mains': 'filipino_cooking',
+  'filipino desserts & kakanin': 'filipino_dessert_making',
+  'kitchen skills': 'kitchen_basics',
+  'philippine scripts': 'philippine_script_writing',
+};
+
 String? selectableSkillLabelForId(String id) {
+  final canonical = kLegacySkillIdAliases[id] ?? id;
   for (final option in kSelectableSkills) {
-    if (option.id == id) return option.label;
+    if (option.id == canonical) return option.label;
   }
   return null;
 }
@@ -91,24 +108,25 @@ List<String> resolveCategoriesForSkills(Iterable<String> skills) {
     final value = raw.trim();
     if (value.isEmpty) continue;
 
-    final direct = kSkillToCategorySlug[value.toLowerCase()];
+    final lower = value.toLowerCase();
+    final canonicalId =
+        kLegacySkillIdAliases[lower] ?? kLegacySkillLabelAliases[lower];
+    final direct = kSkillToCategorySlug[canonicalId ?? lower];
     if (direct != null) {
       categories.add(direct);
       continue;
     }
 
-    final normalized = value.toLowerCase().replaceAll(
-      RegExp(r'[^a-z0-9]+'),
-      '_',
-    );
-    final bySlug = kSkillToCategorySlug[normalized];
+    final normalized = lower.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    final bySlug =
+        kSkillToCategorySlug[kLegacySkillIdAliases[normalized] ?? normalized];
     if (bySlug != null) {
       categories.add(bySlug);
       continue;
     }
 
     for (final option in kSelectableSkills) {
-      if (option.label.toLowerCase() == value.toLowerCase()) {
+      if (option.label.toLowerCase() == lower) {
         final category = kSkillToCategorySlug[option.id];
         if (category != null) categories.add(category);
         break;

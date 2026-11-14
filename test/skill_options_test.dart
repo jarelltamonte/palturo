@@ -7,8 +7,8 @@ void main() {
   test('onboarding offers the depth-2 layer, not single dishes', () {
     final labels = kLearningOptions.map((o) => o.label).toList();
 
-    expect(labels, contains('Filipino Mains'));
-    expect(labels, contains('Filipino Desserts & Kakanin'));
+    expect(labels, contains('Filipino Cooking'));
+    expect(labels, contains('Filipino Dessert Making'));
     expect(labels, contains('Filipino Embroidery'));
     expect(labels, contains('Programming'));
     expect(labels, contains('Sewing'));
@@ -29,19 +29,22 @@ void main() {
   });
 
   test('labels and ids both resolve to a category', () {
-    expect(resolveCategoriesForSkills(['filipino_mains']), ['everyday_skills']);
-    expect(
-      resolveCategoriesForSkills(['Filipino Desserts & Kakanin']),
-      ['everyday_skills'],
-    );
+    expect(resolveCategoriesForSkills(['filipino_cooking']), [
+      'everyday_skills',
+    ]);
+    expect(resolveCategoriesForSkills(['Filipino Dessert Making']), [
+      'everyday_skills',
+    ]);
     expect(resolveCategoriesForSkills(['Programming']), ['everyday_skills']);
     expect(resolveCategoriesForSkills(['Farming']), ['agriculture_livelihood']);
-    expect(resolveCategoriesForSkills(['Filipino Embroidery']), ['arts_design']);
+    expect(resolveCategoriesForSkills(['Filipino Embroidery']), [
+      'arts_design',
+    ]);
     expect(resolveCategoriesForSkills(['Vocal Music']), ['language_culture']);
   });
 
   test('option ids resolve back to their labels', () {
-    expect(selectableSkillLabelForId('filipino_mains'), 'Filipino Mains');
+    expect(selectableSkillLabelForId('filipino_cooking'), 'Filipino Cooking');
     expect(selectableSkillLabelForId('programming'), 'Programming');
     expect(selectableSkillLabelForId('missing'), isNull);
   });

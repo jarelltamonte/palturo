@@ -10,6 +10,7 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/explore_deck_page.dart';
+import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
@@ -67,6 +68,9 @@ class HomePage extends StatefulWidget {
   /// Test hook: replaces the real deck fetch. Production leaves this null.
   final Future<List<Person>> Function({bool force})? deckLoader;
 
+  /// Test hook: replaces the real profile read that decides the setup state.
+  final Future<ProfileData?> Function()? profileLoader;
+
   /// Test hook: replaces the real request send. Production leaves this null.
   final SendConnectionRequest? sendRequest;
 
@@ -83,6 +87,7 @@ class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
     this.deckLoader,
+    this.profileLoader,
     this.sendRequest,
     this.seenLoader,
     this.markSeen,
@@ -303,9 +308,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<List<Person>> _fetchDeck({bool force = false}) async {
-    if (widget.deckLoader != null) return widget.deckLoader!(force: force);
-
-    final me = await ProfileService().getCurrentUserProfile();
+    // A test deck loader should not trigger a real profile read. When the test
+    // also supplies a profile, use it so the setup state is exercised.
+    final me =
+        widget.profileLoader != null
+            ? await widget.profileLoader!()
+            : widget.deckLoader != null
+            ? null
+            : await ProfileService().getCurrentUserProfile();
 
     if (mounted && me != null) {
       setState(() => _myProfile = me);
@@ -316,6 +326,8 @@ class _HomePageState extends State<HomePage> {
     if (me != null && me.needsSetup) {
       return const [];
     }
+
+    if (widget.deckLoader != null) return widget.deckLoader!(force: force);
 
     if (_roleFilter == RoleFilter.all) {
       final decks = await Future.wait([
@@ -380,6 +392,35 @@ class _HomePageState extends State<HomePage> {
       if (updated != null) {
         setState(() => _myProfile = updated);
       }
+    } finally {
+      _openingEditor = false;
+    }
+  }
+
+  /// Continues the onboarding flow for a profile that has no role or skills.
+  ///
+  /// This is the setup checklist's primary action, so it resumes the saved
+  /// draft instead of opening the profile editor.
+  Future<void> _openOnboardingSetup() async {
+    if (_openingEditor) return;
+    _openingEditor = true;
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => OnboardingFlow(
+                onFinished: () {
+                  if (mounted) Navigator.of(context).pop();
+                },
+                onSkip: () async {
+                  if (mounted) Navigator.of(context).pop();
+                },
+              ),
+        ),
+      );
+      if (!mounted) return;
+      await _loadDeck(force: true);
     } finally {
       _openingEditor = false;
     }
@@ -1072,7 +1113,8 @@ class _HomePageState extends State<HomePage> {
       onExplore: _openExploreDeck,
       onViewAgain: _viewAgain,
       onBrowse: widget.onBrowse,
-      onUpdateProfile: _openSettings,
+      onUpdateProfile: needsSetup ? _openOnboardingSetup : _openSettings,
+      updateLabel: needsSetup ? 'Finish Profile' : 'Update Profile',
       message:
           needsSetup
               ? 'Complete your profile setup so we can find Pals for you. '

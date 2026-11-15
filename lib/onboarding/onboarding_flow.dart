@@ -85,7 +85,7 @@ class OnboardingFlow extends StatefulWidget {
 
 class _OnboardingFlowState extends State<OnboardingFlow> {
   final _controller = OnboardingController();
-  final _profileService = ProfileService();
+  late final ProfileService _profileService = ProfileService();
   final List<OnboardingStep> _history = [OnboardingStep.intro];
 
   List<OnboardingOption> _dynamicOptions = List.from(kBaseOptions);
@@ -109,8 +109,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     super.dispose();
   }
 
-  String get _draftKey =>
-      onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id);
+  String get _draftKey {
+    try {
+      return onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id);
+    } catch (_) {
+      // The flow is also mounted in widget tests and previews where Supabase
+      // is not initialized. Fall back to the anonymous draft key.
+      return onboardingDraftKey(null);
+    }
+  }
 
   OnboardingOption _optionForId(String id) {
     // A restored draft can hold `other:onboarding:...` ids. Use the same
@@ -199,10 +206,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
     final baseLabels = kBaseOptions.map((e) => e.label).toList();
 
-    final dbSkills = await _profileService.getRandomDistinctSkills(
-      excludeSkills: baseLabels,
-      limit: 6,
-    );
+    List<String> dbSkills;
+    try {
+      dbSkills = await _profileService.getRandomDistinctSkills(
+        excludeSkills: baseLabels,
+        limit: 6,
+      );
+    } catch (_) {
+      // Community suggestions are optional; the base taxonomy still works.
+      return;
+    }
 
     final dbOptions =
         dbSkills

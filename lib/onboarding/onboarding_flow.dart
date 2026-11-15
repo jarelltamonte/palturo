@@ -87,14 +87,10 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id);
 
   OnboardingOption _optionForId(String id) {
-    return OnboardingOption(
-      id,
-      id
-          .split('_')
-          .where((part) => part.isNotEmpty)
-          .map((part) => part[0].toUpperCase() + part.substring(1))
-          .join(' '),
-    );
+    // A restored draft can hold `other:onboarding:...` ids. Use the same
+    // display-label resolver as the review step so the chip never shows the
+    // raw encoding.
+    return OnboardingOption(id, onboardingInterestLabel(id));
   }
 
   void _persistDraft() {

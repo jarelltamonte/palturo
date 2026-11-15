@@ -119,37 +119,45 @@ class _ProfilePageState extends State<ProfilePage> {
         builder:
             (_) => OnboardingFlow(
               onFinished: () async {
-                await PreferencesService.instance.setBool(
-                  'skipped_onboarding',
-                  false,
-                );
                 if (!mounted) return;
                 Navigator.of(context).pop();
                 setState(() {
                   _resumeSkipped = false;
                   _resumeDismissed = true;
                 });
-                await PreferencesService.instance.setBool(
-                  onboardingResumeDismissedKey(_uid),
-                  true,
-                );
+                try {
+                  await PreferencesService.instance.setBool(
+                    'skipped_onboarding',
+                    false,
+                  );
+                  await PreferencesService.instance.setBool(
+                    onboardingResumeDismissedKey(_uid),
+                    true,
+                  );
+                } catch (_) {
+                  // The profile is saved; preference cleanup is best-effort.
+                }
                 _loadProfile();
               },
               onSkip: () async {
-                await PreferencesService.instance.setBool(
-                  'skipped_onboarding',
-                  true,
-                );
-                await PreferencesService.instance.setBool(
-                  onboardingResumeDismissedKey(_uid),
-                  false,
-                );
                 if (!mounted) return;
                 Navigator.of(context).pop();
                 setState(() {
                   _resumeSkipped = true;
                   _resumeDismissed = false;
                 });
+                try {
+                  await PreferencesService.instance.setBool(
+                    'skipped_onboarding',
+                    true,
+                  );
+                  await PreferencesService.instance.setBool(
+                    onboardingResumeDismissedKey(_uid),
+                    false,
+                  );
+                } catch (_) {
+                  // Leaving setup must not depend on preference storage.
+                }
               },
             ),
       ),

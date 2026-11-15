@@ -44,9 +44,35 @@ String onboardingResumeDismissedKey(String? userId) =>
         ? 'onboarding_resume_dismissed'
         : 'onboarding_resume_dismissed_$userId';
 
+/// Confirms leaving onboarding, then hands off to the caller's exit path.
+///
+/// The handoff is awaited and errors are swallowed so a failed preference
+/// write can never trap the user on the review screen after they chose to
+/// finish later.
+Future<void> confirmOnboardingSkip(
+  BuildContext context,
+  Future<void> Function() onSkip,
+) async {
+  final leave = await showConfirmDialog(
+    context,
+    title: 'Finish later?',
+    message:
+        'Your matches will be less relevant until you add your role, skills, and availability.',
+    confirmLabel: 'Finish later',
+    cancelLabel: 'Keep editing',
+    destructive: false,
+  );
+  if (!leave || !context.mounted) return;
+  try {
+    await onSkip();
+  } catch (_) {
+    // The caller owns the exit path.
+  }
+}
+
 class OnboardingFlow extends StatefulWidget {
   final VoidCallback onFinished;
-  final VoidCallback onSkip;
+  final Future<void> Function() onSkip;
   const OnboardingFlow({
     super.key,
     required this.onFinished,
@@ -130,19 +156,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  Future<void> _confirmSkip() async {
-    final leave = await showConfirmDialog(
-      context,
-      title: 'Finish later?',
-      message:
-          'Your matches will be less relevant until you add your role, skills, and availability.',
-      confirmLabel: 'Finish later',
-      cancelLabel: 'Keep editing',
-      destructive: false,
-    );
-    if (!leave || !mounted) return;
-    widget.onSkip();
-  }
+  Future<void> _confirmSkip() => confirmOnboardingSkip(context, widget.onSkip);
 
   void _editFromReview(OnboardingStep step) {
     setState(() {

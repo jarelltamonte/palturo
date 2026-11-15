@@ -536,10 +536,15 @@ class _ChatsPageState extends State<ChatsPage> {
       padding: const EdgeInsets.only(top: 80),
       child: AppEmptyState(
         showIllustration: false,
+        icon: Icons.search_off_rounded,
         title:
             _hasActiveFilter && _query.trim().isEmpty
                 ? 'No chats match your filters'
                 : 'No chats found',
+        message:
+            _hasActiveFilter || _query.trim().isNotEmpty
+                ? 'Try a different name or clear the filters.'
+                : 'Your conversations will appear here.',
         actionLabel:
             _hasActiveFilter || _query.trim().isNotEmpty
                 ? 'Clear search and filters'
@@ -551,8 +556,10 @@ class _ChatsPageState extends State<ChatsPage> {
 
   Widget _buildNoMatchesState() {
     return AppEmptyState(
+      showIllustration: false,
+      icon: Icons.forum_outlined,
       title: 'No chats yet',
-      message: 'Send a request or start swiping to meet your first Pal.',
+      message: 'Chats open after you and a Pal accept a request.',
       actionLabel: 'Start swiping',
       onAction: _startSwiping,
       bottomPadding: AppSpacing.bottomNavClearanceFor(context),

@@ -1109,7 +1109,15 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     final filteredOut = _requests.isNotEmpty;
     return AppEmptyState(
       bottomPadding: AppSpacing.bottomNavClearanceFor(context),
+      showIllustration: false,
+      icon: filteredOut ? Icons.filter_alt_off_outlined : Icons.inbox_outlined,
       title: filteredOut ? 'No requests match your filters' : 'No requests yet',
+      message:
+          filteredOut
+              ? 'Try widening a filter, or clear them all.'
+              : _outgoing.isNotEmpty
+              ? 'Your sent requests are waiting for a reply.'
+              : 'Your next skill swap starts with a hello.',
       actionLabel:
           filteredOut
               ? 'Clear filters'

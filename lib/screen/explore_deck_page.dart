@@ -16,16 +16,30 @@ import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/swipe_deck.dart';
 
 typedef ExploreDeckLoader = Future<List<Person>> Function({int limit});
+typedef ExploreSendRequest =
+    Future<String?> Function(
+      String userId, {
+      String? skillName,
+      String? skillPath,
+    });
 
 /// Endless random card deck reached from the exhausted For You screen.
 ///
 /// Cards look and behave like the For You deck, but the source is random
 /// people and the deck refills itself before the user reaches the end.
 class ExploreDeckPage extends StatefulWidget {
-  const ExploreDeckPage({super.key, this.loader, this.batchSize = 20});
+  const ExploreDeckPage({
+    super.key,
+    this.loader,
+    this.sendRequest,
+    this.batchSize = 20,
+  });
 
   /// Test hook: replaces the random deck RPC.
   final ExploreDeckLoader? loader;
+
+  /// Test hook: replaces the connection-request RPC.
+  final ExploreSendRequest? sendRequest;
   final int batchSize;
 
   @override
@@ -263,7 +277,8 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
     _actionInFlight = true;
     if (mounted) setState(() => _sendingRequest = true);
     try {
-      final connectionId = await MatchApi.sendConnectionRequest(
+      final send = widget.sendRequest ?? MatchApi.sendConnectionRequest;
+      final connectionId = await send(
         person.id,
         skillName: person.skillName,
         skillPath: person.skillPath,

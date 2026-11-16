@@ -47,6 +47,51 @@ void main() {
     expect(key.currentState!.loadedCount, greaterThanOrEqualTo(4));
   });
 
+  testWidgets('sending a request carries the random card skill context', (
+    tester,
+  ) async {
+    String? sentId;
+    String? sentSkill;
+    String? sentPath;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: ExploreDeckPage(
+          batchSize: 1,
+          loader:
+              ({int limit = 20}) async => [
+                Person(
+                  id: 'b',
+                  name: 'Beta',
+                  schedule: 'Weekends',
+                  language: 'English',
+                  learningStyle: 'Hands-on Practice',
+                  skillName: 'Filipino Cooking',
+                  skillPath: 'cooking_culinary.filipino_cooking',
+                  role: PersonRole.mentor,
+                ),
+              ],
+          sendRequest: (id, {skillName, skillPath}) async {
+            sentId = id;
+            sentSkill = skillName;
+            sentPath = skillPath;
+            return 'conn-1';
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Send request'));
+    await tester.pumpAndSettle();
+
+    expect(sentId, 'b');
+    expect(sentSkill, 'Filipino Cooking');
+    expect(sentPath, 'cooking_culinary.filipino_cooking');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a failed first load offers a retry', (tester) async {
     var attempts = 0;
 

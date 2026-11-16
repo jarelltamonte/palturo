@@ -652,15 +652,13 @@ class _ChatsPageState extends State<ChatsPage> {
                                     ),
                                     if (_hasActiveFilter)
                                       Positioned(
-                                        right: 6,
-                                        top: 6,
+                                        right: 10,
+                                        top: 10,
                                         child: Container(
                                           width: 8,
                                           height: 8,
                                           decoration: BoxDecoration(
-                                            color: AppColors.accentText(
-                                              context,
-                                            ),
+                                            color: const Color(0xFFB0CE13),
                                             shape: BoxShape.circle,
                                           ),
                                         ),

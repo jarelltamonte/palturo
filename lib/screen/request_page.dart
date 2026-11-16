@@ -1187,13 +1187,13 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                             ? _hasActiveFilter
                             : _hasSentFilter)
                           Positioned(
-                            right: -2,
-                            top: 9,
+                            right: 10,
+                            top: 10,
                             child: Container(
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
-                                color: AppColors.accentText(context),
+                                color: const Color(0xFFB0CE13),
                                 shape: BoxShape.circle,
                               ),
                             ),

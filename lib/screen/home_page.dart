@@ -865,13 +865,13 @@ class _HomePageState extends State<HomePage> {
                             ),
                             if (_hasActiveFilter)
                               Positioned(
-                                right: -2,
-                                top: 8,
+                                right: 10,
+                                top: 10,
                                 child: Container(
                                   width: 8,
                                   height: 8,
                                   decoration: BoxDecoration(
-                                    color: AppColors.accentText(context),
+                                    color: const Color(0xFFB0CE13),
                                     shape: BoxShape.circle,
                                   ),
                                 ),

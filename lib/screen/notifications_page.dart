@@ -402,6 +402,7 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
             fontSize: 20,
           ),
         ),
+        actionsPadding: EdgeInsets.zero,
         actions: [
           if (!_loading && _error == null && _hasUnread)
             AppChrome.iconAction(

@@ -8,13 +8,17 @@ Widget host(Widget child) => MaterialApp(
   home: Scaffold(body: Center(child: SizedBox(width: 360, child: child))),
 );
 
-RequestCard card({required Future<bool> Function() onAccept}) => RequestCard(
+RequestCard card({
+  required Future<bool> Function() onAccept,
+  String requestSource = 'unknown',
+}) => RequestCard(
   skillName: 'Cooking',
   requesterName: 'Test Pal',
   schedule: 'Weekends',
   language: 'English',
   learningStyle: 'Hands-on Practice',
   timeAgo: 'now',
+  requestSource: requestSource,
   onAccept: onAccept,
   onDecline: () {},
 );
@@ -53,5 +57,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Start chatting'), findsOneWidget);
+  });
+
+  testWidgets('source note shows where the request came from', (tester) async {
+    await tester.pumpWidget(
+      host(card(onAccept: () async => true, requestSource: 'explore')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discovered you in Explore'), findsOneWidget);
+  });
+
+  testWidgets('unknown source shows no note', (tester) async {
+    await tester.pumpWidget(host(card(onAccept: () async => true)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Found you as a match'), findsNothing);
+    expect(find.text('Discovered you in Explore'), findsNothing);
+    expect(find.text('Found you in Browse'), findsNothing);
+  });
+
+  testWidgets('source note fits 360 at 200% text', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 360,
+                child: card(
+                  onAccept: () async => true,
+                  requestSource: 'explore',
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discovered you in Explore'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

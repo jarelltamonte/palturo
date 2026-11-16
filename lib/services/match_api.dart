@@ -149,6 +149,9 @@ class RequestLite {
   final String? requestedSkillName;
   final String? skillPath;
   final bool? inDeclaredDomain;
+
+  /// match | explore | browse | unknown
+  final String requestSource;
   final DateTime createdAt;
   const RequestLite({
     required this.connectionId,
@@ -160,6 +163,7 @@ class RequestLite {
     this.requestedSkillName,
     this.skillPath,
     this.inDeclaredDomain,
+    this.requestSource = 'unknown',
     required this.createdAt,
   });
 
@@ -174,6 +178,7 @@ class RequestLite {
       skillName: skill,
       skillPath: skillPath,
       inDeclaredDomain: inDeclaredDomain,
+      requestSource: requestSource,
       requesterName: requesterName,
       schedule: '',
       language: '',
@@ -675,6 +680,7 @@ class MatchApi {
         requestedSkillName: r['requested_skill_name'] as String?,
         skillPath: r['requested_skill_path'] as String?,
         inDeclaredDomain: r['in_declared_domain'] as bool?,
+        requestSource: (r['request_source'] as String?) ?? 'unknown',
         createdAt:
             DateTime.tryParse(r['created_at']?.toString() ?? '') ??
             DateTime.now(),
@@ -709,6 +715,7 @@ class MatchApi {
     String userId, {
     String? skillName,
     String? skillPath,
+    String? source,
   }) async {
     final id = await _Client.c.rpc(
       'send_connection_request',
@@ -716,6 +723,7 @@ class MatchApi {
         'p_recipient': userId,
         'p_skill_name': skillName,
         'p_skill_path': skillPath,
+        'p_source': source ?? 'unknown',
       },
     );
     return id?.toString();

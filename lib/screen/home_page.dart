@@ -49,6 +49,7 @@ typedef SendConnectionRequest =
       String userId, {
       String? skillName,
       String? skillPath,
+      String? source,
     });
 
 /// Sends a request with a hard cap so a stalled network call cannot leave the
@@ -58,10 +59,12 @@ Future<String?> sendRequestWithTimeout(
   SendConnectionRequest send,
   Person person, {
   Duration timeout = kSendRequestTimeout,
+  String source = 'match',
 }) => send(
   person.id,
   skillName: person.skillName,
   skillPath: person.skillPath,
+  source: source,
 ).timeout(timeout);
 
 class HomePage extends StatefulWidget {
@@ -539,7 +542,11 @@ class _HomePageState extends State<HomePage> {
     setState(() => _sendingRequest = true);
     try {
       final send = widget.sendRequest ?? MatchApi.sendConnectionRequest;
-      final connectionId = await sendRequestWithTimeout(send, person);
+      final connectionId = await sendRequestWithTimeout(
+        send,
+        person,
+        source: 'match',
+      );
       if (!mounted) return;
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');

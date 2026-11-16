@@ -29,6 +29,9 @@ class RequestCard extends StatefulWidget {
   final String timeAgo;
   final String iconAsset;
   final String seekingLabel;
+
+  /// match | explore | browse | unknown
+  final String requestSource;
   final String? connectionId;
   final ImageProvider? avatarImage;
   final Person? person;
@@ -49,6 +52,7 @@ class RequestCard extends StatefulWidget {
     required this.timeAgo,
     this.iconAsset = 'assets/icons/rlearner.svg',
     this.seekingLabel = 'Seeking a learner in',
+    this.requestSource = 'unknown',
     this.connectionId,
     this.avatarImage,
     this.person,
@@ -71,6 +75,20 @@ class _RequestCardState extends State<RequestCard>
   _RequestOutcome _outcome = _RequestOutcome.none;
 
   String get _skill => _titleCase(widget.skillName);
+
+  String? get _sourceLabel => switch (widget.requestSource) {
+    'match' => 'Found you as a match',
+    'explore' => 'Discovered you in Explore',
+    'browse' => 'Found you in Browse',
+    _ => null,
+  };
+
+  IconData get _sourceIcon => switch (widget.requestSource) {
+    'match' => Icons.auto_awesome,
+    'explore' => Icons.explore_outlined,
+    'browse' => Icons.search,
+    _ => Icons.person_outline,
+  };
 
   @override
   void initState() {
@@ -454,6 +472,37 @@ class _RequestCardState extends State<RequestCard>
               ),
             ],
           ),
+          if (_sourceLabel != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.mutedSurface(context),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.border(context)),
+              ),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 5,
+                runSpacing: 2,
+                children: [
+                  Icon(
+                    _sourceIcon,
+                    size: 13,
+                    color: AppColors.accentText(context),
+                  ),
+                  Text(
+                    _sourceLabel!,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Divider(
             height: 1,
@@ -497,11 +546,15 @@ class _RequestCardState extends State<RequestCard>
                                 color: textTheme,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                formatSchedule(widget.schedule),
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 12,
+                              Flexible(
+                                child: Text(
+                                  formatSchedule(widget.schedule),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: textTheme,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ],
@@ -512,11 +565,15 @@ class _RequestCardState extends State<RequestCard>
                             children: [
                               Icon(Icons.translate, size: 13, color: textTheme),
                               const SizedBox(width: 4),
-                              Text(
-                                widget.language,
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 12,
+                              Flexible(
+                                child: Text(
+                                  widget.language,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: textTheme,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ],
@@ -531,11 +588,15 @@ class _RequestCardState extends State<RequestCard>
                                 color: textTheme,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                widget.learningStyle,
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme,
-                                  fontSize: 12,
+                              Flexible(
+                                child: Text(
+                                  widget.learningStyle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: textTheme,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ],

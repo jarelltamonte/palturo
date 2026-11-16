@@ -190,6 +190,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
         person.id,
         skillName: person.skillName,
         skillPath: person.skillPath,
+        source: 'browse',
       );
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');

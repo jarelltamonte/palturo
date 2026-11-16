@@ -36,6 +36,9 @@ class ConnectionRequest {
   final String skillName;
   final String? skillPath;
   final bool? inDeclaredDomain;
+
+  /// match | explore | browse | unknown
+  final String requestSource;
   final String requesterName;
   final String schedule;
   final String language;
@@ -53,6 +56,7 @@ class ConnectionRequest {
     required this.skillName,
     this.skillPath,
     this.inDeclaredDomain,
+    this.requestSource = 'unknown',
     required this.requesterName,
     required this.schedule,
     required this.language,
@@ -893,6 +897,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                 timeAgo: timeAgo(request.requestedAt),
                 iconAsset: request.iconAsset,
                 seekingLabel: request.seekingLabel,
+                requestSource: request.requestSource,
                 connectionId: request.id,
                 avatarImage: _requestAvatar(request),
                 person: request.toPerson(),

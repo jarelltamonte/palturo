@@ -6,7 +6,7 @@ documentation and schema of record, not an automatically applied migration.
 
 Forward-only migrations in `migrations/` are the source of change after that
 baseline. The latest migration is
-`20261114001200_showcase_cache_invalidation.sql`.
+`20261117000100_request_source.sql`.
 
 ## Current taxonomy
 
@@ -22,6 +22,9 @@ selections.
 `skill_showcases` is the public table discovery reads. The editor keys media by
 the depth-2 skill and keeps a specific caption. `connections.skill_name` and
 `connections.skill_path` store request context at depth 2.
+`connections.request_source` records the discovery surface (`match`, `explore`,
+`browse`, or `unknown` for legacy requests) so the recipient can see where the
+request came from.
 
 ## Rebuild a fresh environment
 

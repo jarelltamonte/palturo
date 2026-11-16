@@ -53,6 +53,7 @@ void main() {
     String? sentId;
     String? sentSkill;
     String? sentPath;
+    String? sentSource;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -72,10 +73,11 @@ void main() {
                   role: PersonRole.mentor,
                 ),
               ],
-          sendRequest: (id, {skillName, skillPath}) async {
+          sendRequest: (id, {skillName, skillPath, source}) async {
             sentId = id;
             sentSkill = skillName;
             sentPath = skillPath;
+            sentSource = source;
             return 'conn-1';
           },
         ),
@@ -89,6 +91,7 @@ void main() {
     expect(sentId, 'b');
     expect(sentSkill, 'Filipino Cooking');
     expect(sentPath, 'cooking_culinary.filipino_cooking');
+    expect(sentSource, 'explore');
     expect(tester.takeException(), isNull);
   });
 

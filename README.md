@@ -83,6 +83,9 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
 - **Browse** shows the nine depth-1 categories, hides branches with nobody for
   the active role, and shows live counts. The category page lists depth-2
   skills and filters empty child skills.
+- Incoming requests show the discovery surface that produced them:
+  `Found you as a match`, `Discovered you in Explore`, or `Found you in
+  Browse`. Legacy requests show no source note.
 
 ### Chat
 
@@ -166,7 +169,8 @@ docs/                 auth runbook and historical reports
   keys media by the depth-2 skill and keeps a specific caption such as
   `Cooking Pinakbet`.
 - `connections.skill_name` and `skill_path` store the request context at
-  depth 2.
+  depth 2. `connections.request_source` records `match`, `explore`, `browse`,
+  or `unknown` for legacy requests.
 
 Key RPCs include `save_user_skills`, `set_skill_showcases`,
 `get_public_profile`, `browse_random_users`, `browse_skill_users`,

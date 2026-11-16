@@ -21,6 +21,7 @@ typedef ExploreSendRequest =
       String userId, {
       String? skillName,
       String? skillPath,
+      String? source,
     });
 
 /// Endless random card deck reached from the exhausted For You screen.
@@ -282,6 +283,7 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
         person.id,
         skillName: person.skillName,
         skillPath: person.skillPath,
+        source: 'explore',
       );
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');

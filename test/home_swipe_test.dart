@@ -19,7 +19,8 @@ void main() {
 
     await expectLater(
       sendRequestWithTimeout(
-        (id, {String? skillName, String? skillPath}) => never.future,
+        (id, {String? skillName, String? skillPath, String? source}) =>
+            never.future,
         person,
         timeout: const Duration(milliseconds: 10),
       ),

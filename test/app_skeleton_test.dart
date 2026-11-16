@@ -11,7 +11,6 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     for (final child in <Widget>[
-      const ExploreGridSkeleton(),
       const ListRowsSkeleton(),
       const RequestCardsSkeleton(),
       const ProfileSkeleton(),

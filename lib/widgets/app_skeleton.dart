@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_colors.dart';
 
 class SkeletonBox extends StatelessWidget {
@@ -24,57 +23,6 @@ class SkeletonBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? AppColors.mutedSurface(context),
         borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}
-
-class ExploreGridSkeleton extends StatelessWidget {
-  const ExploreGridSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Loading categories',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          const spacing = 16.0;
-          const topInset = 8.0;
-          final bottomInset = AppSpacing.bottomNavClearanceFor(context);
-          final itemHeight =
-              ((constraints.maxHeight - topInset - bottomInset - spacing) / 2)
-                  .clamp(120.0, double.infinity);
-          return GridView.builder(
-            padding: EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: spacing,
-              mainAxisSpacing: spacing,
-              mainAxisExtent: itemHeight,
-            ),
-            itemCount: 4,
-            itemBuilder:
-                (_, __) => Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.elevatedSurface(context),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.border(context)),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SkeletonBox(width: 48, height: 48, radius: 24),
-                      SizedBox(height: 14),
-                      SkeletonBox(width: 112, height: 12),
-                      SizedBox(height: 8),
-                      SkeletonBox(width: 88, height: 10),
-                    ],
-                  ),
-                ),
-          );
-        },
       ),
     );
   }

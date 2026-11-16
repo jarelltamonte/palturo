@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -19,19 +21,53 @@ import 'package:palturo/services/profile_service.dart';
 
 enum ExploreRole { learner, mentor }
 
+/// The domain the field guide features on a given day.
+///
+/// Domains rotate daily through a stable path-sorted list, so the featured
+/// pick changes each day but stays put across reloads on the same day.
+Map<String, dynamic>? featuredDomainForDay(
+  List<Map<String, dynamic>> roots,
+  DateTime day,
+) {
+  if (roots.isEmpty) return null;
+  final ordered = [...roots]..sort(
+    (a, b) =>
+        (a['path'] ?? '').toString().compareTo((b['path'] ?? '').toString()),
+  );
+  final start = DateTime.utc(2024, 1, 1);
+  final days =
+      DateTime.utc(day.year, day.month, day.day).difference(start).inDays;
+  final index = days % ordered.length;
+  return ordered[index < 0 ? index + ordered.length : index];
+}
+
 class ExplorePage extends StatefulWidget {
-  const ExplorePage({super.key});
+  /// Test hooks. Production leaves these null.
+  final Future<List<Map<String, dynamic>>> Function()? taxonomyLoader;
+  final Future<int> Function(String path, {required String kind})? countLoader;
+  final Future<List<Map<String, dynamic>>> Function()? skillsLoader;
+  final DateTime Function()? now;
+
+  const ExplorePage({
+    super.key,
+    this.taxonomyLoader,
+    this.countLoader,
+    this.skillsLoader,
+    this.now,
+  });
 
   @override
   State<ExplorePage> createState() => _ExplorePageState();
 }
 
 class _ExplorePageState extends State<ExplorePage> {
+  final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _roots = const [];
   Map<String, int> _rootCounts = const {};
   bool _hasMentorSkills = false;
   bool _loading = true;
   String? _error;
+  String _query = '';
 
   static const _roleKey = 'browse_mentor_mode';
 
@@ -68,6 +104,30 @@ class _ExplorePageState extends State<ExplorePage> {
     _loadSavedRole();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filteredRoots {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return _roots;
+    return _roots.where((node) {
+      final label = (node['name'] ?? '').toString().toLowerCase();
+      final description = _descriptionFor(node).toLowerCase();
+      return label.contains(query) || description.contains(query);
+    }).toList();
+  }
+
+  Map<String, dynamic>? get _featuredRoot =>
+      featuredDomainForDay(_roots, (widget.now ?? DateTime.now)());
+
+  String get _roleNoun => _role == ExploreRole.mentor ? 'learner' : 'mentor';
+
+  int _countFor(Map<String, dynamic> node) =>
+      _rootCounts[(node['path'] ?? '').toString()] ?? 0;
+
   Future<void> _loadSavedRole() async {
     var mentor = false;
     try {
@@ -83,31 +143,36 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   /// Learner: return all roots.
-  /// Mentor: return only roots related to the user's mentor skills.
-  Future<List<Map<String, dynamic>>> _filterByRole(
-    List<Map<String, dynamic>> roots,
-  ) async {
+  /// Mentor: return only roots related to the user's mentor skills. The
+  /// `hasMentorSkills` flag travels with the result so a superseded request
+  /// cannot leave the empty state describing the wrong situation.
+  Future<({List<Map<String, dynamic>> roots, bool hasMentorSkills})>
+  _filterByRole(List<Map<String, dynamic>> roots) async {
     if (_role == ExploreRole.learner) {
-      _hasMentorSkills = false;
-      return roots;
+      return (roots: roots, hasMentorSkills: false);
     }
 
-    final skills = await MatchApi.mySkills();
+    final skills =
+        widget.skillsLoader != null
+            ? await widget.skillsLoader!()
+            : await MatchApi.mySkills();
     final mentorPaths =
         skills
             .where((skill) => skill['kind'] == 'teach')
             .map((skill) => (skill['path'] ?? '') as String)
             .where((path) => path.isNotEmpty)
             .toList();
-    _hasMentorSkills = mentorPaths.isNotEmpty;
 
-    return roots.where((root) {
-      final rootPath = (root['path'] ?? '') as String;
-      if (rootPath.isEmpty) return false;
-      return mentorPaths.any(
-        (path) => path == rootPath || path.startsWith('$rootPath.'),
-      );
-    }).toList();
+    final filtered =
+        roots.where((root) {
+          final rootPath = (root['path'] ?? '') as String;
+          if (rootPath.isEmpty) return false;
+          return mentorPaths.any(
+            (path) => path == rootPath || path.startsWith('$rootPath.'),
+          );
+        }).toList();
+
+    return (roots: filtered, hasMentorSkills: mentorPaths.isNotEmpty);
   }
 
   /// Counts the people available under each root for the active role. Empty
@@ -122,8 +187,11 @@ class _ExplorePageState extends State<ExplorePage> {
         final path = (root['path'] ?? '').toString();
         if (path.isEmpty) return const MapEntry('', 0);
         try {
-          final people = await MatchApi.browseSkillUsers(path, kind: kind);
-          return MapEntry(path, people.length);
+          final count =
+              widget.countLoader != null
+                  ? await widget.countLoader!(path, kind: kind)
+                  : (await MatchApi.browseSkillUsers(path, kind: kind)).length;
+          return MapEntry(path, count);
         } catch (e) {
           // A failed count must not hide a valid category.
           debugPrint('[Browse] count failed for $path: $e');
@@ -144,14 +212,17 @@ class _ExplorePageState extends State<ExplorePage> {
       });
     }
     try {
-      final nodes = await MatchApi.taxonomyVisible();
+      final nodes =
+          widget.taxonomyLoader != null
+              ? await widget.taxonomyLoader!()
+              : await MatchApi.taxonomyVisible();
       final roots =
           nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
-      final filtered = await _filterByRole(roots);
-      final counts = await _rootCountsFor(filtered);
+      final roleResult = await _filterByRole(roots);
+      final counts = await _rootCountsFor(roleResult.roots);
       if (!mounted || requestId != _requestId) return;
       final visible =
-          filtered
+          roleResult.roots
               .where(
                 (root) => (counts[(root['path'] ?? '').toString()] ?? 1) > 0,
               )
@@ -159,13 +230,14 @@ class _ExplorePageState extends State<ExplorePage> {
       setState(() {
         _roots = visible;
         _rootCounts = counts;
+        _hasMentorSkills = roleResult.hasMentorSkills;
         _loading = false;
       });
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
       final message = friendlyError(
         e,
-        fallback: "Couldn't load categories. Please try again.",
+        fallback: "Couldn't load domains. Please try again.",
       );
       setState(() {
         _loading = false;
@@ -180,7 +252,9 @@ class _ExplorePageState extends State<ExplorePage> {
   void _onRoleChanged(ExploreRole role) {
     if (role == _role) return;
     setState(() => _role = role);
-    PreferencesService.instance.setBool(_roleKey, role == ExploreRole.mentor);
+    PreferencesService.instance
+        .setBool(_roleKey, role == ExploreRole.mentor)
+        .catchError((Object _) {});
     _loadTaxonomy();
   }
 
@@ -230,179 +304,238 @@ class _ExplorePageState extends State<ExplorePage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final muted = _fgMuted(context);
+    final featured = _query.trim().isEmpty ? _featuredRoot : null;
+    final roots = _filteredRoots;
+    final featuredPath = (featured?['path'] ?? '').toString();
+    final gridRoots =
+        featured == null
+            ? roots
+            : roots
+                .where(
+                  (node) => (node['path'] ?? '').toString() != featuredPath,
+                )
+                .toList();
+    final appBarHeight = math.max(
+      AppSpacing.topBarHeight(),
+      MediaQuery.textScalerOf(context).scale(24) + 24,
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppChrome.appBar(
-        titleSpacing: AppSpacing.titleSpacing,
-        title: Padding(
-          padding: EdgeInsets.zero,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Browse',
-                style: AppTextStyles.headingText.copyWith(color: textTheme),
-              ),
-              SizedBox(
-                width: AppSpacing.iconTarget,
-                height: AppSpacing.iconTarget,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  alignment: Alignment.centerRight,
-                  tooltip: 'How Browse works',
-                  icon: Icon(
-                    CupertinoIcons.question_circle,
-                    color: textTheme,
-                    size: 24,
-                  ),
-                  onPressed: () {
-                    showAdaptiveDialog(
-                      context: context,
-                      builder: (context) => const _ExploreInfoDialog(),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+        toolbarHeight: appBarHeight,
+        title: Text(
+          'Browse',
+          style: AppTextStyles.headingText.copyWith(color: textTheme),
         ),
+        actions: [
+          AppChrome.iconAction(
+            icon: CupertinoIcons.question_circle,
+            tooltip: 'How Browse works',
+            color: textTheme,
+            onPressed: () {
+              showAdaptiveDialog(
+                context: context,
+                builder: (context) => const _ExploreInfoDialog(),
+              );
+            },
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        onRefresh: _refreshTaxonomy,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            AppSpacing.bottomNavClearanceFor(context),
+          ),
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            Text(
+              'Follow a craft, meet the person behind it.',
+              style: AppTextStyles.regularText.copyWith(
+                fontSize: 13,
+                height: 1.45,
+                color: muted,
+              ),
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildCaption(textTheme),
+            const SizedBox(height: 12),
+            _FieldGuideSearch(
+              controller: _searchController,
+              query: _query,
+              onChanged: (value) => setState(() => _query = value),
+              onClear: () {
+                _searchController.clear();
+                setState(() => _query = '');
+              },
             ),
-            const SizedBox(height: 8),
-            Expanded(child: _buildContent(textTheme)),
+            const SizedBox(height: 10),
+            _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            const SizedBox(height: 6),
+            _buildCaption(muted),
+            const SizedBox(height: 14),
+            if (_loading)
+              const _FieldGuideSkeleton()
+            else if (_error != null)
+              _buildErrorState(context)
+            else if (_roots.isEmpty)
+              _buildEmptyState(context)
+            else if (roots.isEmpty)
+              _buildSearchEmpty(context)
+            else ...[
+              if (featured != null) ...[
+                _FeaturedDomainCard(
+                  label: (featured['name'] ?? '').toString(),
+                  description: _descriptionFor(featured),
+                  icon: exploreRootIcon(featuredPath),
+                  count: _countFor(featured),
+                  countLabel: _roleNoun,
+                  onTap: () => _openCategory(featured),
+                ),
+                const SizedBox(height: 14),
+              ],
+              if (gridRoots.isNotEmpty) ...[
+                _buildSectionLabel(
+                  context,
+                  gridRoots.length,
+                  featuredShown: featured != null,
+                ),
+                const SizedBox(height: 8),
+                _buildDomainGrid(context, gridRoots),
+              ],
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCaption(Color textTheme) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 18),
-      child: AnimatedSwitcher(
-        duration: AppMotion.base,
-        child: Text(
-          _role == ExploreRole.mentor
-              ? 'Showing categories with learners available right now.'
-              : 'Showing categories with mentors available right now.',
-          key: ValueKey(_role),
-          style: TextStyle(
-            fontSize: 12,
-            color: textTheme.withValues(alpha: 0.7),
+  Widget _buildCaption(Color muted) {
+    return AnimatedSwitcher(
+      duration: AppMotion.base,
+      child: Text(
+        _role == ExploreRole.mentor
+            ? 'Showing domains with learners available right now.'
+            : 'Showing domains with mentors available right now.',
+        key: ValueKey(_role),
+        style: AppTextStyles.regularText.copyWith(fontSize: 12, color: muted),
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(
+    BuildContext context,
+    int count, {
+    bool featuredShown = false,
+  }) {
+    final muted = _fgMuted(context);
+    final label =
+        _query.trim().isNotEmpty
+            ? 'RESULTS'
+            : featuredShown
+            ? 'MORE DOMAINS'
+            : 'ALL DOMAINS';
+    return Row(
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.boldText.copyWith(
+            fontSize: 10,
+            letterSpacing: 1.2,
+            color: muted,
           ),
+        ),
+        const Spacer(),
+        Text(
+          count.toString().padLeft(2, '0'),
+          style: AppTextStyles.boldText.copyWith(fontSize: 10, color: muted),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDomainGrid(
+    BuildContext context,
+    List<Map<String, dynamic>> roots,
+  ) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final cardHeight = (132 * scale).toDouble();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns =
+            constraints.maxWidth >= 1000
+                ? 4
+                : constraints.maxWidth >= 900
+                ? 3
+                : 2;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          itemCount: roots.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            mainAxisExtent: cardHeight,
+          ),
+          itemBuilder: (context, index) {
+            final node = roots[index];
+            final path = (node['path'] ?? '').toString();
+            return _DomainCard(
+              index: index + 1,
+              label: (node['name'] ?? '').toString(),
+              description: _descriptionFor(node),
+              icon: exploreRootIcon(path),
+              tint: _fieldGuideTint(path),
+              count: _rootCounts[path] ?? 0,
+              countLabel: _roleNoun,
+              onTap: () => _openCategory(node),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchEmpty(BuildContext context) {
+    final muted = _fgMuted(context);
+    return SizedBox(
+      height: 320,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'No domains match "${_query.trim()}".',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                fontSize: 14,
+                color: muted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                _searchController.clear();
+                setState(() => _query = '');
+              },
+              child: const Text('Clear search'),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(Color textTheme) {
-    if (_loading) {
-      return const ExploreGridSkeleton();
-    }
-    if (_error != null) return _buildErrorState(textTheme);
-    if (_roots.isEmpty) return _buildEmptyState(textTheme);
-    return _roots.length == 4
-        ? _buildGrid2x2(textTheme)
-        : _buildGridAuto(textTheme);
-  }
-
-  Widget _buildGrid2x2(Color textTheme) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 16.0;
-        const topInset = 8.0;
-        final bottomInset = AppSpacing.bottomNavClearanceFor(context);
-        final rawItemHeight =
-            (constraints.maxHeight - topInset - bottomInset - spacing) / 2;
-        if (rawItemHeight < 172) return _buildGridAuto(textTheme);
-
-        // Wide desktop surfaces lay the four roots out in one row so the cards
-        // keep a comfortable aspect instead of stretching to half the viewport.
-        final columns = constraints.maxWidth >= 900 ? 4 : 2;
-        final itemHeight =
-            columns == 4
-                ? 210.0
-                : constraints.maxWidth >= 700
-                ? rawItemHeight.clamp(172.0, 300.0)
-                : rawItemHeight;
-        return RefreshIndicator(
-          onRefresh: _refreshTaxonomy,
-          child: GridView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(16, topInset, 16, bottomInset),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              crossAxisSpacing: spacing,
-              mainAxisSpacing: spacing,
-              mainAxisExtent: itemHeight,
-            ),
-            itemCount: _roots.length,
-            itemBuilder: (context, index) => _buildCard(index),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildGridAuto(Color textTheme) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 900 ? 3 : 2;
-        return RefreshIndicator(
-          onRefresh: _refreshTaxonomy,
-          child: GridView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              AppSpacing.bottomNavClearanceFor(context),
-            ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              mainAxisExtent: 190,
-            ),
-            itemCount: _roots.length,
-            itemBuilder: (context, index) => _buildCard(index),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCard(int index) {
-    final node = _roots[index];
-    final path = (node['path'] ?? '') as String;
-    return _CategoryCard(
-      label: (node['name'] ?? '') as String,
-      description: _descriptionFor(node),
-      icon: exploreRootIcon(path),
-      count: _rootCounts[path] ?? 0,
-      countLabel: _role == ExploreRole.mentor ? 'learner' : 'mentor',
-      onTap: () => _openCategory(node),
-    );
-  }
-
-  Widget _buildEmptyState(Color textTheme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+  Widget _buildEmptyState(BuildContext context) {
+    final muted = _fgMuted(context);
+    return SizedBox(
+      height: 320,
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -410,10 +543,13 @@ class _ExplorePageState extends State<ExplorePage> {
               _role == ExploreRole.mentor
                   ? _hasMentorSkills
                       ? 'No learners are looking for your skills right now. Check back soon.'
-                      : 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
-                  : 'No categories available right now.',
+                      : 'You haven\'t added any mentor skills yet. Add some to your profile and matching domains will show up here.'
+                  : 'No domains available right now.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(color: textTheme),
+              style: AppTextStyles.regularText.copyWith(
+                fontSize: 14,
+                color: muted,
+              ),
             ),
             if (_role == ExploreRole.mentor) ...[
               const SizedBox(height: 8),
@@ -430,7 +566,7 @@ class _ExplorePageState extends State<ExplorePage> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: _loadTaxonomy,
-                child: const Text('Refresh categories'),
+                child: const Text('Refresh domains'),
               ),
             ],
           ],
@@ -439,26 +575,29 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  Widget _buildErrorState(Color textTheme) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _error ?? "Couldn't load categories. Please try again.",
-            style: AppTextStyles.regularText.copyWith(color: textTheme),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadTaxonomy,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text(
-              'Retry',
-              style: TextStyle(color: Colors.black, fontSize: 16),
+  Widget _buildErrorState(BuildContext context) {
+    final muted = _fgMuted(context);
+    return SizedBox(
+      height: 320,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error ?? "Couldn't load domains. Please try again.",
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                fontSize: 14,
+                color: muted,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadTaxonomy,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -510,14 +649,21 @@ class _RoleToggle extends StatelessWidget {
                     },
                   ),
                   const SizedBox(width: 6),
-                  AnimatedDefaultTextStyle(
-                    duration: AppMotion.base,
-                    style: AppTextStyles.regularText.copyWith(
-                      fontSize: 14,
-                      color: contentColor,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  Flexible(
+                    child: AnimatedDefaultTextStyle(
+                      duration: AppMotion.base,
+                      style: AppTextStyles.regularText.copyWith(
+                        fontSize: 14,
+                        color: contentColor,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    child: Text(label),
                   ),
                 ],
               ),
@@ -578,7 +724,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
   static const _titles = ['Browse', 'Heads up'];
 
   static const _messages = [
-    'Browse categories to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a category and swipe through people who are teaching or learning in it.',
+    'Browse domains to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a domain and swipe through people who are teaching or learning in it.',
     'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Browse is for discovering something new, so keep an open mind.',
   ];
 
@@ -738,8 +884,112 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
   }
 }
 
-class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({
+bool _fgIsDark(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark;
+
+Color _fgCard(BuildContext context) => AppColors.elevatedSurface(context);
+
+Color _fgInk(BuildContext context) => Theme.of(context).colorScheme.secondary;
+
+Color _fgMuted(BuildContext context) => AppColors.mutedText(context);
+
+Color _fgBorder(BuildContext context) => AppColors.border(context);
+
+Color _fieldGuideTint(String path) {
+  switch (path.split('.').first) {
+    case 'agriculture_livelihood':
+    case 'modern_practical_skills':
+      return const Color(0xFFCFE8DA);
+    case 'cooking_culinary':
+    case 'traditional_crafts':
+      return const Color(0xFFF3E1C7);
+    case 'household_skills':
+    case 'visual_arts_design':
+      return const Color(0xFFF0D9BD);
+    case 'language_writing':
+    case 'performing_arts':
+      return const Color(0xFFE3D9F2);
+    case 'martial_arts':
+      return const Color(0xFFF6D9D3);
+    default:
+      return AppColors.primary.withValues(alpha: 0.18);
+  }
+}
+
+String _countLabelText(int count, String countLabel) {
+  if (count >= 50) return '50+ ${countLabel}s';
+  return '$count $countLabel${count == 1 ? '' : 's'}';
+}
+
+class _FieldGuideSearch extends StatelessWidget {
+  const _FieldGuideSearch({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final muted = _fgMuted(context);
+
+    return Container(
+      height: AppSpacing.iconTarget,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: textTheme.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search_rounded, size: 18, color: muted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              textInputAction: TextInputAction.search,
+              cursorColor: AppColors.accentText(context),
+              style: AppTextStyles.regularText.copyWith(color: textTheme),
+              decoration: InputDecoration(
+                hintText: 'Search domains',
+                hintStyle: AppTextStyles.regularText.copyWith(color: muted),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (query.trim().isNotEmpty)
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Clear search',
+              child: GestureDetector(
+                onTap: onClear,
+                child: SizedBox(
+                  width: AppSpacing.iconTarget,
+                  height: AppSpacing.iconTarget,
+                  child: Center(
+                    child: Icon(Icons.cancel, size: 18, color: muted),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturedDomainCard extends StatelessWidget {
+  const _FeaturedDomainCard({
     required this.label,
     required this.description,
     required this.icon,
@@ -757,95 +1007,275 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-    final cardColor = AppColors.elevatedSurface(context);
+    final isDark = _fgIsDark(context);
+    final base = isDark ? AppColors.elevatedDark : AppColors.background;
+    final border = isDark ? AppColors.borderDark : Colors.transparent;
 
-    return Container(
-      foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border(context)),
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            spreadRadius: 0,
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+    return Material(
+      color: base,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: border),
           ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            spreadRadius: 0,
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'FEATURED',
+                      style: AppTextStyles.boldText.copyWith(
+                        fontSize: 9,
+                        letterSpacing: 1.2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.headingText.copyWith(
+                        fontSize: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.regularText.copyWith(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_countLabelText(count, countLabel)} available',
+                      style: AppTextStyles.boldText.copyWith(
+                        fontSize: 11,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Icon(icon, size: 28, color: AppColors.primary),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _DomainCard extends StatelessWidget {
+  const _DomainCard({
+    required this.index,
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.tint,
+    required this.count,
+    required this.countLabel,
+    required this.onTap,
+  });
+
+  final int index;
+  final String label;
+  final String description;
+  final IconData icon;
+  final Color tint;
+  final int count;
+  final String countLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = _fgCard(context);
+    final border = _fgBorder(context);
+    final ink = _fgInk(context);
+    final muted = _fgMuted(context);
+
+    return Semantics(
+      container: true,
+      button: true,
+      label: '$label. $description. ${_countLabelText(count, countLabel)}.',
+      onTap: onTap,
+      excludeSemantics: true,
       child: Material(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
+        color: card,
+        borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          hoverColor: Colors.transparent,
-          focusColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: border),
+            ),
+            padding: const EdgeInsets.fromLTRB(11, 11, 11, 10),
+            child: Stack(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, size: 22, color: AppColors.background),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: tint,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(
+                        icon,
+                        size: 17,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.boldText.copyWith(
+                        fontSize: 13,
+                        height: 1.2,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Flexible(
+                      child: Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.regularText.copyWith(
+                          fontSize: 11,
+                          height: 1.35,
+                          color: muted,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _countLabelText(count, countLabel),
+                      style: AppTextStyles.boldText.copyWith(
+                        fontSize: 10,
+                        color: AppColors.accentText(context),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.headingText.copyWith(
-                    color: textColor,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Flexible(
-                  child: Text(
-                    description,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textColor.withValues(alpha: 0.7),
-                      fontSize: 12,
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: ExcludeSemantics(
+                    child: Text(
+                      index.toString().padLeft(2, '0'),
+                      style: AppTextStyles.regularText.copyWith(
+                        fontSize: 10,
+                        color: muted,
+                      ),
                     ),
                   ),
                 ),
-                if (count > 0) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    count >= 50
-                        ? '50+ ${countLabel}s'
-                        : '$count $countLabel${count == 1 ? '' : 's'}',
-                    style: TextStyle(
-                      color: AppColors.accentText(context),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FieldGuideSkeleton extends StatelessWidget {
+  const _FieldGuideSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final cardHeight = (132 * scale).toDouble();
+    return Semantics(
+      label: 'Loading domains',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns =
+              constraints.maxWidth >= 1000
+                  ? 4
+                  : constraints.maxWidth >= 900
+                  ? 3
+                  : 2;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(height: 96, radius: 24),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const SkeletonBox(width: 90, height: 10),
+                  const Spacer(),
+                  const SkeletonBox(width: 20, height: 10),
+                ],
+              ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: 4,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: cardHeight,
+                ),
+                itemBuilder:
+                    (_, __) => Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: _fgCard(context),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: _fgBorder(context)),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonBox(width: 32, height: 32, radius: 11),
+                          SizedBox(height: 10),
+                          SkeletonBox(width: 110, height: 10),
+                          SizedBox(height: 6),
+                          SkeletonBox(width: 80, height: 8),
+                        ],
+                      ),
+                    ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

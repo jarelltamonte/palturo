@@ -101,6 +101,20 @@ class PersonCardOverlay extends StatefulWidget {
 class _PersonCardOverlayState extends State<PersonCardOverlay> {
   int _photoIndex = 0;
   bool _bioExpanded = false;
+  final GlobalKey _infoKey = GlobalKey();
+  double _infoHeight = 140;
+
+  void _measureInfo() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _infoKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+      final height = box.size.height;
+      if ((height - _infoHeight).abs() > 0.5) {
+        setState(() => _infoHeight = height);
+      }
+    });
+  }
 
   @override
   void didUpdateWidget(covariant PersonCardOverlay oldWidget) {
@@ -220,6 +234,35 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
     final shownMedia = isDetailsPage ? backdropPhoto : currentPhoto;
     final showProfilePill = widget.showProfilePill && !isDetailsPage;
 
+    if (!isDetailsPage) _measureInfo();
+    final playBottom = (widget.showActions ? 130.0 : 64.0) + _infoHeight + 10;
+
+    final shade = IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.85),
+                ],
+                stops: const [0.35, 1.0],
+              ),
+            ),
+          ),
+          AnimatedOpacity(
+            opacity: isDetailsPage ? 1 : 0,
+            duration: AppMotion.base,
+            child: ColoredBox(color: Colors.black.withValues(alpha: 0.82)),
+          ),
+        ],
+      ),
+    );
+
     final roleIconAsset =
         widget.person.role == PersonRole.learner
             ? 'assets/icons/rlearner.svg'
@@ -272,9 +315,13 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 url: shownMedia,
                 fallback: _CardFallback(name: widget.person.name),
                 alignment: Alignment.topCenter,
-                onOpenProfile: widget.onOpenProfile,
+                foreground: shade,
+                controlsBottom: playBottom,
               )
-              : _CardFallback(name: widget.person.name),
+              : Stack(
+                fit: StackFit.expand,
+                children: [_CardFallback(name: widget.person.name), shade],
+              ),
           if (widget.onOpenProfile != null && !hasVideo)
             Positioned.fill(
               child: Semantics(
@@ -347,30 +394,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
           ],
-          IgnorePointer(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.85),
-                  ],
-                  stops: const [0.35, 1.0],
-                ),
-              ),
-            ),
-          ),
-          IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: isDetailsPage ? 1 : 0,
-              duration: AppMotion.base,
-              child: ColoredBox(color: Colors.black.withValues(alpha: 0.82)),
-            ),
-          ),
-          if (widget.person.compatibility != null ||
-              widget.onOpenProfile != null)
+          if (!isDetailsPage &&
+              (widget.person.compatibility != null ||
+                  widget.onOpenProfile != null))
             Positioned(
               top: 16,
               left: 16,
@@ -508,7 +534,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 ),
               ),
             ),
-          Positioned(
+          if (!isDetailsPage || widget.onOpenProfile == null)
+            Positioned(
               top: 16,
               right: widget.showMenu ? 16 + AppSpacing.iconTarget : 16,
               child: Semantics(
@@ -546,12 +573,53 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 ),
               ),
             ),
+          if (isDetailsPage && widget.onOpenProfile != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Semantics(
+                container: true,
+                button: true,
+                label: 'Back to photos',
+                child: GestureDetector(
+                  onTap: () => setState(() => _photoIndex = 0),
+                  child: SizedBox(
+                    width: AppSpacing.iconTarget,
+                    height: AppSpacing.iconTarget,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (!isDetailsPage)
             Positioned(
               left: 20,
               right: 20,
               bottom: widget.showActions ? 130 : 64,
-              child: Column(
+              child: NotificationListener<SizeChangedLayoutNotification>(
+                onNotification: (_) {
+                  _measureInfo();
+                  return false;
+                },
+                child: SizeChangedLayoutNotifier(
+                  child: Column(
+                key: _infoKey,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -724,6 +792,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     _buildBio(context, bodyText),
                   ],
                 ],
+              ),
+                ),
               ),
             ),
           if (isDetailsPage)

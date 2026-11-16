@@ -23,6 +23,14 @@ class ShowcaseMedia extends StatefulWidget {
   final Alignment alignment;
   final VoidCallback? onOpenProfile;
 
+  /// Drawn above the media but below the play/pause button, so shading
+  /// layers never dim the control.
+  final Widget? foreground;
+
+  /// Distance from the bottom edge for the play/pause button. When null the
+  /// button stays centered near the top.
+  final double? controlsBottom;
+
   const ShowcaseMedia({
     super.key,
     required this.url,
@@ -30,6 +38,8 @@ class ShowcaseMedia extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.onOpenProfile,
+    this.foreground,
+    this.controlsBottom,
   });
 
   @override
@@ -117,8 +127,13 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _withForeground(Widget child) {
+    final foreground = widget.foreground;
+    if (foreground == null) return child;
+    return Stack(fit: StackFit.expand, children: [child, foreground]);
+  }
+
+  Widget _buildStatic() {
     if (!_isVideo) {
       final uri = MediaUrl.tryParse(widget.url);
       if (uri == null) return widget.fallback;
@@ -148,9 +163,11 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
     if (_failed || controller?.value.hasError == true) {
       return widget.fallback;
     }
-    if (controller == null || !controller.value.isInitialized) {
-      return _MediaLoading(fallback: widget.fallback);
-    }
+    return _MediaLoading(fallback: widget.fallback);
+  }
+
+  Widget _buildVideo(VideoPlayerController controller) {
+    final bottom = widget.controlsBottom;
 
     return Stack(
       fit: StackFit.expand,
@@ -165,8 +182,10 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
             child: VideoPlayer(controller),
           ),
         ),
+        if (widget.foreground != null) widget.foreground!,
         Positioned(
-          top: 12,
+          top: bottom == null ? 12 : null,
+          bottom: bottom,
           left: 0,
           right: 0,
           child: Row(
@@ -206,38 +225,25 @@ class _ShowcaseMediaState extends State<ShowcaseMedia> {
                   ),
                 ),
               ),
-              if (widget.onOpenProfile != null) ...[
-                const SizedBox(width: 8),
-                Semantics(
-                  button: true,
-                  label: 'View profile',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: widget.onOpenProfile,
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.62),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.22),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.person_outline_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
       ],
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isVideo) {
+      final controller = _controller;
+      final ready =
+          !_failed &&
+          controller != null &&
+          controller.value.isInitialized &&
+          !controller.value.hasError;
+      if (ready) return _buildVideo(controller);
+    }
+    return _withForeground(_buildStatic());
   }
 }
 

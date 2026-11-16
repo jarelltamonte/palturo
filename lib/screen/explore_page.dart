@@ -374,8 +374,6 @@ class _ExplorePageState extends State<ExplorePage> {
             ),
             const SizedBox(height: 10),
             _RoleToggle(value: _role, onChanged: _onRoleChanged),
-            const SizedBox(height: 6),
-            _buildCaption(muted),
             const SizedBox(height: 14),
             if (_loading)
               const _FieldGuideSkeleton()
@@ -409,19 +407,6 @@ class _ExplorePageState extends State<ExplorePage> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCaption(Color muted) {
-    return AnimatedSwitcher(
-      duration: AppMotion.base,
-      child: Text(
-        _role == ExploreRole.mentor
-            ? 'Showing domains with learners available right now.'
-            : 'Showing domains with mentors available right now.',
-        key: ValueKey(_role),
-        style: AppTextStyles.regularText.copyWith(fontSize: 12, color: muted),
       ),
     );
   }
@@ -884,9 +869,6 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
   }
 }
 
-bool _fgIsDark(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark;
-
 Color _fgCard(BuildContext context) => AppColors.elevatedSurface(context);
 
 Color _fgInk(BuildContext context) => Theme.of(context).colorScheme.secondary;
@@ -961,6 +943,9 @@ class _FieldGuideSearch extends StatelessWidget {
                 hintText: 'Search domains',
                 hintStyle: AppTextStyles.regularText.copyWith(color: muted),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),
@@ -1007,12 +992,14 @@ class _FeaturedDomainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _fgIsDark(context);
-    final base = isDark ? AppColors.elevatedDark : AppColors.background;
-    final border = isDark ? AppColors.borderDark : Colors.transparent;
+    final card = AppColors.mutedSurface(context);
+    final border = _fgBorder(context);
+    final ink = _fgInk(context);
+    final muted = _fgMuted(context);
+    final accent = AppColors.accentText(context);
 
     return Material(
-      color: base,
+      color: card,
       borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1035,7 +1022,7 @@ class _FeaturedDomainCard extends StatelessWidget {
                       style: AppTextStyles.boldText.copyWith(
                         fontSize: 9,
                         letterSpacing: 1.2,
-                        color: AppColors.primary,
+                        color: accent,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1045,7 +1032,7 @@ class _FeaturedDomainCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.headingText.copyWith(
                         fontSize: 20,
-                        color: Colors.white,
+                        color: ink,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -1056,7 +1043,7 @@ class _FeaturedDomainCard extends StatelessWidget {
                       style: AppTextStyles.regularText.copyWith(
                         fontSize: 12,
                         height: 1.4,
-                        color: Colors.white70,
+                        color: muted,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1064,7 +1051,7 @@ class _FeaturedDomainCard extends StatelessWidget {
                       '${_countLabelText(count, countLabel)} available',
                       style: AppTextStyles.boldText.copyWith(
                         fontSize: 11,
-                        color: AppColors.primary,
+                        color: accent,
                       ),
                     ),
                   ],
@@ -1075,13 +1062,13 @@ class _FeaturedDomainCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.14),
+                  color: AppColors.primary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.35),
+                    color: AppColors.primary.withValues(alpha: 0.45),
                   ),
                 ),
-                child: Icon(icon, size: 28, color: AppColors.primary),
+                child: Icon(icon, size: 28, color: accent),
               ),
             ],
           ),

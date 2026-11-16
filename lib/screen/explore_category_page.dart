@@ -1,22 +1,26 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_expand.dart';
+import 'package:palturo/screen/explore_taxonomy.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/utils/media_url.dart';
+import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
-import 'package:palturo/utils/friendly_error.dart';
 
 /// Category detail sits between the Browse root and the people deck.
 ///
-/// It uses the visible taxonomy to expose child skills, shows a real count of
-/// people for the selected role, and sends the user straight to a swipe deck.
+/// It reads like the field guide chapter opener: the domain and who is here,
+/// then the skills inside it, then one way into the deck.
 class ExploreCategoryPage extends StatefulWidget {
   const ExploreCategoryPage({
     super.key,
@@ -25,6 +29,8 @@ class ExploreCategoryPage extends StatefulWidget {
     required this.description,
     required this.mentor,
     this.onRoleChanged,
+    this.taxonomyLoader,
+    this.usersLoader,
   });
 
   final String nodePath;
@@ -33,15 +39,27 @@ class ExploreCategoryPage extends StatefulWidget {
   final bool mentor;
   final ValueChanged<bool>? onRoleChanged;
 
+  /// Test hooks. Production leaves these null.
+  final Future<List<Map<String, dynamic>>> Function(String path)?
+  taxonomyLoader;
+  final Future<List<Person>> Function(String path, {required String kind})?
+  usersLoader;
+
   @override
   State<ExploreCategoryPage> createState() => _ExploreCategoryPageState();
 }
 
 class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
-  static const double _navClearance = 88;
+  static const double _barReserve = 120;
+  static const double _pageReserve = 120;
 
-  late final bool _mentor = widget.mentor;
+  late bool _mentor = widget.mentor;
+
+  /// The role the currently painted data belongs to. A failed reload falls
+  /// back to it so labels and people never disagree.
+  late bool _dataMentor = widget.mentor;
   List<Map<String, dynamic>> _children = const [];
+  Map<String, int> _childCounts = const {};
   List<Person> _people = const [];
   int _otherCount = 0;
   bool _loading = true;
@@ -50,7 +68,21 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 
   String get _kind => _mentor ? 'learn' : 'teach';
 
-  bool get _showCta => !_loading && _error == null && _people.isNotEmpty;
+  String get _noun => _mentor ? 'learner' : 'mentor';
+
+  String get _otherNoun => _mentor ? 'mentor' : 'learner';
+
+  String get _peopleLabel => _mentor ? 'Learners here' : 'Mentors here';
+
+  String get _nounAvailable =>
+      '$_noun${_people.length == 1 ? '' : 's'} available';
+
+  bool get _showDeckCta => !_loading && _error == null && _people.isNotEmpty;
+
+  bool get _showSwitchCta =>
+      !_loading && _error == null && _people.isEmpty && _otherCount > 0;
+
+  bool get _showBar => _showDeckCta || _showSwitchCta;
 
   @override
   void initState() {
@@ -58,56 +90,124 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     _load();
   }
 
+  Future<List<Map<String, dynamic>>> _taxonomy(String path) =>
+      widget.taxonomyLoader != null
+          ? widget.taxonomyLoader!(path)
+          : MatchApi.taxonomyVisible(rootPath: path);
+
+  Future<List<Person>> _users(String path, String kind) =>
+      widget.usersLoader != null
+          ? widget.usersLoader!(path, kind: kind)
+          : MatchApi.browseSkillUsers(path, kind: kind);
+
   Future<void> _load() async {
     final requestId = ++_requestId;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    final hadData = _people.isNotEmpty || _children.isNotEmpty;
+    if (!hadData) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    // Capture the role so a switch mid-flight cannot mix the two responses.
+    final kind = _kind;
+    final mentor = _mentor;
     try {
       final rootDepth = widget.nodePath.split('.').length;
       var nodes = <Map<String, dynamic>>[];
       try {
-        nodes = await MatchApi.taxonomyVisible(rootPath: widget.nodePath);
+        nodes = await _taxonomy(widget.nodePath);
       } catch (e) {
         debugPrint('[Browse] taxonomy unavailable: $e');
       }
-      final people = await MatchApi.browseSkillUsers(
-        widget.nodePath,
-        kind: _kind,
-      );
+      final people = await _users(widget.nodePath, kind);
       if (!mounted || requestId != _requestId) return;
 
-      final children =
-          nodes
-              .where((n) => (n['depth'] as num?)?.toInt() == rootDepth + 1)
-              .toList();
+      final children = _visibleChildren(
+        nodes
+            .where((n) => (n['depth'] as num?)?.toInt() == rootDepth + 1)
+            .toList(),
+        nodes,
+      );
+      // Paint the page before the per-skill counts land; the rows fill in.
       setState(() {
-        _children = _visibleChildren(children, nodes);
         _people = people;
-        _otherCount = 0;
+        _children = children;
+        _childCounts = const {};
         _loading = false;
+        _error = null;
+        _dataMentor = mentor;
       });
-      unawaited(_loadOtherCount(requestId));
+      unawaited(_loadChildCounts(requestId, children, kind, people));
+      unawaited(_loadOtherCount(requestId, mentor));
     } catch (e) {
       debugPrint('[Browse] category load failed: $e');
       if (!mounted || requestId != _requestId) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load this category. Please try again.",
+      );
+      if (hadData) {
+        // The switch failed, so put the page back on the role its data
+        // belongs to instead of showing old people under new labels.
+        if (_mentor != _dataMentor) {
+          setState(() => _mentor = _dataMentor);
+          widget.onRoleChanged?.call(_dataMentor);
+        }
+        if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
+          showAppError(context, message);
+        }
+        return;
+      }
       setState(() {
         _loading = false;
-        _error = friendlyError(
-          e,
-          fallback: "Couldn't load this category. Please try again.",
-        );
+        _error = message;
       });
     }
   }
 
-  Future<void> _loadOtherCount(int requestId) async {
+  /// Role-specific counts for the child skills, so every visible row leads to
+  /// people in the active role. `-1` marks a count that failed: the row stays,
+  /// but no number is shown.
+  Future<void> _loadChildCounts(
+    int requestId,
+    List<Map<String, dynamic>> children,
+    String kind,
+    List<Person> people,
+  ) async {
+    if (children.isEmpty) return;
+    final entries = await Future.wait(
+      children.map((child) async {
+        final path = (child['path'] ?? '').toString();
+        if (path.isEmpty) return const MapEntry('', -1);
+        try {
+          final users = await _users(path, kind);
+          return MapEntry(path, users.length);
+        } catch (e) {
+          debugPrint('[Browse] skill count failed for $path: $e');
+          return MapEntry(path, -1);
+        }
+      }),
+    );
+    if (!mounted || requestId != _requestId) return;
+    final counts = Map<String, int>.fromEntries(entries);
+    setState(() {
+      _childCounts = counts;
+      final withPeople =
+          children.where((child) {
+            final value = counts[(child['path'] ?? '').toString()];
+            // Keep unknown counts (-1); drop skills that are known to be empty.
+            return value != 0;
+          }).toList();
+      // If nobody here, or nobody is tagged on a child, keep the taxonomy so
+      // the page still offers a way forward.
+      _children = people.isEmpty || withPeople.isEmpty ? children : withPeople;
+    });
+  }
+
+  Future<void> _loadOtherCount(int requestId, bool mentor) async {
     try {
-      final other = await MatchApi.browseSkillUsers(
-        widget.nodePath,
-        kind: _mentor ? 'teach' : 'learn',
-      );
+      final other = await _users(widget.nodePath, mentor ? 'teach' : 'learn');
       if (!mounted || requestId != _requestId) return;
       setState(() => _otherCount = other.length);
     } catch (_) {
@@ -149,11 +249,18 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         .toList();
   }
 
-  void _openChild(Map<String, dynamic> node) {
+  void _switchRole() {
+    final next = !_mentor;
+    setState(() => _mentor = next);
+    widget.onRoleChanged?.call(next);
+    _load();
+  }
+
+  Future<void> _openChild(Map<String, dynamic> node) async {
     final path = (node['path'] ?? '').toString();
     final label = (node['name'] ?? '').toString();
     if (path.isEmpty || label.isEmpty) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -162,14 +269,25 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               nodeLabel: label,
               description: 'Explore $label in the PalTuro community.',
               mentor: _mentor,
-              onRoleChanged: widget.onRoleChanged,
+              // Mirror a role switch made deeper in the stack so this page
+              // does not come back showing the old role.
+              onRoleChanged: (mentor) {
+                if (!mounted) return;
+                if (mentor != _mentor) {
+                  setState(() => _mentor = mentor);
+                  _load();
+                }
+                widget.onRoleChanged?.call(mentor);
+              },
+              taxonomyLoader: widget.taxonomyLoader,
+              usersLoader: widget.usersLoader,
             ),
       ),
     );
   }
 
-  void _startBrowsing() {
-    Navigator.push(
+  Future<void> _startBrowsing() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -180,6 +298,8 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
             ),
       ),
     );
+    // Requests sent in the deck change who is available.
+    if (mounted) _load();
   }
 
   String _countLabel(int n) => n >= 50 ? '50+' : '$n';
@@ -187,339 +307,471 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final surface = Theme.of(context).colorScheme.surface;
-    final adaptiveHeight = AppSpacing.topBarHeight();
+    final appBarHeight = math.max(
+      AppSpacing.topBarHeight(),
+      MediaQuery.textScalerOf(context).scale(24) + 24,
+    );
 
     return Scaffold(
-      backgroundColor: surface,
-      appBar: AppBar(
-        toolbarHeight: adaptiveHeight,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: AppSpacing.titleSpacing,
-        title: Row(
-          children: [
-            Semantics(
-              button: true,
-              label: 'Back',
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.pop(context),
-                child: SizedBox(
-                  width: AppSpacing.iconTarget,
-                  height: AppSpacing.iconTarget,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Icon(
-                      Icons.arrow_back_ios_new,
-                      color: textTheme,
-                      size: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                widget.nodeLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.headingText.copyWith(
-                  color: textTheme,
-                  fontSize: 20,
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppChrome.appBar(
+        toolbarHeight: appBarHeight,
+        leading: AppChrome.backButton(context, color: textTheme),
+        title: Text(
+          widget.nodeLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.headingText.copyWith(
+            color: textTheme,
+            fontSize: 20,
+          ),
         ),
       ),
       body: SafeArea(
         bottom: false,
-        child:
-            _loading
-                ? const _CategorySkeleton()
-                : _error != null
-                ? _buildError(textTheme)
-                : Stack(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (_loading) return const _CategorySkeleton();
+            if (_error != null) return _buildError(textTheme);
+
+            final wide = constraints.maxWidth >= 760;
+            final scale = (MediaQuery.textScalerOf(context).scale(12) / 12)
+                .clamp(1.0, 2.5);
+            final barReserve =
+                _showBar
+                    ? AppSpacing.bottomNavClearanceFor(context) +
+                        _barReserve * scale
+                    : _pageReserve;
+            final bottomInset =
+                wide
+                    ? math.max(
+                      AppSpacing.pageBottom,
+                      AppSpacing.bottomNavClearanceFor(context) + 16,
+                    )
+                    : barReserve;
+
+            return Stack(
+              children: [
+                ListView(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset),
                   children: [
-                    ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        8,
-                        16,
-                        _showCta ? _navClearance + 88 : 120,
-                      ),
-                      children: [
-                        _buildHeader(textTheme),
-                        if (_people.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          Text(
-                            _mentor ? 'Learners here' : 'Mentors here',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textTheme,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _buildPeoplePreview(textTheme),
-                        ],
-                        if (_children.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          Text(
-                            'Skills in this category',
-                            style: AppTextStyles.boldText.copyWith(
-                              color: textTheme,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final child in _children)
-                                _SkillChip(
-                                  label: (child['name'] ?? '').toString(),
-                                  onTap: () => _openChild(child),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (_showCta)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: _buildBottomCta(surface),
-                      ),
+                    if (wide)
+                      _buildWideBody(constraints.maxWidth)
+                    else
+                      ..._buildNarrowBody(),
                   ],
                 ),
+                if (_showBar && !wide)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildBottomBar(),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildPeoplePreview(Color textTheme) {
-    final visible = _people.length > 6 ? 6 : _people.length;
-    return Column(
+  List<Widget> _buildNarrowBody() {
+    return [
+      _buildHero(),
+      if (_people.isNotEmpty) ...[
+        const SizedBox(height: 24),
+        _buildSectionLabel(_peopleLabel, _people.length),
+        const SizedBox(height: 10),
+        _buildPeople(),
+      ],
+      if (_children.isNotEmpty) ...[
+        const SizedBox(height: 24),
+        _buildSectionLabel('Skills in this domain', _children.length),
+        const SizedBox(height: 10),
+        _buildSkills(),
+      ],
+    ];
+  }
+
+  Widget _buildWideBody(double width) {
+    final leftWidth = width >= 1000 ? 380.0 : 300.0;
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 82,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: visible,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final person = _people[index];
-              final photo =
-                  person.photoUrls.isNotEmpty ? person.photoUrls.first : null;
-              return SizedBox(
-                width: 64,
-                child: Column(
-                  children: [
-                    UserAvatar(
-                      name: person.name,
-                      image: MediaUrl.image(photo),
-                      size: 48,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      person.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: textTheme.withValues(alpha: 0.7),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+          width: leftWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHero(),
+              if (_showDeckCta) ...[
+                const SizedBox(height: 18),
+                _buildDeckButton(),
+              ] else if (_showSwitchCta) ...[
+                const SizedBox(height: 18),
+                _buildSwitchButton(),
+              ],
+            ],
           ),
         ),
-        if (_people.length > visible) ...[
-          const SizedBox(height: 4),
-          Text(
-            'and ${_people.length - visible} more',
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.mutedText(context),
-              fontSize: 11,
-            ),
+        const SizedBox(width: 28),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_people.isNotEmpty) ...[
+                _buildSectionLabel(_peopleLabel, _people.length),
+                const SizedBox(height: 10),
+                _buildPeople(),
+              ],
+              if (_children.isNotEmpty) ...[
+                if (_people.isNotEmpty) const SizedBox(height: 24),
+                _buildSectionLabel('Skills in this domain', _children.length),
+                const SizedBox(height: 10),
+                _buildSkills(),
+              ],
+            ],
           ),
-        ],
+        ),
       ],
     );
   }
 
-  Widget _buildBottomCta(Color surface) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 28, 16, _navClearance),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [surface.withValues(alpha: 0), surface],
-          stops: const [0, 0.45],
-        ),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: ElevatedButton.icon(
-          onPressed: _startBrowsing,
-          icon: const Icon(Icons.style_outlined),
-          label: Text('Start browsing ${_mentor ? 'learners' : 'mentors'}'),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRolePill() {
-    final roleName = _mentor ? 'Mentor' : 'Learner';
-    final svgAsset =
-        _mentor ? 'assets/icons/rmentor.svg' : 'assets/icons/rlearner.svg';
-
-    return Semantics(
-      label: 'Browsing as $roleName',
-      excludeSemantics: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.mutedSurface(context),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              svgAsset,
-              width: 16,
-              height: 16,
-              colorFilter: ColorFilter.mode(
-                AppColors.accentText(context),
-                BlendMode.srcIn,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Browsing as $roleName',
-              style: AppTextStyles.boldText.copyWith(
-                color: Theme.of(context).colorScheme.secondary,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(Color textTheme) {
-    final noun = _mentor ? 'learner' : 'mentor';
-    final otherNoun = _mentor ? 'mentor' : 'learner';
+  Widget _buildHero() {
+    final muted = AppColors.mutedText(context);
+    final accent = AppColors.accentText(context);
     final count = _people.length;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.elevatedSurface(context),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildRolePill(),
-          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: exploreTint(widget.nodePath),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    exploreRootIcon(widget.nodePath),
+                    size: 26,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                _RoleChip(mentor: _mentor, onTap: _switchRole),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Text(
             widget.description,
             style: AppTextStyles.regularText.copyWith(
-              color: textTheme.withValues(alpha: 0.76),
+              color: muted,
               fontSize: 14,
-              height: 1.4,
+              height: 1.45,
             ),
           ),
-          const SizedBox(height: 24),
-          if (_people.isEmpty)
-            _buildEmpty(textTheme)
-          else
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
+          const SizedBox(height: 14),
+          if (count == 0) ...[
+            _buildEmptyPanel(muted),
+            if (_otherCount > 0) ...[
+              const SizedBox(height: 10),
+              _buildOtherCount(muted),
+            ],
+          ] else
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 Text(
                   _countLabel(count),
                   style: AppTextStyles.headingText.copyWith(
-                    color: AppColors.accentText(context),
-                    fontSize: 44,
+                    color: accent,
+                    fontSize: 20,
+                    letterSpacing: -0.4,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '$noun${count == 1 ? '' : 's'} available',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: textTheme,
-                      fontSize: 16,
-                    ),
+                Text(
+                  _nounAvailable,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: muted,
+                    fontSize: 12,
                   ),
                 ),
+                if (_otherCount > 0) _buildOtherCount(muted),
               ],
             ),
-          if (_otherCount > 0) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  Icons.swap_horiz,
-                  size: 15,
-                  color: AppColors.mutedText(context),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '${_countLabel(_otherCount)} fellow $otherNoun${_otherCount == 1 ? '' : 's'} here',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildEmpty(Color textTheme) {
+  Widget _buildOtherCount(Color muted) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.groups_outlined,
-          size: 26,
-          color: textTheme.withValues(alpha: 0.35),
+        Container(
+          width: 3,
+          height: 3,
+          decoration: BoxDecoration(color: muted, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 10),
-        Expanded(
+        const SizedBox(width: 8),
+        Flexible(
           child: Text(
-            'No one is available in this category right now.',
+            '${_countLabel(_otherCount)} $_otherNoun${_otherCount == 1 ? '' : 's'} here',
             style: AppTextStyles.regularText.copyWith(
-              color: textTheme.withValues(alpha: 0.7),
-              fontSize: 14,
+              color: muted,
+              fontSize: 12,
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmptyPanel(Color muted) {
+    final tail =
+        _otherCount > 0
+            ? ' Try a skill below, or switch roles.'
+            : (_children.isNotEmpty ? ' Try a skill below.' : '');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.mutedSurface(context),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.groups_outlined, size: 20, color: muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'No ${_noun}s are free in this domain right now.$tail',
+              style: AppTextStyles.regularText.copyWith(
+                color: muted,
+                fontSize: 12,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label, int count) {
+    final ink = Theme.of(context).colorScheme.secondary;
+    final muted = AppColors.mutedText(context);
+    return Semantics(
+      container: true,
+      header: true,
+      label: '$label, ${_countLabel(count)}',
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.boldText.copyWith(
+                fontSize: 10,
+                letterSpacing: 1.2,
+                color: ink,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _countLabel(count).padLeft(2, '0'),
+            style: AppTextStyles.boldText.copyWith(fontSize: 10, color: muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeople() {
+    final visible = _people.length > 4 ? 4 : _people.length;
+    final remaining = _people.length - visible;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final person in _people.take(visible)) ...[
+            _PersonTile(person: person),
+            const SizedBox(width: 10),
+          ],
+          if (remaining > 0)
+            Semantics(
+              container: true,
+              button: true,
+              label: '$remaining more ${_noun}s. Start browsing.',
+              onTap: _startBrowsing,
+              excludeSemantics: true,
+              child: InkWell(
+                onTap: _startBrowsing,
+                borderRadius: BorderRadius.circular(26),
+                child: SizedBox(
+                  width: 52,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.mutedSurface(context),
+                          border: Border.all(color: AppColors.border(context)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '+$remaining',
+                            style: AppTextStyles.boldText.copyWith(
+                              fontSize: 11,
+                              color: AppColors.mutedText(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'more',
+                        style: AppTextStyles.regularText.copyWith(
+                          fontSize: 10,
+                          color: AppColors.mutedText(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkills() {
+    final border = AppColors.border(context);
+    final rows = <Widget>[];
+    for (final child in _children) {
+      if (rows.isNotEmpty) {
+        rows.add(Divider(height: 1, thickness: 1, color: border));
+      }
+      rows.add(
+        _SkillRow(
+          label: (child['name'] ?? '').toString(),
+          count: _childCounts[(child['path'] ?? '').toString()],
+          countLabel: _noun,
+          onTap: () => _openChild(child),
+        ),
+      );
+    }
+    return Material(
+      color: AppColors.elevatedSurface(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: rows),
+    );
+  }
+
+  Widget _buildDeckButton() {
+    return _actionButton(
+      onPressed: _startBrowsing,
+      icon: Icons.style_outlined,
+      label: 'Start browsing ${_mentor ? 'learners' : 'mentors'}',
+    );
+  }
+
+  Widget _buildSwitchButton() {
+    return _actionButton(
+      onPressed: _switchRole,
+      icon: Icons.swap_horiz,
+      label: _mentor ? 'Switch to learning' : 'Switch to teaching',
+      outlined: true,
+    );
+  }
+
+  Widget _actionButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    bool outlined = false,
+  }) {
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(width: 8),
+        Flexible(child: Text(label, textAlign: TextAlign.center)),
+      ],
+    );
+    return SizedBox(
+      width: double.infinity,
+      child:
+          outlined
+              ? OutlinedButton(onPressed: onPressed, child: child)
+              : ElevatedButton(onPressed: onPressed, child: child),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    final count = _people.length;
+    final muted = AppColors.mutedText(context);
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        AppSpacing.bottomNavClearanceFor(context),
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(top: BorderSide(color: AppColors.border(context))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_showDeckCta) _buildDeckButton() else _buildSwitchButton(),
+          const SizedBox(height: 6),
+          Text(
+            _showDeckCta
+                ? 'Swipe through $count $_noun${count == 1 ? '' : 's'}, no pressure to match'
+                : 'See the $_otherCount $_otherNoun${_otherCount == 1 ? '' : 's'} waiting in this domain',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.regularText.copyWith(
+              fontSize: 10,
+              color: muted,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -544,50 +796,189 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   }
 }
 
-class _SkillChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
+class _RoleChip extends StatelessWidget {
+  const _RoleChip({required this.mentor, required this.onTap});
 
-  const _SkillChip({required this.label, required this.onTap});
+  final bool mentor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).colorScheme.secondary;
+    final roleName = mentor ? 'Mentor' : 'Learner';
+    final otherRole = mentor ? 'learning' : 'teaching';
+    final svgAsset =
+        mentor ? 'assets/icons/rmentor.svg' : 'assets/icons/rlearner.svg';
+    final ink = Theme.of(context).colorScheme.secondary;
 
     return Semantics(
+      container: true,
       button: true,
-      label: label,
+      label: 'Browsing as $roleName. Switch to $otherRole.',
       onTap: onTap,
       excludeSemantics: true,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.fromLTRB(16, 0, 10, 0),
-          backgroundColor: Colors.transparent,
-          side: BorderSide(color: AppColors.border(context)),
-          shape: const StadiumBorder(),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.regularText.copyWith(
-                color: textTheme,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+      child: Material(
+        color: AppColors.mutedSurface(context),
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const StadiumBorder(),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    svgAsset,
+                    width: 14,
+                    height: 14,
+                    colorFilter: ColorFilter.mode(
+                      AppColors.accentText(context),
+                      BlendMode.srcIn,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          const TextSpan(text: 'Browsing as '),
+                          TextSpan(
+                            text: roleName,
+                            style: TextStyle(
+                              color: AppColors.accentText(context),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: ink,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: AppColors.mutedText(context),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 2),
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: AppColors.mutedText(context),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonTile extends StatelessWidget {
+  const _PersonTile({required this.person});
+
+  final Person person;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = person.photoUrls.isNotEmpty ? person.photoUrls.first : null;
+
+    return SizedBox(
+      width: 52,
+      child: Column(
+        children: [
+          ExcludeSemantics(
+            child: UserAvatar(
+              name: person.name,
+              image: MediaUrl.image(photo),
+              size: 46,
             ),
-          ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            person.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.regularText.copyWith(
+              color: AppColors.mutedText(context),
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkillRow extends StatelessWidget {
+  const _SkillRow({
+    required this.label,
+    required this.count,
+    required this.countLabel,
+    required this.onTap,
+  });
+
+  final String label;
+  final int? count;
+  final String countLabel;
+  final VoidCallback onTap;
+
+  String? get _countText {
+    final value = count;
+    if (value == null || value <= 0) return null;
+    if (value >= 50) return '50+ ${countLabel}s';
+    return '$value $countLabel${value == 1 ? '' : 's'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final countText = _countText;
+    return Semantics(
+      container: true,
+      button: true,
+      label: countText == null ? '$label.' : '$label. $countText.',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.boldText.copyWith(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (countText != null)
+                Text(
+                  countText,
+                  style: AppTextStyles.boldText.copyWith(
+                    fontSize: 11,
+                    color: AppColors.accentText(context),
+                  ),
+                ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: AppColors.mutedText(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -605,36 +996,49 @@ class _CategorySkeleton extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
           Container(
-            height: 200,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.elevatedSurface(context),
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.border(context)),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SkeletonBox(width: 140, height: 28, radius: 14),
-                SizedBox(height: 18),
-                SkeletonBox(width: 220, height: 14),
-                Spacer(),
-                SkeletonBox(width: 170, height: 40),
+                Row(
+                  children: [
+                    SkeletonBox(width: 52, height: 52, radius: 16),
+                    Spacer(),
+                    SkeletonBox(width: 132, height: 44, radius: 999),
+                  ],
+                ),
+                SizedBox(height: 16),
+                SkeletonBox(width: 220, height: 12),
+                SizedBox(height: 16),
+                SkeletonBox(width: 150, height: 20),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          const SkeletonBox(width: 150, height: 14),
+          const SkeletonBox(width: 110, height: 10),
           const SizedBox(height: 10),
-          const Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          const Row(
             children: [
-              SkeletonBox(width: 100, height: 44, radius: 22),
-              SkeletonBox(width: 128, height: 44, radius: 22),
-              SkeletonBox(width: 90, height: 44, radius: 22),
+              SkeletonBox(width: 46, height: 46, radius: 23),
+              SizedBox(width: 10),
+              SkeletonBox(width: 46, height: 46, radius: 23),
+              SizedBox(width: 10),
+              SkeletonBox(width: 46, height: 46, radius: 23),
             ],
           ),
+          const SizedBox(height: 24),
+          const SkeletonBox(width: 140, height: 10),
+          const SizedBox(height: 10),
+          const SkeletonBox(height: 56, radius: 14),
+          const SizedBox(height: 8),
+          const SkeletonBox(height: 56, radius: 14),
+          const SizedBox(height: 8),
+          const SkeletonBox(height: 56, radius: 14),
         ],
       ),
     );

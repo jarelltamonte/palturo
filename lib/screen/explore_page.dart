@@ -273,10 +273,9 @@ class _ExplorePageState extends State<ExplorePage> {
               mentor: _role == ExploreRole.mentor,
               onRoleChanged: (mentor) {
                 if (!mounted) return;
-                setState(() {
-                  _role = mentor ? ExploreRole.mentor : ExploreRole.learner;
-                });
-                _loadTaxonomy();
+                _onRoleChanged(
+                  mentor ? ExploreRole.mentor : ExploreRole.learner,
+                );
               },
             ),
       ),
@@ -475,7 +474,7 @@ class _ExplorePageState extends State<ExplorePage> {
               label: (node['name'] ?? '').toString(),
               description: _descriptionFor(node),
               icon: exploreRootIcon(path),
-              tint: _fieldGuideTint(path),
+              tint: exploreTint(path),
               count: _rootCounts[path] ?? 0,
               countLabel: _roleNoun,
               onTap: () => _openCategory(node),
@@ -876,27 +875,6 @@ Color _fgInk(BuildContext context) => Theme.of(context).colorScheme.secondary;
 Color _fgMuted(BuildContext context) => AppColors.mutedText(context);
 
 Color _fgBorder(BuildContext context) => AppColors.border(context);
-
-Color _fieldGuideTint(String path) {
-  switch (path.split('.').first) {
-    case 'agriculture_livelihood':
-    case 'modern_practical_skills':
-      return const Color(0xFFCFE8DA);
-    case 'cooking_culinary':
-    case 'traditional_crafts':
-      return const Color(0xFFF3E1C7);
-    case 'household_skills':
-    case 'visual_arts_design':
-      return const Color(0xFFF0D9BD);
-    case 'language_writing':
-    case 'performing_arts':
-      return const Color(0xFFE3D9F2);
-    case 'martial_arts':
-      return const Color(0xFFF6D9D3);
-    default:
-      return AppColors.primary.withValues(alpha: 0.18);
-  }
-}
 
 String _countLabelText(int count, String countLabel) {
   if (count >= 50) return '50+ ${countLabel}s';

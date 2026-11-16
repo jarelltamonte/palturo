@@ -1019,11 +1019,6 @@ class _SettingsState extends State<Settings> {
                 onTap: _openAccount,
               ),
             ),
-            _settingsTile(
-              icon: Icons.logout_rounded,
-              title: 'Log out',
-              onTap: _loggingOut ? null : _logout,
-            ),
 
             _sectionLabel('Support'),
             _settingsTile(
@@ -1042,7 +1037,7 @@ class _SettingsState extends State<Settings> {
               onTap: _showHelpDialog,
             ),
 
-            _sectionLabel('Legal & about'),
+            _sectionLabel('Legal'),
             _settingsTile(
               icon: Icons.description_outlined,
               title: 'Terms of Service',
@@ -1058,6 +1053,7 @@ class _SettingsState extends State<Settings> {
               title: 'Cookies Policy',
               onTap: () => LegalDialogs.showCookiesPolicy(context),
             ),
+            _sectionLabel('About'),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.info_outline, color: textTheme),
@@ -1072,6 +1068,12 @@ class _SettingsState extends State<Settings> {
                   fontSize: 12,
                 ),
               ),
+            ),
+            _sectionLabel('Session'),
+            _settingsTile(
+              icon: Icons.logout_rounded,
+              title: 'Log out',
+              onTap: _loggingOut ? null : _logout,
             ),
             SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom),
           ],

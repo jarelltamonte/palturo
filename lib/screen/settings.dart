@@ -1073,6 +1073,7 @@ class _SettingsState extends State<Settings> {
             _settingsTile(
               icon: Icons.logout_rounded,
               title: 'Log out',
+              trailing: const SizedBox.shrink(),
               onTap: _loggingOut ? null : _logout,
             ),
             SizedBox(height: 24 + MediaQuery.paddingOf(context).bottom),

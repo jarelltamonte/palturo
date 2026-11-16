@@ -848,6 +848,12 @@ class MatchApi {
       final learningStyles = List<String>.from(
         r['learning_styles'] ?? const [],
       );
+      final showcases =
+          ((r['showcases'] as List?) ?? [])
+              .whereType<Map>()
+              .map((m) => m['media'] as String?)
+              .whereType<String>()
+              .toList();
       return Person(
         id: r['user_id'] as String,
         name: _displayName(r['name']),
@@ -864,6 +870,7 @@ class MatchApi {
         role: kind == 'learn' ? PersonRole.learner : PersonRole.mentor,
         bio: (r['note'] ?? '') as String,
         photoUrls: [r['avatar_url'] as String?],
+        showcaseUrls: showcases,
       );
     }).toList();
   }

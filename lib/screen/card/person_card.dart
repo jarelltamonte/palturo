@@ -111,19 +111,17 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
     }
 
     // Showcase pages can change for the same person (e.g. after an edit).
-    // Keep the index inside the current media list instead of showing a
-    // blank page with no selected dot.
-    final total = widget.person.cardMedia.length;
-    if (total == 0) {
-      _photoIndex = 0;
-    } else if (_photoIndex >= total) {
-      _photoIndex = total - 1;
+    // Keep the index inside the current page list. The last page is the
+    // details page, which sits one past the final media item.
+    final lastPage = widget.person.cardMedia.length;
+    if (_photoIndex > lastPage) {
+      _photoIndex = lastPage;
     }
   }
 
   void _nextPhoto() {
-    final total = widget.person.cardMedia.length;
-    if (total > 0 && _photoIndex < total - 1) {
+    final lastPage = widget.person.cardMedia.length;
+    if (_photoIndex < lastPage) {
       setState(() => _photoIndex++);
     }
   }
@@ -210,11 +208,17 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
   @override
   Widget build(BuildContext context) {
     final photoUrls = widget.person.cardMedia;
-    final currentPhoto =
-        photoUrls.isNotEmpty && _photoIndex < photoUrls.length
-            ? photoUrls[_photoIndex]
-            : null;
+    final mediaCount = photoUrls.length;
+    final totalPages = mediaCount + 1;
+    final isDetailsPage = _photoIndex >= mediaCount;
+    final currentPhoto = isDetailsPage ? null : photoUrls[_photoIndex];
     final hasVideo = isVideoUrl(currentPhoto);
+    final backdropPhoto = photoUrls.firstWhere(
+      (url) => url != null && !isVideoUrl(url),
+      orElse: () => null,
+    );
+    final shownMedia = isDetailsPage ? backdropPhoto : currentPhoto;
+    final showProfilePill = widget.showProfilePill && !isDetailsPage;
 
     final roleIconAsset =
         widget.person.role == PersonRole.learner
@@ -263,9 +267,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 ),
               ),
             ),
-          currentPhoto != null
+          shownMedia != null
               ? ShowcaseMedia(
-                url: currentPhoto,
+                url: shownMedia,
                 fallback: _CardFallback(name: widget.person.name),
                 alignment: Alignment.topCenter,
                 onOpenProfile: widget.onOpenProfile,
@@ -315,7 +319,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
           ),
-          if (photoUrls.length > 1) ...[
+          if (totalPages > 1) ...[
             Positioned(
               left: 6,
               top: 0,
@@ -337,7 +341,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 child: Center(
                   child: _PhotoChevron(
                     icon: Icons.chevron_right,
-                    visible: _photoIndex < photoUrls.length - 1,
+                    visible: _photoIndex < totalPages - 1,
                   ),
                 ),
               ),
@@ -356,6 +360,13 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   stops: const [0.35, 1.0],
                 ),
               ),
+            ),
+          ),
+          IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: isDetailsPage ? 1 : 0,
+              duration: AppMotion.base,
+              child: ColoredBox(color: Colors.black.withValues(alpha: 0.82)),
             ),
           ),
           if (widget.person.compatibility != null ||
@@ -379,9 +390,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                   if (widget.person.compatibility != null &&
                       widget.onWhyMatch != null &&
                       widget.onOpenProfile != null &&
-                      widget.showProfilePill)
+                      showProfilePill)
                     const SizedBox(height: 6),
-                  if (widget.onOpenProfile != null && widget.showProfilePill)
+                  if (widget.onOpenProfile != null && showProfilePill)
                     _GlassPill(
                       onTap: widget.onOpenProfile,
                       icon: Icons.person_outline,
@@ -483,6 +494,9 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.35),
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.28),
+                        ),
                       ),
                       child: const Icon(
                         Icons.more_horiz,
@@ -495,95 +509,59 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               ),
             ),
           Positioned(
-            left: 20,
-            right: 20,
-            bottom: widget.showActions ? 130 : 64,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        '$roleLabel ',
-                        style: AppTextStyles.regularText.copyWith(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 6,
-                            ),
-                          ],
+              top: 16,
+              right: widget.showMenu ? 16 + AppSpacing.iconTarget : 16,
+              child: Semantics(
+                container: true,
+                button: true,
+                label: isDetailsPage ? 'Back to photos' : 'Show full details',
+                child: GestureDetector(
+                  onTap:
+                      () => setState(
+                        () => _photoIndex = isDetailsPage ? 0 : mediaCount,
+                      ),
+                  child: SizedBox(
+                    width: AppSpacing.iconTarget,
+                    height: AppSpacing.iconTarget,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                          ),
                         ),
-                      ),
-                    ),
-                    Flexible(
-                      child: Text(
-                        toTitleCase(widget.person.skillName),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.boldText.copyWith(
-                          color: AppColors.primary,
-                          fontSize: 14,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    SvgPicture.asset(
-                      roleIconAsset,
-                      width: 16,
-                      height: 16,
-                      colorFilter: const ColorFilter.mode(
-                        AppColors.primary,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.person.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.boldText.copyWith(
+                        child: Icon(
+                          isDetailsPage
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
                           color: Colors.white,
-                          fontSize: 22,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 8,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
+                          size: 22,
                         ),
                       ),
                     ),
-                    if (scheduleText.isNotEmpty) ...[
-                      const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 6),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 150),
+                  ),
+                ),
+              ),
+            ),
+          if (!isDetailsPage)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: widget.showActions ? 130 : 64,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
                         child: Text(
-                          scheduleText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          '$roleLabel ',
                           style: AppTextStyles.regularText.copyWith(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 14,
                             shadows: [
                               Shadow(
@@ -594,85 +572,178 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           ),
                         ),
                       ),
-                    ],
-                  ],
-                ),
-                if (language.isNotEmpty || learningStyle.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 16,
-                    children: [
-                      if (language.isNotEmpty)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.translate,
-                              size: 15,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                language,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.6,
-                                      ),
-                                      blurRadius: 6,
-                                    ),
-                                  ],
-                                ),
+                      Flexible(
+                        child: Text(
+                          toTitleCase(widget.person.skillName),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.boldText.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 14,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 6,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      if (learningStyle.isNotEmpty)
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.psychology,
-                              size: 15,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                learningStyle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.6,
-                                      ),
-                                      blurRadius: 6,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(width: 6),
+                      SvgPicture.asset(
+                        roleIconAsset,
+                        width: 16,
+                        height: 16,
+                        colorFilter: const ColorFilter.mode(
+                          AppColors.primary,
+                          BlendMode.srcIn,
                         ),
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.person.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.boldText.copyWith(
+                            color: Colors.white,
+                            fontSize: 22,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                blurRadius: 8,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (scheduleText.isNotEmpty) ...[
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 150),
+                          child: Text(
+                            scheduleText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: Colors.white,
+                              fontSize: 14,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (language.isNotEmpty || learningStyle.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 16,
+                      children: [
+                        if (language.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.translate,
+                                size: 15,
+                                color: Colors.white70,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  language,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (learningStyle.isNotEmpty)
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.psychology,
+                                size: 15,
+                                color: Colors.white70,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  learningStyle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.regularText.copyWith(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (bodyText.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    _buildBio(context, bodyText),
+                  ],
                 ],
-                if (bodyText.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  _buildBio(context, bodyText),
-                ],
-              ],
+              ),
             ),
-          ),
+          if (isDetailsPage)
+            Positioned(
+              left: 20,
+              right: 20,
+              top: 72,
+              bottom: widget.showActions ? 130 : 64,
+              child: _DetailsPage(
+                roleLabel: roleLabel,
+                roleIconAsset: roleIconAsset,
+                skillName: toTitleCase(widget.person.skillName),
+                name: widget.person.name,
+                schedule: scheduleText,
+                language: language,
+                learningStyle: learningStyle,
+                bodyLabel: widget.showSkillNote ? 'About this skill' : 'About',
+                body: bodyText,
+              ),
+            ),
           Positioned(
             left: 20,
             right: 20,
@@ -680,12 +751,12 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (photoUrls.length > 10)
+                if (totalPages > 10)
                   Semantics(
-                    label: 'Photo ${_photoIndex + 1} of ${photoUrls.length}',
+                    label: 'Page ${_photoIndex + 1} of $totalPages',
                     excludeSemantics: true,
                     child: Text(
-                      '${_photoIndex + 1} / ${photoUrls.length}',
+                      '${_photoIndex + 1} / $totalPages',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -695,11 +766,14 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     ),
                   )
                 else
-                  for (int i = 0; i < photoUrls.length; i++) ...[
+                  for (int i = 0; i < totalPages; i++) ...[
                     Semantics(
                       button: true,
                       selected: i == _photoIndex,
-                      label: 'Show photo ${i + 1}',
+                      label:
+                          i == mediaCount
+                              ? 'Show full details'
+                              : 'Show photo ${i + 1}',
                       child: GestureDetector(
                         key: ValueKey('card-dot-$i'),
                         onTap: () => setState(() => _photoIndex = i),
@@ -716,6 +790,8 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                                 color:
                                     i == _photoIndex
                                         ? AppColors.primary
+                                        : isDetailsPage
+                                        ? Colors.white.withValues(alpha: 0.35)
                                         : Colors.black.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(4),
                               ),
@@ -724,7 +800,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         ),
                       ),
                     ),
-                    if (i != photoUrls.length - 1) const SizedBox(width: 4),
+                    if (i != totalPages - 1) const SizedBox(width: 4),
                   ],
               ],
             ),
@@ -803,6 +879,157 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
   }
 }
 
+class _DetailsPage extends StatelessWidget {
+  final String roleLabel;
+  final String roleIconAsset;
+  final String skillName;
+  final String name;
+  final String schedule;
+  final String language;
+  final String learningStyle;
+  final String bodyLabel;
+  final String body;
+
+  const _DetailsPage({
+    required this.roleLabel,
+    required this.roleIconAsset,
+    required this.skillName,
+    required this.name,
+    required this.schedule,
+    required this.language,
+    required this.learningStyle,
+    required this.bodyLabel,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                roleLabel,
+                style: AppTextStyles.regularText.copyWith(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                skillName,
+                style: AppTextStyles.boldText.copyWith(
+                  color: AppColors.primary,
+                  fontSize: 14,
+                ),
+              ),
+              SvgPicture.asset(
+                roleIconAsset,
+                width: 16,
+                height: 16,
+                colorFilter: const ColorFilter.mode(
+                  AppColors.primary,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            name,
+            style: AppTextStyles.boldText.copyWith(
+              color: Colors.white,
+              fontSize: 22,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: Colors.white.withValues(alpha: 0.2)),
+          if (language.isNotEmpty)
+            _DetailRow(
+              icon: Icons.translate,
+              label: 'Languages',
+              value: language,
+            ),
+          if (learningStyle.isNotEmpty)
+            _DetailRow(
+              icon: Icons.psychology,
+              label: 'Learning style',
+              value: learningStyle,
+            ),
+          if (schedule.isNotEmpty)
+            _DetailRow(
+              icon: Icons.calendar_today_outlined,
+              label: 'Availability',
+              value: schedule,
+            ),
+          if (body.isNotEmpty)
+            _DetailRow(
+              icon: Icons.format_quote_rounded,
+              iconColor: AppColors.primary,
+              label: bodyLabel,
+              value: body,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.iconColor = Colors.white70,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: Colors.white60,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PhotoChevron extends StatelessWidget {
   final IconData icon;
   final bool visible;
@@ -820,6 +1047,7 @@ class _PhotoChevron extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.28),
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
         ),
         child: Icon(icon, color: Colors.white, size: 22),
       ),
@@ -1010,6 +1238,9 @@ void showPersonProfileDialog(
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.35),
                             shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28),
+                            ),
                           ),
                           child: const Icon(
                             Icons.close,

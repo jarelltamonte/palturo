@@ -34,6 +34,10 @@ class MatchedUser {
   final String? lastMessage;
   final String? lastMessageTime;
   final bool hasUnread;
+
+  /// True for an accepted match with no messages yet. The Chats list shows a
+  /// "Start talking" prompt instead of an empty preview.
+  final bool needsFirstMessage;
   final String? presence;
 
   /// Live-data extras: the connection row + counterpart profile id (null for
@@ -55,6 +59,7 @@ class MatchedUser {
     this.lastMessage,
     this.lastMessageTime,
     this.hasUnread = false,
+    this.needsFirstMessage = false,
     this.presence,
     this.connectionId,
     this.otherUserId,

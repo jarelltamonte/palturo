@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/chats_page.dart';
 import 'package:palturo/screen/chats_room.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/chat_menu_row.dart';
 import 'package:palturo/widgets/chat_search_sheet.dart';
@@ -155,6 +156,90 @@ void main() {
     expect(find.text('Active 20m ago'), findsOneWidget);
     expect(find.text('Yesterday'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('new match row shows a start-talking prompt', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: SizedBox(
+              width: 360,
+              child: ChatListItem(
+                name: 'Grace Lim',
+                message: 'Start talking',
+                time: '',
+                skillName: 'Binangkal',
+                needsFirstMessage: true,
+                onTap: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Start talking'), findsOneWidget);
+    expect(find.text('New Pal'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('a new Pal conversation needs a first message', () {
+    final conversation = ConversationLite(
+      connectionId: 'c1',
+      status: 'accepted',
+      otherUserId: 'u1',
+      otherName: 'Grace Lim',
+      otherRole: 'mentor',
+      unread: 0,
+    );
+
+    final chat = matchedUserFromConversation(conversation);
+
+    expect(chat.needsFirstMessage, isTrue);
+    expect(chat.lastMessage, isNull);
+  });
+
+  test('a conversation with a message is not a new Pal', () {
+    final conversation = ConversationLite(
+      connectionId: 'c1',
+      status: 'accepted',
+      otherUserId: 'u1',
+      otherName: 'Grace Lim',
+      otherRole: 'mentor',
+      lastMessage: 'Kumusta!',
+      lastAt: DateTime(2026, 11, 16),
+      unread: 0,
+    );
+
+    final chat = matchedUserFromConversation(conversation);
+
+    expect(chat.needsFirstMessage, isFalse);
+    expect(chat.lastMessage, 'Kumusta!');
+  });
+
+  test('a draft still counts as a started conversation', () {
+    final conversation = ConversationLite(
+      connectionId: 'c1',
+      status: 'accepted',
+      otherUserId: 'u1',
+      otherName: 'Grace Lim',
+      otherRole: 'mentor',
+      unread: 0,
+    );
+
+    final chat = matchedUserFromConversation(conversation, draft: 'Hello');
+
+    expect(chat.needsFirstMessage, isFalse);
+    expect(chat.lastMessage, 'Draft: Hello');
   });
 
   test('typing payloads only match the enabled peer', () {

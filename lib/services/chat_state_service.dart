@@ -219,6 +219,11 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
 
   void _sortConversations(List<ConversationLite> list) {
     list.sort((a, b) {
+      // A new Pal with no messages is the most actionable row, so keep it
+      // above conversations that already have a message.
+      final aNew = a.lastAt == null;
+      final bNew = b.lastAt == null;
+      if (aNew != bNew) return aNew ? -1 : 1;
       final ta = a.lastAt ?? DateTime(1900);
       final tb = b.lastAt ?? DateTime(1900);
       return tb.compareTo(ta); // newest first

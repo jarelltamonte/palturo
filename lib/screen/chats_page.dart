@@ -28,6 +28,50 @@ import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
+/// Maps a live conversation row to the Chats list model.
+///
+/// An accepted connection with no messages becomes a "new Pal" row so a fresh
+/// match is not buried in the Pals list without a follow-up prompt.
+@visibleForTesting
+MatchedUser matchedUserFromConversation(
+  ConversationLite conversation, {
+  String? draft,
+}) {
+  return MatchedUser(
+    id: '${conversation.connectionId}|${conversation.otherUserId}',
+    presence: presenceLabel(
+      conversation.otherLastSeenAt,
+      enabled: conversation.otherPresenceEnabled,
+    ),
+    name: conversation.otherName,
+    role:
+        conversation.otherRole == 'learner'
+            ? PersonRole.learner
+            : PersonRole.mentor,
+    skillName: conversation.otherSkill ?? '',
+    category: SkillCategory.everydayPractical,
+    schedule: '',
+    language: '',
+    learningStyle: '',
+    lastMessage:
+        draft != null
+            ? 'Draft: ${_draftPreview(draft)}'
+            : conversation.lastMessage,
+    lastMessageTime: ChatTimeFormatter.formatChatListTime(conversation.lastAt),
+    hasUnread: conversationHasUnread(conversation),
+    needsFirstMessage: conversation.lastMessage == null && draft == null,
+    avatarUrl: conversation.otherAvatar,
+    connectionId: conversation.connectionId,
+    otherUserId: conversation.otherUserId,
+  );
+}
+
+String _draftPreview(String draft) {
+  final collapsed = draft.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (collapsed.length <= 48) return collapsed;
+  return '${collapsed.substring(0, 45)}...';
+}
+
 class ChatsPage extends StatefulWidget {
   final VoidCallback? onStartSwiping;
 
@@ -70,37 +114,14 @@ class _ChatsPageState extends State<ChatsPage> {
   static const int _maxMatchCards = 8;
 
   List<MatchedUser> get _chats =>
-      ChatStateService.instance.conversations.map((c) {
-        final draft = DraftService.instance.draftFor(c.connectionId);
-        return MatchedUser(
-          id: '${c.connectionId}|${c.otherUserId}',
-          presence: presenceLabel(
-            c.otherLastSeenAt,
-            enabled: c.otherPresenceEnabled,
-          ),
-          name: c.otherName,
-          role:
-              c.otherRole == 'learner' ? PersonRole.learner : PersonRole.mentor,
-          skillName: c.otherSkill ?? '',
-          category: SkillCategory.everydayPractical,
-          schedule: '',
-          language: '',
-          learningStyle: '',
-          lastMessage:
-              draft != null ? 'Draft: ${_draftPreview(draft)}' : c.lastMessage,
-          lastMessageTime: ChatTimeFormatter.formatChatListTime(c.lastAt),
-          hasUnread: conversationHasUnread(c),
-          avatarUrl: c.otherAvatar,
-          connectionId: c.connectionId,
-          otherUserId: c.otherUserId,
-        );
-      }).toList();
-
-  String _draftPreview(String draft) {
-    final collapsed = draft.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (collapsed.length <= 48) return collapsed;
-    return '${collapsed.substring(0, 45)}...';
-  }
+      ChatStateService.instance.conversations
+          .map(
+            (c) => matchedUserFromConversation(
+              c,
+              draft: DraftService.instance.draftFor(c.connectionId),
+            ),
+          )
+          .toList();
 
   bool get _loadingChats => ChatStateService.instance.loading;
   String? get _chatsError => ChatStateService.instance.error;
@@ -196,11 +217,11 @@ class _ChatsPageState extends State<ChatsPage> {
   List<MatchedUser> get _filteredMessages {
     final q = _query.trim().toLowerCase();
     return _chats.where((c) {
-      if (c.lastMessage == null) return false;
+      final preview = c.lastMessage ?? '';
       final matchesQuery =
           q.isEmpty ||
           c.name.toLowerCase().contains(q) ||
-          c.lastMessage!.toLowerCase().contains(q);
+          preview.toLowerCase().contains(q);
       return matchesQuery && _matchesRole(c) && _matchesRead(c);
     }).toList();
   }
@@ -804,11 +825,17 @@ class _ChatsPageState extends State<ChatsPage> {
                   itemBuilder: (context, index) {
                     final chat = messages[index];
                     final ImageProvider? avatarImage = chat.avatarImage;
+                    final needsFirstMessage = chat.needsFirstMessage;
 
                     return ChatListItem(
                       name: chat.name,
-                      message: chat.lastMessage!,
-                      time: chat.lastMessageTime ?? '',
+                      message:
+                          needsFirstMessage
+                              ? 'Start talking'
+                              : (chat.lastMessage ?? ''),
+                      time:
+                          needsFirstMessage ? '' : (chat.lastMessageTime ?? ''),
+                      needsFirstMessage: needsFirstMessage,
                       presence: chat.presence,
                       hasUnread:
                           chat.hasUnread &&
@@ -971,6 +998,7 @@ class ChatListItem extends StatelessWidget {
   final String? skillName;
   final PersonRole? role;
   final bool muted;
+  final bool needsFirstMessage;
   final ImageProvider? avatarImage;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -985,6 +1013,7 @@ class ChatListItem extends StatelessWidget {
     this.skillName,
     this.role,
     this.muted = false,
+    this.needsFirstMessage = false,
     this.avatarImage,
     this.onTap,
     this.onLongPress,
@@ -1020,6 +1049,27 @@ class ChatListItem extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (needsFirstMessage) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'New Pal',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: AppColors.accentText(context),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (hasUnread) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -1049,10 +1099,23 @@ class ChatListItem extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.regularText.copyWith(
-                            color: textTheme.withValues(alpha: 0.9),
+                            color:
+                                needsFirstMessage
+                                    ? AppColors.accentText(context)
+                                    : textTheme.withValues(alpha: 0.9),
+                            fontWeight:
+                                needsFirstMessage ? FontWeight.w600 : null,
                           ),
                         ),
                       ),
+                      if (needsFirstMessage) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: AppColors.accentText(context),
+                        ),
+                      ],
                       if (muted) ...[
                         const SizedBox(width: 6),
                         Semantics(

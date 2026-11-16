@@ -208,7 +208,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navigationIcons.length, (index) {
               final isSelected = _selectedIndex == index;
-              final activeColor = AppColors.primary;
+              final activeColor = AppColors.navColor;
               final inactiveColor = AppColors.mutedText(context);
               final isChat = index == 2;
               final isRequests = index == 3;

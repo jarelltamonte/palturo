@@ -6,6 +6,7 @@ class AppColors {
   static const Color binputBackground = Color(0xFFF3F4F6);
 
   static const Color primary = Color(0xFFBFE109);
+  static const Color navColor = Color(0xFFb0ce13);
   static const Color secondary = Color(0xFFBCBCBC);
 
   static const Color textPrimary = Color(0xFFFFFFFF);

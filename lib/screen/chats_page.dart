@@ -240,6 +240,12 @@ class _ChatsPageState extends State<ChatsPage> {
               ),
               row('unread', 'Mark as unread', Icons.mark_chat_unread_outlined),
               row(
+                'delete',
+                'Delete conversation',
+                Icons.delete_outline,
+                color: AppColors.dangerText(sheetContext),
+              ),
+              row(
                 'report',
                 'Report',
                 Icons.flag_outlined,
@@ -283,6 +289,16 @@ class _ChatsPageState extends State<ChatsPage> {
             "Couldn't mark this chat unread. Please try again.",
           );
         }
+      case 'delete':
+        final confirmed = await showConfirmDialog(
+          context,
+          title: 'Delete conversation?',
+          message:
+              'This deletes the messages with ${chat.name}. Your Pal connection stays.',
+          confirmLabel: 'Delete',
+        );
+        if (!confirmed) return;
+        await _deleteConversation(chat);
       case 'report':
         final reason = await showReportReasonDialog(context, name: chat.name);
         if (reason == null) return;
@@ -297,6 +313,26 @@ class _ChatsPageState extends State<ChatsPage> {
         );
         if (!confirmed) return;
         await _blockChat(chat);
+    }
+  }
+
+  Future<void> _deleteConversation(MatchedUser chat) async {
+    final connectionId = chat.connectionId;
+    if (connectionId == null) return;
+    try {
+      await MatchApi.deleteConversation(connectionId);
+      await ChatStateService.instance.loadConversations(showSpinner: false);
+      if (!mounted) return;
+      showAppSnackBar(context, 'Conversation deleted');
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not delete this conversation. Please try again.',
+        ),
+      );
     }
   }
 
@@ -500,10 +536,15 @@ class _ChatsPageState extends State<ChatsPage> {
       padding: const EdgeInsets.only(top: 80),
       child: AppEmptyState(
         showIllustration: false,
+        icon: Icons.search_off_rounded,
         title:
             _hasActiveFilter && _query.trim().isEmpty
                 ? 'No chats match your filters'
                 : 'No chats found',
+        message:
+            _hasActiveFilter || _query.trim().isNotEmpty
+                ? 'Try a different name or clear the filters.'
+                : 'Your conversations will appear here.',
         actionLabel:
             _hasActiveFilter || _query.trim().isNotEmpty
                 ? 'Clear search and filters'
@@ -515,8 +556,10 @@ class _ChatsPageState extends State<ChatsPage> {
 
   Widget _buildNoMatchesState() {
     return AppEmptyState(
+      showIllustration: false,
+      icon: Icons.forum_outlined,
       title: 'No chats yet',
-      message: 'Send a request or start swiping to meet your first Pal.',
+      message: 'Chats open after you and a Pal accept a request.',
       actionLabel: 'Start swiping',
       onAction: _startSwiping,
       bottomPadding: AppSpacing.bottomNavClearanceFor(context),

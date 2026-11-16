@@ -14,6 +14,44 @@ void main() {
     AppBannerController.instance.clear();
   });
 
+  testWidgets('banner does not require an Overlay ancestor', (tester) async {
+    // The banner host lives above the Navigator, so there is no Overlay here.
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Localizations(
+          locale: const Locale('en'),
+          delegates: const [
+            DefaultMaterialLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          child: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Theme(
+              data: lightMode,
+              child: AppBannerHost(child: const SizedBox.expand()),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    AppBannerController.instance.show(
+      const AppBannerData(
+        id: 'no-overlay',
+        title: 'New request',
+        body: 'QA Tester wants to exchange Cooking Pinakbet with you.',
+        icon: Icons.person_add_alt_1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('New request'), findsOneWidget);
+    expect(find.bySemanticsLabel('Dismiss notification'), findsOneWidget);
+    AppBannerController.instance.clear();
+  });
+
   testWidgets('standard banner renders, routes, and dismisses', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
@@ -233,7 +271,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text("You're now Pals with RJ"), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Dismiss notification'));
+    await tester.tap(find.bySemanticsLabel('Dismiss notification'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();

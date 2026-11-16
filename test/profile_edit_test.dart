@@ -8,6 +8,7 @@ import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/theme.dart';
+import 'package:palturo/widgets/top_labeled_field.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -182,11 +183,7 @@ void main() {
     await pumpEdit(
       tester,
       service: const _RejectingProfileService(
-        RejectedSkill(
-          skillId: rejectedId,
-          name: 'Thawing Ice',
-          kind: 'teach',
-        ),
+        RejectedSkill(skillId: rejectedId, name: 'Thawing Ice', kind: 'teach'),
       ),
     );
     // `other:<categoryId>:<name>` is how custom rows are encoded.
@@ -232,9 +229,7 @@ void main() {
     expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
   });
 
-  testWidgets('teaching profile requires a showcase before saving', (
-    tester,
-  ) async {
+  testWidgets('teaching profile can save without a showcase', (tester) async {
     final service = _SlowProfileService();
     await pumpEdit(
       tester,
@@ -242,17 +237,23 @@ void main() {
       data: profile().copyWith(teachingSkillImages: const {}),
     );
 
-    await tester.enterText(find.byType(TextField).first, 'Updated bio');
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, 'Updated bio');
     await tester.pump();
     await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Showcase Required'), findsOneWidget);
-    expect(service.completer.isCompleted, isFalse);
-
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
+    // The save starts; the showcase is a discovery requirement, not a block.
     expect(find.text('Showcase Required'), findsNothing);
+    expect(find.textContaining('to PalTuro'), findsOneWidget);
+    expect(service.completer.isCompleted, isFalse);
   });
 
   testWidgets('role change preview keeps hidden skill counts', (tester) async {

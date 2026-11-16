@@ -8,7 +8,9 @@ import 'package:palturo/services/match_api.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
+import 'package:palturo/utils/media_url.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
 /// Category detail sits between the Browse root and the people deck.
@@ -76,11 +78,12 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       );
       if (!mounted || requestId != _requestId) return;
 
+      final children =
+          nodes
+              .where((n) => (n['depth'] as num?)?.toInt() == rootDepth + 1)
+              .toList();
       setState(() {
-        _children =
-            nodes
-                .where((n) => (n['depth'] as num?)?.toInt() == rootDepth + 1)
-                .toList();
+        _children = _visibleChildren(children, nodes);
         _people = people;
         _otherCount = 0;
         _loading = false;
@@ -110,6 +113,40 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     } catch (_) {
       // The opposite-role count is decorative; never block the category.
     }
+  }
+
+  /// Drops child branches with no people anywhere below them. The taxonomy
+  /// returns every child and leaf, so a child's subtree usage is the sum of
+  /// its own count and its descendants' counts.
+  List<Map<String, dynamic>> _visibleChildren(
+    List<Map<String, dynamic>> children,
+    List<Map<String, dynamic>> nodes,
+  ) {
+    if (children.isEmpty) return children;
+    final childPaths =
+        children
+            .map((child) => (child['path'] ?? '').toString())
+            .where((path) => path.isNotEmpty)
+            .toSet();
+    if (childPaths.isEmpty) return children;
+
+    final usage = <String, int>{};
+    for (final node in nodes) {
+      final count = (node['usage_count'] as num?)?.toInt() ?? 0;
+      if (count <= 0) continue;
+      var path = (node['path'] ?? '').toString();
+      while (path.isNotEmpty) {
+        if (childPaths.contains(path)) {
+          usage[path] = (usage[path] ?? 0) + count;
+        }
+        final dot = path.lastIndexOf('.');
+        path = dot > 0 ? path.substring(0, dot) : '';
+      }
+    }
+
+    return children
+        .where((child) => (usage[(child['path'] ?? '').toString()] ?? 0) > 0)
+        .toList();
   }
 
   void _openChild(Map<String, dynamic> node) {
@@ -217,6 +254,18 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                       ),
                       children: [
                         _buildHeader(textTheme),
+                        if (_people.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            _mentor ? 'Learners here' : 'Mentors here',
+                            style: AppTextStyles.boldText.copyWith(
+                              color: textTheme,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildPeoplePreview(textTheme),
+                        ],
                         if (_children.isNotEmpty) ...[
                           const SizedBox(height: 24),
                           Text(
@@ -251,6 +300,61 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                   ],
                 ),
       ),
+    );
+  }
+
+  Widget _buildPeoplePreview(Color textTheme) {
+    final visible = _people.length > 6 ? 6 : _people.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 82,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: visible,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final person = _people[index];
+              final photo =
+                  person.photoUrls.isNotEmpty ? person.photoUrls.first : null;
+              return SizedBox(
+                width: 64,
+                child: Column(
+                  children: [
+                    UserAvatar(
+                      name: person.name,
+                      image: MediaUrl.image(photo),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      person.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: textTheme.withValues(alpha: 0.7),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        if (_people.length > visible) ...[
+          const SizedBox(height: 4),
+          Text(
+            'and ${_people.length - visible} more',
+            style: AppTextStyles.regularText.copyWith(
+              color: AppColors.mutedText(context),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ],
     );
   }
 

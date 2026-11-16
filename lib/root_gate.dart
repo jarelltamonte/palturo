@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/landing_page.dart';
 import 'package:palturo/onboarding_intro.dart';
+import 'package:palturo/widgets/desktop_route_frame.dart';
 
 class AppRootDecider extends StatefulWidget {
   final bool isOnboardingDone;
@@ -36,7 +37,7 @@ class _AppRootDeciderState extends State<AppRootDecider> {
     }
 
     return widget.isOnboardingDone
-        ? const LandingPage()
-        : const OnboardingIntro();
+        ? const DesktopRouteFrame(maxWidth: 560, child: LandingPage())
+        : const DesktopRouteFrame(maxWidth: 560, child: OnboardingIntro());
   }
 }

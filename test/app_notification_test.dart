@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/models/app_notification.dart';
+import 'package:palturo/services/notification_service.dart';
 
 void main() {
   test('parses an enriched notification row', () {
@@ -100,5 +101,26 @@ void main() {
     expect(row['actor_name'], 'Nanay Cita');
     expect(row['skill_name'], 'Parol Making');
     expect(row['created_at'], isA<String>());
+  });
+
+  test('request badge counts only unread incoming requests', () {
+    AppNotification item(String id, String kind, {String? readAt}) =>
+        AppNotification.fromRow({
+          'id': id,
+          'kind': kind,
+          'payload': {'connection_id': 'c-$id'},
+          'read_at': readAt,
+          'created_at': '2026-11-04T10:00:00Z',
+        });
+
+    final items = [
+      item('n1', 'connection_request'),
+      item('n2', 'connection_request', readAt: '2026-11-04T11:00:00Z'),
+      item('n3', 'feedback_ready'),
+      item('n4', 'request_accepted'),
+      item('n5', 'request_declined'),
+    ];
+
+    expect(unreadRequestCount(items), 1);
   });
 }

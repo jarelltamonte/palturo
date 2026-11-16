@@ -48,6 +48,33 @@ void main() {
     expect(saved, 1);
   });
 
+  testWidgets('review resolves a custom skill id to its label', (tester) async {
+    final controller =
+        OnboardingController()
+          ..role = OnboardingRole.learn
+          ..learningInterests.add('other:onboarding:Quality Assurance')
+          ..learningStyles.add('Hands-on Practice')
+          ..languages.add('English')
+          ..setAvailabilityDays({'Friday'});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: OnboardingReviewScreen(
+          controller: controller,
+          onSave: () {},
+          onEditRole: () {},
+          onEditLearning: () {},
+          onEditTeaching: () {},
+          onEditDetails: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('Quality Assurance'), findsOneWidget);
+    expect(find.textContaining('other:onboarding:'), findsNothing);
+  });
+
   testWidgets('review blocks saving an incomplete active role', (tester) async {
     final controller = OnboardingController()..role = OnboardingRole.both;
     await tester.pumpWidget(

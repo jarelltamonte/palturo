@@ -111,7 +111,7 @@ void main() {
     await tester.pumpWidget(harness(personOverride: manyMedia));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 / 12'), findsOneWidget);
+    expect(find.text('1 / 13'), findsOneWidget);
     expect(find.byKey(const ValueKey('card-dot-0')), findsNothing);
     expect(tester.takeException(), isNull);
   });

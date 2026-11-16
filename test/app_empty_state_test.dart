@@ -51,6 +51,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('static icon replaces the animated illustration', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Scaffold(
+          body: AppEmptyState(
+            showIllustration: false,
+            icon: Icons.inbox_outlined,
+            title: 'No requests yet',
+            message: 'Your next skill swap starts with a hello.',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(Lottie), findsNothing);
+    expect(find.byIcon(Icons.inbox_outlined), findsOneWidget);
+    expect(find.text('No requests yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('bottom padding keeps the action above the tab bar', (
     tester,
   ) async {
@@ -71,8 +93,10 @@ void main() {
             ),
         home: Scaffold(
           body: AppEmptyState(
+            showIllustration: false,
+            icon: Icons.forum_outlined,
             title: 'No chats yet',
-            message: 'Send a request to meet your first Pal.',
+            message: 'Chats open after you and a Pal accept a request.',
             actionLabel: 'Start swiping',
             onAction: () {},
             bottomPadding: 124,

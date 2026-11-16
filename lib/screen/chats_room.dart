@@ -611,10 +611,14 @@ class _ChatRoomState extends State<ChatRoom> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_scrollController.hasClients) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      // The lazy list can refine maxScrollExtent after the new bubble is laid
+      // out. A second frame lands on the true bottom instead of one line up.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      }
+      });
     });
   }
 
@@ -763,6 +767,90 @@ class _ChatRoomState extends State<ChatRoom> {
     if (!mounted) return;
     unawaited(Haptics.selection());
     showAppSnackBar(context, 'Message copied');
+  }
+
+  Future<void> _showMessageActions(Map<String, dynamic> msg, bool mine) async {
+    final body = (msg['body'] ?? '').toString();
+    final messageId = msg['id']?.toString();
+    if ((msg['deleted_at']?.toString().trim().isNotEmpty ?? false) ||
+        body == 'Message Deleted') {
+      return;
+    }
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.elevatedSurface(context),
+      builder: (sheetContext) {
+        final text = Theme.of(sheetContext).colorScheme.secondary;
+        Widget row(String value, String label, IconData icon, {Color? color}) {
+          final tint = color ?? text;
+          return ListTile(
+            leading: Icon(icon, size: 20, color: tint),
+            title: Text(
+              label,
+              style: AppTextStyles.regularText.copyWith(color: tint),
+            ),
+            onTap: () => Navigator.pop(sheetContext, value),
+          );
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              row('copy', 'Copy', Icons.copy_outlined),
+              if (mine && messageId != null)
+                row(
+                  'delete',
+                  'Delete message',
+                  Icons.delete_outline,
+                  color: AppColors.dangerText(sheetContext),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (action == null || !mounted) return;
+    if (action == 'copy') {
+      await _copyMessage(body);
+      return;
+    }
+    if (action != 'delete' || messageId == null) return;
+
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete message?',
+      message: 'This removes the message for you and ${widget.name}.',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+
+    try {
+      await MatchApi.deleteMessage(messageId);
+      if (!mounted) return;
+      final deletedAt = DateTime.now().toUtc().toIso8601String();
+      setState(() {
+        _messages =
+            _messages.map((message) {
+              if (message['id']?.toString() != messageId) return message;
+              return {
+                ...message,
+                'body': 'Message Deleted',
+                'deleted_at': deletedAt,
+              };
+            }).toList();
+      });
+      showAppSnackBar(context, 'Message deleted');
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not delete this message. Please try again.',
+        ),
+      );
+    }
   }
 
   void _highlightMessage(String key) {
@@ -1268,95 +1356,95 @@ class _ChatRoomState extends State<ChatRoom> {
         actionsPadding: EdgeInsets.zero,
         actions: [
           PopupMenuButton<String>(
-              tooltip: 'Chat options',
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              color: AppColors.elevatedSurface(context),
-              elevation: 6,
-              offset: const Offset(0, 40),
-              onSelected: _handleMenuAction,
-              itemBuilder:
-                  (context) => [
-                    if (_feedbackGateOpen && !_feedbackRated)
-                      PopupMenuItem<String>(
-                        value: 'feedback',
-                        child: _menuRow(
-                          'Leave feedback',
-                          Icons.star_outline,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    if (widget.person != null)
-                      PopupMenuItem<String>(
-                        value: 'profile',
-                        child: _menuRow('View profile', Icons.person_outline),
-                      ),
+            tooltip: 'Chat options',
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            color: AppColors.elevatedSurface(context),
+            elevation: 6,
+            offset: const Offset(0, 40),
+            onSelected: _handleMenuAction,
+            itemBuilder:
+                (context) => [
+                  if (_feedbackGateOpen && !_feedbackRated)
                     PopupMenuItem<String>(
-                      value: 'mute',
+                      value: 'feedback',
                       child: _menuRow(
-                        ChatStateService.instance.isMuted(
-                              widget.connectionId ?? '',
-                            )
-                            ? 'Unmute notifications'
-                            : 'Mute notifications',
-                        ChatStateService.instance.isMuted(
-                              widget.connectionId ?? '',
-                            )
-                            ? Icons.notifications_active_outlined
-                            : Icons.notifications_off_outlined,
+                        'Leave feedback',
+                        Icons.star_outline,
+                        color: AppColors.primary,
                       ),
                     ),
+                  if (widget.person != null)
                     PopupMenuItem<String>(
-                      value: 'unread',
-                      child: _menuRow(
-                        'Mark as unread',
-                        Icons.mark_chat_unread_outlined,
-                      ),
+                      value: 'profile',
+                      child: _menuRow('View profile', Icons.person_outline),
                     ),
-                    PopupMenuItem<String>(
-                      value: 'search',
-                      child: _menuRow('Search in chat', Icons.search),
+                  PopupMenuItem<String>(
+                    value: 'mute',
+                    child: _menuRow(
+                      ChatStateService.instance.isMuted(
+                            widget.connectionId ?? '',
+                          )
+                          ? 'Unmute notifications'
+                          : 'Mute notifications',
+                      ChatStateService.instance.isMuted(
+                            widget.connectionId ?? '',
+                          )
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_off_outlined,
                     ),
-                    if (_pending.any(
-                      (item) => item.status == PendingMessageStatus.failed,
-                    ))
-                      PopupMenuItem<String>(
-                        value: 'retry_failed',
-                        child: _menuRow('Retry failed messages', Icons.refresh),
-                      ),
-                    PopupMenuItem<String>(
-                      value: 'report',
-                      child: _menuRow(
-                        'Report',
-                        Icons.flag_outlined,
-                        color: AppColors.dangerText(context),
-                      ),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'block',
-                      child: _menuRow(
-                        'Block',
-                        Icons.block,
-                        color: AppColors.dangerText(context),
-                      ),
-                    ),
-                  ],
-              child: SizedBox(
-                width: AppSpacing.iconTarget,
-                height: AppSpacing.iconTarget,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.more_horiz, color: textTheme, size: 24),
                   ),
+                  PopupMenuItem<String>(
+                    value: 'unread',
+                    child: _menuRow(
+                      'Mark as unread',
+                      Icons.mark_chat_unread_outlined,
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'search',
+                    child: _menuRow('Search in chat', Icons.search),
+                  ),
+                  if (_pending.any(
+                    (item) => item.status == PendingMessageStatus.failed,
+                  ))
+                    PopupMenuItem<String>(
+                      value: 'retry_failed',
+                      child: _menuRow('Retry failed messages', Icons.refresh),
+                    ),
+                  PopupMenuItem<String>(
+                    value: 'report',
+                    child: _menuRow(
+                      'Report',
+                      Icons.flag_outlined,
+                      color: AppColors.dangerText(context),
+                    ),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'block',
+                    child: _menuRow(
+                      'Block',
+                      Icons.block,
+                      color: AppColors.dangerText(context),
+                    ),
+                  ),
+                ],
+            child: SizedBox(
+              width: AppSpacing.iconTarget,
+              height: AppSpacing.iconTarget,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.more_horiz, color: textTheme, size: 24),
                 ),
               ),
+            ),
           ),
         ],
       ),
@@ -1475,7 +1563,10 @@ class _ChatRoomState extends State<ChatRoom> {
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.background,
-                      minimumSize: const Size(AppSpacing.iconTarget, AppSpacing.iconTarget),
+                      minimumSize: const Size(
+                        AppSpacing.iconTarget,
+                        AppSpacing.iconTarget,
+                      ),
                       maximumSize: const Size(58, 48),
                     ),
                     icon:
@@ -1641,7 +1732,10 @@ class _ChatRoomState extends State<ChatRoom> {
                 TextButton(
                   onPressed: () => setState(() => _feedbackCollapsed = true),
                   style: TextButton.styleFrom(
-                    minimumSize: const Size(AppSpacing.iconTarget, AppSpacing.iconTarget),
+                    minimumSize: const Size(
+                      AppSpacing.iconTarget,
+                      AppSpacing.iconTarget,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text('Hide', style: TextStyle(fontSize: 12)),
@@ -1649,7 +1743,10 @@ class _ChatRoomState extends State<ChatRoom> {
                 TextButton(
                   onPressed: _showFeedbackDialog,
                   style: TextButton.styleFrom(
-                    minimumSize: const Size(AppSpacing.iconTarget, AppSpacing.iconTarget),
+                    minimumSize: const Size(
+                      AppSpacing.iconTarget,
+                      AppSpacing.iconTarget,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text(
@@ -1829,6 +1926,10 @@ class _ChatRoomState extends State<ChatRoom> {
           }
           final msg = _messages[i];
           final mine = msg['sender_id'] == myId;
+          final body = (msg['body'] ?? '').toString();
+          final isDeleted =
+              (msg['deleted_at']?.toString().trim().isNotEmpty ?? false) ||
+              body == 'Message Deleted';
           final currTime = DateTime.tryParse(
             msg['created_at']?.toString() ?? '',
           );
@@ -1865,16 +1966,20 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                 ),
               GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (_expandedTimestamps.contains(messageKey)) {
-                      _expandedTimestamps.remove(messageKey);
-                    } else {
-                      _expandedTimestamps.add(messageKey);
-                    }
-                  });
-                },
-                onLongPress: () => _copyMessage((msg['body'] ?? '').toString()),
+                onTap:
+                    isDeleted
+                        ? null
+                        : () {
+                          setState(() {
+                            if (_expandedTimestamps.contains(messageKey)) {
+                              _expandedTimestamps.remove(messageKey);
+                            } else {
+                              _expandedTimestamps.add(messageKey);
+                            }
+                          });
+                        },
+                onLongPress:
+                    isDeleted ? null : () => _showMessageActions(msg, mine),
                 child: Container(
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   padding: const EdgeInsets.symmetric(
@@ -1886,12 +1991,16 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                   decoration: BoxDecoration(
                     color:
-                        mine
+                        isDeleted
+                            ? AppColors.mutedSurface(context)
+                            : mine
                             ? AppColors.primary.withValues(alpha: 0.9)
                             : Colors.grey.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(16),
                     border:
-                        _highlightedMessageKey == messageKey
+                        isDeleted
+                            ? Border.all(color: AppColors.border(context))
+                            : _highlightedMessageKey == messageKey
                             ? Border.all(
                               color: AppColors.accentText(context),
                               width: 2,
@@ -1899,9 +2008,15 @@ class _ChatRoomState extends State<ChatRoom> {
                             : null,
                   ),
                   child: Text(
-                    (msg['body'] ?? '').toString(),
+                    isDeleted ? 'Message Deleted' : body,
                     style: AppTextStyles.regularText.copyWith(
-                      color: mine ? Colors.black : textTheme,
+                      color:
+                          isDeleted
+                              ? AppColors.mutedText(context)
+                              : mine
+                              ? Colors.black
+                              : textTheme,
+                      fontStyle: isDeleted ? FontStyle.italic : null,
                     ),
                   ),
                 ),

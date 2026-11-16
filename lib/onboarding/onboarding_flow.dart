@@ -6,6 +6,14 @@ import 'package:palturo/onboarding/onboarding_complete.dart';
 import 'package:palturo/onboarding/onboarding_entry.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_models.dart';
+import 'skill_options.dart';
+
+export 'skill_options.dart'
+    show
+        kSelectableSkills,
+        kSkillToCategorySlug,
+        resolveCategoriesForSkills,
+        selectableSkillLabelForId;
 import 'screens/onboarding_final_screen.dart';
 import 'screens/onboarding_review_screen.dart';
 import 'screens/onboarding_interests_screen.dart';
@@ -24,55 +32,9 @@ enum OnboardingStep {
   complete,
 }
 
-const kBaseOptions = [
-  OnboardingOption('cooking_pinakbet', 'Cooking Pinakbet'),
-  OnboardingOption('baybayin_script', 'Baybayin Script'),
-  OnboardingOption('barong_embroidery', 'Barong Embroidery'),
-  OnboardingOption('weaving_inabel', 'Weaving Inabel'),
-  OnboardingOption('cooking_puto', 'Cooking Puto'),
-  OnboardingOption('arnis_martial_arts', 'Arnis Martial Arts'),
-  OnboardingOption('tinikling_dance', 'Tinikling Dance'),
-  OnboardingOption('parol_making', 'Parol Making'),
-  OnboardingOption('kulintang_drumming', 'Kulintang Drumming'),
-  OnboardingOption('kundiman_singing', 'Kundiman Singing'),
-  OnboardingOption('pagbabalat', 'Pagbabalat'),
-  OnboardingOption('others', 'Others'),
-];
-
+const kBaseOptions = kSelectableSkills;
 const kLearningOptions = kBaseOptions;
 const kTeachingOptions = kBaseOptions;
-
-const Map<String, String> kSkillToCategorySlug = {
-  'barong_embroidery': 'arts_design',
-  'weaving_inabel': 'arts_design',
-  'parol_making': 'arts_design',
-  'pagbabalat': 'arts_design',
-
-  'baybayin_script': 'language_culture',
-  'tinikling_dance': 'language_culture',
-  'kulintang_drumming': 'language_culture',
-  'kundiman_singing': 'language_culture',
-
-  'cooking_pinakbet': 'everyday_skills',
-  'cooking_puto': 'everyday_skills',
-  'arnis_martial_arts': 'everyday_skills',
-};
-
-List<String> resolveCategoriesForSkills(Iterable<String> skills) {
-  final categories = <String>{};
-  for (final skill in skills) {
-    final normalized = skill.trim().toLowerCase().replaceAll(
-      RegExp(r'\s+'),
-      '_',
-    );
-
-    final cat = kSkillToCategorySlug[normalized];
-    if (cat != null) {
-      categories.add(cat);
-    }
-  }
-  return categories.toList();
-}
 
 String onboardingDraftKey(String? userId) =>
     userId == null ? 'onboarding_draft' : 'onboarding_draft_$userId';
@@ -82,9 +44,35 @@ String onboardingResumeDismissedKey(String? userId) =>
         ? 'onboarding_resume_dismissed'
         : 'onboarding_resume_dismissed_$userId';
 
+/// Confirms leaving onboarding, then hands off to the caller's exit path.
+///
+/// The handoff is awaited and errors are swallowed so a failed preference
+/// write can never trap the user on the review screen after they chose to
+/// finish later.
+Future<void> confirmOnboardingSkip(
+  BuildContext context,
+  Future<void> Function() onSkip,
+) async {
+  final leave = await showConfirmDialog(
+    context,
+    title: 'Finish later?',
+    message:
+        'Your matches will be less relevant until you add your role, skills, and availability.',
+    confirmLabel: 'Finish later',
+    cancelLabel: 'Keep editing',
+    destructive: false,
+  );
+  if (!leave || !context.mounted) return;
+  try {
+    await onSkip();
+  } catch (_) {
+    // The caller owns the exit path.
+  }
+}
+
 class OnboardingFlow extends StatefulWidget {
   final VoidCallback onFinished;
-  final VoidCallback onSkip;
+  final Future<void> Function() onSkip;
   const OnboardingFlow({
     super.key,
     required this.onFinished,
@@ -97,13 +85,12 @@ class OnboardingFlow extends StatefulWidget {
 
 class _OnboardingFlowState extends State<OnboardingFlow> {
   final _controller = OnboardingController();
-  final _profileService = ProfileService();
+  late final ProfileService _profileService = ProfileService();
   final List<OnboardingStep> _history = [OnboardingStep.intro];
 
   List<OnboardingOption> _dynamicOptions = List.from(kBaseOptions);
   bool _isSaving = false;
 
-  static const int _targetSkillsCount = 11;
   bool _returnToReview = false;
 
   OnboardingStep get _current => _history.last;
@@ -122,18 +109,21 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     super.dispose();
   }
 
-  String get _draftKey =>
-      onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id);
+  String get _draftKey {
+    try {
+      return onboardingDraftKey(Supabase.instance.client.auth.currentUser?.id);
+    } catch (_) {
+      // The flow is also mounted in widget tests and previews where Supabase
+      // is not initialized. Fall back to the anonymous draft key.
+      return onboardingDraftKey(null);
+    }
+  }
 
   OnboardingOption _optionForId(String id) {
-    return OnboardingOption(
-      id,
-      id
-          .split('_')
-          .where((part) => part.isNotEmpty)
-          .map((part) => part[0].toUpperCase() + part.substring(1))
-          .join(' '),
-    );
+    // A restored draft can hold `other:onboarding:...` ids. Use the same
+    // display-label resolver as the review step so the chip never shows the
+    // raw encoding.
+    return OnboardingOption(id, onboardingInterestLabel(id));
   }
 
   void _persistDraft() {
@@ -173,19 +163,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  Future<void> _confirmSkip() async {
-    final leave = await showConfirmDialog(
-      context,
-      title: 'Finish later?',
-      message:
-          'Your matches will be less relevant until you add your role, skills, and availability.',
-      confirmLabel: 'Finish later',
-      cancelLabel: 'Keep editing',
-      destructive: false,
-    );
-    if (!leave || !mounted) return;
-    widget.onSkip();
-  }
+  Future<void> _confirmSkip() => confirmOnboardingSkip(context, widget.onSkip);
 
   void _editFromReview(OnboardingStep step) {
     setState(() {
@@ -228,10 +206,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
     final baseLabels = kBaseOptions.map((e) => e.label).toList();
 
-    final dbSkills = await _profileService.getRandomDistinctSkills(
-      excludeSkills: baseLabels,
-      limit: 6,
-    );
+    List<String> dbSkills;
+    try {
+      dbSkills = await _profileService.getRandomDistinctSkills(
+        excludeSkills: baseLabels,
+        limit: 6,
+      );
+    } catch (_) {
+      // Community suggestions are optional; the base taxonomy still works.
+      return;
+    }
 
     final dbOptions =
         dbSkills
@@ -247,32 +231,94 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       uniqueMap.putIfAbsent(opt.label.toLowerCase(), () => opt);
     }
 
-    final pool = uniqueMap.values.toList()..shuffle();
-
-    final selectedSkills = pool.take(_targetSkillsCount).toList();
+    final selected = {
+      ..._controller.learningInterests,
+      ..._controller.teachingInterests,
+    };
+    final preserved =
+        selected
+            .where(
+              (id) =>
+                  id != 'others' &&
+                  !uniqueMap.values.any((option) => option.id == id),
+            )
+            .map(_optionForId)
+            .toList();
+    for (final option in preserved) {
+      uniqueMap.putIfAbsent(option.label.toLowerCase(), () => option);
+    }
 
     if (mounted) {
-      final selected = {
-        ..._controller.learningInterests,
-        ..._controller.teachingInterests,
-      };
-      final preserved =
-          selected
-              .where(
-                (id) =>
-                    id != 'others' &&
-                    !selectedSkills.any((option) => option.id == id),
-              )
-              .map(_optionForId)
-              .toList();
       setState(() {
         _dynamicOptions = [
-          ...preserved,
-          ...selectedSkills,
+          ...uniqueMap.values,
           const OnboardingOption('others', 'Others'),
         ];
       });
     }
+  }
+
+  Future<OnboardingCreateResult> _createInterest(
+    String text, {
+    required bool teaching,
+  }) async {
+    final label = text.trim();
+    if (label.isEmpty) {
+      return const OnboardingCreateResult.failed('Enter a skill name.');
+    }
+
+    final SkillModerationResult verdict;
+    try {
+      verdict = await _profileService.moderateSkillName(
+        label,
+        teaching ? 'teach' : 'learn',
+      );
+    } on SkillModerationException {
+      return const OnboardingCreateResult.failed(
+        'That name does not look like a skill we can add. Try a clearer name, '
+        'like "Sourdough Baking".',
+      );
+    } catch (_) {
+      return const OnboardingCreateResult.failed(
+        'We could not check that skill right now. Please try again.',
+      );
+    }
+
+    // A depth-2 match becomes the canonical chip. A specific leaf stays as a
+    // custom chip so the review keeps the user's wording; save stores the
+    // depth-2 parent and keeps the leaf as the matching focus.
+    final pathParts =
+        verdict.path.split('.').where((part) => part.isNotEmpty).toList();
+    final canonicalId =
+        pathParts.length == 2 ? selectableSkillIdForPath(verdict.path) : null;
+    final id = canonicalId ?? 'other:onboarding:${verdict.name}';
+    final displayName = selectableSkillLabelForId(id) ?? verdict.name;
+
+    if (canonicalId == null) {
+      setState(() {
+        if (!_dynamicOptions.any((option) => option.id == id)) {
+          _dynamicOptions = [
+            ..._dynamicOptions.where((option) => option.id != 'others'),
+            OnboardingOption(id, verdict.name),
+            const OnboardingOption('others', 'Others'),
+          ];
+        }
+      });
+    }
+
+    final alreadySelected =
+        teaching
+            ? _controller.teachingInterests.contains(id)
+            : _controller.learningInterests.contains(id);
+    if (!alreadySelected) {
+      if (teaching) {
+        _controller.toggleTeachingInterest(id, max: 2);
+      } else {
+        _controller.toggleLearningInterest(id, max: 3);
+      }
+    }
+
+    return OnboardingCreateResult.added(displayName);
   }
 
   void _goTo(OnboardingStep step) => setState(() => _history.add(step));
@@ -393,12 +439,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           animation: _controller,
           builder:
               (context, _) => OnboardingInterestsScreen(
+                key: const ValueKey('onboarding-learning-interests'),
                 highlightWord: 'Learning?',
                 options: _dynamicOptions,
                 selected: _controller.learningInterests,
                 maxSelections: 3,
                 onToggle:
                     (id) => _controller.toggleLearningInterest(id, max: 3),
+                onCreate: (text) => _createInterest(text, teaching: false),
                 progress: _progress(step),
                 stepLabel: '',
                 onContinue: () => _goTo(_next(step)),
@@ -412,12 +460,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           animation: _controller,
           builder:
               (context, _) => OnboardingInterestsScreen(
+                key: const ValueKey('onboarding-teaching-interests'),
                 highlightWord: 'Teaching?',
                 options: _dynamicOptions,
                 selected: _controller.teachingInterests,
                 maxSelections: 2,
                 onToggle:
                     (id) => _controller.toggleTeachingInterest(id, max: 2),
+                onCreate: (text) => _createInterest(text, teaching: true),
                 progress: _progress(step),
                 stepLabel: '',
                 onContinue: () => _goTo(_next(step)),

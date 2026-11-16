@@ -82,6 +82,11 @@
       left: 50%;
       -ms-transform: translate(-50%, -50%);
       transform: translate(-50%, -50%);
+      width: auto;
+      height: auto;
+      max-width: min(55vw, 260px);
+      max-height: 55vh;
+      object-fit: contain;
     }
 
     .contain {
@@ -103,10 +108,15 @@
 
     .bottom {
       position: absolute;
-      bottom: 0;
+      bottom: max(24px, env(safe-area-inset-bottom));
       left: 50%;
       -ms-transform: translate(-50%, 0);
       transform: translate(-50%, 0);
+      width: auto;
+      height: auto;
+      max-width: min(42vw, 220px);
+      max-height: 16vh;
+      object-fit: contain;
     }
 
     .bottomLeft {

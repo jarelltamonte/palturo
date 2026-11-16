@@ -68,6 +68,16 @@ class ProfileData {
     return full.isNotEmpty ? full : 'User';
   }
 
+  bool get hasAnySkill =>
+      learningSkillIds.isNotEmpty || teachingSkillIds.isNotEmpty;
+
+  /// True when For You should show the setup checklist instead of looking for
+  /// matches: no role chosen, or no skill picked on either side.
+  bool get needsSetup => role == null || !hasAnySkill;
+
+  bool get needsShowcase =>
+      teachingSkillIds.isNotEmpty && teachingSkillImages.isEmpty;
+
   ProfileData copyWith({
     String? id,
     String? firstName,
@@ -119,6 +129,15 @@ class ProfileData {
     );
   }
 
+  static List<String> _stringList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<String>()
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
   factory ProfileData.fromMap(
     Map<String, dynamic> map, {
     String fallbackFirst = 'User',
@@ -163,12 +182,12 @@ class ProfileData {
       avatarUrl: map['avatar_url'] as String?,
       photos: parsedPhotos,
       bio: (map['bio'] as String?) ?? '',
-      languages: List<String>.from(map['languages'] ?? []),
-      interests: List<String>.from(map['learning_styles'] ?? []),
+      languages: _stringList(map['languages']),
+      interests: _stringList(map['learning_styles']),
       role: parsedRole,
-      learningSkillIds: List<String>.from(map['learning_skills'] ?? []),
-      teachingSkillIds: List<String>.from(map['teaching_skills'] ?? []),
-      skillCategories: List<String>.from(map['skill_categories'] ?? []),
+      learningSkillIds: _stringList(map['learning_skills']),
+      teachingSkillIds: _stringList(map['teaching_skills']),
+      skillCategories: _stringList(map['skill_categories']),
       teachingSkillImages: parsedSkillImages,
       hasCompletedOnboarding: map['has_completed_onboarding'] as bool? ?? false,
       isProfileCompleted: map['is_profile_completed'] as bool? ?? false,

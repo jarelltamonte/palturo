@@ -11,6 +11,7 @@ import 'package:palturo/services/app_navigation.dart';
 import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/haptics.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/services/sound_service.dart';
@@ -29,6 +30,7 @@ class NotificationPresenter {
 
   final Set<String> _celebrated = <String>{};
   StreamSubscription<AppNotification>? _notificationSub;
+  StreamSubscription<AppNotification>? _deletionSub;
   StreamSubscription<IncomingMessageEvent>? _messageSub;
   bool _initialized = false;
 
@@ -39,6 +41,7 @@ class NotificationPresenter {
     _notificationSub = NotificationService.instance.events.listen(
       _onNotification,
     );
+    _deletionSub = NotificationService.instance.deletions.listen(_onDeleted);
     _messageSub = ChatStateService.instance.messageEvents.listen(_onMessage);
   }
 
@@ -51,7 +54,10 @@ class NotificationPresenter {
     String? avatarUrl,
     Person? person,
     PersonRole? role,
+    String? notificationId,
   }) {
+    if (!PreferencesService.instance.notificationsEnabled) return;
+    if (!PreferencesService.instance.requestNotificationsEnabled) return;
     if (!_markCelebrated(connectionId)) return;
     if (notificationFeedbackAllowed()) {
       unawaited(Haptics.match());
@@ -62,60 +68,108 @@ class NotificationPresenter {
       name: name.trim().isEmpty ? 'your Pal' : name,
       skillName: skillName,
       avatarUrl: avatarUrl,
-      onSayHello:
-          () => AppRouter.openChat(
-            connectionId: connectionId,
-            name: name,
-            skillName: skillName,
-            avatarUrl: avatarUrl,
-            person: person,
-            role: role,
-          ),
+      onSayHello: () {
+        if (notificationId != null) {
+          unawaited(NotificationService.instance.markItemRead(notificationId));
+        }
+        AppRouter.openChat(
+          connectionId: connectionId,
+          name: name,
+          skillName: skillName,
+          avatarUrl: avatarUrl,
+          person: person,
+          role: role,
+        );
+      },
     );
     AppBannerController.instance.show(data, preempt: true);
   }
 
   void _onNotification(AppNotification item) {
+    unawaited(_presentNotification(item));
+  }
+
+  void _onDeleted(AppNotification item) {
+    AppBannerController.instance.removeGroup(
+      'notification:${item.kind.wireValue}:${item.connectionId ?? item.id}',
+    );
+  }
+
+  Future<void> _presentNotification(AppNotification item) async {
     if (Supabase.instance.client.auth.currentUser == null) return;
     if (!NotificationService.instance.isForeground) return;
-    if (!PreferencesService.instance.notificationsEnabled) {
-      return;
-    }
-    if (AppShellState.instance.activityOpen) {
-      return;
-    }
+    if (!PreferencesService.instance.notificationsEnabled) return;
+    if (AppShellState.instance.activityOpen) return;
     if (item.kind == AppNotificationKind.unknown) return;
     if (!notificationKindEnabled(item.kind)) return;
-
-    final view = presentActivity(item.toRow());
     if (item.kind == AppNotificationKind.connectionRequest &&
         (AppShellState.instance.selectedTab == 3 ||
             AppShellState.instance.requestsOpen)) {
       return;
     }
 
+    // The realtime row carries IDs only. Enrich it the same way Activity does
+    // so the banner can name the person and skill.
+    RequestLite? incoming;
+    ConversationLite? conversation;
+    if (item.kind == AppNotificationKind.connectionRequest) {
+      incoming = await _findIncoming(item.connectionId);
+    } else if (item.kind == AppNotificationKind.requestAccepted ||
+        item.kind == AppNotificationKind.requestDeclined ||
+        item.kind == AppNotificationKind.feedbackReady) {
+      conversation = await _findConversation(item.connectionId);
+    }
+
+    // The user may have left, disabled notifications, or opened the relevant
+    // screen while the enrichment call was in flight.
+    if (Supabase.instance.client.auth.currentUser == null) return;
+    if (!NotificationService.instance.isForeground) return;
+    if (!PreferencesService.instance.notificationsEnabled) return;
+    if (!notificationKindEnabled(item.kind)) return;
+    if (AppShellState.instance.activityOpen) return;
+    if (item.kind == AppNotificationKind.connectionRequest &&
+        (AppShellState.instance.selectedTab == 3 ||
+            AppShellState.instance.requestsOpen)) {
+      return;
+    }
+
+    final view = presentActivity(
+      item.toRow(),
+      incoming: incoming,
+      conversation: conversation,
+    );
+    final enriched = item.copyWith(
+      actorName: view.actorName,
+      actorAvatar:
+          item.actorAvatar ?? conversation?.otherAvatar ?? incoming?.avatarUrl,
+      skillName: view.skillName,
+      role: item.role ?? conversation?.otherRole,
+    );
+
     if (item.kind == AppNotificationKind.requestAccepted) {
-      final connectionId = item.connectionId;
+      final connectionId = enriched.connectionId;
       if (connectionId == null) {
-        _showStandard(item, view);
+        _showStandard(enriched, view);
         return;
       }
       if (ChatStateService.instance.activeConnectionId == connectionId) {
         _markCelebrated(connectionId);
         return;
       }
-      final role = _roleFrom(item.role);
+      final avatarUrl = enriched.actorAvatar;
+      final role = _roleFrom(enriched.role);
       showMatch(
         connectionId: connectionId,
         name: view.actorName ?? 'your Pal',
         skillName: view.skillName,
-        avatarUrl: item.actorAvatar,
+        avatarUrl: avatarUrl,
         role: role,
+        notificationId: enriched.id,
         person: _personFor(
-          id: item.actorId,
+          id: enriched.actorId,
           name: view.actorName ?? 'Pal',
           skillName: view.skillName,
-          avatarUrl: item.actorAvatar,
+          avatarUrl: avatarUrl,
           role: role,
         ),
       );
@@ -123,11 +177,37 @@ class NotificationPresenter {
     }
 
     if (item.kind == AppNotificationKind.feedbackReady &&
-        ChatStateService.instance.activeConnectionId == item.connectionId) {
+        ChatStateService.instance.activeConnectionId == enriched.connectionId) {
       return;
     }
 
-    _showStandard(item, view);
+    _showStandard(enriched, view);
+  }
+
+  Future<RequestLite?> _findIncoming(String? connectionId) async {
+    if (connectionId == null) return null;
+    try {
+      final rows = await MatchApi.getIncomingRequests();
+      for (final row in rows) {
+        if (row.connectionId == connectionId) return row;
+      }
+    } catch (_) {
+      // Enrichment is best-effort; the banner falls back to generic copy.
+    }
+    return null;
+  }
+
+  Future<ConversationLite?> _findConversation(String? connectionId) async {
+    if (connectionId == null) return null;
+    try {
+      final rows = await MatchApi.getConversations();
+      for (final row in rows) {
+        if (row.connectionId == connectionId) return row;
+      }
+    } catch (_) {
+      // Enrichment is best-effort; the banner falls back to generic copy.
+    }
+    return null;
   }
 
   void _showStandard(AppNotification item, ActivityItemView view) {
@@ -143,15 +223,24 @@ class NotificationPresenter {
         unawaited(Haptics.selection());
       }
     }
-    final onTap = _tapFor(item, view);
+    final rawTap = _tapFor(item, view);
+    VoidCallback? readThen(VoidCallback? action) {
+      if (action == null) return null;
+      return () {
+        unawaited(NotificationService.instance.markItemRead(item.id));
+        action();
+      };
+    }
+
+    final onTap = readThen(rawTap);
     final String? actionLabel;
     final VoidCallback? onAction;
     if (item.kind == AppNotificationKind.skillModeration) {
       actionLabel = 'Review';
-      onAction = () => AppRouter.openProfile();
-    } else if (onTap != null && view.actionLabel.isNotEmpty) {
+      onAction = readThen(() => AppRouter.openProfile());
+    } else if (rawTap != null && view.actionLabel.isNotEmpty) {
       actionLabel = view.actionLabel;
-      onAction = onTap;
+      onAction = readThen(rawTap);
     } else {
       actionLabel = null;
       onAction = null;
@@ -319,6 +408,7 @@ class NotificationPresenter {
 
   void dispose() {
     _notificationSub?.cancel();
+    _deletionSub?.cancel();
     _messageSub?.cancel();
     AppBannerController.instance.clear();
   }

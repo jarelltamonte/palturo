@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/widgets/desktop_route_frame.dart';
 
 ThemeData _baseTheme({
   required Brightness brightness,
@@ -40,6 +42,17 @@ ThemeData _baseTheme({
     colorScheme: scheme,
     scaffoldBackgroundColor: surface,
     fontFamily: 'Inter',
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: DesktopPageTransitionsBuilder(
+          base: CupertinoPageTransitionsBuilder(),
+        ),
+        TargetPlatform.windows: DesktopPageTransitionsBuilder(),
+        TargetPlatform.linux: DesktopPageTransitionsBuilder(),
+      },
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,

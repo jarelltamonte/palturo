@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 
 /// Shared empty-state layout so Chats, Requests, and Activity agree on
-/// illustration size, text rhythm, and action placement.
+/// illustration or icon size, text rhythm, and action placement.
 class AppEmptyState extends StatelessWidget {
   final String title;
   final String? message;
   final String? actionLabel;
   final VoidCallback? onAction;
   final bool showIllustration;
+
+  /// A static icon used instead of the animated illustration.
+  final IconData? icon;
 
   /// Space reserved under the content for the floating bottom navigation.
   final double bottomPadding;
@@ -24,6 +28,7 @@ class AppEmptyState extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.showIllustration = true,
+    this.icon,
     this.bottomPadding = 0,
   });
 
@@ -38,8 +43,7 @@ class AppEmptyState extends StatelessWidget {
   Widget _content(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
     final largeText = MediaQuery.textScalerOf(context).scale(12) > 16;
-    final illustration =
-        largeText ? compactIllustrationSize : illustrationSize;
+    final illustration = largeText ? compactIllustrationSize : illustrationSize;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -52,6 +56,18 @@ class AppEmptyState extends StatelessWidget {
             animate: !MediaQuery.disableAnimationsOf(context),
           ),
           const SizedBox(height: 8),
+        ] else if (icon != null) ...[
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.mutedSurface(context),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border(context)),
+            ),
+            child: Icon(icon, size: 30, color: AppColors.mutedText(context)),
+          ),
+          const SizedBox(height: 14),
         ],
         Text(
           title,

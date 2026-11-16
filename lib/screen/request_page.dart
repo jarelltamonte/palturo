@@ -12,6 +12,7 @@ import 'package:palturo/screen/notifications_page.dart';
 import 'package:palturo/screen/matches.dart';
 import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
+import 'package:palturo/models/app_notification.dart';
 import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/haptics.dart';
@@ -23,6 +24,7 @@ import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/app_empty_state.dart';
+import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/theme/app_spacing.dart';
@@ -284,6 +286,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   bool _responding = false;
   bool _cancelling = false;
   final Set<String> _declinedIds = {};
+  StreamSubscription<AppNotification>? _notificationEvents;
+  StreamSubscription<AppNotification>? _notificationDeletions;
 
   @override
   void initState() {
@@ -292,6 +296,12 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     _restoreFilters();
     widget.refreshSignal?.addListener(_refreshFromShell);
     NotificationService.instance.addListener(_onActivityChanged);
+    _notificationEvents = NotificationService.instance.events.listen(
+      _onNotificationEvent,
+    );
+    _notificationDeletions = NotificationService.instance.deletions.listen(
+      _onNotificationDeleted,
+    );
     _loadRequests();
     _loadOutgoing();
   }
@@ -323,11 +333,35 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     if (_isPushedRequests) AppShellState.instance.setRequestsOpen(false);
     widget.refreshSignal?.removeListener(_refreshFromShell);
     NotificationService.instance.removeListener(_onActivityChanged);
+    _notificationEvents?.cancel();
+    _notificationDeletions?.cancel();
     super.dispose();
   }
 
   void _onActivityChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// A realtime request must appear in the list, not just the badge. Reload
+  /// the affected surface when the notification event arrives.
+  void _onNotificationEvent(AppNotification item) {
+    if (!mounted) return;
+    if (item.kind.isRequest) {
+      _loadRequests();
+    }
+    if (item.kind.isMatch || item.kind.isDecline) {
+      _loadOutgoing();
+    }
+  }
+
+  void _onNotificationDeleted(AppNotification item) {
+    if (!mounted) return;
+    if (item.kind.isRequest) {
+      _loadRequests();
+    }
+    if (item.kind.isMatch || item.kind.isDecline) {
+      _loadOutgoing();
+    }
   }
 
   void _refreshFromShell() {
@@ -574,7 +608,9 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       await ChatStateService.instance.loadConversations(showSpinner: false);
       if (!mounted) return false;
 
-      NotificationService.instance.refresh();
+      AppBannerController.instance.removeGroup(
+        'notification:connection_request:${request.id}',
+      );
 
       if (!accept) {
         setState(() => _declinedIds.add(request.id));
@@ -584,23 +620,30 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
           duration: const Duration(seconds: 3),
         );
         Future<void>.delayed(const Duration(seconds: 5), () {
-          if (!mounted || !_declinedIds.contains(request.id)) return;
+          if (!_declinedIds.contains(request.id)) return;
+          unawaited(
+            NotificationService.instance.markRequestHandled(request.id),
+          );
+          if (!mounted) return;
           setState(() => _declinedIds.remove(request.id));
           _removeRequest(request.id);
         });
-        return true;
+      } else {
+        _removeRequest(request.id);
+
+        NotificationPresenter.instance.showMatch(
+          connectionId: request.id,
+          name: request.requesterName,
+          skillName: request.skillName,
+          avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
+          role: request.role,
+          person: request.toPerson(),
+        );
+
+        await NotificationService.instance.markRequestHandled(request.id);
+        unawaited(NotificationService.instance.refresh());
       }
 
-      _removeRequest(request.id);
-
-      NotificationPresenter.instance.showMatch(
-        connectionId: request.id,
-        name: request.requesterName,
-        skillName: request.skillName,
-        avatarUrl: request.photoUrls.isEmpty ? null : request.photoUrls.first,
-        role: request.role,
-        person: request.toPerson(),
-      );
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -1066,7 +1109,15 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     final filteredOut = _requests.isNotEmpty;
     return AppEmptyState(
       bottomPadding: AppSpacing.bottomNavClearanceFor(context),
+      showIllustration: false,
+      icon: filteredOut ? Icons.filter_alt_off_outlined : Icons.inbox_outlined,
       title: filteredOut ? 'No requests match your filters' : 'No requests yet',
+      message:
+          filteredOut
+              ? 'Try widening a filter, or clear them all.'
+              : _outgoing.isNotEmpty
+              ? 'Your sent requests are waiting for a reply.'
+              : 'Your next skill swap starts with a hello.',
       actionLabel:
           filteredOut
               ? 'Clear filters'

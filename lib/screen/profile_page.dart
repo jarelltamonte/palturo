@@ -119,37 +119,45 @@ class _ProfilePageState extends State<ProfilePage> {
         builder:
             (_) => OnboardingFlow(
               onFinished: () async {
-                await PreferencesService.instance.setBool(
-                  'skipped_onboarding',
-                  false,
-                );
                 if (!mounted) return;
                 Navigator.of(context).pop();
                 setState(() {
                   _resumeSkipped = false;
                   _resumeDismissed = true;
                 });
-                await PreferencesService.instance.setBool(
-                  onboardingResumeDismissedKey(_uid),
-                  true,
-                );
+                try {
+                  await PreferencesService.instance.setBool(
+                    'skipped_onboarding',
+                    false,
+                  );
+                  await PreferencesService.instance.setBool(
+                    onboardingResumeDismissedKey(_uid),
+                    true,
+                  );
+                } catch (_) {
+                  // The profile is saved; preference cleanup is best-effort.
+                }
                 _loadProfile();
               },
               onSkip: () async {
-                await PreferencesService.instance.setBool(
-                  'skipped_onboarding',
-                  true,
-                );
-                await PreferencesService.instance.setBool(
-                  onboardingResumeDismissedKey(_uid),
-                  false,
-                );
                 if (!mounted) return;
                 Navigator.of(context).pop();
                 setState(() {
                   _resumeSkipped = true;
                   _resumeDismissed = false;
                 });
+                try {
+                  await PreferencesService.instance.setBool(
+                    'skipped_onboarding',
+                    true,
+                  );
+                  await PreferencesService.instance.setBool(
+                    onboardingResumeDismissedKey(_uid),
+                    false,
+                  );
+                } catch (_) {
+                  // Leaving setup must not depend on preference storage.
+                }
               },
             ),
       ),
@@ -379,7 +387,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       if (_needsProfileTip(_profile!) && !_showResume)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                          child: _ProfileTip(onEdit: _openEdit),
+                          child: _ProfileTip(
+                            onEdit: _openEdit,
+                            profile: _profile!,
+                          ),
                         ),
                       if (_showResume)
                         Padding(
@@ -671,12 +682,19 @@ class ProfileSummaryCard extends StatelessWidget {
 
 class _ProfileTip extends StatelessWidget {
   final VoidCallback onEdit;
+  final ProfileData profile;
 
-  const _ProfileTip({required this.onEdit});
+  const _ProfileTip({required this.onEdit, required this.profile});
 
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
+    final needsShowcase = profile.needsShowcase;
+    final message =
+        needsShowcase
+            ? 'Add a showcase so you appear in For You and Browse. You can '
+                'add it now or later.'
+            : 'Finish your profile details to improve your recommendations.';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
@@ -694,7 +712,7 @@ class _ProfileTip extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Finish your profile details to improve your recommendations.',
+              message,
               style: AppTextStyles.regularText.copyWith(
                 color: textColor,
                 fontSize: 13,
@@ -702,7 +720,10 @@ class _ProfileTip extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(onPressed: onEdit, child: const Text('Improve')),
+          TextButton(
+            onPressed: onEdit,
+            child: Text(needsShowcase ? 'Add' : 'Improve'),
+          ),
         ],
       ),
     );

@@ -147,6 +147,12 @@ class NotificationPresenter {
     );
 
     if (item.kind == AppNotificationKind.requestAccepted) {
+      // The requester sees the match through this event, so refresh the chat
+      // list before showing the banner. Otherwise the new Pal only appears
+      // after the next periodic refresh.
+      unawaited(
+        ChatStateService.instance.loadConversations(showSpinner: false),
+      );
       final connectionId = enriched.connectionId;
       if (connectionId == null) {
         _showStandard(enriched, view);

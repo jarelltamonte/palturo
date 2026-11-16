@@ -64,3 +64,7 @@ UI-AUDIT*.md
 UI-FEATURE-AUDIT*.md
 *SESSION*.md
 *session*.md
+
+# Generated reports stay local; the public field guide is deployed separately
+docs/*.html
+docs/*.pdf

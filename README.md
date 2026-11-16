@@ -259,8 +259,9 @@ redirect URLs, and verification checklist.
   state, request-card rollback, chat deletion and tombstones, showcase
   attachments, media limits, and profile parsing.
 
-Historical reports and audits live in `docs/*.html` and `docs/*.pdf`. They
-describe earlier passes and are not a substitute for the current README.
+Historical reports and audits are kept locally and are not part of the
+repository. They describe earlier passes and are not a substitute for the
+current README.
 
 ## Security notes
 

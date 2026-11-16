@@ -1124,38 +1124,80 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
           _view == RequestView.sent ? 'Sent requests' : 'Requests',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.headingText.copyWith(color: textTheme),
+          style:
+              _view == RequestView.sent
+                  ? AppTextStyles.headingText.copyWith(
+                    color: textTheme,
+                    fontSize: 20,
+                  )
+                  : AppTextStyles.headingText.copyWith(color: textTheme),
         ),
         actionsPadding: EdgeInsets.zero,
         actions: [
-              AppChrome.iconAction(
-                icon: Icons.notifications_none_rounded,
-                tooltip: 'Activity',
-                onPressed:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationsPage(),
+          AppChrome.iconAction(
+            icon: Icons.notifications_none_rounded,
+            tooltip: 'Activity',
+            onPressed:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Icons.notifications_none_rounded,
+                  color: textTheme,
+                  size: 24,
+                ),
+                if (PreferencesService.instance.notificationsEnabled &&
+                    NotificationService.instance.unread > 0)
+                  Positioned(
+                    right: -1,
+                    top: -1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
                       ),
                     ),
+                  ),
+              ],
+            ),
+          ),
+          Semantics(
+            container: true,
+            button: true,
+            label:
+                _view == RequestView.incoming
+                    ? 'Filter requests'
+                    : 'Filter sent requests',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _openFilterSheet,
+              child: SizedBox(
+                width: AppSpacing.iconTarget,
+                height: AppSpacing.iconTarget,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Icon(
-                      Icons.notifications_none_rounded,
-                      color: textTheme,
-                      size: 24,
+                    Align(
+                      alignment: Alignment.center,
+                      child: Icon(Icons.tune, color: textTheme, size: 24),
                     ),
-                    if (PreferencesService.instance.notificationsEnabled &&
-                        NotificationService.instance.unread > 0)
+                    if (_view == RequestView.incoming
+                        ? _hasActiveFilter
+                        : _hasSentFilter)
                       Positioned(
-                        right: -1,
-                        top: -1,
+                        right: 10,
+                        top: 10,
                         child: Container(
-                    width: 8,
+                          width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFB0CE13),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1163,47 +1205,9 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
                   ],
                 ),
               ),
-              Semantics(
-                container: true,
-                button: true,
-                label:
-                    _view == RequestView.incoming
-                        ? 'Filter requests'
-                        : 'Filter sent requests',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _openFilterSheet,
-                  child: SizedBox(
-                    width: AppSpacing.iconTarget,
-                    height: AppSpacing.iconTarget,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Align(
-                          alignment: Alignment.center,
-                          child: Icon(Icons.tune, color: textTheme, size: 24),
-                        ),
-                        if (_view == RequestView.incoming
-                            ? _hasActiveFilter
-                            : _hasSentFilter)
-                          Positioned(
-                            right: 10,
-                            top: 10,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFB0CE13),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -1255,11 +1259,7 @@ class _SentRequestCard extends StatelessWidget {
   final VoidCallback? onWithdraw;
   final VoidCallback? onTap;
 
-  const _SentRequestCard({
-    required this.request,
-    this.onWithdraw,
-    this.onTap,
-  });
+  const _SentRequestCard({required this.request, this.onWithdraw, this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -91,8 +91,14 @@ void main() {
     expect(find.text('FEATURED'), findsOneWidget);
     // The feature card owns one domain, so the grid lists the rest.
     expect(find.text('MORE DOMAINS'), findsOneWidget);
-    expect(find.text('08'), findsAtLeastNWidgets(1));
     expect(find.text('ALL DOMAINS'), findsNothing);
+    // Domain numbers are gone from both the section label and the cards.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Text && RegExp(r'^\d{2}$').hasMatch(w.data ?? ''),
+      ),
+      findsNothing,
+    );
     expect(find.text((featured['name'] ?? '').toString()), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

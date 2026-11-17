@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:palturo/theme/app_colors.dart';
 
 /// Icon per taxonomy root path. Shared by Browse and the Explore feed so the
 /// same category always reads the same way.
@@ -19,26 +20,7 @@ IconData exploreRootIcon(String path) {
   return exploreRootIcons[root] ?? Icons.category_outlined;
 }
 
-/// Pastel tile behind a domain icon. Shared so a domain reads the same on
-/// Browse and on its own page.
-Color exploreTint(String path) {
-  switch (path.split('.').first) {
-    case 'agriculture_livelihood':
-    case 'modern_practical_skills':
-      return const Color(0xFFCFE8DA);
-    case 'cooking_culinary':
-    case 'traditional_crafts':
-      return const Color(0xFFF3E1C7);
-    case 'household_skills':
-    case 'visual_arts_design':
-      return const Color(0xFFF0D9BD);
-    case 'language_writing':
-    case 'performing_arts':
-      return const Color(0xFFE3D9F2);
-    case 'martial_arts':
-      return const Color(0xFFF6D9D3);
-    default:
-      // Lime at 18%, matching AppColors.primary with alpha.
-      return const Color(0x2EBFE109);
-  }
-}
+/// Tile behind a domain icon. One brand-green tint everywhere so the cards
+/// read as one system instead of a pastel palette.
+Color exploreTileTint(BuildContext context) =>
+    AppColors.primary.withValues(alpha: 0.18);

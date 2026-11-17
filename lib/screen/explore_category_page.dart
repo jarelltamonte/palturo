@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/screen/explore_taxonomy.dart';
@@ -28,7 +27,6 @@ class ExploreCategoryPage extends StatefulWidget {
     required this.nodeLabel,
     required this.description,
     required this.mentor,
-    this.onRoleChanged,
     this.taxonomyLoader,
     this.usersLoader,
   });
@@ -37,7 +35,6 @@ class ExploreCategoryPage extends StatefulWidget {
   final String nodeLabel;
   final String description;
   final bool mentor;
-  final ValueChanged<bool>? onRoleChanged;
 
   /// Test hooks. Production leaves these null.
   final Future<List<Map<String, dynamic>>> Function(String path)?
@@ -53,11 +50,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   static const double _barReserve = 120;
   static const double _pageReserve = 120;
 
-  late bool _mentor = widget.mentor;
-
-  /// The role the currently painted data belongs to. A failed reload falls
-  /// back to it so labels and people never disagree.
-  late bool _dataMentor = widget.mentor;
+  bool get _mentor => widget.mentor;
   List<Map<String, dynamic>> _children = const [];
   Map<String, int> _childCounts = const {};
   List<Person> _people = const [];
@@ -78,11 +71,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       '$_noun${_people.length == 1 ? '' : 's'} available';
 
   bool get _showDeckCta => !_loading && _error == null && _people.isNotEmpty;
-
-  bool get _showSwitchCta =>
-      !_loading && _error == null && _people.isEmpty && _otherCount > 0;
-
-  bool get _showBar => _showDeckCta || _showSwitchCta;
 
   @override
   void initState() {
@@ -109,9 +97,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         _error = null;
       });
     }
-    // Capture the role so a switch mid-flight cannot mix the two responses.
     final kind = _kind;
-    final mentor = _mentor;
     try {
       final rootDepth = widget.nodePath.split('.').length;
       var nodes = <Map<String, dynamic>>[];
@@ -136,10 +122,9 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         _childCounts = const {};
         _loading = false;
         _error = null;
-        _dataMentor = mentor;
       });
       unawaited(_loadChildCounts(requestId, children, kind, people));
-      unawaited(_loadOtherCount(requestId, mentor));
+      unawaited(_loadOtherCount(requestId));
     } catch (e) {
       debugPrint('[Browse] category load failed: $e');
       if (!mounted || requestId != _requestId) return;
@@ -148,12 +133,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         fallback: "Couldn't load this category. Please try again.",
       );
       if (hadData) {
-        // The switch failed, so put the page back on the role its data
-        // belongs to instead of showing old people under new labels.
-        if (_mentor != _dataMentor) {
-          setState(() => _mentor = _dataMentor);
-          widget.onRoleChanged?.call(_dataMentor);
-        }
         if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
           showAppError(context, message);
         }
@@ -205,9 +184,9 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     });
   }
 
-  Future<void> _loadOtherCount(int requestId, bool mentor) async {
+  Future<void> _loadOtherCount(int requestId) async {
     try {
-      final other = await _users(widget.nodePath, mentor ? 'teach' : 'learn');
+      final other = await _users(widget.nodePath, _mentor ? 'teach' : 'learn');
       if (!mounted || requestId != _requestId) return;
       setState(() => _otherCount = other.length);
     } catch (_) {
@@ -249,18 +228,11 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         .toList();
   }
 
-  void _switchRole() {
-    final next = !_mentor;
-    setState(() => _mentor = next);
-    widget.onRoleChanged?.call(next);
-    _load();
-  }
-
-  Future<void> _openChild(Map<String, dynamic> node) async {
+  void _openChild(Map<String, dynamic> node) {
     final path = (node['path'] ?? '').toString();
     final label = (node['name'] ?? '').toString();
     if (path.isEmpty || label.isEmpty) return;
-    await Navigator.push(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -269,16 +241,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               nodeLabel: label,
               description: 'Explore $label in the PalTuro community.',
               mentor: _mentor,
-              // Mirror a role switch made deeper in the stack so this page
-              // does not come back showing the old role.
-              onRoleChanged: (mentor) {
-                if (!mounted) return;
-                if (mentor != _mentor) {
-                  setState(() => _mentor = mentor);
-                  _load();
-                }
-                widget.onRoleChanged?.call(mentor);
-              },
               taxonomyLoader: widget.taxonomyLoader,
               usersLoader: widget.usersLoader,
             ),
@@ -338,7 +300,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
             final scale = (MediaQuery.textScalerOf(context).scale(12) / 12)
                 .clamp(1.0, 2.5);
             final barReserve =
-                _showBar
+                _showDeckCta
                     ? AppSpacing.bottomNavClearanceFor(context) +
                         _barReserve * scale
                     : _pageReserve;
@@ -361,7 +323,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                       ..._buildNarrowBody(),
                   ],
                 ),
-                if (_showBar && !wide)
+                if (_showDeckCta && !wide)
                   Positioned(
                     left: 0,
                     right: 0,
@@ -408,9 +370,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               if (_showDeckCta) ...[
                 const SizedBox(height: 18),
                 _buildDeckButton(),
-              ] else if (_showSwitchCta) ...[
-                const SizedBox(height: 18),
-                _buildSwitchButton(),
               ],
             ],
           ),
@@ -454,29 +413,20 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 10,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: exploreTint(widget.nodePath),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    exploreRootIcon(widget.nodePath),
-                    size: 26,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                _RoleChip(mentor: _mentor, onTap: _switchRole),
-              ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: exploreTileTint(context),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                exploreRootIcon(widget.nodePath),
+                size: 26,
+                color: AppColors.accentText(context),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -495,6 +445,13 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               const SizedBox(height: 10),
               _buildOtherCount(muted),
             ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _load,
+                child: const Text('Check again'),
+              ),
+            ),
           ] else
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -548,10 +505,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   }
 
   Widget _buildEmptyPanel(Color muted) {
-    final tail =
-        _otherCount > 0
-            ? ' Try a skill below, or switch roles.'
-            : (_children.isNotEmpty ? ' Try a skill below.' : '');
+    final tail = _children.isNotEmpty ? ' Try a skill below.' : '';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -702,42 +656,22 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   }
 
   Widget _buildDeckButton() {
-    return _actionButton(
-      onPressed: _startBrowsing,
-      icon: Icons.style_outlined,
-      label: 'Start browsing ${_mentor ? 'learners' : 'mentors'}',
-    );
-  }
-
-  Widget _buildSwitchButton() {
-    return _actionButton(
-      onPressed: _switchRole,
-      icon: Icons.swap_horiz,
-      label: _mentor ? 'Switch to learning' : 'Switch to teaching',
-      outlined: true,
-    );
-  }
-
-  Widget _actionButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-    required String label,
-    bool outlined = false,
-  }) {
     final child = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20),
+        const Icon(Icons.style_outlined, size: 20),
         const SizedBox(width: 8),
-        Flexible(child: Text(label, textAlign: TextAlign.center)),
+        Flexible(
+          child: Text(
+            'Start browsing ${_mentor ? 'learners' : 'mentors'}',
+            textAlign: TextAlign.center,
+          ),
+        ),
       ],
     );
     return SizedBox(
       width: double.infinity,
-      child:
-          outlined
-              ? OutlinedButton(onPressed: onPressed, child: child)
-              : ElevatedButton(onPressed: onPressed, child: child),
+      child: ElevatedButton(onPressed: _startBrowsing, child: child),
     );
   }
 
@@ -758,12 +692,10 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_showDeckCta) _buildDeckButton() else _buildSwitchButton(),
+          _buildDeckButton(),
           const SizedBox(height: 6),
           Text(
-            _showDeckCta
-                ? 'Swipe through $count $_noun${count == 1 ? '' : 's'}, no pressure to match'
-                : 'See the $_otherCount $_otherNoun${_otherCount == 1 ? '' : 's'} waiting in this domain',
+            'Swipe through $count $_noun${count == 1 ? '' : 's'}, no pressure to match',
             textAlign: TextAlign.center,
             style: AppTextStyles.regularText.copyWith(
               fontSize: 10,
@@ -790,89 +722,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
             const SizedBox(height: 16),
             ElevatedButton(onPressed: _load, child: const Text('Retry')),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleChip extends StatelessWidget {
-  const _RoleChip({required this.mentor, required this.onTap});
-
-  final bool mentor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final roleName = mentor ? 'Mentor' : 'Learner';
-    final otherRole = mentor ? 'learning' : 'teaching';
-    final svgAsset =
-        mentor ? 'assets/icons/rmentor.svg' : 'assets/icons/rlearner.svg';
-    final ink = Theme.of(context).colorScheme.secondary;
-
-    return Semantics(
-      container: true,
-      button: true,
-      label: 'Browsing as $roleName. Switch to $otherRole.',
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Material(
-        color: AppColors.mutedSurface(context),
-        shape: const StadiumBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const StadiumBorder(),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 44),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SvgPicture.asset(
-                    svgAsset,
-                    width: 14,
-                    height: 14,
-                    colorFilter: ColorFilter.mode(
-                      AppColors.accentText(context),
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(text: 'Browsing as '),
-                          TextSpan(
-                            text: roleName,
-                            style: TextStyle(
-                              color: AppColors.accentText(context),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: ink,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 16,
-                    color: AppColors.mutedText(context),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -1005,13 +854,7 @@ class _CategorySkeleton extends StatelessWidget {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    SkeletonBox(width: 52, height: 52, radius: 16),
-                    Spacer(),
-                    SkeletonBox(width: 132, height: 44, radius: 999),
-                  ],
-                ),
+                SkeletonBox(width: 52, height: 52, radius: 16),
                 SizedBox(height: 16),
                 SkeletonBox(width: 220, height: 12),
                 SizedBox(height: 16),

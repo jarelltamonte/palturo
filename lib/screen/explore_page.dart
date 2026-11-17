@@ -271,12 +271,6 @@ class _ExplorePageState extends State<ExplorePage> {
               nodeLabel: label,
               description: _descriptionFor(root),
               mentor: _role == ExploreRole.mentor,
-              onRoleChanged: (mentor) {
-                if (!mounted) return;
-                _onRoleChanged(
-                  mentor ? ExploreRole.mentor : ExploreRole.learner,
-                );
-              },
             ),
       ),
     );
@@ -395,11 +389,7 @@ class _ExplorePageState extends State<ExplorePage> {
                 const SizedBox(height: 14),
               ],
               if (gridRoots.isNotEmpty) ...[
-                _buildSectionLabel(
-                  context,
-                  gridRoots.length,
-                  featuredShown: featured != null,
-                ),
+                _buildSectionLabel(context, featuredShown: featured != null),
                 const SizedBox(height: 8),
                 _buildDomainGrid(context, gridRoots),
               ],
@@ -411,8 +401,7 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Widget _buildSectionLabel(
-    BuildContext context,
-    int count, {
+    BuildContext context, {
     bool featuredShown = false,
   }) {
     final muted = _fgMuted(context);
@@ -422,22 +411,13 @@ class _ExplorePageState extends State<ExplorePage> {
             : featuredShown
             ? 'MORE DOMAINS'
             : 'ALL DOMAINS';
-    return Row(
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.boldText.copyWith(
-            fontSize: 10,
-            letterSpacing: 1.2,
-            color: muted,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          count.toString().padLeft(2, '0'),
-          style: AppTextStyles.boldText.copyWith(fontSize: 10, color: muted),
-        ),
-      ],
+    return Text(
+      label,
+      style: AppTextStyles.boldText.copyWith(
+        fontSize: 10,
+        letterSpacing: 1.2,
+        color: muted,
+      ),
     );
   }
 
@@ -470,11 +450,10 @@ class _ExplorePageState extends State<ExplorePage> {
             final node = roots[index];
             final path = (node['path'] ?? '').toString();
             return _DomainCard(
-              index: index + 1,
               label: (node['name'] ?? '').toString(),
               description: _descriptionFor(node),
               icon: exploreRootIcon(path),
-              tint: exploreTint(path),
+              tint: exploreTileTint(context),
               count: _rootCounts[path] ?? 0,
               countLabel: _roleNoun,
               onTap: () => _openCategory(node),
@@ -1040,7 +1019,7 @@ class _FeaturedDomainCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.18),
+                  color: exploreTileTint(context),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: AppColors.primary.withValues(alpha: 0.45),
@@ -1058,7 +1037,6 @@ class _FeaturedDomainCard extends StatelessWidget {
 
 class _DomainCard extends StatelessWidget {
   const _DomainCard({
-    required this.index,
     required this.label,
     required this.description,
     required this.icon,
@@ -1068,7 +1046,6 @@ class _DomainCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final int index;
   final String label;
   final String description;
   final IconData icon;
@@ -1102,70 +1079,53 @@ class _DomainCard extends StatelessWidget {
               border: Border.all(color: border),
             ),
             padding: const EdgeInsets.fromLTRB(11, 11, 11, 10),
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: tint,
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 17,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.boldText.copyWith(
-                        fontSize: 13,
-                        height: 1.2,
-                        color: ink,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Flexible(
-                      child: Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.regularText.copyWith(
-                          fontSize: 11,
-                          height: 1.35,
-                          color: muted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _countLabelText(count, countLabel),
-                      style: AppTextStyles.boldText.copyWith(
-                        fontSize: 10,
-                        color: AppColors.accentText(context),
-                      ),
-                    ),
-                  ],
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 17,
+                    color: AppColors.accentText(context),
+                  ),
                 ),
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: ExcludeSemantics(
-                    child: Text(
-                      index.toString().padLeft(2, '0'),
-                      style: AppTextStyles.regularText.copyWith(
-                        fontSize: 10,
-                        color: muted,
-                      ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.boldText.copyWith(
+                    fontSize: 13,
+                    height: 1.2,
+                    color: ink,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Flexible(
+                  child: Text(
+                    description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.regularText.copyWith(
+                      fontSize: 11,
+                      height: 1.35,
+                      color: muted,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _countLabelText(count, countLabel),
+                  style: AppTextStyles.boldText.copyWith(
+                    fontSize: 10,
+                    color: AppColors.accentText(context),
                   ),
                 ),
               ],
@@ -1199,13 +1159,7 @@ class _FieldGuideSkeleton extends StatelessWidget {
             children: [
               SkeletonBox(height: 96, radius: 24),
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  const SkeletonBox(width: 90, height: 10),
-                  const Spacer(),
-                  const SkeletonBox(width: 20, height: 10),
-                ],
-              ),
+              const SkeletonBox(width: 90, height: 10),
               const SizedBox(height: 8),
               GridView.builder(
                 shrinkWrap: true,

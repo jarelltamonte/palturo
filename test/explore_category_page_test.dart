@@ -52,21 +52,18 @@ class _FakeUsers {
     this.rootTeach = 6,
     this.rootLearn = 2,
     this.noPeople = false,
-    this.failLearn = false,
     this.failPaths = const {},
   });
 
   final int rootTeach;
   final int rootLearn;
   final bool noPeople;
-  final bool failLearn;
   final Set<String> failPaths;
   final List<String> kinds = [];
 
   Future<List<Person>> call(String path, {required String kind}) async {
     kinds.add('$path:$kind');
     if (failPaths.contains(path)) throw Exception('boom');
-    if (failLearn && kind == 'learn') throw Exception('learn boom');
     if (noPeople && kind == 'teach') return const [];
     switch (path) {
       case 'cooking_culinary':
@@ -88,7 +85,6 @@ Widget _app({
   required ThemeData theme,
   required Future<List<Person>> Function(String path, {required String kind})
   users,
-  ValueChanged<bool>? onRoleChanged,
   Size? surface,
   double textScale = 1,
 }) {
@@ -105,7 +101,6 @@ Widget _app({
         nodeLabel: 'Cooking & Culinary',
         description: 'Recipes, flavors, and kitchen traditions',
         mentor: false,
-        onRoleChanged: onRoleChanged,
         taxonomyLoader: (path) async => _taxonomy(path),
         usersLoader: users,
       ),
@@ -118,20 +113,13 @@ Future<void> _pump(
   required ThemeData theme,
   required Future<List<Person>> Function(String path, {required String kind})
   users,
-  ValueChanged<bool>? onRoleChanged,
   Size surface = const Size(390, 844),
   double textScale = 1,
 }) async {
   await tester.binding.setSurfaceSize(surface);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
-    _app(
-      theme: theme,
-      users: users,
-      onRoleChanged: onRoleChanged,
-      surface: surface,
-      textScale: textScale,
-    ),
+    _app(theme: theme, users: users, surface: surface, textScale: textScale),
   );
   await tester.pumpAndSettle();
 }
@@ -148,7 +136,6 @@ void main() {
       find.text('Recipes, flavors, and kitchen traditions'),
       findsOneWidget,
     );
-    expect(find.text('Browsing as Learner'), findsOneWidget);
     expect(find.text('6'), findsOneWidget);
     expect(find.text('mentors available'), findsOneWidget);
     expect(find.text('2 learners here'), findsOneWidget);
@@ -175,31 +162,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('role chip switches the page and reports to Browse', (
-    tester,
-  ) async {
-    final users = _FakeUsers();
-    final roles = <bool>[];
-    await _pump(
-      tester,
-      theme: lightMode,
-      users: users.call,
-      onRoleChanged: roles.add,
-    );
-
-    await tester.tap(find.text('Browsing as Learner'));
-    await tester.pumpAndSettle();
-
-    expect(roles, [true]);
-    expect(find.text('Browsing as Mentor'), findsOneWidget);
-    // The people row is now learners, so the label has to follow.
-    expect(find.text('LEARNERS HERE'), findsOneWidget);
-    expect(find.text('learners available'), findsOneWidget);
-    expect(find.text('Start browsing learners'), findsOneWidget);
-    expect(users.kinds.contains('cooking_culinary:learn'), isTrue);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('a single available person reads as singular', (tester) async {
     final users = _FakeUsers(rootTeach: 1);
     await _pump(tester, theme: lightMode, users: users.call);
@@ -209,7 +171,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('empty domain keeps the skills and offers the role switch', (
+  testWidgets('empty domain keeps the skills and drops the deck action', (
     tester,
   ) async {
     final users = _FakeUsers(rootTeach: 0, rootLearn: 2, noPeople: true);
@@ -222,11 +184,11 @@ void main() {
     expect(find.text('MENTORS HERE'), findsNothing);
     expect(find.text('Filipino cooking'), findsOneWidget);
     expect(find.text('Start browsing mentors'), findsNothing);
-    expect(find.text('Switch to teaching'), findsOneWidget);
-    expect(
-      find.text('See the 2 learners waiting in this domain'),
-      findsOneWidget,
-    );
+    // Role switching lives on Browse, so the domain page offers no swap.
+    expect(find.text('Switch to teaching'), findsNothing);
+    expect(find.textContaining('switch roles'), findsNothing);
+    // The empty state still offers a retry.
+    expect(find.text('Check again'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -255,47 +217,6 @@ void main() {
       find.text('Explore Filipino cooking in the PalTuro community.'),
       findsOneWidget,
     );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('a role change inside a skill page updates the parent', (
-    tester,
-  ) async {
-    final users = _FakeUsers();
-    await _pump(tester, theme: lightMode, users: users.call);
-
-    await tester.tap(find.text('Filipino cooking'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Explore Filipino cooking in the PalTuro community.'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Browsing as Learner'));
-    await tester.pumpAndSettle();
-    expect(find.text('Browsing as Mentor'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Back').last);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Browsing as Mentor'), findsOneWidget);
-    expect(find.text('LEARNERS HERE'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('a failed role switch keeps the role it can still show', (
-    tester,
-  ) async {
-    final users = _FakeUsers(failLearn: true);
-    await _pump(tester, theme: lightMode, users: users.call);
-
-    await tester.tap(find.text('Browsing as Learner'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Browsing as Learner'), findsOneWidget);
-    expect(find.text('MENTORS HERE'), findsOneWidget);
-    expect(find.text('Start browsing mentors'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 5));
     expect(tester.takeException(), isNull);
   });
 

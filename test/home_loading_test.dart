@@ -153,4 +153,67 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('a requested card is not replayed by View Again', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const people = [
+      Person(
+        id: 'p1',
+        name: 'Alpha',
+        schedule: 'Weekends',
+        language: 'English',
+        learningStyle: 'Hands-on Practice',
+        skillName: 'Cooking',
+        role: PersonRole.mentor,
+      ),
+      Person(
+        id: 'p2',
+        name: 'Beta',
+        schedule: 'Weekends',
+        language: 'English',
+        learningStyle: 'Hands-on Practice',
+        skillName: 'Weaving',
+        role: PersonRole.mentor,
+      ),
+    ];
+    var sent = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: HomePage(
+          deckLoader: ({bool force = false}) async => people,
+          seenLoader: () async => <String>{},
+          markSeen: (_) async {},
+          unmarkSeen: (_) async {},
+          sendRequest: (id, {skillName, skillPath, source}) async {
+            sent++;
+            return 'connection-$id';
+          },
+          onBrowse: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha'), findsOneWidget);
+
+    await tester.tap(find.text('Send request'));
+    await tester.pumpAndSettle();
+    expect(sent, 1);
+    expect(find.text('Beta'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('View Again'), findsOneWidget);
+
+    await tester.tap(find.text('View Again'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Beta'), findsOneWidget);
+    expect(find.text('Alpha'), findsNothing);
+  });
 }

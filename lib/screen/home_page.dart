@@ -106,6 +106,12 @@ class _HomePageState extends State<HomePage> {
   List<Person> _people = const [];
   List<Person> _rawDeck = const [];
   bool _replayAll = false;
+
+  /// People this session must not offer again: a request was sent, or they
+  /// were blocked or reported. The server filters connections on the next
+  /// fetch, but the in-memory deck still holds them, so replay has to skip
+  /// them explicitly.
+  final Set<String> _hiddenIds = <String>{};
   bool _loading = true;
   bool _slowLoad = false;
   Timer? _slowTimer;
@@ -152,6 +158,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Drops anyone this session already acted on before the deck is rendered.
+  List<Person> _offerable(List<Person> deck) {
+    if (_hiddenIds.isEmpty) return deck;
+    return deck
+        .where((person) => !_hiddenIds.contains(person.id))
+        .toList(growable: false);
+  }
+
   List<Person> _visibleDeck(List<Person> deck, Set<String> seen) {
     if (_replayAll) return List<Person>.of(deck);
     return deck
@@ -182,7 +196,7 @@ class _HomePageState extends State<HomePage> {
     final cached = _cachedDeck();
     setState(() {
       if (_people.isEmpty && cached != null) {
-        _people = _visibleDeck(cached, seen);
+        _people = _visibleDeck(_offerable(cached), seen);
         _currentIndex = 0;
       }
       _loading = _people.isEmpty;
@@ -223,9 +237,10 @@ class _HomePageState extends State<HomePage> {
       debugPrint('[People] deck loaded: ${deck.length} people');
 
       setState(() {
-        final sameDeck = _sameDeck(_rawDeck, deck);
-        _rawDeck = deck;
-        _people = _visibleDeck(deck, seen);
+        final visible = _offerable(deck);
+        final sameDeck = _sameDeck(_rawDeck, visible);
+        _rawDeck = visible;
+        _people = _visibleDeck(visible, seen);
         _loading = false;
         _slowLoad = false;
         if (!sameDeck) {
@@ -551,6 +566,8 @@ class _HomePageState extends State<HomePage> {
       if (connectionId == null || connectionId.isEmpty) {
         throw Exception('The server did not confirm the request.');
       }
+      // Never offer this person again, not even through View Again.
+      setState(() => _hiddenIds.add(person.id));
       _advanceFrom(person, right: true, connectionId: connectionId);
       Haptics.success();
       showAppSuccess(context, 'Connection request sent to ${person.name}');
@@ -627,6 +644,9 @@ class _HomePageState extends State<HomePage> {
     final index = _history.last;
     final right = _historyRight.last;
     final connectionId = _historyConnectionIds.last;
+    final people = _filteredPeople;
+    final undonePerson =
+        index >= 0 && index < people.length ? people[index] : null;
 
     if (right && connectionId != null) {
       _undoing = true;
@@ -646,6 +666,8 @@ class _HomePageState extends State<HomePage> {
       }
       _undoing = false;
       if (!mounted) return;
+      // The request is withdrawn, so the person is offerable again.
+      if (undonePerson != null) _hiddenIds.remove(undonePerson.id);
       ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
       showAppSnackBar(context, 'Connection request withdrawn');
     }
@@ -662,10 +684,10 @@ class _HomePageState extends State<HomePage> {
       _undoToken++;
     });
 
-    final people = _filteredPeople;
-    if (index >= 0 && index < people.length) {
+    final unmarkPerson = undonePerson;
+    if (unmarkPerson != null) {
       final unmark = widget.unmarkSeen ?? SeenDeckService.instance.unmarkSeen;
-      unawaited(unmark(people[index].id));
+      unawaited(unmark(unmarkPerson.id));
     }
   }
 
@@ -742,15 +764,17 @@ class _HomePageState extends State<HomePage> {
 
   /// Replays the cards already fetched for this session. The persisted seen
   /// set is left intact so the next relogin still opens on the exhausted view.
+  /// Anyone requested, blocked, or reported is skipped.
   void _viewAgain() {
-    if (_rawDeck.isEmpty) {
+    final replayable = _offerable(_rawDeck);
+    if (replayable.isEmpty) {
       _loadDeck(force: true);
       return;
     }
     Haptics.selection();
     setState(() {
       _replayAll = true;
-      _people = List<Person>.of(_rawDeck);
+      _people = List<Person>.of(replayable);
       _currentIndex = 0;
       _history.clear();
       _historyRight.clear();
@@ -780,6 +804,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       showAppSuccess(context, 'You blocked ${person.name}');
+      setState(() => _hiddenIds.add(person.id));
       _dismissCard(person);
     } catch (e) {
       if (!mounted) return;
@@ -810,6 +835,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
 
       showAppSuccess(context, 'Thanks for your report.');
+      setState(() => _hiddenIds.add(person.id));
       _dismissCard(person);
     } catch (e) {
       if (!mounted) return;

@@ -418,14 +418,10 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: AppColors.elevatedSurface(context),
-        borderRadius:
-            stacked
-                ? BorderRadius.circular(28)
-                : const BorderRadius.vertical(top: Radius.circular(28)),
-        border:
-            stacked
-                ? Border.all(color: AppColors.border(context))
-                : Border(top: BorderSide(color: AppColors.border(context))),
+        // Round every corner: the sheet floats above the transparent composer,
+        // so a square bottom edge reads as a hard cut.
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.border(context)),
         boxShadow:
             stacked
                 ? null

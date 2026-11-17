@@ -392,6 +392,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final errorColor = Theme.of(context).colorScheme.error;
     final adaptiveHeight =
         Theme.of(context).platform == TargetPlatform.iOS ? 44.0 : 56.0;
+    final keyboardIsOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
     final showPasswordChecklist =
         (_passwordFocusNode.hasFocus || _passwordController.text.isNotEmpty) &&
@@ -428,6 +429,43 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
+      bottomNavigationBar:
+          keyboardIsOpen
+              ? null
+              : SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _register,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        textStyle: AppTextStyles.boldText,
+                        foregroundColor: AppColors.textSecondary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      child:
+                          _isSubmitting
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.textSecondary,
+                                  ),
+                                ),
+                              )
+                              : const Text('Sign Up'),
+                    ),
+                  ),
+                ),
+              ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -695,7 +733,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: const Size(0, 44),
+                                    minimumSize: Size.zero,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
@@ -716,7 +754,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: const Size(0, 44),
+                                    minimumSize: Size.zero,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
@@ -738,7 +776,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: const Size(0, 44),
+                                    minimumSize: Size.zero,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
@@ -751,35 +789,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               const TextSpan(text: '.'),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting ? null : _register,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: AppTextStyles.boldText,
-                            foregroundColor: AppColors.textSecondary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                          ),
-                          child:
-                              _isSubmitting
-                                  ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  )
-                                  : const Text('Sign Up'),
                         ),
                       ),
                       const SizedBox(height: 16),

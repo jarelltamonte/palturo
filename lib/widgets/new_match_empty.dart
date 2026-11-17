@@ -158,11 +158,16 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final scale = MediaQuery.textScalerOf(context).scale(12) / 12;
-        final profile = _buildProfile(
-          context,
-          preferences: preferences,
-          bio: bio,
-          canOpenProfile: canOpenProfile,
+        final profile = Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: _buildProfile(
+              context,
+              preferences: preferences,
+              bio: bio,
+              canOpenProfile: canOpenProfile,
+            ),
+          ),
         );
         // On short screens or with large text, let the whole empty state
         // scroll together instead of stacking two scroll areas.
@@ -308,7 +313,28 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
   }) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final muted = AppColors.mutedText(context);
-    final cardWidth = (constraints.maxWidth * 0.62).clamp(200.0, 280.0);
+    final contentWidth = (constraints.maxWidth - 32).clamp(240.0, 848.0);
+    final fitsThree = contentWidth >= 3 * 200 + 16;
+    final cardWidth =
+        fitsThree
+            ? ((contentWidth - 16) / 3).clamp(200.0, 300.0)
+            : (contentWidth * 0.62).clamp(200.0, 280.0);
+    final cards = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < starters.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _StarterCard(
+              width: cardWidth,
+              text: starters[i],
+              tag: _tagFor(starters[i]),
+              onUse: () => widget.onUseStarter(starters[i]),
+            ),
+          ],
+        ],
+      ),
+    );
     final content = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,28 +377,15 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
           ],
         ),
         const SizedBox(height: 6),
-        SingleChildScrollView(
-          key: const ValueKey('starter-scroll'),
-          controller: _startersController,
-          scrollDirection: Axis.horizontal,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < starters.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  _StarterCard(
-                    width: cardWidth,
-                    text: starters[i],
-                    tag: _tagFor(starters[i]),
-                    onUse: () => widget.onUseStarter(starters[i]),
-                  ),
-                ],
-                const SizedBox(width: 8),
-              ],
-            ),
+        if (fitsThree)
+          cards
+        else
+          SingleChildScrollView(
+            key: const ValueKey('starter-scroll'),
+            controller: _startersController,
+            scrollDirection: Axis.horizontal,
+            child: cards,
           ),
-        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -394,7 +407,7 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
               ),
             ),
             const Spacer(),
-            _Dots(count: starters.length, active: _page),
+            if (!fitsThree) _Dots(count: starters.length, active: _page),
           ],
         ),
       ],
@@ -431,7 +444,7 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
+          constraints: BoxConstraints(maxWidth: contentWidth),
           child: content,
         ),
       ),
@@ -551,15 +564,19 @@ class _StarterCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Text(
-                tag.toUpperCase(),
-                style: AppTextStyles.boldText.copyWith(
-                  color: muted,
-                  fontSize: 9,
-                  letterSpacing: 0.8,
+              Flexible(
+                child: Text(
+                  tag.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.boldText.copyWith(
+                    color: muted,
+                    fontSize: 9,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Semantics(
                 container: true,
                 button: true,

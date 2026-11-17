@@ -144,7 +144,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('View Again'));
+    await tester.tap(find.text('See cards again'));
     await tester.pumpAndSettle();
 
     expect(find.text('Alpha'), findsOneWidget);

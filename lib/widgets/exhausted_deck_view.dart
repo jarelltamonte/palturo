@@ -16,15 +16,18 @@ class ExhaustedDeckView extends StatefulWidget {
     required this.onExplore,
     required this.onViewAgain,
     required this.onUpdateProfile,
+    this.onViewMatches,
     this.onBrowse,
     this.message = note,
     this.showViewAgain = true,
+    this.showViewMatches = true,
     this.showBrowse = true,
     this.updateLabel = 'Update Profile',
   });
 
   final VoidCallback onExplore;
   final VoidCallback onViewAgain;
+  final VoidCallback? onViewMatches;
   final VoidCallback? onBrowse;
   final VoidCallback onUpdateProfile;
 
@@ -33,6 +36,7 @@ class ExhaustedDeckView extends StatefulWidget {
 
   /// The setup variant hides replay and browse; there is nothing to replay.
   final bool showViewAgain;
+  final bool showViewMatches;
   final bool showBrowse;
   final String updateLabel;
 
@@ -223,10 +227,17 @@ class _ExhaustedDeckViewState extends State<ExhaustedDeckView>
           width: width,
           child: OutlinedButton(
             onPressed: widget.onViewAgain,
-            child: const Text('View Again'),
+            child: const Text('See cards again'),
           ),
         ),
         const SizedBox(height: 10),
+        if (widget.showViewMatches && widget.onViewMatches != null) ...[
+          TextButton(
+            onPressed: widget.onViewMatches,
+            child: const Text('View matches'),
+          ),
+          const SizedBox(height: 4),
+        ],
       ],
       if (widget.showBrowse && widget.onBrowse != null) ...[
         SizedBox(

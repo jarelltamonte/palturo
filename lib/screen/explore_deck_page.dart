@@ -125,14 +125,6 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
       if (_recentIds.add(person.id)) out.add(person);
     }
 
-    // A small community can exhaust the fresh pool. Accept the batch anyway so
-    // the deck keeps going instead of stopping.
-    if (out.isEmpty) {
-      for (final person in batch) {
-        if (person.id != keepCurrent) out.add(person);
-      }
-    }
-
     if (_recentIds.length > _recentLimit) {
       final keep = _recentIds.toList().sublist(
         _recentIds.length - _recentLimit,
@@ -404,7 +396,10 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
                 style: AppTextStyles.regularText.copyWith(color: textTheme),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: _loadMore, child: const Text('Retry')),
+              ElevatedButton(
+                onPressed: _loadInitial,
+                child: const Text('Retry'),
+              ),
             ],
           ),
         ),

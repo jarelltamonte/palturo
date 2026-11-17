@@ -15,9 +15,7 @@ Person person(String id, String name) => Person(
 );
 
 void main() {
-  testWidgets('opens directly on a random card and keeps the deck fed', (
-    tester,
-  ) async {
+  testWidgets('opens on a random card and never repeats one', (tester) async {
     final key = GlobalKey<ExploreDeckPageState>();
 
     await tester.pumpWidget(
@@ -38,13 +36,49 @@ void main() {
 
     expect(find.text('Explore'), findsOneWidget);
     expect(find.text('Alpha'), findsOneWidget);
-    expect(key.currentState!.loadedCount, greaterThanOrEqualTo(2));
+    expect(key.currentState!.loadedCount, 2);
 
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
 
     expect(find.text('Beta'), findsOneWidget);
-    expect(key.currentState!.loadedCount, greaterThanOrEqualTo(4));
+    expect(key.currentState!.loadedCount, 2);
+
+    // The pool is exhausted, so the deck ends instead of showing Alpha again.
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('Alpha'), findsNothing);
+    expect(
+      find.textContaining('No more random Pals are available'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a one-person pool stops instead of looping the same card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: ExploreDeckPage(
+          batchSize: 1,
+          loader: ({int limit = 20}) async => [person('p', 'Para Cetamol')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Para Cetamol'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Para Cetamol'), findsNothing);
+    expect(
+      find.textContaining('No more random Pals are available'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('sending a request carries the random card skill context', (

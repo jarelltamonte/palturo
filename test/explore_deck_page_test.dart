@@ -119,4 +119,118 @@ void main() {
 
     expect(find.text('Alpha'), findsOneWidget);
   });
+
+  testWidgets('an empty pool shows the empty state with a retry', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: ExploreDeckPage(loader: ({int limit = 20}) async => const []),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No random Pals are available right now.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsOneWidget);
+  });
+
+  testWidgets('duplicate people are only dealt once', (tester) async {
+    final key = GlobalKey<ExploreDeckPageState>();
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: ExploreDeckPage(
+          key: key,
+          batchSize: 3,
+          loader: ({int limit = 20}) async {
+            calls++;
+            if (calls > 1) return const [];
+            return [
+              person('a', 'Alpha'),
+              person('a', 'Alpha again'),
+              person('b', 'Beta'),
+            ];
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(key.currentState!.loadedCount, 2);
+    expect(find.text('Alpha'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('Beta'), findsOneWidget);
+  });
+
+  testWidgets('an exhausted pool reports that nothing is left', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: ExploreDeckPage(
+          batchSize: 1,
+          loader: ({int limit = 20}) async {
+            calls++;
+            return calls == 1 ? [person('a', 'Alpha')] : const [];
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('No more random Pals are available'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('explore deck fits 360 at 200% text', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: ExploreDeckPage(
+            loader: ({int limit = 20}) async => [person('a', 'Alpha')],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Explore'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('explore deck renders in dark mode', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: darkMode,
+        home: ExploreDeckPage(
+          loader: ({int limit = 20}) async => [person('a', 'Alpha')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Send request'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

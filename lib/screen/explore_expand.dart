@@ -22,11 +22,26 @@ class ExploreExpand extends StatefulWidget {
   /// people who want to learn it (Mentor mode).
   final String kind;
 
+  /// Test hooks. Production leaves these null.
+  final Future<List<Person>> Function(String path, {required String kind})?
+  usersLoader;
+  final Future<List<Person>> Function({int limit})? randomLoader;
+  final Future<String?> Function(
+    String userId, {
+    String? skillName,
+    String? skillPath,
+    String? source,
+  })?
+  sendRequest;
+
   const ExploreExpand({
     super.key,
     required this.nodePath,
     required this.nodeLabel,
     required this.kind,
+    this.usersLoader,
+    this.randomLoader,
+    this.sendRequest,
   });
 
   @override
@@ -34,6 +49,8 @@ class ExploreExpand extends StatefulWidget {
 }
 
 class _ExploreExpandState extends State<ExploreExpand> {
+  static const int _deckTarget = 12;
+
   List<Person> _people = const [];
   bool _loading = true;
   String? _error;
@@ -62,13 +79,34 @@ class _ExploreExpandState extends State<ExploreExpand> {
     });
 
     try {
-      final users = await MatchApi.browseSkillUsers(
-        widget.nodePath,
-        kind: widget.kind,
-      );
+      final users =
+          widget.usersLoader != null
+              ? await widget.usersLoader!(widget.nodePath, kind: widget.kind)
+              : await MatchApi.browseSkillUsers(
+                widget.nodePath,
+                kind: widget.kind,
+              );
 
       final seen = <String>{};
       final unique = users.where((u) => seen.add(u.id)).toList();
+
+      // A thin category should still feel like discovery. Keep the category
+      // matches first, then top up with random Pals from the whole pool so the
+      // deck does not stop after one card.
+      if (unique.length < _deckTarget) {
+        try {
+          final random =
+              widget.randomLoader != null
+                  ? await widget.randomLoader!(limit: _deckTarget * 2)
+                  : await MatchApi.getRandomDeck(limit: _deckTarget * 2);
+          for (final person in random) {
+            if (unique.length >= _deckTarget) break;
+            if (seen.add(person.id)) unique.add(person);
+          }
+        } catch (e) {
+          debugPrint('[Browse] random fill failed: $e');
+        }
+      }
 
       if (!mounted) return;
 
@@ -186,7 +224,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
     _actionInFlight = true;
     if (mounted) setState(() => _sendingRequest = true);
     try {
-      final connectionId = await MatchApi.sendConnectionRequest(
+      final send = widget.sendRequest ?? MatchApi.sendConnectionRequest;
+      final connectionId = await send(
         person.id,
         skillName: person.skillName,
         skillPath: person.skillPath,

@@ -232,11 +232,14 @@ class _ExhaustedDeckViewState extends State<ExhaustedDeckView>
         ),
         const SizedBox(height: 10),
         if (widget.showViewMatches && widget.onViewMatches != null) ...[
-          TextButton(
-            onPressed: widget.onViewMatches,
-            child: const Text('View matches'),
+          SizedBox(
+            width: width,
+            child: OutlinedButton(
+              onPressed: widget.onViewMatches,
+              child: const Text('View matches'),
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 10),
         ],
       ],
       if (widget.showBrowse && widget.onBrowse != null) ...[

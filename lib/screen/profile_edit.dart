@@ -10,7 +10,11 @@ import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
-    show kLearningStyleOptions, kDayOptions, kLanguageOptions;
+    show
+        kLearningStyleOptions,
+        kTeachingStyleOptions,
+        kDayOptions,
+        kLanguageOptions;
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/services/sound_service.dart';
@@ -50,6 +54,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late Map<String, String> _availability;
   late List<String> _languages;
   late List<String> _learningStyles;
+  late List<String> _teachingStyles;
   List<String?> _photos = [null, null, null];
 
   OnboardingRole? _role;
@@ -89,6 +94,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _availability = _parseAvailability(widget.profile);
     _languages = List.from(widget.profile.languages);
     _learningStyles = List.from(widget.profile.interests);
+    _teachingStyles = List.from(widget.profile.teachingStyles);
     _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);
     _teachingSkillIds = List.from(widget.profile.teachingSkillIds);
@@ -228,6 +234,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     }
     if (!listEquals(_languages, widget.profile.languages)) return true;
     if (!listEquals(_learningStyles, widget.profile.interests)) return true;
+    if (!listEquals(_teachingStyles, widget.profile.teachingStyles)) {
+      return true;
+    }
     if (!listEquals(_learningSkillIds, widget.profile.learningSkillIds)) {
       return true;
     }
@@ -540,6 +549,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       availableDays: selectedDays,
       languages: _languages,
       interests: _learningStyles,
+      teachingStyles: _teachingStyles,
       role: _role,
       photos: _photos,
       learningSkillIds: _learningSkillIds,
@@ -687,6 +697,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       availableDays: selectedDays,
       languages: _languages,
       interests: _learningStyles,
+      teachingStyles: _teachingStyles,
       role: _role,
       photos: _photos,
       learningSkillIds: learningSkills,
@@ -960,6 +971,26 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                     ),
                               ),
                         ),
+                        if (_role == OnboardingRole.teach ||
+                            _role == OnboardingRole.both) ...[
+                          const SizedBox(height: 12),
+                          _DropdownInfoField(
+                            icon: Icons.school_outlined,
+                            label: 'Teaching Style',
+                            value: _teachingStyles.join(', '),
+                            hint: 'Tap to set teaching styles',
+                            onTap:
+                                () => _pickMultiSelect(
+                                  title: 'Teaching Style',
+                                  options: kTeachingStyleOptions,
+                                  selected: _teachingStyles,
+                                  onSaved:
+                                      (result) => setState(
+                                        () => _teachingStyles = result,
+                                      ),
+                                ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

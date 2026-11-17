@@ -518,6 +518,7 @@ class ProfileService {
               .update({
                 'role': controller.role?.dbValue ?? 'learner',
                 'learning_styles': controller.learningStyles.toList(),
+                'teaching_styles': controller.teachingStyles.toList(),
                 'languages': controller.languages.toList(),
                 'availability': availableDays,
                 'skill_categories': calculatedCategories,
@@ -581,7 +582,8 @@ class ProfileService {
               .select(
                 'id, first_name, last_name, display_name, bio, avatar_url, '
                 'photos, role, learning_skills, teaching_skills, '
-                'learning_styles, languages, availability, skill_categories, '
+                'learning_styles, teaching_styles, languages, availability, '
+                'skill_categories, '
                 'teaching_skill_images, timezone, is_profile_completed, '
                 'has_completed_onboarding, created_at, updated_at',
               )
@@ -1116,6 +1118,7 @@ class ProfileService {
           'role': updatedProfile.role?.dbValue ?? 'learner',
           'skill_categories': allCategorySlugs.toList(),
           'learning_styles': updatedProfile.interests,
+          'teaching_styles': updatedProfile.teachingStyles,
           'languages': updatedProfile.languages,
           'availability': availableDays,
           'is_profile_completed': isCompleted,

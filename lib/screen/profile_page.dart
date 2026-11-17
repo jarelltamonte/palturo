@@ -274,6 +274,7 @@ class _ProfilePageState extends State<ProfilePage> {
       schedule: formattedSched.isNotEmpty ? formattedSched : 'No schedule set',
       language: profile.languages.join(', '),
       learningStyle: profile.interests.join(', '),
+      teachingStyle: profile.teachingStyles.join(', '),
       skillName: skillName,
       role: role,
       bio: profile.bio,
@@ -673,6 +674,25 @@ class ProfileSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
+            if ((profile.role == OnboardingRole.teach ||
+                    profile.role == OnboardingRole.both) &&
+                profile.teachingStyles.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.school_outlined, size: 18, color: textColor),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      'Teaching style: ${profile.teachingStyles.join(', ')}',
+                      maxLines: 2,
+                      style: TextStyle(color: textColor, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

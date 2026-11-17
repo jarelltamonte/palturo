@@ -75,6 +75,59 @@ void main() {
     expect(find.textContaining('other:onboarding:'), findsNothing);
   });
 
+  testWidgets('review lists the teaching style only for mentors', (
+    tester,
+  ) async {
+    final mentor =
+        OnboardingController()
+          ..role = OnboardingRole.teach
+          ..teachingInterests.add('barong_embroidery')
+          ..learningStyles.add('Hands-on Practice')
+          ..teachingStyles.add('Discussion')
+          ..languages.add('English')
+          ..setAvailabilityDays({'Friday'});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: OnboardingReviewScreen(
+          controller: mentor,
+          onSave: () {},
+          onEditRole: () {},
+          onEditLearning: () {},
+          onEditTeaching: () {},
+          onEditDetails: () {},
+        ),
+      ),
+    );
+    await tester.scrollUntilVisible(find.text('Teaching style'), 300);
+    expect(find.text('Teaching style'), findsOneWidget);
+    expect(find.text('Discussion'), findsOneWidget);
+
+    final learner =
+        OnboardingController()
+          ..role = OnboardingRole.learn
+          ..learningInterests.add('cooking_pinakbet')
+          ..learningStyles.add('Hands-on Practice')
+          ..languages.add('English')
+          ..setAvailabilityDays({'Friday'});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: OnboardingReviewScreen(
+          controller: learner,
+          onSave: () {},
+          onEditRole: () {},
+          onEditLearning: () {},
+          onEditTeaching: () {},
+          onEditDetails: () {},
+        ),
+      ),
+    );
+    expect(find.text('Teaching style'), findsNothing);
+  });
+
   testWidgets('review blocks saving an incomplete active role', (tester) async {
     final controller = OnboardingController()..role = OnboardingRole.both;
     await tester.pumpWidget(

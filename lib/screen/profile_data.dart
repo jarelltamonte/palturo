@@ -12,6 +12,9 @@ class ProfileData {
   final String bio;
   final List<String> languages;
   final List<String> interests;
+
+  /// Teaching styles for mentors (empty for learner-only profiles).
+  final List<String> teachingStyles;
   final OnboardingRole? role;
   final List<String> learningSkillIds;
   final List<String> teachingSkillIds;
@@ -44,6 +47,7 @@ class ProfileData {
     this.bio = '',
     this.languages = const [],
     this.interests = const [],
+    this.teachingStyles = const [],
     this.role,
     this.learningSkillIds = const [],
     this.teachingSkillIds = const [],
@@ -89,6 +93,7 @@ class ProfileData {
     String? bio,
     List<String>? languages,
     List<String>? interests,
+    List<String>? teachingStyles,
     OnboardingRole? role,
     List<String>? learningSkillIds,
     List<String>? teachingSkillIds,
@@ -113,6 +118,7 @@ class ProfileData {
       bio: bio ?? this.bio,
       languages: languages ?? this.languages,
       interests: interests ?? this.interests,
+      teachingStyles: teachingStyles ?? this.teachingStyles,
       role: role ?? this.role,
       learningSkillIds: learningSkillIds ?? this.learningSkillIds,
       teachingSkillIds: teachingSkillIds ?? this.teachingSkillIds,
@@ -184,6 +190,7 @@ class ProfileData {
       bio: (map['bio'] as String?) ?? '',
       languages: _stringList(map['languages']),
       interests: _stringList(map['learning_styles']),
+      teachingStyles: _stringList(map['teaching_styles']),
       role: parsedRole,
       learningSkillIds: _stringList(map['learning_skills']),
       teachingSkillIds: _stringList(map['teaching_skills']),

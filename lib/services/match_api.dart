@@ -343,6 +343,7 @@ class MatchApi {
       schedule: formatScheduleDays(availabilityDays),
       language: (p['p_languages'] ?? '') as String,
       learningStyle: (p['p_styles'] ?? '') as String,
+      teachingStyle: (p['p_teaching_styles'] ?? '') as String,
       skillName: skill,
       skillPath: skillPath,
       role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
@@ -850,6 +851,9 @@ class MatchApi {
       final learningStyles = List<String>.from(
         r['learning_styles'] ?? const [],
       );
+      final teachingStyles = List<String>.from(
+        r['teaching_styles'] ?? const [],
+      );
       final showcases =
           ((r['showcases'] as List?) ?? [])
               .whereType<Map>()
@@ -865,6 +869,7 @@ class MatchApi {
                 : formatSchedule(availability),
         language: languages.join(', '),
         learningStyle: learningStyles.join(', '),
+        teachingStyle: teachingStyles.join(', '),
         skillName: (r['skill_name'] ?? '').toString(),
         skillPath: (r['skill_path'] ?? '').toString(),
         // The card is shown in a teaching or learning deck, so reflect the

@@ -8,6 +8,7 @@ class OnboardingController extends ChangeNotifier {
   final Set<String> teachingInterests = {};
 
   final Set<String> learningStyles = {};
+  final Set<String> teachingStyles = {};
   final Set<String> availabilityDays = {};
   final Map<String, String> availability = {};
   final Set<String> languages = {};
@@ -42,6 +43,13 @@ class OnboardingController extends ChangeNotifier {
 
   void setLearningStyles(Iterable<String> values) {
     learningStyles
+      ..clear()
+      ..addAll(values);
+    notifyListeners();
+  }
+
+  void setTeachingStyles(Iterable<String> values) {
+    teachingStyles
       ..clear()
       ..addAll(values);
     notifyListeners();
@@ -101,6 +109,7 @@ class OnboardingController extends ChangeNotifier {
     'learningInterests': learningInterests.toList(),
     'teachingInterests': teachingInterests.toList(),
     'learningStyles': learningStyles.toList(),
+    'teachingStyles': teachingStyles.toList(),
     'availabilityDays': availabilityDays.toList(),
     'availability': availability,
     'languages': languages.toList(),
@@ -121,6 +130,9 @@ class OnboardingController extends ChangeNotifier {
     learningStyles
       ..clear()
       ..addAll(_strings(json['learningStyles']));
+    teachingStyles
+      ..clear()
+      ..addAll(_strings(json['teachingStyles']));
     availabilityDays
       ..clear()
       ..addAll(_strings(json['availabilityDays']));

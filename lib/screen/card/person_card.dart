@@ -18,6 +18,9 @@ class Person {
   final String schedule;
   final String language;
   final String learningStyle;
+
+  /// How this person teaches. Empty for learner-only profiles.
+  final String teachingStyle;
   final String skillName;
   final String skillPath;
   final PersonRole role;
@@ -43,6 +46,7 @@ class Person {
     required this.schedule,
     required this.language,
     required this.learningStyle,
+    this.teachingStyle = '',
     required this.skillName,
     this.skillPath = '',
     required this.role,
@@ -619,180 +623,182 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 },
                 child: SizeChangedLayoutNotifier(
                   child: Column(
-                key: _infoKey,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                    key: _infoKey,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Flexible(
-                        child: Text(
-                          '$roleLabel ',
-                          style: AppTextStyles.regularText.copyWith(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 6,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              '$roleLabel ',
+                              style: AppTextStyles.regularText.copyWith(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 6,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Flexible(
-                        child: Text(
-                          toTitleCase(widget.person.skillName),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.boldText.copyWith(
-                            color: AppColors.primary,
-                            fontSize: 14,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      SvgPicture.asset(
-                        roleIconAsset,
-                        width: 16,
-                        height: 16,
-                        colorFilter: const ColorFilter.mode(
-                          AppColors.primary,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.person.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.boldText.copyWith(
-                            color: Colors.white,
-                            fontSize: 22,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                blurRadius: 8,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (scheduleText.isNotEmpty) ...[
-                        const Icon(
-                          Icons.calendar_today_outlined,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 6),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 150),
-                          child: Text(
-                            scheduleText,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.regularText.copyWith(
-                              color: Colors.white,
-                              fontSize: 14,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.6),
-                                  blurRadius: 6,
-                                ),
-                              ],
                             ),
                           ),
+                          Flexible(
+                            child: Text(
+                              toTitleCase(widget.person.skillName),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.boldText.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 14,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          SvgPicture.asset(
+                            roleIconAsset,
+                            width: 16,
+                            height: 16,
+                            colorFilter: const ColorFilter.mode(
+                              AppColors.primary,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.person.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.boldText.copyWith(
+                                color: Colors.white,
+                                fontSize: 22,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (scheduleText.isNotEmpty) ...[
+                            const Icon(
+                              Icons.calendar_today_outlined,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 150),
+                              child: Text(
+                                scheduleText,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (language.isNotEmpty || learningStyle.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 16,
+                          children: [
+                            if (language.isNotEmpty)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.translate,
+                                    size: 15,
+                                    color: Colors.white70,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      language,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.regularText.copyWith(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            if (learningStyle.isNotEmpty)
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.psychology,
+                                    size: 15,
+                                    color: Colors.white70,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      learningStyle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.regularText.copyWith(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                            blurRadius: 6,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
+                      ],
+                      if (bodyText.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildBio(context, bodyText),
                       ],
                     ],
                   ),
-                  if (language.isNotEmpty || learningStyle.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 16,
-                      children: [
-                        if (language.isNotEmpty)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.translate,
-                                size: 15,
-                                color: Colors.white70,
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  language,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.regularText.copyWith(
-                                    color: Colors.white70,
-                                    fontSize: 13,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        if (learningStyle.isNotEmpty)
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.psychology,
-                                size: 15,
-                                color: Colors.white70,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  learningStyle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.regularText.copyWith(
-                                    color: Colors.white70,
-                                    fontSize: 13,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ],
-                  if (bodyText.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    _buildBio(context, bodyText),
-                  ],
-                ],
-              ),
                 ),
               ),
             ),
@@ -810,6 +816,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                 schedule: scheduleText,
                 language: language,
                 learningStyle: learningStyle,
+                teachingStyle: widget.person.teachingStyle.trim(),
                 bodyLabel: widget.showSkillNote ? 'About this skill' : 'About',
                 body: bodyText,
               ),
@@ -957,6 +964,7 @@ class _DetailsPage extends StatelessWidget {
   final String schedule;
   final String language;
   final String learningStyle;
+  final String teachingStyle;
   final String bodyLabel;
   final String body;
 
@@ -968,6 +976,7 @@ class _DetailsPage extends StatelessWidget {
     required this.schedule,
     required this.language,
     required this.learningStyle,
+    required this.teachingStyle,
     required this.bodyLabel,
     required this.body,
   });
@@ -1029,6 +1038,12 @@ class _DetailsPage extends StatelessWidget {
               icon: Icons.psychology,
               label: 'Learning style',
               value: learningStyle,
+            ),
+          if (teachingStyle.isNotEmpty)
+            _DetailRow(
+              icon: Icons.school_outlined,
+              label: 'Teaching style',
+              value: teachingStyle,
             ),
           if (schedule.isNotEmpty)
             _DetailRow(

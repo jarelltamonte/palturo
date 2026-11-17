@@ -12,6 +12,10 @@ const kLearningStyleOptions = [
   'Video Tutorials',
 ];
 
+/// Teaching styles use the same vocabulary as learning styles: they describe
+/// how a mentor runs a session, and they are only collected for mentors.
+const kTeachingStyleOptions = kLearningStyleOptions;
+
 const kDayOptions = [
   'Sunday',
   'Monday',
@@ -82,6 +86,19 @@ class OnboardingFinalScreen extends StatelessWidget {
                   multiSelect: true,
                   onChanged: controller.setLearningStyles,
                 ),
+                if (controller.wantsTeaching) ...[
+                  const SizedBox(height: 24),
+                  OnboardingSelectField(
+                    label: 'Teaching Style',
+                    labelIcon: Icons.school_outlined,
+                    hint: 'Select your teaching style',
+                    displayValue: controller.teachingStyles.join(', '),
+                    options: kTeachingStyleOptions,
+                    selected: controller.teachingStyles,
+                    multiSelect: true,
+                    onChanged: controller.setTeachingStyles,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 OnboardingSelectField(
                   label: 'Availability',

@@ -130,6 +130,15 @@ class OnboardingReviewScreen extends StatelessWidget {
                     : controller.learningStyles.join(', '),
             onEdit: onEditDetails,
           ),
+          if (controller.wantsTeaching)
+            _ReviewSection(
+              title: 'Teaching style',
+              value:
+                  controller.teachingStyles.isEmpty
+                      ? 'Not set'
+                      : controller.teachingStyles.join(', '),
+              onEdit: onEditDetails,
+            ),
           const SizedBox(height: 8),
           Text(
             'You can change any of this later from Profile.',

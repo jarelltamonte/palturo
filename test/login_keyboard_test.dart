@@ -34,13 +34,10 @@ void main() {
     await tester.pumpAndSettle();
 
     const keyboardTop = 844.0 - 300.0;
-    await tester.ensureVisible(find.text('Create new account'));
-    await tester.pumpAndSettle();
-
-    expect(
-      tester.getRect(find.text('Create new account')).bottom,
-      lessThanOrEqualTo(keyboardTop),
-    );
+    // The create-account CTA lives in the bottom bar and is hidden while the
+    // keyboard is open, so the form itself must stay reachable.
+    expect(find.text('Create new account'), findsNothing);
+    expect(find.text('Log In'), findsOneWidget);
     expect(
       tester.getRect(find.text('Log In')).bottom,
       lessThanOrEqualTo(keyboardTop),
@@ -49,6 +46,23 @@ void main() {
       tester.getRect(find.text('Forgot Password?')).bottom,
       lessThanOrEqualTo(keyboardTop),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('login shows the create-account action without a keyboard', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(theme: lightMode, home: const LoginPage()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create new account'), findsOneWidget);
+    expect(find.text('Log In'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

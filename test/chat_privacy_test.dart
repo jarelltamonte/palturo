@@ -23,7 +23,7 @@ void main() {
     );
     expect(
       presenceLabel(
-        now.subtract(const Duration(minutes: 1)),
+        now.subtract(const Duration(seconds: 30)),
         enabled: enabled,
         now: now,
       ),
@@ -63,11 +63,11 @@ void main() {
     );
   });
 
-  test('online window is two minutes', () {
+  test('online window is one minute', () {
     final now = DateTime(2026, 11, 5, 12);
     expect(
       presenceIsOnline(
-        now.subtract(const Duration(seconds: 90)),
+        now.subtract(const Duration(seconds: 30)),
         enabled: true,
         now: now,
       ),
@@ -75,7 +75,7 @@ void main() {
     );
     expect(
       presenceIsOnline(
-        now.subtract(const Duration(minutes: 3)),
+        now.subtract(const Duration(seconds: 90)),
         enabled: true,
         now: now,
       ),

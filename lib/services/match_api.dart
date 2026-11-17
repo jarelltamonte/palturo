@@ -585,6 +585,7 @@ class MatchApi {
         'body': m['body'],
         'created_at': m['created_at'],
         'deleted_at': m['deleted_at'],
+        'edited_at': m['edited_at'],
       };
     }).toList();
   }
@@ -594,6 +595,19 @@ class MatchApi {
       'send_message',
       params: {'p_connection': connectionId, 'p_body': body},
     );
+  }
+
+  /// Edits one of the caller's own messages. Returns the stored body and
+  /// edited_at so the room can update without a refetch.
+  static Future<Map<String, dynamic>?> editMessage(
+    String messageId,
+    String body,
+  ) async {
+    final res = await _Client.c.rpc(
+      'edit_message',
+      params: {'p_message': messageId, 'p_body': body},
+    );
+    return res is Map ? Map<String, dynamic>.from(res) : null;
   }
 
   /// Deletes one of the caller's own messages.

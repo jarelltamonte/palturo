@@ -67,6 +67,51 @@ int? unreadDividerIndex({required int length, required int unreadAtOpen}) {
   return (length - unreadAtOpen).clamp(0, length - 1);
 }
 
+/// Message actions sheet. Editing and deleting are only offered on your own
+/// messages; copying is always available.
+@visibleForTesting
+Future<String?> showMessageActionSheet(
+  BuildContext context, {
+  required bool canEdit,
+  required bool canDelete,
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: AppColors.elevatedSurface(context),
+    builder: (sheetContext) {
+      final text = Theme.of(sheetContext).colorScheme.secondary;
+      Widget row(String value, String label, IconData icon, {Color? color}) {
+        final tint = color ?? text;
+        return ListTile(
+          leading: Icon(icon, size: 20, color: tint),
+          title: Text(
+            label,
+            style: AppTextStyles.regularText.copyWith(color: tint),
+          ),
+          onTap: () => Navigator.pop(sheetContext, value),
+        );
+      }
+
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            row('copy', 'Copy', Icons.copy_outlined),
+            if (canEdit) row('edit', 'Edit message', Icons.edit_outlined),
+            if (canDelete)
+              row(
+                'delete',
+                'Delete message',
+                Icons.delete_outline,
+                color: AppColors.dangerText(sheetContext),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 class ChatRoom extends StatefulWidget {
   final String? connectionId;
   final String name;
@@ -809,6 +854,43 @@ class _ChatRoomState extends State<ChatRoom> {
     showAppSnackBar(context, 'Message copied');
   }
 
+  Future<void> _editMessage(String messageId, String currentBody) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _EditMessageDialog(initialText: currentBody),
+    );
+    if (result == null || !mounted) return;
+
+    final text = result.trim();
+    if (text.isEmpty || text == currentBody.trim()) return;
+
+    try {
+      final updated = await MatchApi.editMessage(messageId, text);
+      if (!mounted) return;
+      final editedAt =
+          updated?['edited_at']?.toString() ??
+          DateTime.now().toUtc().toIso8601String();
+      final body = updated?['body']?.toString() ?? text;
+      setState(() {
+        _messages =
+            _messages.map((message) {
+              if (message['id']?.toString() != messageId) return message;
+              return {...message, 'body': body, 'edited_at': editedAt};
+            }).toList();
+      });
+      showAppSnackBar(context, 'Message edited');
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not edit this message. Please try again.',
+        ),
+      );
+    }
+  }
+
   Future<void> _showMessageActions(Map<String, dynamic> msg, bool mine) async {
     final body = (msg['body'] ?? '').toString();
     final messageId = msg['id']?.toString();
@@ -816,43 +898,19 @@ class _ChatRoomState extends State<ChatRoom> {
         body == 'Message Deleted') {
       return;
     }
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.elevatedSurface(context),
-      builder: (sheetContext) {
-        final text = Theme.of(sheetContext).colorScheme.secondary;
-        Widget row(String value, String label, IconData icon, {Color? color}) {
-          final tint = color ?? text;
-          return ListTile(
-            leading: Icon(icon, size: 20, color: tint),
-            title: Text(
-              label,
-              style: AppTextStyles.regularText.copyWith(color: tint),
-            ),
-            onTap: () => Navigator.pop(sheetContext, value),
-          );
-        }
-
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              row('copy', 'Copy', Icons.copy_outlined),
-              if (mine && messageId != null)
-                row(
-                  'delete',
-                  'Delete message',
-                  Icons.delete_outline,
-                  color: AppColors.dangerText(sheetContext),
-                ),
-            ],
-          ),
-        );
-      },
+    final own = mine && messageId != null;
+    final action = await showMessageActionSheet(
+      context,
+      canEdit: own,
+      canDelete: own,
     );
     if (action == null || !mounted) return;
     if (action == 'copy') {
       await _copyMessage(body);
+      return;
+    }
+    if (action == 'edit' && messageId != null) {
+      await _editMessage(messageId, body);
       return;
     }
     if (action != 'delete' || messageId == null) return;
@@ -2110,6 +2168,18 @@ class _ChatRoomState extends State<ChatRoom> {
                   ),
                 ),
               ),
+              if (!isDeleted &&
+                  (msg['edited_at']?.toString().trim().isNotEmpty ?? false))
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, left: 6, right: 6),
+                  child: Text(
+                    'Edited',
+                    style: AppTextStyles.regularText.copyWith(
+                      fontSize: 10,
+                      color: textTheme.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
               if (isSelected && currTime != null)
                 Padding(
                   padding: const EdgeInsets.only(
@@ -2146,6 +2216,53 @@ class _ChatRoomState extends State<ChatRoom> {
           );
         },
       ),
+    );
+  }
+}
+
+class _EditMessageDialog extends StatefulWidget {
+  const _EditMessageDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_EditMessageDialog> createState() => _EditMessageDialogState();
+}
+
+class _EditMessageDialogState extends State<_EditMessageDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialText,
+  )..selection = TextSelection.collapsed(offset: widget.initialText.length);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit message'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        minLines: 1,
+        maxLines: 5,
+        maxLength: 4000,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(hintText: 'Message'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

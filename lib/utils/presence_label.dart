@@ -29,5 +29,6 @@ bool presenceIsOnline(
 }) {
   if (!enabled || lastSeen == null) return false;
   final current = now ?? DateTime.now();
-  return current.difference(lastSeen).inMinutes < 2;
+  // Heartbeats land every ~20s, so a minute of silence means the peer is gone.
+  return current.difference(lastSeen).inSeconds < 60;
 }

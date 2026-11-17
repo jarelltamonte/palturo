@@ -226,6 +226,35 @@ void main() {
     expect(chat.lastMessage, 'Kumusta!');
   });
 
+  test('matched users carry a live online flag for Quick Access', () {
+    final online = matchedUserFromConversation(
+      ConversationLite(
+        connectionId: 'c1',
+        status: 'accepted',
+        otherUserId: 'u1',
+        otherName: 'Grace Lim',
+        otherRole: 'mentor',
+        unread: 0,
+        otherLastSeenAt: DateTime.now().subtract(const Duration(seconds: 10)),
+      ),
+    );
+    final offline = matchedUserFromConversation(
+      ConversationLite(
+        connectionId: 'c2',
+        status: 'accepted',
+        otherUserId: 'u2',
+        otherName: 'RJ Castillano',
+        otherRole: 'mentor',
+        unread: 0,
+        otherLastSeenAt: DateTime.now().subtract(const Duration(minutes: 10)),
+      ),
+    );
+
+    expect(online.isOnline, isTrue);
+    expect(online.presence, 'Online');
+    expect(offline.isOnline, isFalse);
+  });
+
   test('a draft still counts as a started conversation', () {
     final conversation = ConversationLite(
       connectionId: 'c1',

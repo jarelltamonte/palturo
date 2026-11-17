@@ -40,6 +40,10 @@ class MatchedUser {
   final bool needsFirstMessage;
   final String? presence;
 
+  /// True when the peer's last heartbeat is recent. Quick Access sorts these
+  /// first so the pals you can actually reach right now sit at the front.
+  final bool isOnline;
+
   /// Live-data extras: the connection row + counterpart profile id (null for
   /// the static dump catalog).
   final String? connectionId;
@@ -61,6 +65,7 @@ class MatchedUser {
     this.hasUnread = false,
     this.needsFirstMessage = false,
     this.presence,
+    this.isOnline = false,
     this.connectionId,
     this.otherUserId,
   });

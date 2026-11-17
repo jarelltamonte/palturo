@@ -437,11 +437,11 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
                     color: Colors.black.withValues(
                       alpha:
                           Theme.of(context).brightness == Brightness.dark
-                              ? 0.32
-                              : 0.08,
+                              ? 0.16
+                              : 0.05,
                     ),
-                    blurRadius: 24,
-                    offset: const Offset(0, -8),
+                    blurRadius: 14,
+                    offset: const Offset(0, -3),
                   ),
                 ],
       ),

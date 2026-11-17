@@ -14,6 +14,19 @@ bool isMuteActive(DateTime? mutedUntil, {DateTime? now}) {
   return mutedUntil.isAfter(now ?? DateTime.now());
 }
 
+/// Orders the Chats list by the newest message. New Pals (no messages) sit
+/// below every started conversation and keep their incoming order.
+@visibleForTesting
+void sortConversationsByRecency(List<ConversationLite> list) {
+  final withMessages = list.where((c) => c.lastAt != null).toList();
+  final newPals = list.where((c) => c.lastAt == null).toList();
+  withMessages.sort((a, b) => b.lastAt!.compareTo(a.lastAt!));
+  list
+    ..clear()
+    ..addAll(withMessages)
+    ..addAll(newPals);
+}
+
 class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   static final ChatStateService instance = ChatStateService._();
 
@@ -114,7 +127,9 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   void _startRefreshTimer() {
     if (Supabase.instance.client.auth.currentUser == null) return;
     if (_refreshTimer?.isActive ?? false) return;
-    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+    // Realtime pushes last_seen_at changes; this poll is the backstop and also
+    // re-evaluates labels so a peer flips to offline promptly.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (_lifecycleState != AppLifecycleState.resumed) return;
       _heartbeat(force: true);
       unawaited(loadConversations(showSpinner: false));
@@ -128,7 +143,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     final now = DateTime.now();
     if (!force &&
         _lastHeartbeat != null &&
-        now.difference(_lastHeartbeat!) < const Duration(seconds: 60)) {
+        now.difference(_lastHeartbeat!) < const Duration(seconds: 20)) {
       return;
     }
     _lastHeartbeat = now;
@@ -218,16 +233,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _sortConversations(List<ConversationLite> list) {
-    list.sort((a, b) {
-      // A new Pal with no messages is the most actionable row, so keep it
-      // above conversations that already have a message.
-      final aNew = a.lastAt == null;
-      final bNew = b.lastAt == null;
-      if (aNew != bNew) return aNew ? -1 : 1;
-      final ta = a.lastAt ?? DateTime(1900);
-      final tb = b.lastAt ?? DateTime(1900);
-      return tb.compareTo(ta); // newest first
-    });
+    sortConversationsByRecency(list);
   }
 
   /// Subscribes once to Postgres changes on messages table.
@@ -249,6 +255,12 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
           table: 'messages',
           callback: _handleRealtimeMessage,
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'profiles',
+          callback: _handleRealtimePresence,
+        )
         .subscribe((status, error) {
           if (status == RealtimeSubscribeStatus.subscribed) {
             _realtimeSubscribed = true;
@@ -262,6 +274,28 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
             _scheduleRealtimeResubscribe();
           }
         });
+  }
+
+  /// Live presence: a peer's heartbeat updates last_seen_at, and the row
+  /// arrives here before the next conversation poll.
+  void _handleRealtimePresence(PostgresChangePayload payload) {
+    final record = payload.newRecord;
+    final userId = record['id']?.toString();
+    if (userId == null) return;
+    final lastSeen = DateTime.tryParse(
+      record['last_seen_at']?.toString() ?? '',
+    );
+    if (lastSeen == null) return;
+
+    var changed = false;
+    for (var i = 0; i < _conversations.length; i++) {
+      final conversation = _conversations[i];
+      if (conversation.otherUserId != userId) continue;
+      if (conversation.otherLastSeenAt == lastSeen) continue;
+      _conversations[i] = conversation.copyWith(otherLastSeenAt: lastSeen);
+      changed = true;
+    }
+    if (changed) notifyListeners();
   }
 
   void _handleRealtimeMessage(PostgresChangePayload payload) {

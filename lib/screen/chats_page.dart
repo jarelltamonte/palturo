@@ -43,6 +43,10 @@ MatchedUser matchedUserFromConversation(
       conversation.otherLastSeenAt,
       enabled: conversation.otherPresenceEnabled,
     ),
+    isOnline: presenceIsOnline(
+      conversation.otherLastSeenAt,
+      enabled: conversation.otherPresenceEnabled,
+    ),
     name: conversation.otherName,
     role:
         conversation.otherRole == 'learner'
@@ -208,10 +212,16 @@ class _ChatsPageState extends State<ChatsPage> {
 
   List<MatchedUser> get _filteredMatches {
     final q = _query.trim().toLowerCase();
-    return _chats.where((c) {
-      final matchesQuery = q.isEmpty || c.name.toLowerCase().contains(q);
-      return matchesQuery && _matchesRole(c) && _matchesRead(c);
-    }).toList();
+    final matches =
+        _chats.where((c) {
+          final matchesQuery = q.isEmpty || c.name.toLowerCase().contains(q);
+          return matchesQuery && _matchesRole(c) && _matchesRead(c);
+        }).toList();
+    // Online pals first, keeping the underlying recency order inside each
+    // group (Dart's sort is not stable, so partition instead).
+    final online = matches.where((c) => c.isOnline).toList();
+    final offline = matches.where((c) => !c.isOnline).toList();
+    return [...online, ...offline];
   }
 
   List<MatchedUser> get _filteredMessages {

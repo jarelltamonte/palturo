@@ -75,7 +75,7 @@ class _OnboardingIntroState extends State<OnboardingIntro> {
         padding: const EdgeInsets.only(
           left: 16,
           right: 16,
-          bottom: 32,
+          bottom: 16,
           top: 50,
         ),
         child: Column(

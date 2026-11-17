@@ -7,6 +7,8 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/utils/media_url.dart';
+import 'package:palturo/widgets/new_match_empty.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
@@ -94,6 +96,7 @@ class _ChatRoomState extends State<ChatRoom> {
   );
 
   final TextEditingController _messageController = TextEditingController();
+  final FocusNode _composerFocus = FocusNode();
   final ScrollController _scrollController = ScrollController();
 
   List<Map<String, dynamic>> _messages = [];
@@ -125,9 +128,23 @@ class _ChatRoomState extends State<ChatRoom> {
   DateTime? _lastTypingSent;
   Timer? _peerTypingTimer;
 
+  /// Latches once the first message is sent so the empty state cannot flash
+  /// back between the optimistic bubble and the reload.
+  bool _startedConversation = false;
+  bool _starterSheetDismissed = false;
+  bool _peerHydrationStarted = false;
+  bool _suppressTypingBroadcast = false;
+  Person? _peerPerson;
+
   @override
   void initState() {
     super.initState();
+    _peerPerson = widget.person;
+    if (widget.connectionId == null &&
+        widget.person != null &&
+        widget.person!.id.isNotEmpty) {
+      unawaited(_hydratePeerProfile());
+    }
     final connectionId = widget.connectionId;
     if (connectionId != null) {
       for (final conversation in ChatStateService.instance.conversations) {
@@ -290,6 +307,7 @@ class _ChatRoomState extends State<ChatRoom> {
   }
 
   void _onComposerChanged() {
+    if (_suppressTypingBroadcast) return;
     final privacy = ChatPrivacyService.instance;
     if (!privacy.loaded || !privacy.typingEnabled) return;
     final text = _messageController.text.trim();
@@ -514,6 +532,7 @@ class _ChatRoomState extends State<ChatRoom> {
       );
     }
     _scrollController.dispose();
+    _composerFocus.dispose();
     _messageController.dispose();
     super.dispose();
   }
@@ -545,6 +564,7 @@ class _ChatRoomState extends State<ChatRoom> {
         _placeUnreadDivider(_messages.length);
         _loadingMessages = false;
       });
+      if (_messages.isEmpty) unawaited(_hydratePeerProfile());
       _scrollToBottom();
       _broadcastRead();
     } catch (e) {
@@ -643,6 +663,25 @@ class _ChatRoomState extends State<ChatRoom> {
       message['id']?.toString() ??
       '${message['created_at']}-${message['sender_id']}-${message['body']}';
 
+  /// Drops an opener into the composer so the user can edit it before sending.
+  void _useStarter(String text) {
+    unawaited(Haptics.tap());
+    _composerFocus.requestFocus();
+    _suppressTypingBroadcast = true;
+    _messageController.text = text;
+    _messageController.selection = TextSelection.collapsed(offset: text.length);
+    _suppressTypingBroadcast = false;
+  }
+
+  String get _emptyStateName {
+    final name = widget.name.trim();
+    if (name.isEmpty || name == 'Pal' || name == 'Community member') {
+      final full = _peerPerson?.name.trim() ?? '';
+      if (full.isNotEmpty) return full;
+    }
+    return widget.name;
+  }
+
   Future<void> _sendMessage() async {
     if (_sendingMessage) return;
 
@@ -652,6 +691,7 @@ class _ChatRoomState extends State<ChatRoom> {
       showAppSnackBar(context, 'This chat is not ready yet.');
       return;
     }
+    _startedConversation = true;
 
     unawaited(Haptics.tap());
     final pending = PendingChatMessage(
@@ -950,8 +990,70 @@ class _ChatRoomState extends State<ChatRoom> {
     }
   }
 
+  /// The list/request payloads carry only the basics. The empty state wants
+  /// the peer's bio, languages, and availability, so hydrate the full public
+  /// profile once for the room.
+  Future<void> _hydratePeerProfile() async {
+    if (_peerHydrationStarted) return;
+    _peerHydrationStarted = true;
+    final directId = widget.person?.id.trim() ?? '';
+    final resolvedId =
+        directId.isNotEmpty
+            ? directId
+            : (ChatStateService.instance
+                    .conversationFor(widget.connectionId ?? '')
+                    ?.otherUserId ??
+                '');
+    if (resolvedId.isEmpty || !_uuidPattern.hasMatch(resolvedId)) return;
+    try {
+      final full = await MatchApi.getPersonFromPublicProfile(resolvedId);
+      if (!mounted || full == null) return;
+      final base = widget.person;
+      if (base == null) {
+        setState(() => _peerPerson = full);
+        return;
+      }
+      final hydratedName = full.name.trim();
+      final keepName =
+          hydratedName.isEmpty || hydratedName == 'Community member';
+      setState(() {
+        _peerPerson = Person(
+          id: full.id.isEmpty ? base.id : full.id,
+          name: keepName ? base.name : full.name,
+          schedule:
+              full.schedule.trim().isEmpty ? base.schedule : full.schedule,
+          language:
+              full.language.trim().isEmpty ? base.language : full.language,
+          learningStyle:
+              full.learningStyle.trim().isEmpty
+                  ? base.learningStyle
+                  : full.learningStyle,
+          skillName:
+              full.skillName.trim().isEmpty ? base.skillName : full.skillName,
+          skillPath:
+              full.skillPath.trim().isEmpty ? base.skillPath : full.skillPath,
+          // The connection row is authoritative for the role in this chat.
+          role: base.role,
+          bio: full.bio.trim().isEmpty ? base.bio : full.bio,
+          skillNote:
+              full.skillNote.trim().isEmpty ? base.skillNote : full.skillNote,
+          photoUrls:
+              full.photoUrls.isNotEmpty ? full.photoUrls : base.photoUrls,
+          showcaseUrls:
+              full.showcaseUrls.isNotEmpty
+                  ? full.showcaseUrls
+                  : base.showcaseUrls,
+          compatibility: base.compatibility ?? full.compatibility,
+          pipeline: base.pipeline,
+        );
+      });
+    } catch (e) {
+      debugPrint('[ChatRoom] peer profile unavailable: $e');
+    }
+  }
+
   void _showProfile() {
-    final person = widget.person;
+    final person = _peerPerson ?? widget.person;
     if (person == null) return;
     showPersonProfileDialog(
       context,
@@ -1222,11 +1324,15 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final keyboardIsOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     final isTyping = _messageController.text.isNotEmpty;
-    final hasMessages = _messages.isNotEmpty || _pending.isNotEmpty;
+    final hasMessages =
+        _messages.isNotEmpty || _pending.isNotEmpty || _startedConversation;
 
-    final showEmptyCard = !hasMessages && !keyboardIsOpen && !isTyping;
-    final showProfileInAppBar =
-        hasMessages || keyboardIsOpen || isTyping || _peerTyping;
+    // Keep the profile visible while the keyboard is open or the peer types;
+    // only the starter sheet steps aside.
+    final showEmptyCard = !hasMessages;
+    final sheetVisible =
+        !_starterSheetDismissed && !keyboardIsOpen && !isTyping;
+    final showProfileInAppBar = hasMessages;
     final presenceText = _peerPresenceText;
     final peerTyping = _showPeerTyping;
     final bgColor = AppColors.mutedSurface(context);
@@ -1461,47 +1567,29 @@ class _ChatRoomState extends State<ChatRoom> {
                     : _loadError != null && _messages.isEmpty
                     ? _buildLoadError(textTheme)
                     : showEmptyCard
-                    ? Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            GestureDetector(
-                              onTap: _showProfile,
-                              child: UserAvatar(
-                                name: widget.name,
-                                image: widget.avatarImage,
-                                size: 100,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              widget.name,
-                              style: AppTextStyles.boldText.copyWith(
-                                color: textTheme,
-                                fontSize: 18,
-                              ),
-                            ),
-                            if (widget.skillName != null &&
-                                widget.skillName!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                'You matched on',
-                                style: AppTextStyles.regularText.copyWith(
-                                  color: textTheme.withValues(alpha: 0.6),
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              SkillTag(
-                                skillName: widget.skillName!,
-                                role: widget.role,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                    ? NewMatchEmpty(
+                      name: _emptyStateName,
+                      avatarImage:
+                          widget.avatarImage ??
+                          MediaUrl.image(
+                            _peerPerson?.photoUrls.isNotEmpty == true
+                                ? _peerPerson!.photoUrls.first
+                                : null,
+                          ),
+                      skillName:
+                          (widget.skillName?.trim().isNotEmpty ?? false)
+                              ? widget.skillName
+                              : _peerPerson?.skillName,
+                      role: widget.role ?? _peerPerson?.role,
+                      person: _peerPerson,
+                      onOpenProfile: _showProfile,
+                      onUseStarter: _useStarter,
+                      sheetVisible: sheetVisible,
+                      onDismissSheet:
+                          () => setState(() => _starterSheetDismissed = true),
+                      canRestoreSheet: _starterSheetDismissed,
+                      onShowSheet:
+                          () => setState(() => _starterSheetDismissed = false),
                     )
                     : Stack(
                       children: [
@@ -1525,6 +1613,7 @@ class _ChatRoomState extends State<ChatRoom> {
                   Expanded(
                     child: TextField(
                       controller: _messageController,
+                      focusNode: _composerFocus,
                       onTap: _scrollToBottom,
                       minLines: 1,
                       maxLines: 3,

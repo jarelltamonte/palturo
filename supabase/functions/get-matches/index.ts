@@ -304,6 +304,11 @@ Deno.serve(async (req) => {
       );
     } catch (e) {
       // graceful fallback to basic matching (bi-encoder ranking only)
+      console.error(
+        `[get-matches] rerank failed, falling back to basic_bi: ${
+          (e as Error)?.message ?? e
+        }`,
+      );
       mode = "basic_bi";
       rerankA = [];
     }

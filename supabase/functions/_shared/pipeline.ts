@@ -30,12 +30,12 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   const weights = cfg.embedding_weights ?? {};
   return {
     embeddingModel: unstr(cfg.embedding_model, "nvidia/nemotron-3.5-embed-1b"),
-    rerankModel: unstr(cfg.rerank_model, "nvidia/llama-nemotron-rerank-vl-1b-v2"),
+    rerankModel: unstr(cfg.rerank_model, "nvidia/nemotron-3.5-rerank-8b"),
     embeddingDim: num(cfg.embedding_dim, 1024),
     embeddingApi: unstr(cfg.embedding_api, "https://integrate.api.nvidia.com/v1/embeddings"),
     rerankApi: unstr(
       cfg.rerank_api,
-      "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-vl-1b-v2/reranking",
+      "https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking",
     ),
     wSkills: Number(weights.skills ?? 0.7),
     wContext: Number(weights.context ?? 0.3),
@@ -97,7 +97,8 @@ export async function nimRerank(
     headers: { Authorization: `Bearer ${key}`, Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({
       model: cfg.rerankModel,
-      // NOTE: model param accepted for tracking; VL reranker input: query + passages
+      // Hosted rerankers each expose their own /v1/retrieval/<model>/reranking
+      // endpoint, and the model field must name that same model.
       query: { text: queryText },
       passages: passageTexts.map((t) => ({ text: t })),
     }),

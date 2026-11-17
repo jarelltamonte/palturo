@@ -726,6 +726,8 @@ class MatchApi {
         'p_source': source ?? 'unknown',
       },
     );
+    // The next deck load must not re-offer someone we just requested.
+    clearCaches();
     return id?.toString();
   }
 

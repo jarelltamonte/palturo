@@ -16,7 +16,6 @@ void main() {
           body: ExhaustedDeckView(
             onExplore: () => calls.add('explore'),
             onViewAgain: () => calls.add('view'),
-            onViewMatches: () => calls.add('matches'),
             onBrowse: () => calls.add('browse'),
             onUpdateProfile: () => calls.add('update'),
           ),
@@ -27,19 +26,17 @@ void main() {
 
     expect(find.text(ExhaustedDeckView.note), findsOneWidget);
     expect(find.text('Explore'), findsOneWidget);
-    expect(find.text('See cards again'), findsOneWidget);
-    expect(find.text('View matches'), findsOneWidget);
+    expect(find.text('View Again'), findsOneWidget);
     expect(find.text('Browse'), findsOneWidget);
     expect(find.text('Update Profile'), findsOneWidget);
 
     await tester.tap(find.text('Explore'));
-    await tester.tap(find.text('See cards again'));
-    await tester.tap(find.text('View matches'));
+    await tester.tap(find.text('View Again'));
     await tester.tap(find.text('Browse'));
     await tester.tap(find.text('Update Profile'));
     await tester.pump();
 
-    expect(calls, ['explore', 'view', 'matches', 'browse', 'update']);
+    expect(calls, ['explore', 'view', 'browse', 'update']);
   });
 
   testWidgets('setup variant shows only explore and update profile', (
@@ -59,7 +56,6 @@ void main() {
             showBrowse: false,
             onExplore: () => calls.add('explore'),
             onViewAgain: () => calls.add('view'),
-            onViewMatches: () => calls.add('matches'),
             onUpdateProfile: () => calls.add('update'),
           ),
         ),
@@ -70,8 +66,7 @@ void main() {
     expect(find.textContaining('Complete your profile setup'), findsOneWidget);
     expect(find.text('Explore'), findsOneWidget);
     expect(find.text('Update Profile'), findsOneWidget);
-    expect(find.text('See cards again'), findsNothing);
-    expect(find.text('View matches'), findsNothing);
+    expect(find.text('View Again'), findsNothing);
     expect(find.text('Browse'), findsNothing);
 
     await tester.tap(find.text('Explore'));

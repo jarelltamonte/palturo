@@ -26,16 +26,39 @@ const json = (body: unknown, status = 200) =>
 const CACHE_COLUMNS =
   "candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode";
 
+/// Users the viewer already has a connection with (pending or accepted).
+async function connectedUserIds(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<Set<string>> {
+  const { data } = await admin
+    .from("connections")
+    .select("requester_id, recipient_id")
+    .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`);
+  const ids = new Set<string>();
+  for (const row of (data ?? []) as Array<{
+    requester_id: string;
+    recipient_id: string;
+  }>) {
+    ids.add(row.requester_id === userId ? row.recipient_id : row.requester_id);
+  }
+  return ids;
+}
+
 async function cacheResults(
   admin: ReturnType<typeof createClient>,
   userId: string,
   rows: Array<Record<string, unknown>>,
 ) {
-  const ids = rows.map((r) => r.candidate_id as string).concat(userId);
+  const excluded = await connectedUserIds(admin, userId);
+  const visible = rows.filter(
+    (r) => !excluded.has(r.candidate_id as string),
+  );
+  const ids = visible.map((r) => r.candidate_id as string).concat(userId);
   const { data: pRows } = await admin.rpc("profile_match_view", { p_users: ids });
   const profiles = (pRows ?? []) as Array<{ user_id: string; name: string; role: string }>;
   const nameOf = new Map(profiles.map((p) => [p.user_id, p]));
-  return rows.map((r) => {
+  return visible.map((r) => {
     const p = nameOf.get(r.candidate_id as string);
     return {
       user_id: r.candidate_id,
@@ -316,9 +339,13 @@ Deno.serve(async (req) => {
     scored.sort((a, b) => b.calibrated_score - a.calibrated_score);
     const ranked = scored.map((s, i) => ({ ...s, rank: i + 1 }));
 
-    await refreshCache(admin, user.id, targetRole, ranked, cfg, mode);
+    // Never offer someone the viewer already has a connection with.
+    const excluded = await connectedUserIds(admin, user.id);
+    const visible = ranked.filter((s) => !excluded.has(s.candidate_id));
 
-    const results = ranked.map((s) => {
+    await refreshCache(admin, user.id, targetRole, visible, cfg, mode);
+
+    const results = visible.map((s) => {
       const p = byId.get(s.candidate_id)!;
       return {
         user_id: s.candidate_id,

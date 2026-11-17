@@ -10,7 +10,6 @@ import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/explore_deck_page.dart';
-import 'package:palturo/screen/matches.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
@@ -741,10 +740,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _openMatchesList() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const Matches()));
-  }
-
   /// Replays the cards already fetched for this session. The persisted seen
   /// set is left intact so the next relogin still opens on the exhausted view.
   void _viewAgain() {
@@ -1124,7 +1119,6 @@ class _HomePageState extends State<HomePage> {
     return ExhaustedDeckView(
       onExplore: _openExploreDeck,
       onViewAgain: _viewAgain,
-      onViewMatches: _openMatchesList,
       onBrowse: widget.onBrowse,
       onUpdateProfile: needsSetup ? _openOnboardingSetup : _openSettings,
       updateLabel: needsSetup ? 'Finish Profile' : 'Update Profile',

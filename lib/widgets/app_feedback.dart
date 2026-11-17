@@ -48,18 +48,23 @@ void showAppSnackBarOn(
           : tone == AppFeedbackTone.success
           ? Icons.check_circle_outline
           : Icons.info_outline;
+  final effectiveDuration =
+      duration ??
+      (tone == AppFeedbackTone.error
+          ? const Duration(seconds: 6)
+          : tone == AppFeedbackTone.success
+          ? const Duration(seconds: 3)
+          : const Duration(seconds: 4));
 
   messenger.showSnackBar(
     SnackBar(
       behavior: margin == null ? null : SnackBarBehavior.floating,
       margin: margin,
-      duration:
-          duration ??
-          (tone == AppFeedbackTone.error
-              ? const Duration(seconds: 6)
-              : tone == AppFeedbackTone.success
-              ? const Duration(seconds: 3)
-              : const Duration(seconds: 4)),
+      duration: effectiveDuration,
+      // SnackBar defaults persist to true whenever it has an action, which
+      // leaves Undo snack bars on screen forever. Every message here has a
+      // duration, so let it dismiss.
+      persist: false,
       content: Row(
         children: [
           Icon(icon, size: 18, color: color),

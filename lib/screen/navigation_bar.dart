@@ -109,11 +109,9 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
 
-        if (_selectedIndex == _exploreIndex &&
-            (_exploreNavKey.currentState?.canPop() ?? false)) {
-          _exploreNavKey.currentState?.pop();
-          return;
-        }
+        // The Browse tab owns a nested Navigator and handles its own back
+        // gesture through NavigatorPopHandler. Popping it here as well removed
+        // two routes in one press and left the tab blank.
 
         final navigator = Navigator.of(context);
         if (navigator.canPop()) {

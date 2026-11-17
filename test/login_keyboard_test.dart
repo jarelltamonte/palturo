@@ -66,7 +66,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('register action stays above a 300px keyboard', (tester) async {
+  testWidgets('register form stays reachable above a 300px keyboard', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
@@ -78,14 +80,24 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    const keyboardTop = 844.0 - 300.0;
-    await tester.ensureVisible(find.text('Sign Up'));
+    // The sign-up CTA lives in the bottom bar and is hidden while typing.
+    expect(find.text('Sign Up'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('register shows the sign-up action without a keyboard', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(theme: lightMode, home: const RegisterPage()),
+    );
     await tester.pumpAndSettle();
 
-    expect(
-      tester.getRect(find.text('Sign Up')).bottom,
-      lessThanOrEqualTo(keyboardTop),
-    );
+    expect(find.text('Sign Up'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

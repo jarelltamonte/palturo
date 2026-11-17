@@ -733,12 +733,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: Size.zero,
+                                    minimumSize: const Size(0, 44),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: const Text('Terms of Service'),
                                 ),
@@ -754,12 +752,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: Size.zero,
+                                    minimumSize: const Size(0, 44),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: const Text('Data Policy'),
                                 ),
@@ -776,12 +772,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: Size.zero,
+                                    minimumSize: const Size(0, 44),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: const Text('Cookies Policy'),
                                 ),

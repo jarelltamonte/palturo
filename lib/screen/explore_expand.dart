@@ -358,7 +358,8 @@ class _ExploreExpandState extends State<ExploreExpand> {
     final current = _people[_currentIndex];
     return SwipeDeck(
       key: _deckKey,
-      cardKey: current.id,
+      // Key by position so a repeated person still resets the deck.
+      cardKey: '${current.id}#$_currentIndex',
       enabled: !_sendingRequest,
       busy: _sendingRequest,
       rightLabel: 'Send request',

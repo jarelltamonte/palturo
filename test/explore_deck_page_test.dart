@@ -15,7 +15,9 @@ Person person(String id, String name) => Person(
 );
 
 void main() {
-  testWidgets('opens on a random card and never repeats one', (tester) async {
+  testWidgets('keeps the deck fed and warns once cards start repeating', (
+    tester,
+  ) async {
     final key = GlobalKey<ExploreDeckPageState>();
 
     await tester.pumpWidget(
@@ -36,25 +38,19 @@ void main() {
 
     expect(find.text('Explore'), findsOneWidget);
     expect(find.text('Alpha'), findsOneWidget);
-    expect(key.currentState!.loadedCount, 2);
 
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+    }
 
-    expect(find.text('Beta'), findsOneWidget);
-    expect(key.currentState!.loadedCount, 2);
-
-    // The pool is exhausted, so the deck ends instead of showing Alpha again.
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
-    expect(find.text('Alpha'), findsNothing);
-    expect(
-      find.textContaining('No more random Pals are available'),
-      findsOneWidget,
-    );
+    // The deck keeps dealing from the small pool instead of stopping.
+    expect(key.currentState!.loadedCount, greaterThan(2));
+    expect(find.textContaining('some cards may repeat'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a one-person pool stops instead of looping the same card', (
+  testWidgets('a one-person pool repeats with a notice instead of a loop', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -70,14 +66,13 @@ void main() {
 
     expect(find.text('Para Cetamol'), findsOneWidget);
 
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+    }
 
-    expect(find.text('Para Cetamol'), findsNothing);
-    expect(
-      find.textContaining('No more random Pals are available'),
-      findsOneWidget,
-    );
+    expect(find.text('Para Cetamol'), findsOneWidget);
+    expect(find.textContaining('some cards may repeat'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

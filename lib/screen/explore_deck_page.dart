@@ -65,6 +65,8 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
   bool _actionInFlight = false;
   bool _undoing = false;
   bool _sendingRequest = false;
+  bool _repeatedLastFill = false;
+  bool _repeatNoticeShown = false;
   final GlobalKey<SwipeDeckState> _deckKey = GlobalKey();
 
   /// Test hook: how many cards the deck has buffered so far.
@@ -93,6 +95,8 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
       _history.clear();
       _historyConnectionIds.clear();
       _recentIds.clear();
+      _repeatedLastFill = false;
+      _repeatNoticeShown = false;
     });
 
     try {
@@ -125,6 +129,16 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
       if (_recentIds.add(person.id)) out.add(person);
     }
 
+    // A small community can exhaust the fresh pool. Accept the batch anyway so
+    // the deck keeps going; the UI tells the user cards may repeat.
+    _repeatedLastFill = false;
+    if (out.isEmpty) {
+      for (final person in batch) {
+        if (person.id != keepCurrent) out.add(person);
+      }
+      _repeatedLastFill = out.isNotEmpty;
+    }
+
     if (_recentIds.length > _recentLimit) {
       final keep = _recentIds.toList().sublist(
         _recentIds.length - _recentLimit,
@@ -134,6 +148,19 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
         ..addAll(keep);
     }
     return out;
+  }
+
+  /// One-time notice when the pool is small enough that the deck has to start
+  /// repeating people. Waits until the user has actually seen a couple of
+  /// cards, so a tiny pool does not greet them with a warning.
+  void _showRepeatNotice() {
+    if (_repeatNoticeShown || !mounted || _history.length < 2) return;
+    _repeatNoticeShown = true;
+    showAppSnackBar(
+      context,
+      'You’ve seen most of the Pals here, so some cards may repeat.',
+      duration: const Duration(seconds: 5),
+    );
   }
 
   Future<void> _loadMore() async {
@@ -161,6 +188,7 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
         _people = [..._people, ...fresh];
         _loadingMore = false;
       });
+      if (_repeatedLastFill) _showRepeatNotice();
     } catch (e) {
       if (!mounted || generation != _generation) return;
       setState(() {
@@ -363,7 +391,9 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
     final current = _people[_currentIndex];
     return SwipeDeck(
       key: _deckKey,
-      cardKey: current.id,
+      // The same person can be dealt again when the pool is small, so key the
+      // deck by position as well; otherwise the card never resets.
+      cardKey: '${current.id}#$_currentIndex',
       enabled: !_sendingRequest,
       busy: _sendingRequest,
       rightLabel: 'Send request',

@@ -29,7 +29,7 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   for (const r of rows ?? []) cfg[r.key] = r.value;
   const weights = cfg.embedding_weights ?? {};
   return {
-    embeddingModel: unstr(cfg.embedding_model, "nvidia/llama-nemotron-embed-vl-1b-v2"),
+    embeddingModel: unstr(cfg.embedding_model, "nvidia/nemotron-3.5-embed-1b"),
     rerankModel: unstr(cfg.rerank_model, "nvidia/llama-nemotron-rerank-vl-1b-v2"),
     embeddingDim: num(cfg.embedding_dim, 1024),
     embeddingApi: unstr(cfg.embedding_api, "https://integrate.api.nvidia.com/v1/embeddings"),
@@ -136,14 +136,18 @@ export async function ensureFreshEmbeddings(
   }>;
   if (rows.length === 0) return { upserted: 0, costEmbeddings: 0 };
 
-  // existing stored hashes (scoped to the users being healed)
+  // existing stored hashes (scoped to the users being healed). Vectors from a
+  // different embedding model are treated as missing: comparing vectors across
+  // models produces meaningless scores, and providers retire models.
   const { data: existing, error: existingErr } = await admin
     .from("profile_embeddings")
-    .select("user_id,role,field_group,input_type,source_hash")
+    .select("user_id,role,field_group,input_type,source_hash,model_name")
     .in("user_id", userIds);
   if (existingErr) throw new Error(`embeddings: ${existingErr.message}`);
   const have = new Set(
-    (existing ?? []).map((r) => `${r.user_id}|${r.role}|${r.field_group}|${r.input_type}:${r.source_hash}`),
+    (existing ?? [])
+      .filter((r) => r.model_name === cfg.embeddingModel)
+      .map((r) => `${r.user_id}|${r.role}|${r.field_group}|${r.input_type}:${r.source_hash}`),
   );
 
   const toUpsert = rows.filter((r) => {

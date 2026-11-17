@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -409,11 +409,24 @@ class ProfileService {
 
   /// Fire-and-forget re-vectorization: recomputes this user's passage
   /// embeddings in profile_embeddings (FR-4/FR-6).
+  ///
+  /// Never throws. Onboarding and profile saves must succeed even when the
+  /// embedding provider is down: discovery falls back to the skills-based
+  /// candidate set, and get-matches self-heals the vectors later.
   Future<void> refreshEmbeddings() async {
     try {
-      await _supabase.functions.invoke('generate-embeddings', body: {});
-    } catch (_) {
-      // Non-fatal: get-matches self-heals stale embeddings on next read.
+      final res = await _supabase.functions.invoke(
+        'generate-embeddings',
+        body: {},
+      );
+      if (res.status >= 400) {
+        debugPrint(
+          '[ProfileService] embedding refresh failed (${res.status}): '
+          '${res.data}',
+        );
+      }
+    } catch (e) {
+      debugPrint('[ProfileService] embedding refresh skipped: $e');
     }
   }
 
@@ -497,24 +510,64 @@ class ProfileService {
       resolvedTeaching.map((name) => {'name': name}).toList(),
     );
 
+    Map<String, dynamic>? saved;
     try {
-      await _supabase
-          .from('profiles')
-          .update({
-            'role': controller.role?.dbValue ?? 'learner',
-            'learning_styles': controller.learningStyles.toList(),
-            'languages': controller.languages.toList(),
-            'availability': availableDays,
-            'skill_categories': calculatedCategories,
-            'has_completed_onboarding': true,
-            'is_profile_completed': isComplete,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', user.id);
+      saved =
+          await _supabase
+              .from('profiles')
+              .update({
+                'role': controller.role?.dbValue ?? 'learner',
+                'learning_styles': controller.learningStyles.toList(),
+                'languages': controller.languages.toList(),
+                'availability': availableDays,
+                'skill_categories': calculatedCategories,
+                'has_completed_onboarding': true,
+                'is_profile_completed': isComplete,
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              })
+              .eq('id', user.id)
+              .select('has_completed_onboarding')
+              .maybeSingle();
     } catch (e) {
       throw Exception('Failed to save profile preferences: $e');
     }
+
+    if (saved == null) {
+      // The update matched no row. Without this check the client would report
+      // success and the gate would send the user straight back to onboarding.
+      throw Exception(
+        'We could not save your profile. Sign out and back in, then try again.',
+      );
+    }
+
+    if (saved['has_completed_onboarding'] != true) {
+      // The write landed but the flag did not stick. Let the server derive it
+      // from the saved profile before giving up.
+      final completed = await _deriveOnboardingCompletion();
+      if (!completed) {
+        throw Exception(
+          'Your details saved, but setup could not be completed. Check your '
+          'role, skills, availability, language, and learning style.',
+        );
+      }
+    }
+
     await refreshEmbeddings();
+  }
+
+  /// Server-side fallback for [saveOnboardingPreferences].
+  ///
+  /// `complete_onboarding()` re-checks the stored profile and sets
+  /// `has_completed_onboarding` when the data is complete, so a silent
+  /// zero-row update or a stale trigger cannot trap the user in onboarding.
+  Future<bool> _deriveOnboardingCompletion() async {
+    try {
+      final result = await _supabase.rpc('complete_onboarding');
+      return result == true;
+    } catch (e) {
+      debugPrint('[ProfileService] complete_onboarding fallback failed: $e');
+      return false;
+    }
   }
 
   Future<ProfileData?> getCurrentUserProfile() async {

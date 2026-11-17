@@ -1,7 +1,8 @@
 // PalTuro — generate-embeddings Edge Function
 // Recomputes profile passages (role x field-group) for the CALLING user and
 // (re)embeds any that changed. Intended to be called after onboarding/profile edits.
-// Uses NIM Llama Nemotron Embed VL 1B v2 (asymmetric: query + passage vectors stored).
+// The embedding model comes from pipeline_config; vectors from a retired model
+// are regenerated because the freshness check includes model_name.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { ensureFreshEmbeddings, getConfig, nimKey } from "../_shared/pipeline.ts";

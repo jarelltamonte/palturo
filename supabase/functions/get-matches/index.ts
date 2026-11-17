@@ -241,16 +241,22 @@ Deno.serve(async (req) => {
       })}`;
     });
 
-    const B_LIMIT = 15;
-    const B_CONCURRENCY = 5;
-    const B_TIMEOUT_MS = 12000;
+    // Reranking must fit inside the client's 12s deck budget. Direction A is a
+    // single call; direction B is bounded to the strongest candidates and both
+    // stop at the deadline, falling back to A-only scores for the tail.
+    const RERANK_BUDGET_MS = 9000;
+    const A_TIMEOUT_MS = 7000;
+    const B_LIMIT = 10;
+    const B_CONCURRENCY = 10;
+    const B_TIMEOUT_MS = 4000;
+    const rerankStarted = Date.now();
 
     let mode = "full";
     let rerankA: Array<{ index: number; logit: number }>;
     let rerankB: Array<number | null> = [];
     let aByIndex = new Map<number, number>();
     try {
-      rerankA = await nimRerank(key, cfg, myDoc, docs);
+      rerankA = await nimRerank(key, cfg, myDoc, docs, A_TIMEOUT_MS);
 
       // Direction B: does the candidate also want me? Each candidate has a
       // different query, so this cannot be a single batch. Bound it to the
@@ -275,9 +281,14 @@ Deno.serve(async (req) => {
         .slice(0, Math.min(B_LIMIT, candidates.length));
 
       rerankB = new Array(candidates.length).fill(null);
+      const perCallTimeout = Math.max(
+        1000,
+        Math.min(B_TIMEOUT_MS, RERANK_BUDGET_MS - (Date.now() - rerankStarted)),
+      );
       let cursor = 0;
       const worker = async () => {
         for (;;) {
+          if (Date.now() - rerankStarted > RERANK_BUDGET_MS) return;
           const job = cursor++;
           if (job >= rankedA.length) return;
           const i = rankedA[job].i;
@@ -288,7 +299,7 @@ Deno.serve(async (req) => {
             context: targetRole === "mentor" ? p.learner_context : p.mentor_context,
           })}`;
           try {
-            const r = await nimRerank(key, cfg, q, [myOfferDoc], B_TIMEOUT_MS);
+            const r = await nimRerank(key, cfg, q, [myOfferDoc], perCallTimeout);
             rerankB[i] = r[0]?.logit ?? null;
           } catch {
             rerankB[i] = null;

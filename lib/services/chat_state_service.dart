@@ -256,9 +256,9 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
           callback: _handleRealtimeMessage,
         )
         .onPostgresChanges(
-          event: PostgresChangeEvent.update,
+          event: PostgresChangeEvent.all,
           schema: 'public',
-          table: 'profiles',
+          table: 'profile_presence',
           callback: _handleRealtimePresence,
         )
         .subscribe((status, error) {
@@ -276,12 +276,13 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
         });
   }
 
-  /// Live presence: a peer's heartbeat updates last_seen_at, and the row
-  /// arrives here before the next conversation poll.
+  /// Live presence: a peer's heartbeat writes profile_presence.last_seen_at,
+  /// and the row arrives here before the next conversation poll.
   void _handleRealtimePresence(PostgresChangePayload payload) {
     final record = payload.newRecord;
-    final userId = record['id']?.toString();
+    final userId = record['user_id']?.toString();
     if (userId == null) return;
+    if (record['presence_enabled'] == false) return;
     final lastSeen = DateTime.tryParse(
       record['last_seen_at']?.toString() ?? '',
     );

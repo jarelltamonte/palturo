@@ -313,24 +313,31 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
   }) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final muted = AppColors.mutedText(context);
-    final contentWidth = (constraints.maxWidth - 32).clamp(240.0, 848.0);
+    // The sheet's padding (32) and 1px border each side come out of the row.
+    final contentWidth = (constraints.maxWidth - 34).clamp(240.0, 848.0);
     final fitsThree = contentWidth >= 3 * 200 + 16;
-    final cardWidth =
-        fitsThree
-            ? ((contentWidth - 16) / 3).clamp(200.0, 300.0)
-            : (contentWidth * 0.62).clamp(200.0, 280.0);
+    final cardWidth = (contentWidth * 0.62).clamp(200.0, 280.0);
     final cards = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < starters.length; i++) ...[
             if (i > 0) const SizedBox(width: 8),
-            _StarterCard(
-              width: cardWidth,
-              text: starters[i],
-              tag: _tagFor(starters[i]),
-              onUse: () => widget.onUseStarter(starters[i]),
-            ),
+            if (fitsThree)
+              Expanded(
+                child: _StarterCard(
+                  text: starters[i],
+                  tag: _tagFor(starters[i]),
+                  onUse: () => widget.onUseStarter(starters[i]),
+                ),
+              )
+            else
+              _StarterCard(
+                width: cardWidth,
+                text: starters[i],
+                tag: _tagFor(starters[i]),
+                onUse: () => widget.onUseStarter(starters[i]),
+              ),
           ],
         ],
       ),
@@ -522,13 +529,13 @@ class _PreferenceChip extends StatelessWidget {
 
 class _StarterCard extends StatelessWidget {
   const _StarterCard({
-    required this.width,
+    this.width,
     required this.text,
     required this.tag,
     required this.onUse,
   });
 
-  final double width;
+  final double? width;
   final String text;
   final String tag;
   final VoidCallback onUse;

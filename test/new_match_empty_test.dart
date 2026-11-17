@@ -234,6 +234,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('new match shows all starters on a wide screen', (tester) async {
+    await _pump(
+      tester,
+      _app(person: _person(), surface: const Size(864, 936)),
+      surface: const Size(864, 936),
+    );
+
+    final starters = buildIceBreakers(
+      name: 'Lolo Ben Cruz',
+      skillName: 'Kitchen Basics',
+    );
+    for (final starter in starters) {
+      expect(find.text(starter), findsOneWidget);
+    }
+    expect(find.byTooltip('Use this starter'), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('new match renders in dark mode', (tester) async {
     await _pump(tester, _app(person: _person(), theme: darkMode));
 

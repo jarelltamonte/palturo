@@ -13,6 +13,7 @@ void showAppSnackBar(
   VoidCallback? onAction,
   Duration? duration,
   AppFeedbackTone tone = AppFeedbackTone.info,
+  EdgeInsets? margin,
 }) {
   showAppSnackBarOn(
     ScaffoldMessenger.of(context),
@@ -21,6 +22,7 @@ void showAppSnackBar(
     onAction: onAction,
     duration: duration,
     tone: tone,
+    margin: margin,
   );
 }
 
@@ -31,6 +33,7 @@ void showAppSnackBarOn(
   VoidCallback? onAction,
   Duration? duration,
   AppFeedbackTone tone = AppFeedbackTone.info,
+  EdgeInsets? margin,
 }) {
   messenger.clearSnackBars();
   final color =
@@ -48,6 +51,8 @@ void showAppSnackBarOn(
 
   messenger.showSnackBar(
     SnackBar(
+      behavior: margin == null ? null : SnackBarBehavior.floating,
+      margin: margin,
       duration:
           duration ??
           (tone == AppFeedbackTone.error

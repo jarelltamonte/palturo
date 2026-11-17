@@ -160,6 +160,8 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
       context,
       'You’ve seen most of the Pals here, so some cards may repeat.',
       duration: const Duration(seconds: 5),
+      // Float above the card's Skip/Send request row instead of covering it.
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 96),
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -8,6 +9,7 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/whats_new_sheet.dart';
 
 import 'home_page.dart';
@@ -27,7 +29,11 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   static const int _exploreIndex = 1;
   int _selectedIndex = 0;
 
-  final List<int> _tabHistory = [0];
+  /// First back press on a root tab arms the exit; a second press inside this
+  /// window closes the app.
+  static const Duration _exitWindow = Duration(seconds: 2);
+  DateTime? _lastBackAt;
+
   final GlobalKey<NavigatorState> _exploreNavKey = GlobalKey<NavigatorState>();
   final ValueNotifier<int> _requestsRefresh = ValueNotifier<int>(0);
 
@@ -89,8 +95,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
 
     setState(() {
       _selectedIndex = index;
-      _tabHistory.remove(index);
-      _tabHistory.add(index);
+      _lastBackAt = null;
     });
   }
 
@@ -109,24 +114,36 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
 
-        // The Browse tab owns a nested Navigator and handles its own back
-        // gesture through NavigatorPopHandler. Popping it here as well removed
-        // two routes in one press and left the tab blank.
-
+        // A pushed page anywhere in the app returns normally.
         final navigator = Navigator.of(context);
         if (navigator.canPop()) {
           navigator.pop();
           return;
         }
 
-        if (_tabHistory.length > 1) {
-          setState(() {
-            _tabHistory.removeLast();
-            _selectedIndex = _tabHistory.last;
-          });
-          AppShellState.instance.setSelectedTab(_selectedIndex);
+        // Browse owns a nested Navigator and pops it through
+        // NavigatorPopHandler; this callback must not act again.
+        if (_selectedIndex == _exploreIndex &&
+            (_exploreNavKey.currentState?.canPop() ?? false)) {
           return;
         }
+
+        // Root tab: ask for a second press before closing the app.
+        final now = DateTime.now();
+        final armed =
+            _lastBackAt != null && now.difference(_lastBackAt!) <= _exitWindow;
+        if (armed) {
+          _lastBackAt = null;
+          SystemNavigator.pop();
+          return;
+        }
+
+        _lastBackAt = now;
+        showAppSnackBar(
+          context,
+          'Press again to close the app',
+          duration: _exitWindow,
+        );
       },
       child: desktop ? _buildDesktopShell(context) : _buildMobileShell(context),
     );
@@ -309,7 +326,12 @@ class _ExploreTabState extends State<_ExploreTab> {
     return NavigatorPopHandler(
       enabled: _canPop && widget.isActive(),
       onPopWithResult: (result) {
-        widget.navigatorKey.currentState?.pop();
+        // NavigatorPopHandler calls this even when the tab is inactive, so
+        // guard both the tab and the stack before popping.
+        if (!widget.isActive()) return;
+        final nav = widget.navigatorKey.currentState;
+        if (nav == null || !nav.canPop()) return;
+        nav.pop();
       },
       child: Navigator(
         key: widget.navigatorKey,

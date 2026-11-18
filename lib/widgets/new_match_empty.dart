@@ -97,9 +97,9 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
       if (text.isNotEmpty) out.add((icon: icon, label: text));
     }
 
-    add(Icons.event_available_outlined, person.schedule);
+    add(Icons.calendar_today_outlined, person.schedule);
     add(Icons.translate, person.language);
-    add(Icons.auto_awesome_outlined, person.learningStyle);
+    add(Icons.psychology, person.learningStyle);
     return out;
   }
 

@@ -742,7 +742,7 @@ class _HomePageState extends State<HomePage> {
           onReport: () => _confirmReport(current),
           onOpenProfile: () => _openProfile(current),
           showProfilePill: false,
-          showShadow: false,
+          showShadow: true,
           showSkillNote: true,
         ),
       ),

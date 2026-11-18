@@ -183,8 +183,9 @@ A/B: `config_revision` is the experiment key.
 - Multiple skills → max + second bonus; never sum.
 - Role asymmetry → seeker learn ↔ candidate teach for mentor targets, and the
   reverse for learner targets.
-- Pending/rejected/retired skills → excluded from discovery and passages;
-  remain on the owner's profile until replaced.
+- Rejected/retired skills → excluded from discovery and passages; classifier-
+  accepted user submissions are auto-approved and marked `auto_approved` so the
+  admin panel can curate them later.
 - Rename/merge → IDs stable; taxonomy version invalidates caches; passages
   re-embed.
 - Missing embeddings → structured path still works.

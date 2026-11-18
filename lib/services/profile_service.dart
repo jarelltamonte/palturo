@@ -773,7 +773,11 @@ class ProfileService {
       );
       final status = verdict?['status']?.toString();
       final node = verdict?['node'];
-      if ((status == 'attached' || status == 'pending') &&
+      // `created` is the current accepted-new-skill verdict. `pending` stays
+      // accepted so an older function version cannot break the editor.
+      if ((status == 'attached' ||
+              status == 'created' ||
+              status == 'pending') &&
           node is Map &&
           node['name'] is String) {
         return SkillModerationResult(

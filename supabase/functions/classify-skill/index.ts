@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
       : closestSpelling(normalized, [...semanticByKey.keys()]);
     const spellingMatch = spellingKey ? semanticByKey.get(spellingKey) ?? null : null;
     let skillDecision: {
-      status: "attached" | "pending" | "queued" | "rejected" | "error";
+      status: "attached" | "created" | "queued" | "rejected" | "error";
       node: Record<string, unknown> | null;
       action: string;
       confidence: number | null;
@@ -261,12 +261,13 @@ Deno.serve(async (req) => {
       dryRun
         ? Promise.resolve({ id: null as string | null, error: null as string | null })
         : placeSkill(admin, user.id, skillId, kind, null);
-    const pendingNode = (parent: { path: string; kind?: string } | null, display: string) => ({
+    const draftNode = (parent: { path: string; kind?: string } | null, display: string) => ({
       id: null,
       name: display,
       path: parent ? `${parent.path}.${normalize(display)}` : normalize(display),
       kind: childKind(parent),
-      status: "pending",
+      status: "approved",
+      auto_approved: true,
     });
 
     if (exact) {
@@ -287,6 +288,7 @@ Deno.serve(async (req) => {
           distance: editDistance(normalized, spellingKey!),
         },
         action: "attach_spelling", confidence: 1.0, model,
+        nodeId: spellingMatch.id,
         promptVersion, revision, stage: dryRun ? "stage1_spelling_dry_run" : "stage1_spelling",
       });
     } else {
@@ -429,9 +431,9 @@ Deno.serve(async (req) => {
             if (!parent) {
               skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
             } else if (dryRun) {
-              skillDecision = { status: "pending", node: pendingNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
+              skillDecision = { status: "created", node: draftNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
             } else {
-              const created = await createPendingNode(
+              const created = await createAutoApprovedNode(
                 admin, parent, cleanedName, user.id,
               );
               if (created.error || !created.node) {
@@ -439,7 +441,7 @@ Deno.serve(async (req) => {
               }
               const placed = await place((created.node as any).id);
               if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-              skillDecision = { status: "pending", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
+              skillDecision = { status: "created", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
             }
           }
         }
@@ -455,9 +457,9 @@ Deno.serve(async (req) => {
           if (!parent) {
             skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
           } else if (dryRun) {
-            skillDecision = { status: "pending", node: pendingNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
+            skillDecision = { status: "created", node: draftNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
           } else {
-            const created = await createPendingNode(
+            const created = await createAutoApprovedNode(
               admin, parent, cleanedName, user.id,
             );
             if (created.error || !created.node) {
@@ -465,14 +467,14 @@ Deno.serve(async (req) => {
             }
             const placed = await place((created.node as any).id);
             if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-            skillDecision = { status: "pending", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
+            skillDecision = { status: "created", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
           }
         }
       } else {
         skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
       }
 
-      await log(admin, { user: user.id, name, note: null, answers: a1, action: skillDecision.action, confidence: actionConf, model, promptVersion, revision, cost: costTotal, stage: dryRun ? "stage1_dry_run" : "stage1_skill" });
+      await log(admin, { user: user.id, name, note: null, answers: a1, action: skillDecision.action, confidence: actionConf, model, promptVersion, revision, cost: costTotal, nodeId: (skillDecision.node as any)?.id ?? null, stage: dryRun ? "stage1_dry_run" : "stage1_skill" });
     }
 
     // ---------- Stage 2: note moderation (separate call; note never influences Stage 1) ----------
@@ -512,11 +514,12 @@ Deno.serve(async (req) => {
           action: noteStored ? "note_accepted" : "note_rejected",
           confidence: null, model, promptVersion, revision,
           cost: Number(v2?.usage?.cost ?? 0),
+          nodeId: (skillDecision.node as any)?.id ?? null,
           stage: "stage2_note",
         });
       } else {
         // service hiccup: keep the note out (conservative), log the failure
-        await log(admin, { user: user.id, name, note, answers: { http_error: orRes2.status }, action: "note_queued", confidence: null, model, promptVersion, revision, stage: "stage2_note" });
+        await log(admin, { user: user.id, name, note, answers: { http_error: orRes2.status }, action: "note_queued", confidence: null, model, promptVersion, revision, nodeId: (skillDecision.node as any)?.id ?? null, stage: "stage2_note" });
       }
     }
 
@@ -587,7 +590,10 @@ function childKind(
   return parent.kind === "category" ? "skill" : "focus";
 }
 
-async function createPendingNode(
+// The classifier is the moderation decision for a new custom skill. Accepted
+// nodes are usable immediately; `auto_approved` keeps them distinguishable from
+// official taxonomy nodes for later manual curation.
+async function createAutoApprovedNode(
   admin: ReturnType<typeof createClient>,
   parent: { id: string; kind?: string },
   name: string,
@@ -600,11 +606,13 @@ async function createPendingNode(
       parent_id: parent.id,
       kind: childKind(parent),
       is_leaf: true,
+      is_visible: true,
       origin: "user_submitted",
-      status: "pending",
+      status: "approved",
+      auto_approved: true,
       submitted_by: userId,
     })
-    .select("id,name,path,status,kind")
+    .select("id,name,path,status,kind,auto_approved")
     .single();
   if (!error) return { node: data as any, error: null };
 
@@ -614,13 +622,30 @@ async function createPendingNode(
   if ((error as any).code === "23505") {
     const { data: siblings } = await admin
       .from("skill_nodes")
-      .select("id,name,path,status,kind")
+      .select("id,name,path,status,kind,auto_approved")
       .eq("parent_id", parent.id)
       .neq("status", "rejected");
     const existing = (siblings ?? []).find(
       (n: any) => String(n.name).toLowerCase() === name.toLowerCase(),
     );
-    if (existing) return { node: existing as any, error: null };
+    if (existing) {
+      // An instance running the previous version may have left the sibling
+      // pending. Promote it so the accepted skill is immediately usable.
+      if ((existing as any).status === "pending") {
+        await admin
+          .from("skill_nodes")
+          .update({
+            status: "approved",
+            is_visible: true,
+            auto_approved: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", (existing as any).id);
+        (existing as any).status = "approved";
+        (existing as any).auto_approved = true;
+      }
+      return { node: existing as any, error: null };
+    }
   }
   return { node: null, error: error.message };
 }
@@ -721,10 +746,12 @@ async function log(
     user: string; name: string; note: string | null; answers: unknown;
     action: string; confidence: number | null; model: string;
     promptVersion: string; revision: number; cost?: number; stage: string;
+    nodeId?: string | null;
   },
 ) {
   await admin.from("skill_moderation_log").insert({
     user_id: args.user,
+    skill_node_id: args.nodeId ?? null,
     raw_input: args.name,
     note: args.note,
     verdict: args.answers as any,

@@ -60,6 +60,42 @@ class Person {
 
   /// Card page media: showcase content first, profile photos after.
   List<String?> get cardMedia => [...showcaseUrls, ...photoUrls];
+
+  Person copyWith({
+    String? id,
+    String? name,
+    String? schedule,
+    String? language,
+    String? learningStyle,
+    String? teachingStyle,
+    String? skillName,
+    String? skillPath,
+    PersonRole? role,
+    String? bio,
+    String? skillNote,
+    List<String?>? photoUrls,
+    List<String?>? showcaseUrls,
+    double? compatibility,
+    String? pipeline,
+  }) {
+    return Person(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      schedule: schedule ?? this.schedule,
+      language: language ?? this.language,
+      learningStyle: learningStyle ?? this.learningStyle,
+      teachingStyle: teachingStyle ?? this.teachingStyle,
+      skillName: skillName ?? this.skillName,
+      skillPath: skillPath ?? this.skillPath,
+      role: role ?? this.role,
+      bio: bio ?? this.bio,
+      skillNote: skillNote ?? this.skillNote,
+      photoUrls: photoUrls ?? this.photoUrls,
+      showcaseUrls: showcaseUrls ?? this.showcaseUrls,
+      compatibility: compatibility ?? this.compatibility,
+      pipeline: pipeline ?? this.pipeline,
+    );
+  }
 }
 
 class PersonCardOverlay extends StatefulWidget {

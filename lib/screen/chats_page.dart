@@ -296,9 +296,19 @@ class _ChatsPageState extends State<ChatsPage> {
 
     switch (action) {
       case 'profile':
+        // The list row only carries the card fields; hydrate the full public
+        // profile so the sheet is not mostly blank.
+        final person = await MatchApi.getPersonFromPublicProfile(
+          chat.otherUserId ?? chat.id,
+        );
+        if (!mounted) return;
+        if (person == null) {
+          showAppError(context, 'This profile is no longer available.');
+          break;
+        }
         showPersonProfileDialog(
           context,
-          chat.toPerson(),
+          person,
           onUnmatch: null,
           onBlock: () => _blockChat(chat),
           onReport: (reason) => _reportChat(chat, reason),

@@ -306,6 +306,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   String? _outgoingError;
   bool _responding = false;
   bool _cancelling = false;
+  bool _openingDetail = false;
   final Set<String> _declinedIds = {};
   StreamSubscription<AppNotification>? _notificationEvents;
   StreamSubscription<AppNotification>? _notificationDeletions;
@@ -719,23 +720,62 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     }
   }
 
-  void _openDetail(ConnectionRequest request) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.7),
-      builder:
-          (_) => RequestDetailDialog(
-            person: request.toPerson(),
-            onAccept: () {
-              _respond(request, true);
-            },
-            onDecline: () {
-              _confirmDecline(request);
-            },
-            onBlock: () => _blockRequester(request),
-            onReport: (reason) => _reportRequester(request, reason),
-          ),
-    );
+  Future<void> _openDetail(ConnectionRequest request) async {
+    if (_openingDetail) return;
+    _openingDetail = true;
+    try {
+      // The request row only carries the card fields. Load the public profile
+      // so the detail sheet can show bio, languages, availability, teaching
+      // style, and showcases instead of a mostly blank card.
+      final hydrated = await MatchApi.getPersonFromPublicProfile(
+        request.requesterId,
+      );
+      if (!mounted) return;
+      if (hydrated == null) {
+        showAppError(context, 'This profile is no longer available.');
+        return;
+      }
+      // Keep the skill that triggered the request; the profile's first skill
+      // may be a different one when the person has several.
+      final requestedSkill = request.skillName.trim();
+      final sameSkill =
+          requestedSkill.isEmpty || requestedSkill == hydrated.skillName;
+      final person = hydrated.copyWith(
+        skillName: requestedSkill.isEmpty ? hydrated.skillName : requestedSkill,
+        skillPath:
+            (request.skillPath ?? '').trim().isNotEmpty
+                ? request.skillPath
+                : hydrated.skillPath,
+        skillNote: sameSkill ? hydrated.skillNote : '',
+      );
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.7),
+        builder:
+            (_) => RequestDetailDialog(
+              person: person,
+              onAccept: () {
+                _respond(request, true);
+              },
+              onDecline: () {
+                _confirmDecline(request);
+              },
+              onBlock: () => _blockRequester(request),
+              onReport: (reason) => _reportRequester(request, reason),
+            ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppError(
+        context,
+        friendlyError(
+          e,
+          fallback: 'Could not load this profile. Please try again.',
+        ),
+      );
+    } finally {
+      _openingDetail = false;
+    }
   }
 
   Future<void> _openSentProfile(OutgoingRequestLite request) async {

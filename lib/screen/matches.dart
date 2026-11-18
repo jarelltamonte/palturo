@@ -397,10 +397,20 @@ class _MatchesState extends State<Matches> {
   }
 
   /// Opens the pal's profile dialog (with unmatch / block / report callbacks).
-  void _openProfile(MatchedUser pal) {
+  Future<void> _openProfile(MatchedUser pal) async {
+    // The list row only carries the card fields; hydrate the full public
+    // profile so the sheet is not mostly blank.
+    final person = await MatchApi.getPersonFromPublicProfile(
+      pal.otherUserId ?? pal.id,
+    );
+    if (!mounted) return;
+    if (person == null) {
+      showAppError(context, 'This profile is no longer available.');
+      return;
+    }
     showPersonProfileDialog(
       context,
-      pal.toPerson(),
+      person,
       onUnmatch: () => _unmatchPal(pal),
       onBlock: () => _blockPal(pal),
       onReport: (reason) => _reportPal(pal, reason),

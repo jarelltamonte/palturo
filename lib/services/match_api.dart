@@ -855,6 +855,29 @@ class MatchApi {
         .toList();
   }
 
+  /// Every domain's population and how many are new to the viewer.
+  ///
+  /// `total` includes people the viewer is already connected with; `fresh`
+  /// excludes them. Browse shows both so a domain full of existing Pals does
+  /// not read as empty.
+  static Future<Map<String, ({int total, int fresh})>> browseDomainCounts({
+    String kind = 'teach',
+  }) async {
+    final res =
+        await _Client.c.rpc('browse_domain_counts', params: {'p_kind': kind})
+            as List;
+    final out = <String, ({int total, int fresh})>{};
+    for (final row in res.whereType<Map>()) {
+      final path = (row['root_path'] ?? '').toString();
+      if (path.isEmpty) continue;
+      out[path] = (
+        total: (row['total'] as num?)?.toInt() ?? 0,
+        fresh: (row['fresh'] as num?)?.toInt() ?? 0,
+      );
+    }
+    return out;
+  }
+
   /// Skill users for Explore expand (teach side by default).
   static Future<List<Person>> browseSkillUsers(
     String nodePath, {

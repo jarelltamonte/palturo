@@ -45,6 +45,8 @@ class ExplorePage extends StatefulWidget {
   /// Test hooks. Production leaves these null.
   final Future<List<Map<String, dynamic>>> Function()? taxonomyLoader;
   final Future<int> Function(String path, {required String kind})? countLoader;
+  final Future<Map<String, ({int total, int fresh})>> Function(String kind)?
+  domainCountsLoader;
   final Future<List<Map<String, dynamic>>> Function()? skillsLoader;
   final DateTime Function()? now;
 
@@ -52,6 +54,7 @@ class ExplorePage extends StatefulWidget {
     super.key,
     this.taxonomyLoader,
     this.countLoader,
+    this.domainCountsLoader,
     this.skillsLoader,
     this.now,
   });
@@ -63,7 +66,7 @@ class ExplorePage extends StatefulWidget {
 class _ExplorePageState extends State<ExplorePage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _roots = const [];
-  Map<String, int> _rootCounts = const {};
+  Map<String, ({int total, int fresh})> _rootCounts = const {};
   bool _hasMentorSkills = false;
   bool _loading = true;
   String? _error;
@@ -120,21 +123,27 @@ class _ExplorePageState extends State<ExplorePage> {
     }).toList();
   }
 
-  /// The daily featured domain prefers one with people so the field guide
-  /// still opens on a populated card; it falls back to the full list only when
-  /// every domain is empty.
+  /// The daily featured domain prefers one with new people so the field guide
+  /// still opens on a card worth tapping; it falls back to domains with any
+  /// people, then to the full list when every domain is empty.
   Map<String, dynamic>? get _featuredRoot {
-    final populated = _roots.where((node) => _countFor(node) > 0).toList();
+    final fresh = _roots.where((node) => _countFor(node).fresh > 0).toList();
+    final populated =
+        _roots.where((node) => _countFor(node).total > 0).toList();
     return featuredDomainForDay(
-      populated.isEmpty ? _roots : populated,
+      fresh.isNotEmpty
+          ? fresh
+          : populated.isNotEmpty
+          ? populated
+          : _roots,
       (widget.now ?? DateTime.now)(),
     );
   }
 
   String get _roleNoun => _role == ExploreRole.mentor ? 'learner' : 'mentor';
 
-  int _countFor(Map<String, dynamic> node) =>
-      _rootCounts[(node['path'] ?? '').toString()] ?? 0;
+  ({int total, int fresh}) _countFor(Map<String, dynamic> node) =>
+      _rootCounts[(node['path'] ?? '').toString()] ?? (total: 0, fresh: 0);
 
   Future<void> _loadSavedRole() async {
     var mentor = false;
@@ -183,32 +192,52 @@ class _ExplorePageState extends State<ExplorePage> {
     return (roots: filtered, hasMentorSkills: mentorPaths.isNotEmpty);
   }
 
-  /// Counts the people available under each root for the active role. The
-  /// counts make every card informative; empty roots stay listed with a
-  /// "No mentors yet" label instead of disappearing.
-  Future<Map<String, int>> _rootCountsFor(
+  /// Population and fresh counts for every root.
+  ///
+  /// `total` includes people the viewer is already connected with; `fresh`
+  /// excludes them. The overview shows both so a domain full of existing Pals
+  /// reads as "3 mentors · all Pals" instead of "No mentors yet".
+  Future<Map<String, ({int total, int fresh})>> _rootCountsFor(
     List<Map<String, dynamic>> roots,
   ) async {
-    if (roots.isEmpty) return const <String, int>{};
+    if (roots.isEmpty) return const <String, ({int total, int fresh})>{};
     final kind = _role == ExploreRole.mentor ? 'learn' : 'teach';
+
+    if (widget.domainCountsLoader != null) {
+      try {
+        return await widget.domainCountsLoader!(kind);
+      } catch (e) {
+        debugPrint('[Browse] domain counts failed: $e');
+        return const <String, ({int total, int fresh})>{};
+      }
+    }
+
+    // A single RPC covers every root. The per-root loader stays for tests that
+    // only care about the fresh count.
+    if (widget.countLoader == null) {
+      try {
+        return await MatchApi.browseDomainCounts(kind: kind);
+      } catch (e) {
+        debugPrint('[Browse] domain counts failed: $e');
+        return const <String, ({int total, int fresh})>{};
+      }
+    }
+
     final entries = await Future.wait(
       roots.map((root) async {
         final path = (root['path'] ?? '').toString();
-        if (path.isEmpty) return const MapEntry('', 0);
+        if (path.isEmpty) return const MapEntry('', (total: 0, fresh: 0));
         try {
-          final count =
-              widget.countLoader != null
-                  ? await widget.countLoader!(path, kind: kind)
-                  : (await MatchApi.browseSkillUsers(path, kind: kind)).length;
-          return MapEntry(path, count);
+          final count = await widget.countLoader!(path, kind: kind);
+          return MapEntry(path, (total: count, fresh: count));
         } catch (e) {
           // A failed count must not hide a valid category.
           debugPrint('[Browse] count failed for $path: $e');
-          return MapEntry(path, 1);
+          return MapEntry(path, (total: 1, fresh: 1));
         }
       }),
     );
-    return Map<String, int>.fromEntries(entries);
+    return Map<String, ({int total, int fresh})>.fromEntries(entries);
   }
 
   Future<void> _loadTaxonomy({bool notifyFailure = false}) async {
@@ -387,7 +416,8 @@ class _ExplorePageState extends State<ExplorePage> {
                   label: (featured['name'] ?? '').toString(),
                   description: _descriptionFor(featured),
                   icon: exploreRootIcon(featuredPath),
-                  count: _countFor(featured),
+                  total: _countFor(featured).total,
+                  fresh: _countFor(featured).fresh,
                   countLabel: _roleNoun,
                   onTap: () => _openCategory(featured),
                 ),
@@ -459,7 +489,8 @@ class _ExplorePageState extends State<ExplorePage> {
               description: _descriptionFor(node),
               icon: exploreRootIcon(path),
               tint: exploreTileTint(context),
-              count: _rootCounts[path] ?? 0,
+              total: (_rootCounts[path] ?? (total: 0, fresh: 0)).total,
+              fresh: (_rootCounts[path] ?? (total: 0, fresh: 0)).fresh,
               countLabel: _roleNoun,
               onTap: () => _openCategory(node),
             );
@@ -865,13 +896,18 @@ String _countLabelText(int count, String countLabel) {
   return '$count $countLabel${count == 1 ? '' : 's'}';
 }
 
-String _countText(int count, String countLabel) =>
-    count <= 0 ? 'No ${countLabel}s yet' : _countLabelText(count, countLabel);
-
-String _availabilityText(int count, String countLabel) =>
-    count <= 0
-        ? 'No ${countLabel}s yet'
-        : '${_countLabelText(count, countLabel)} available';
+/// The domain card's count line.
+///
+/// Shows the whole domain and, when some of those people are already Pals,
+/// how many are new. A domain full of existing Pals must not read as empty.
+String _domainCountText(int total, int fresh, String countLabel) {
+  if (total <= 0) return 'No ${countLabel}s yet';
+  final base = _countLabelText(total, countLabel);
+  if (fresh <= 0) return '$base · all Pals';
+  if (fresh >= total) return base;
+  final freshText = fresh >= 50 ? '50+ new' : '$fresh new';
+  return '$base · $freshText';
+}
 
 class _FieldGuideSearch extends StatelessWidget {
   const _FieldGuideSearch({
@@ -948,7 +984,8 @@ class _FeaturedDomainCard extends StatelessWidget {
     required this.label,
     required this.description,
     required this.icon,
-    required this.count,
+    required this.total,
+    required this.fresh,
     required this.countLabel,
     required this.onTap,
   });
@@ -956,7 +993,8 @@ class _FeaturedDomainCard extends StatelessWidget {
   final String label;
   final String description;
   final IconData icon;
-  final int count;
+  final int total;
+  final int fresh;
   final String countLabel;
   final VoidCallback onTap;
 
@@ -1018,10 +1056,10 @@ class _FeaturedDomainCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _availabilityText(count, countLabel),
+                      _domainCountText(total, fresh, countLabel),
                       style: AppTextStyles.boldText.copyWith(
                         fontSize: 11,
-                        color: count > 0 ? accent : muted,
+                        color: total > 0 ? accent : muted,
                       ),
                     ),
                   ],
@@ -1054,7 +1092,8 @@ class _DomainCard extends StatelessWidget {
     required this.description,
     required this.icon,
     required this.tint,
-    required this.count,
+    required this.total,
+    required this.fresh,
     required this.countLabel,
     required this.onTap,
   });
@@ -1063,7 +1102,8 @@ class _DomainCard extends StatelessWidget {
   final String description;
   final IconData icon;
   final Color tint;
-  final int count;
+  final int total;
+  final int fresh;
   final String countLabel;
   final VoidCallback onTap;
 
@@ -1077,7 +1117,8 @@ class _DomainCard extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: '$label. $description. ${_countText(count, countLabel)}.',
+      label:
+          '$label. $description. ${_domainCountText(total, fresh, countLabel)}.',
       onTap: onTap,
       excludeSemantics: true,
       child: Material(
@@ -1135,10 +1176,10 @@ class _DomainCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _countText(count, countLabel),
+                  _domainCountText(total, fresh, countLabel),
                   style: AppTextStyles.boldText.copyWith(
                     fontSize: 10,
-                    color: count > 0 ? AppColors.accentText(context) : muted,
+                    color: total > 0 ? AppColors.accentText(context) : muted,
                   ),
                 ),
               ],

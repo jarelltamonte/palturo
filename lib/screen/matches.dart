@@ -134,7 +134,6 @@ class _MatchesState extends State<Matches> {
                         ? PersonRole.learner
                         : PersonRole.mentor,
                 skillName: c.otherSkill ?? '',
-                category: SkillCategory.everydayPractical,
                 schedule: '',
                 language: '',
                 learningStyle: '',

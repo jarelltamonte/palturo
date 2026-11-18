@@ -363,7 +363,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
       enabled: !_sendingRequest,
       busy: _sendingRequest,
       rightLabel: 'Send request',
-      leftLabel: 'Pass',
+      leftLabel: 'Skip',
       onSwiped: (right) => _handleSwipe(current, right),
       child: PersonCardOverlay(
         person: current,
@@ -372,7 +372,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
         onBlock: () => _confirmBlock(current),
         onReport: () => _confirmReport(current),
         onOpenProfile: () => showPersonProfileDialog(context, current),
-        skipLabel: 'Pass',
+        skipLabel: 'Skip',
         addLabel: 'Send request',
       ),
     );

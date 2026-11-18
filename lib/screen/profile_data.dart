@@ -18,7 +18,6 @@ class ProfileData {
   final OnboardingRole? role;
   final List<String> learningSkillIds;
   final List<String> teachingSkillIds;
-  final List<String> skillCategories;
   final Map<String, String> teachingSkillImages;
 
   /// Per-placement notes keyed by taxonomy leaf id (DEV-22).
@@ -51,7 +50,6 @@ class ProfileData {
     this.role,
     this.learningSkillIds = const [],
     this.teachingSkillIds = const [],
-    this.skillCategories = const [],
     this.teachingSkillImages = const {},
     this.learningNotes = const {},
     this.teachingNotes = const {},
@@ -97,7 +95,6 @@ class ProfileData {
     OnboardingRole? role,
     List<String>? learningSkillIds,
     List<String>? teachingSkillIds,
-    List<String>? skillCategories,
     Map<String, String>? teachingSkillImages,
     Map<String, String>? learningNotes,
     Map<String, String>? teachingNotes,
@@ -122,7 +119,6 @@ class ProfileData {
       role: role ?? this.role,
       learningSkillIds: learningSkillIds ?? this.learningSkillIds,
       teachingSkillIds: teachingSkillIds ?? this.teachingSkillIds,
-      skillCategories: skillCategories ?? this.skillCategories,
       teachingSkillImages: teachingSkillImages ?? this.teachingSkillImages,
       learningNotes: learningNotes ?? this.learningNotes,
       teachingNotes: teachingNotes ?? this.teachingNotes,
@@ -194,7 +190,6 @@ class ProfileData {
       role: parsedRole,
       learningSkillIds: _stringList(map['learning_skills']),
       teachingSkillIds: _stringList(map['teaching_skills']),
-      skillCategories: _stringList(map['skill_categories']),
       teachingSkillImages: parsedSkillImages,
       hasCompletedOnboarding: map['has_completed_onboarding'] as bool? ?? false,
       isProfileCompleted: map['is_profile_completed'] as bool? ?? false,

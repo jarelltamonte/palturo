@@ -92,15 +92,6 @@ const Map<String, String> kSkillToCategorySlug = {
   'painting': 'visual_arts_design',
 };
 
-/// Pre-taxonomy bucket slugs that can still appear in saved profiles and
-/// drafts. They map to the root category that replaced them so a re-save
-/// rewrites the value instead of keeping a dead slug.
-const Map<String, String> kLegacyCategoryAliases = {
-  'everyday_skills': 'modern_practical_skills',
-  'language_culture': 'language_writing',
-  'arts_design': 'visual_arts_design',
-};
-
 /// Drafts and cached selections can still carry the pre-rename ids. Map them
 /// so a resumed onboarding keeps the user's choices.
 const Map<String, String> kLegacySkillIdAliases = {
@@ -175,43 +166,4 @@ String onboardingInterestLabel(String id) {
       .where((part) => part.isNotEmpty)
       .map((part) => part[0].toUpperCase() + part.substring(1))
       .join(' ');
-}
-
-List<String> resolveCategoriesForSkills(Iterable<String> skills) {
-  final categories = <String>{};
-  for (final raw in skills) {
-    final value = raw.trim();
-    if (value.isEmpty) continue;
-
-    final lower = value.toLowerCase();
-    final legacy = kLegacyCategoryAliases[lower];
-    if (legacy != null) {
-      categories.add(legacy);
-      continue;
-    }
-    final canonicalId =
-        kLegacySkillIdAliases[lower] ?? kLegacySkillLabelAliases[lower];
-    final direct = kSkillToCategorySlug[canonicalId ?? lower];
-    if (direct != null) {
-      categories.add(direct);
-      continue;
-    }
-
-    final normalized = lower.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-    final bySlug =
-        kSkillToCategorySlug[kLegacySkillIdAliases[normalized] ?? normalized];
-    if (bySlug != null) {
-      categories.add(bySlug);
-      continue;
-    }
-
-    for (final option in kSelectableSkills) {
-      if (option.label.toLowerCase() == lower) {
-        final category = kSkillToCategorySlug[option.id];
-        if (category != null) categories.add(category);
-        break;
-      }
-    }
-  }
-  return categories.toList();
 }

@@ -84,12 +84,12 @@ void main() {
     expect(find.text('Cooking & Culinary'), findsOneWidget);
     expect(find.text('Alpha'), findsOneWidget);
 
-    await tester.tap(find.text('Pass'));
+    await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
     expect(find.text('Beta'), findsOneWidget);
 
     // The deck keeps going past the category with people from the wider pool.
-    await tester.tap(find.text('Pass'));
+    await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
     expect(find.text('Gamma'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -108,7 +108,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Pass'));
+    await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
 
     expect(find.text('Beta'), findsOneWidget);
@@ -264,7 +264,7 @@ void main() {
     );
 
     expect(find.text('Alpha'), findsOneWidget);
-    expect(find.text('Pass'), findsOneWidget);
+    expect(find.text('Skip'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

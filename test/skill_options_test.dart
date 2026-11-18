@@ -49,28 +49,6 @@ void main() {
     }
   });
 
-  test('labels and ids both resolve to the current root category', () {
-    expect(resolveCategoriesForSkills(['filipino_cooking']), [
-      'cooking_culinary',
-    ]);
-    expect(resolveCategoriesForSkills(['Filipino Dessert Making']), [
-      'cooking_culinary',
-    ]);
-    expect(resolveCategoriesForSkills(['Python Programming']), [
-      'modern_practical_skills',
-    ]);
-    expect(resolveCategoriesForSkills(['Farming']), ['agriculture_livelihood']);
-    expect(resolveCategoriesForSkills(['Filipino Embroidery']), [
-      'traditional_crafts',
-    ]);
-    expect(resolveCategoriesForSkills(['Vocal Music']), ['performing_arts']);
-    // Legacy bucket slugs from older saves are rewritten, not kept.
-    expect(resolveCategoriesForSkills(['everyday_skills']), [
-      'modern_practical_skills',
-    ]);
-    expect(resolveCategoriesForSkills(['arts_design']), ['visual_arts_design']);
-  });
-
   test('option ids resolve back to their labels', () {
     expect(selectableSkillLabelForId('filipino_cooking'), 'Filipino Cooking');
     expect(

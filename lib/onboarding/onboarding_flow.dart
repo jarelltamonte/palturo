@@ -9,11 +9,7 @@ import 'onboarding_models.dart';
 import 'skill_options.dart';
 
 export 'skill_options.dart'
-    show
-        kSelectableSkills,
-        kSkillToCategorySlug,
-        resolveCategoriesForSkills,
-        selectableSkillLabelForId;
+    show kSelectableSkills, kSkillToCategorySlug, selectableSkillLabelForId;
 import 'screens/onboarding_final_screen.dart';
 import 'screens/onboarding_review_screen.dart';
 import 'screens/onboarding_interests_screen.dart';

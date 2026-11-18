@@ -26,21 +26,34 @@ const json = (body: unknown, status = 200) =>
 const CACHE_COLUMNS =
   "candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode";
 
-/// Users the viewer already has a connection with (pending or accepted).
-async function connectedUserIds(
+/// Users the viewer must not see in discovery: existing connections (pending
+/// or accepted) and either direction of a report.
+async function excludedUserIds(
   admin: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<Set<string>> {
-  const { data } = await admin
-    .from("connections")
-    .select("requester_id, recipient_id")
-    .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`);
+  const [{ data: connections }, { data: reports }] = await Promise.all([
+    admin
+      .from("connections")
+      .select("requester_id, recipient_id")
+      .or(`requester_id.eq.${userId},recipient_id.eq.${userId}`),
+    admin
+      .from("reports")
+      .select("reporter_id, reported_id")
+      .or(`reporter_id.eq.${userId},reported_id.eq.${userId}`),
+  ]);
   const ids = new Set<string>();
-  for (const row of (data ?? []) as Array<{
+  for (const row of (connections ?? []) as Array<{
     requester_id: string;
     recipient_id: string;
   }>) {
     ids.add(row.requester_id === userId ? row.recipient_id : row.requester_id);
+  }
+  for (const row of (reports ?? []) as Array<{
+    reporter_id: string;
+    reported_id: string;
+  }>) {
+    ids.add(row.reporter_id === userId ? row.reported_id : row.reporter_id);
   }
   return ids;
 }
@@ -50,7 +63,7 @@ async function cacheResults(
   userId: string,
   rows: Array<Record<string, unknown>>,
 ) {
-  const excluded = await connectedUserIds(admin, userId);
+  const excluded = await excludedUserIds(admin, userId);
   const visible = rows.filter(
     (r) => !excluded.has(r.candidate_id as string),
   );
@@ -241,7 +254,7 @@ Deno.serve(async (req) => {
       })}`;
     });
 
-    // Reranking must fit inside the client's 12s deck budget. Direction A is a
+    // Reranking must fit inside the client's 18s deck budget. Direction A is a
     // single call; direction B is bounded to the strongest candidates and both
     // stop at the deadline, falling back to A-only scores for the tail.
     const RERANK_BUDGET_MS = 9000;
@@ -356,7 +369,7 @@ Deno.serve(async (req) => {
     const ranked = scored.map((s, i) => ({ ...s, rank: i + 1 }));
 
     // Never offer someone the viewer already has a connection with.
-    const excluded = await connectedUserIds(admin, user.id);
+    const excluded = await excludedUserIds(admin, user.id);
     const visible = ranked.filter((s) => !excluded.has(s.candidate_id));
 
     await refreshCache(admin, user.id, targetRole, visible, cfg, mode);
@@ -417,3 +430,4 @@ async function refreshCache(
   }));
   await admin.from("match_cache").insert(payload);
 }
+

@@ -53,7 +53,6 @@ MatchedUser matchedUserFromConversation(
             ? PersonRole.learner
             : PersonRole.mentor,
     skillName: conversation.otherSkill ?? '',
-    category: SkillCategory.everydayPractical,
     schedule: '',
     language: '',
     learningStyle: '',

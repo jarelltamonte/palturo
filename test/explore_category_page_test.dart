@@ -87,6 +87,11 @@ Widget _app({
   users,
   Size? surface,
   double textScale = 1,
+  Future<({int total, int fresh, int newcomers})> Function(
+    String path, {
+    required String kind,
+  })?
+  countsLoader,
 }) {
   final size = surface ?? const Size(390, 844);
   return MaterialApp(
@@ -103,6 +108,7 @@ Widget _app({
         mentor: false,
         taxonomyLoader: (path) async => _taxonomy(path),
         usersLoader: users,
+        countsLoader: countsLoader,
       ),
     ),
   );
@@ -115,17 +121,28 @@ Future<void> _pump(
   users,
   Size surface = const Size(390, 844),
   double textScale = 1,
+  Future<({int total, int fresh, int newcomers})> Function(
+    String path, {
+    required String kind,
+  })?
+  countsLoader,
 }) async {
   await tester.binding.setSurfaceSize(surface);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
-    _app(theme: theme, users: users, surface: surface, textScale: textScale),
+    _app(
+      theme: theme,
+      users: users,
+      surface: surface,
+      textScale: textScale,
+      countsLoader: countsLoader,
+    ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('domain page shows the hero, people, skills, and one action', (
+  testWidgets('domain page shows the hero, counts, skills, and one action', (
     tester,
   ) async {
     final users = _FakeUsers();
@@ -137,16 +154,10 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('6'), findsOneWidget);
-    expect(find.text('mentors available'), findsOneWidget);
+    expect(find.text('mentors here'), findsOneWidget);
     expect(find.text('2 learners here'), findsOneWidget);
 
-    expect(find.text('MENTORS HERE'), findsOneWidget);
-    expect(find.text('Person 0'), findsOneWidget);
-    // Four faces then a +N tile.
-    expect(find.text('+2'), findsOneWidget);
-    expect(find.text('more'), findsOneWidget);
-
-    expect(find.text('SKILLS IN THIS DOMAIN'), findsOneWidget);
+    expect(find.text('SKILLS'), findsOneWidget);
     expect(find.text('Filipino cooking'), findsOneWidget);
     expect(find.text('2 mentors'), findsOneWidget);
     expect(find.text('Baking & pastry'), findsOneWidget);
@@ -166,7 +177,7 @@ void main() {
     final users = _FakeUsers(rootTeach: 1);
     await _pump(tester, theme: lightMode, users: users.call);
 
-    expect(find.text('mentor available'), findsOneWidget);
+    expect(find.text('mentor here'), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -181,7 +192,7 @@ void main() {
       find.textContaining('No mentors are free in this domain right now'),
       findsOneWidget,
     );
-    expect(find.text('MENTORS HERE'), findsNothing);
+    expect(find.text('SKILLS'), findsOneWidget);
     expect(find.text('Filipino cooking'), findsOneWidget);
     expect(find.text('Start browsing mentors'), findsNothing);
     // Role switching lives on Browse, so the domain page offers no swap.
@@ -189,6 +200,53 @@ void main() {
     expect(find.textContaining('switch roles'), findsNothing);
     // The empty state still offers a retry.
     expect(find.text('Check again'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an all-matched domain explains the missing people', (
+    tester,
+  ) async {
+    final users = _FakeUsers(noPeople: true);
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: users.call,
+      countsLoader:
+          (path, {required kind}) async => (total: 3, fresh: 0, newcomers: 0),
+    );
+
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('mentors here'), findsOneWidget);
+    expect(
+      find.textContaining('Matched with 3 mentors in this domain'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('No new mentors are free right now'),
+      findsOneWidget,
+    );
+    expect(find.text('Start browsing mentors'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the matched panel uses the singular for one person', (
+    tester,
+  ) async {
+    final users = _FakeUsers(noPeople: true);
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: users.call,
+      countsLoader:
+          (path, {required kind}) async => (total: 1, fresh: 0, newcomers: 0),
+    );
+
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('mentor here'), findsOneWidget);
+    expect(
+      find.textContaining('Matched with 1 mentor in this domain'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -255,7 +313,7 @@ void main() {
       surface: const Size(1120, 900),
     );
 
-    final heroX = tester.getTopLeft(find.text('mentors available')).dx;
+    final heroX = tester.getTopLeft(find.text('mentors here')).dx;
     final skillsX = tester.getTopLeft(find.text('Filipino cooking')).dx;
     expect(skillsX, greaterThan(heroX + 200));
     expect(find.text('Start browsing mentors'), findsOneWidget);

@@ -10,11 +10,9 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/utils/friendly_error.dart';
-import 'package:palturo/utils/media_url.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
-import 'package:palturo/widgets/user_avatar.dart';
 
 /// Category detail sits between the Browse root and the people deck.
 ///
@@ -29,6 +27,7 @@ class ExploreCategoryPage extends StatefulWidget {
     required this.mentor,
     this.taxonomyLoader,
     this.usersLoader,
+    this.countsLoader,
   });
 
   final String nodePath;
@@ -41,6 +40,11 @@ class ExploreCategoryPage extends StatefulWidget {
   taxonomyLoader;
   final Future<List<Person>> Function(String path, {required String kind})?
   usersLoader;
+  final Future<({int total, int fresh, int newcomers})> Function(
+    String path, {
+    required String kind,
+  })?
+  countsLoader;
 
   @override
   State<ExploreCategoryPage> createState() => _ExploreCategoryPageState();
@@ -54,6 +58,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   List<Map<String, dynamic>> _children = const [];
   Map<String, int> _childCounts = const {};
   List<Person> _people = const [];
+  int _total = 0;
   int _otherCount = 0;
   bool _loading = true;
   String? _error;
@@ -65,10 +70,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 
   String get _otherNoun => _mentor ? 'mentor' : 'learner';
 
-  String get _peopleLabel => _mentor ? 'Learners here' : 'Mentors here';
-
-  String get _nounAvailable =>
-      '$_noun${_people.length == 1 ? '' : 's'} available';
+  String get _nounHere => '$_noun${_total == 1 ? '' : 's'} here';
 
   bool get _showDeckCta => !_loading && _error == null && _people.isNotEmpty;
 
@@ -87,6 +89,14 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       widget.usersLoader != null
           ? widget.usersLoader!(path, kind: kind)
           : MatchApi.browseSkillUsers(path, kind: kind);
+
+  Future<({int total, int fresh, int newcomers})> _counts(
+    String path,
+    String kind,
+  ) =>
+      widget.countsLoader != null
+          ? widget.countsLoader!(path, kind: kind)
+          : MatchApi.browsePeopleCounts(path, kind: kind);
 
   Future<void> _load() async {
     final requestId = ++_requestId;
@@ -107,6 +117,16 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         debugPrint('[Browse] taxonomy unavailable: $e');
       }
       final people = await _users(widget.nodePath, kind);
+      var total = people.length;
+      if (widget.countsLoader != null || widget.usersLoader == null) {
+        try {
+          final counts = await _counts(widget.nodePath, kind);
+          total = counts.total;
+        } catch (e) {
+          // The total is explanatory; the loaded people still drive the deck.
+          debugPrint('[Browse] people count unavailable: $e');
+        }
+      }
       if (!mounted || requestId != _requestId) return;
 
       final children = _visibleChildren(
@@ -122,6 +142,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       // Paint the page before the per-skill counts land; the rows fill in.
       setState(() {
         _people = people;
+        _total = total;
         _children = children;
         _childCounts = const {};
         _loading = false;
@@ -189,13 +210,24 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   }
 
   Future<void> _loadOtherCount(int requestId) async {
-    try {
-      final other = await _users(widget.nodePath, _mentor ? 'teach' : 'learn');
-      if (!mounted || requestId != _requestId) return;
-      setState(() => _otherCount = other.length);
-    } catch (_) {
-      // The opposite-role count is decorative; never block the category.
+    final otherKind = _mentor ? 'teach' : 'learn';
+    var count = 0;
+    if (widget.countsLoader != null || widget.usersLoader == null) {
+      try {
+        count = (await _counts(widget.nodePath, otherKind)).total;
+      } catch (_) {
+        // Fall through to the loaded people below.
+      }
     }
+    if (count == 0) {
+      try {
+        count = (await _users(widget.nodePath, otherKind)).length;
+      } catch (_) {
+        // The opposite-role count is decorative; never block the category.
+      }
+    }
+    if (!mounted || requestId != _requestId) return;
+    setState(() => _otherCount = count);
   }
 
   /// Drops child branches with no people anywhere below them. The taxonomy
@@ -247,6 +279,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               mentor: _mentor,
               taxonomyLoader: widget.taxonomyLoader,
               usersLoader: widget.usersLoader,
+              countsLoader: widget.countsLoader,
             ),
       ),
     );
@@ -345,15 +378,9 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   List<Widget> _buildNarrowBody() {
     return [
       _buildHero(),
-      if (_people.isNotEmpty) ...[
-        const SizedBox(height: 24),
-        _buildSectionLabel(_peopleLabel, _people.length),
-        const SizedBox(height: 10),
-        _buildPeople(),
-      ],
       if (_children.isNotEmpty) ...[
         const SizedBox(height: 24),
-        _buildSectionLabel('Skills in this domain', _children.length),
+        _buildSectionLabel('Skills'),
         const SizedBox(height: 10),
         _buildSkills(),
       ],
@@ -383,14 +410,8 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_people.isNotEmpty) ...[
-                _buildSectionLabel(_peopleLabel, _people.length),
-                const SizedBox(height: 10),
-                _buildPeople(),
-              ],
               if (_children.isNotEmpty) ...[
-                if (_people.isNotEmpty) const SizedBox(height: 24),
-                _buildSectionLabel('Skills in this domain', _children.length),
+                _buildSectionLabel('Skills'),
                 const SizedBox(height: 10),
                 _buildSkills(),
               ],
@@ -404,7 +425,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   Widget _buildHero() {
     final muted = AppColors.mutedText(context);
     final accent = AppColors.accentText(context);
-    final count = _people.length;
+    final count = _total;
 
     return Container(
       width: double.infinity,
@@ -456,7 +477,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                 child: const Text('Check again'),
               ),
             ),
-          ] else
+          ] else ...[
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 8,
@@ -471,17 +492,47 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                   ),
                 ),
                 Text(
-                  _nounAvailable,
+                  _nounHere,
                   style: AppTextStyles.regularText.copyWith(
                     color: muted,
                     fontSize: 12,
                   ),
                 ),
+                if (_people.isNotEmpty && _people.length < count) ...[
+                  _buildDot(muted),
+                  Text(
+                    '${_countLabel(_people.length)} available',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
                 if (_otherCount > 0) _buildOtherCount(muted),
               ],
             ),
+            if (_people.isEmpty) ...[
+              const SizedBox(height: 12),
+              _buildEmptyPanel(muted),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _load,
+                  child: const Text('Check again'),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildDot(Color muted) {
+    return Container(
+      width: 3,
+      height: 3,
+      decoration: BoxDecoration(color: muted, shape: BoxShape.circle),
     );
   }
 
@@ -510,6 +561,13 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 
   Widget _buildEmptyPanel(Color muted) {
     final tail = _children.isNotEmpty ? ' Try a skill below.' : '';
+    final matched = _total > 0;
+    final matchedNoun = _total == 1 ? _noun : '${_noun}s';
+    final text =
+        matched
+            ? 'Matched with $_total $matchedNoun in this domain. '
+                'No new ${_noun}s are free right now.$tail'
+            : 'No ${_noun}s are free in this domain right now.$tail';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -519,11 +577,15 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       ),
       child: Row(
         children: [
-          Icon(Icons.groups_outlined, size: 20, color: muted),
+          Icon(
+            matched ? Icons.check_circle_outline : Icons.groups_outlined,
+            size: 20,
+            color: muted,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'No ${_noun}s are free in this domain right now.$tail',
+              text,
               style: AppTextStyles.regularText.copyWith(
                 color: muted,
                 fontSize: 12,
@@ -536,98 +598,22 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     );
   }
 
-  Widget _buildSectionLabel(String label, int count) {
+  Widget _buildSectionLabel(String label) {
     final ink = Theme.of(context).colorScheme.secondary;
-    final muted = AppColors.mutedText(context);
     return Semantics(
       container: true,
       header: true,
-      label: '$label, ${_countLabel(count)}',
+      label: label,
       excludeSemantics: true,
-      child: Row(
-        children: [
-          Flexible(
-            child: Text(
-              label.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.boldText.copyWith(
-                fontSize: 10,
-                letterSpacing: 1.2,
-                color: ink,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _countLabel(count).padLeft(2, '0'),
-            style: AppTextStyles.boldText.copyWith(fontSize: 10, color: muted),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPeople() {
-    final visible = _people.length > 4 ? 4 : _people.length;
-    final remaining = _people.length - visible;
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      clipBehavior: Clip.none,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final person in _people.take(visible)) ...[
-            _PersonTile(person: person),
-            const SizedBox(width: 10),
-          ],
-          if (remaining > 0)
-            Semantics(
-              container: true,
-              button: true,
-              label: '$remaining more ${_noun}s. Start browsing.',
-              onTap: _startBrowsing,
-              excludeSemantics: true,
-              child: InkWell(
-                onTap: _startBrowsing,
-                borderRadius: BorderRadius.circular(26),
-                child: SizedBox(
-                  width: 52,
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.mutedSurface(context),
-                          border: Border.all(color: AppColors.border(context)),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '+$remaining',
-                            style: AppTextStyles.boldText.copyWith(
-                              fontSize: 11,
-                              color: AppColors.mutedText(context),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'more',
-                        style: AppTextStyles.regularText.copyWith(
-                          fontSize: 10,
-                          color: AppColors.mutedText(context),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
+      child: Text(
+        label.toUpperCase(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.boldText.copyWith(
+          fontSize: 10,
+          letterSpacing: 1.2,
+          color: ink,
+        ),
       ),
     );
   }
@@ -732,43 +718,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   }
 }
 
-class _PersonTile extends StatelessWidget {
-  const _PersonTile({required this.person});
-
-  final Person person;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = person.photoUrls.isNotEmpty ? person.photoUrls.first : null;
-
-    return SizedBox(
-      width: 52,
-      child: Column(
-        children: [
-          ExcludeSemantics(
-            child: UserAvatar(
-              name: person.name,
-              image: MediaUrl.image(photo),
-              size: 46,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            person.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.regularText.copyWith(
-              color: AppColors.mutedText(context),
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SkillRow extends StatelessWidget {
   const _SkillRow({
     required this.label,
@@ -867,19 +816,7 @@ class _CategorySkeleton extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const SkeletonBox(width: 110, height: 10),
-          const SizedBox(height: 10),
-          const Row(
-            children: [
-              SkeletonBox(width: 46, height: 46, radius: 23),
-              SizedBox(width: 10),
-              SkeletonBox(width: 46, height: 46, radius: 23),
-              SizedBox(width: 10),
-              SkeletonBox(width: 46, height: 46, radius: 23),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const SkeletonBox(width: 140, height: 10),
+          const SkeletonBox(width: 60, height: 10),
           const SizedBox(height: 10),
           const SkeletonBox(height: 56, radius: 14),
           const SizedBox(height: 8),

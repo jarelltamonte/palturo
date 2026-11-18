@@ -173,15 +173,20 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('mentor mode keeps only domains matching teaching skills', (
+  testWidgets('mentor mode highlights teaching domains and keeps the rest', (
     tester,
   ) async {
     await tester.pumpWidget(
       _app(
         theme: lightMode,
+        surface: const Size(390, 1600),
         skillsLoader:
             () async => [
-              {'kind': 'teach', 'path': 'cooking_culinary'},
+              {
+                'kind': 'teach',
+                'path': 'cooking_culinary.filipino_cooking',
+                'name': 'Filipino Cooking',
+              },
             ],
       ),
     );
@@ -190,11 +195,14 @@ void main() {
     await tester.tap(find.text('Mentor'));
     await tester.pumpAndSettle();
 
+    expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
     expect(find.text('Cooking & Culinary'), findsOneWidget);
-    expect(find.text('Household Skills'), findsNothing);
-    // The only match is already the feature card, so there is no grid.
-    expect(find.text('FEATURED'), findsOneWidget);
-    expect(find.text('MORE DOMAINS'), findsNothing);
+    expect(find.text('Filipino Cooking'), findsOneWidget);
+    expect(find.text('YOU TEACH HERE'), findsOneWidget);
+    // The rest of the directory stays available below the teaching card.
+    expect(find.text('EXPLORE OTHER DOMAINS'), findsOneWidget);
+    expect(find.text('Household Skills'), findsOneWidget);
+    expect(find.text('FEATURED'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -255,6 +263,39 @@ void main() {
     final description = find.text('Recipes, flavors, and kitchen traditions');
     expect(description, findsOneWidget);
     expect(tester.getSize(description).height, greaterThan(20));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mentor cards fit 360 at 200% text', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      _app(
+        theme: lightMode,
+        surface: const Size(360, 1600),
+        textScale: 2,
+        skillsLoader:
+            () async => [
+              {
+                'kind': 'teach',
+                'path': 'cooking_culinary.filipino_cooking',
+                'name': 'Filipino Cooking',
+              },
+              {
+                'kind': 'teach',
+                'path': 'cooking_culinary.filipino_dessert_making',
+                'name': 'Filipino Dessert Making',
+              },
+            ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mentor'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+    expect(find.text('Filipino Cooking'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

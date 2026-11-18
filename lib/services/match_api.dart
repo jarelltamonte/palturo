@@ -878,6 +878,26 @@ class MatchApi {
     return out;
   }
 
+  /// Population counts for one Browse node (a domain or a skill).
+  static Future<({int total, int fresh, int newcomers})> browsePeopleCounts(
+    String nodePath, {
+    String kind = 'teach',
+  }) async {
+    final res =
+        await _Client.c.rpc(
+              'browse_people_counts',
+              params: {'p_node': nodePath, 'p_kind': kind},
+            )
+            as List;
+    final rows = res.whereType<Map>().toList();
+    final row = rows.isEmpty ? null : rows.first;
+    return (
+      total: (row?['total'] as num?)?.toInt() ?? 0,
+      fresh: (row?['fresh'] as num?)?.toInt() ?? 0,
+      newcomers: (row?['newcomers'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   /// Skill users for Explore expand (teach side by default).
   static Future<List<Person>> browseSkillUsers(
     String nodePath, {

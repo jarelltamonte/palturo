@@ -68,6 +68,8 @@ class ExplorePage extends StatefulWidget {
 class _ExplorePageState extends State<ExplorePage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _roots = const [];
+  Set<String> _teachingPaths = const {};
+  Map<String, List<String>> _mentorSkills = const {};
   Map<String, ({int total, int fresh, int newcomers})> _rootCounts = const {};
   bool _hasMentorSkills = false;
   bool _loading = true;
@@ -165,25 +167,54 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   /// Learner: return all roots.
-  /// Mentor: return only roots related to the user's mentor skills. The
-  /// `hasMentorSkills` flag travels with the result so a superseded request
-  /// cannot leave the empty state describing the wrong situation.
-  Future<({List<Map<String, dynamic>> roots, bool hasMentorSkills})>
+  /// Mentor: return the roots related to the user's teaching skills plus the
+  /// skill names per root for the teaching cards. The `hasMentorSkills` flag
+  /// travels with the result so a superseded request cannot leave the empty
+  /// state describing the wrong situation.
+  Future<
+    ({
+      List<Map<String, dynamic>> roots,
+      bool hasMentorSkills,
+      Map<String, List<String>> skillsByRoot,
+    })
+  >
   _filterByRole(List<Map<String, dynamic>> roots) async {
     if (_role == ExploreRole.learner) {
-      return (roots: roots, hasMentorSkills: false);
+      return (
+        roots: roots,
+        hasMentorSkills: false,
+        skillsByRoot: const <String, List<String>>{},
+      );
     }
 
     final skills =
         widget.skillsLoader != null
             ? await widget.skillsLoader!()
             : await MatchApi.mySkills();
+    final teaching = skills.where((skill) => skill['kind'] == 'teach');
     final mentorPaths =
-        skills
-            .where((skill) => skill['kind'] == 'teach')
+        teaching
             .map((skill) => (skill['path'] ?? '') as String)
             .where((path) => path.isNotEmpty)
             .toList();
+
+    final skillsByRoot = <String, List<String>>{};
+    for (final skill in teaching) {
+      final path = (skill['path'] ?? '') as String;
+      if (path.isEmpty) continue;
+      final root = path.split('.').first;
+      final name = (skill['name'] ?? '').toString().trim();
+      final label =
+          name.isNotEmpty
+              ? name
+              : path.split('.').last.replaceAll('_', ' ').trim();
+      if (label.isEmpty) continue;
+      final list = skillsByRoot.putIfAbsent(root, () => <String>[]);
+      if (!list.contains(label)) list.add(label);
+    }
+    for (final list in skillsByRoot.values) {
+      list.sort();
+    }
 
     final filtered =
         roots.where((root) {
@@ -194,7 +225,11 @@ class _ExplorePageState extends State<ExplorePage> {
           );
         }).toList();
 
-    return (roots: filtered, hasMentorSkills: mentorPaths.isNotEmpty);
+    return (
+      roots: filtered,
+      hasMentorSkills: mentorPaths.isNotEmpty,
+      skillsByRoot: skillsByRoot,
+    );
   }
 
   /// Population, fresh, and newcomer counts for every root.
@@ -269,12 +304,22 @@ class _ExplorePageState extends State<ExplorePage> {
       final roots =
           nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
       final roleResult = await _filterByRole(roots);
-      final counts = await _rootCountsFor(roleResult.roots);
+      // Count every root: Mentor mode shows the teaching domains as cards and
+      // the rest in an "Explore other domains" grid.
+      final counts = await _rootCountsFor(roots);
       if (!mounted || requestId != _requestId) return;
       // Keep every domain visible: empty ones still lead to their skills and
       // the empty state, and the daily featured domain should not disappear.
       setState(() {
-        _roots = roleResult.roots;
+        _roots = roots;
+        _teachingPaths =
+            _role == ExploreRole.mentor
+                ? roleResult.roots
+                    .map((root) => (root['path'] ?? '').toString())
+                    .where((path) => path.isNotEmpty)
+                    .toSet()
+                : const <String>{};
+        _mentorSkills = roleResult.skillsByRoot;
         _rootCounts = counts;
         _hasMentorSkills = roleResult.hasMentorSkills;
         _loading = false;
@@ -344,13 +389,35 @@ class _ExplorePageState extends State<ExplorePage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final muted = _fgMuted(context);
-    final featured = _query.trim().isEmpty ? _featuredRoot : null;
+    final queryActive = _query.trim().isNotEmpty;
+    final mentorMode = _role == ExploreRole.mentor;
+    final featured = !queryActive && !mentorMode ? _featuredRoot : null;
     final roots = _filteredRoots;
     final featuredPath = (featured?['path'] ?? '').toString();
-    final gridRoots =
-        featured == null
+    final teachingRoots =
+        mentorMode
             ? roots
-            : roots
+                .where(
+                  (node) =>
+                      _teachingPaths.contains((node['path'] ?? '').toString()),
+                )
+                .toList()
+            : const <Map<String, dynamic>>[];
+    final otherRoots =
+        mentorMode
+            ? roots
+                .where(
+                  (node) =>
+                      !_teachingPaths.contains((node['path'] ?? '').toString()),
+                )
+                .toList()
+            : roots;
+    final gridRoots =
+        queryActive
+            ? roots
+            : featured == null
+            ? otherRoots
+            : otherRoots
                 .where(
                   (node) => (node['path'] ?? '').toString() != featuredPath,
                 )
@@ -402,6 +469,8 @@ class _ExplorePageState extends State<ExplorePage> {
               ),
             ),
             const SizedBox(height: 12),
+            _RoleToggle(value: _role, onChanged: _onRoleChanged),
+            const SizedBox(height: 10),
             _FieldGuideSearch(
               controller: _searchController,
               query: _query,
@@ -411,8 +480,6 @@ class _ExplorePageState extends State<ExplorePage> {
                 setState(() => _query = '');
               },
             ),
-            const SizedBox(height: 10),
-            _RoleToggle(value: _role, onChanged: _onRoleChanged),
             const SizedBox(height: 14),
             if (_loading)
               const _FieldGuideSkeleton()
@@ -422,7 +489,41 @@ class _ExplorePageState extends State<ExplorePage> {
               _buildEmptyState(context)
             else if (roots.isEmpty)
               _buildSearchEmpty(context)
-            else ...[
+            else if (mentorMode && !queryActive && teachingRoots.isEmpty)
+              _buildEmptyState(context)
+            else if (mentorMode && !queryActive) ...[
+              if (teachingRoots.isNotEmpty) ...[
+                _buildMentorSectionLabel(
+                  context,
+                  'YOUR TEACHING DOMAINS',
+                  hint:
+                      '${teachingRoots.length} '
+                      'domain${teachingRoots.length == 1 ? '' : 's'}',
+                ),
+                const SizedBox(height: 8),
+                for (final root in teachingRoots) ...[
+                  _TeachingDomainCard(
+                    label: (root['name'] ?? '').toString(),
+                    description: _descriptionFor(root),
+                    icon: exploreRootIcon((root['path'] ?? '').toString()),
+                    total: _countFor(root).total,
+                    newcomers: _countFor(root).newcomers,
+                    skills:
+                        _mentorSkills[(root['path'] ?? '').toString()] ??
+                        const <String>[],
+                    countLabel: _roleNoun,
+                    onTap: () => _openCategory(root),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                if (gridRoots.isNotEmpty) const SizedBox(height: 6),
+              ],
+              if (gridRoots.isNotEmpty) ...[
+                _buildMentorSectionLabel(context, 'EXPLORE OTHER DOMAINS'),
+                const SizedBox(height: 8),
+                _buildDomainGrid(context, gridRoots),
+              ],
+            ] else ...[
               if (featured != null) ...[
                 _FeaturedDomainCard(
                   label: (featured['name'] ?? '').toString(),
@@ -465,6 +566,36 @@ class _ExplorePageState extends State<ExplorePage> {
         letterSpacing: 1.2,
         color: muted,
       ),
+    );
+  }
+
+  Widget _buildMentorSectionLabel(
+    BuildContext context,
+    String label, {
+    String? hint,
+  }) {
+    final muted = _fgMuted(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: AppTextStyles.boldText.copyWith(
+              fontSize: 10,
+              letterSpacing: 1.2,
+              color: muted,
+            ),
+          ),
+        ),
+        if (hint != null)
+          Text(
+            hint,
+            style: AppTextStyles.regularText.copyWith(
+              fontSize: 11,
+              color: muted,
+            ),
+          ),
+      ],
     );
   }
 
@@ -1095,6 +1226,209 @@ class _FeaturedDomainCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeachingDomainCard extends StatelessWidget {
+  const _TeachingDomainCard({
+    required this.label,
+    required this.description,
+    required this.icon,
+    required this.total,
+    required this.newcomers,
+    required this.skills,
+    required this.countLabel,
+    required this.onTap,
+  });
+
+  final String label;
+  final String description;
+  final IconData icon;
+  final int total;
+  final int newcomers;
+  final List<String> skills;
+  final String countLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = _fgCard(context);
+    final border = _fgBorder(context);
+    final ink = _fgInk(context);
+    final muted = _fgMuted(context);
+    final accent = AppColors.accentText(context);
+    final visibleSkills = skills.take(3).toList();
+    final extra = skills.length - visibleSkills.length;
+
+    return Semantics(
+      container: true,
+      button: true,
+      label:
+          '$label. $description. '
+          '${_domainCountText(total, newcomers, countLabel)}. '
+          '${skills.isEmpty ? '' : '${skills.join(', ')}. '}'
+          'Browse ${countLabel}s.',
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Material(
+        color: card,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: exploreTileTint(context),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(icon, size: 22, color: accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            label,
+                            style: AppTextStyles.boldText.copyWith(
+                              fontSize: 16,
+                              color: ink,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            description,
+                            style: AppTextStyles.regularText.copyWith(
+                              fontSize: 11.5,
+                              height: 1.35,
+                              color: muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          total <= 0
+                              ? 'No ${countLabel}s yet'
+                              : _countLabelText(total, countLabel),
+                          style: AppTextStyles.boldText.copyWith(
+                            fontSize: 10.5,
+                            color: total > 0 ? accent : muted,
+                          ),
+                        ),
+                        if (newcomers > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            newcomers >= 50 ? '50+ new' : '$newcomers new',
+                            style: AppTextStyles.boldText.copyWith(
+                              fontSize: 10,
+                              color: accent,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+                if (skills.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final skill in visibleSkills)
+                        _MentorSkillChip(label: skill),
+                      if (extra > 0) _MentorSkillChip(label: '+$extra'),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Divider(height: 1, thickness: 1, color: border),
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'YOU TEACH HERE',
+                      style: AppTextStyles.boldText.copyWith(
+                        fontSize: 9,
+                        letterSpacing: 0.7,
+                        color: accent,
+                      ),
+                    ),
+                    const Spacer(),
+                    Flexible(
+                      child: Text(
+                        'Browse ${countLabel}s',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.boldText.copyWith(
+                          fontSize: 11.5,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.chevron_right, size: 18, color: accent),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MentorSkillChip extends StatelessWidget {
+  const _MentorSkillChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = Theme.of(context).colorScheme.secondary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: ink.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: AppTextStyles.regularText.copyWith(
+          color: ink.withValues(alpha: 0.8),
+          fontSize: 12,
         ),
       ),
     );

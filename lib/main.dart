@@ -28,9 +28,25 @@ import 'package:palturo/config/app_config.dart';
 
 /// Only HTTPS links on the owned auth origin may inject a Supabase session.
 /// The custom `palturo://` scheme is used only for the tokenless app reopen.
-bool _isTrustedAuthCallback(Uri uri) =>
-    uri.scheme == 'https' &&
-    (uri.host == 'palturo.app' || uri.host == 'www.palturo.app');
+///
+/// The host check alone is not enough: Supabase parses the launch URL whenever
+/// this returns true, so an ordinary page load (`/?v=...`) would throw
+/// "No code detected in query parameters". Require actual auth material.
+bool _isTrustedAuthCallback(Uri uri) {
+  if (uri.scheme != 'https') return false;
+  if (uri.host != 'palturo.app' && uri.host != 'www.palturo.app') {
+    return false;
+  }
+  final query = uri.queryParameters;
+  final fragment = uri.fragment;
+  bool has(String key) => query.containsKey(key) || fragment.contains('$key=');
+  return has('code') ||
+      has('access_token') ||
+      has('refresh_token') ||
+      has('error') ||
+      has('error_description') ||
+      has('type');
+}
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();

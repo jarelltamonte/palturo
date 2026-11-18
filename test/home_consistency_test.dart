@@ -70,7 +70,7 @@ void main() {
       'p_showcases': <dynamic>[],
     }, 'p1');
 
-    expect(person.skillName, 'barong embroidery');
+    expect(person.skillName, 'Barong Embroidery');
     expect(person.skillNote, 'Teaching note');
   });
 
@@ -99,7 +99,7 @@ void main() {
       'p_showcases': <dynamic>[],
     }, 'p1');
 
-    expect(person.skillName, 'cooking adobo');
+    expect(person.skillName, 'Cooking Adobo');
     expect(person.skillNote, 'Learning note');
   });
 
@@ -158,3 +158,4 @@ void main() {
     );
   });
 }
+

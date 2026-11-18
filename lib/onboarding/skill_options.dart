@@ -26,7 +26,11 @@ const kSelectableSkills = <OnboardingOption>[
   OnboardingOption('graphic_design', 'Graphic Design'),
   OnboardingOption('motorcycle_maintenance', 'Motorcycle Maintenance'),
   OnboardingOption('nail_art', 'Nail Art'),
-  OnboardingOption('programming', 'Programming'),
+  // Programming is a category; these are the selectable skills under it.
+  OnboardingOption('general_programming', 'General Programming'),
+  OnboardingOption('python_programming', 'Python Programming'),
+  OnboardingOption('c_sharp_programming', 'C# Programming'),
+  OnboardingOption('web_development', 'Web Development'),
   OnboardingOption('sewing', 'Sewing'),
   OnboardingOption('tshirt_printing', 'T-Shirt Printing'),
   OnboardingOption('woodworking', 'Woodworking'),
@@ -60,7 +64,10 @@ const Map<String, String> kSkillToCategorySlug = {
   'graphic_design': 'everyday_skills',
   'motorcycle_maintenance': 'everyday_skills',
   'nail_art': 'everyday_skills',
-  'programming': 'everyday_skills',
+  'general_programming': 'everyday_skills',
+  'python_programming': 'everyday_skills',
+  'c_sharp_programming': 'everyday_skills',
+  'web_development': 'everyday_skills',
   'sewing': 'everyday_skills',
   'tshirt_printing': 'everyday_skills',
   'woodworking': 'everyday_skills',
@@ -116,14 +123,18 @@ String? selectableSkillIdForLabel(String label) {
   return null;
 }
 
-/// The depth-2 option id encoded in a taxonomy path such as
+/// The selectable option id encoded in a taxonomy path.
+///
+/// Skills may live at any depth (`...programming.python_programming`), so the
+/// leaf segment is checked first, then any ancestor for legacy paths such as
 /// `cooking_culinary.filipino_cooking.sourdough_baking`.
 String? selectableSkillIdForPath(String path) {
   final parts = path.split('.').where((part) => part.isNotEmpty).toList();
-  if (parts.length < 2) return null;
-  final candidate = kLegacySkillIdAliases[parts[1]] ?? parts[1];
-  for (final option in kSelectableSkills) {
-    if (option.id == candidate) return option.id;
+  for (final raw in parts.reversed) {
+    final candidate = kLegacySkillIdAliases[raw] ?? raw;
+    for (final option in kSelectableSkills) {
+      if (option.id == candidate) return option.id;
+    }
   }
   return null;
 }
@@ -183,3 +194,4 @@ List<String> resolveCategoriesForSkills(Iterable<String> skills) {
   }
   return categories.toList();
 }
+

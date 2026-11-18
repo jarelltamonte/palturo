@@ -111,7 +111,11 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 
       final children = _visibleChildren(
         nodes
-            .where((n) => (n['depth'] as num?)?.toInt() == rootDepth + 1)
+            .where(
+              (n) =>
+                  (n['depth'] as num?)?.toInt() == rootDepth + 1 &&
+                  (n['kind'] ?? '') != 'focus',
+            )
             .toList(),
         nodes,
       );

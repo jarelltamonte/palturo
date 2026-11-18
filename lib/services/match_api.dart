@@ -319,12 +319,14 @@ class MatchApi {
     String skillNote = '';
     if (skillEntries.isNotEmpty) {
       final entry = skillEntries.first as Map;
-      // leaf name only (short-form template) - full chain lives in the profile dialog
+      // Prefer the node name: the path leaf is a slug and loses casing and
+      // symbols ("python_programming", "c_sharp_programming").
       final raw = ((entry['path'] ?? '') as String);
       skillPath = raw;
+      final entryName = (entry['skill'] ?? '').toString().trim();
       skill =
-          raw.isEmpty
-              ? ((entry['skill'] ?? '') as String)
+          entryName.isNotEmpty
+              ? entryName
               : raw.split('.').last.replaceAll('_', ' ').trim();
       if (preferred.isNotEmpty) {
         skillNote = ((entry['note'] as String?) ?? '').trim();

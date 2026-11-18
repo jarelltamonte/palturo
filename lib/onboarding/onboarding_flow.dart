@@ -284,13 +284,11 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       );
     }
 
-    // A depth-2 match becomes the canonical chip. A specific leaf stays as a
-    // custom chip so the review keeps the user's wording; save stores the
-    // depth-2 parent and keeps the leaf as the matching focus.
-    final pathParts =
-        verdict.path.split('.').where((part) => part.isNotEmpty).toList();
-    final canonicalId =
-        pathParts.length == 2 ? selectableSkillIdForPath(verdict.path) : null;
+    // Any selectable id on the path becomes the canonical chip, regardless of
+    // the node's depth. A focus leaf still resolves to its parent skill; a
+    // genuinely new skill keeps the user's wording and stores as a custom
+    // pending skill.
+    final canonicalId = selectableSkillIdForPath(verdict.path);
     final id = canonicalId ?? 'other:onboarding:${verdict.name}';
     final displayName = selectableSkillLabelForId(id) ?? verdict.name;
 

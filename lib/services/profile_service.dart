@@ -11,7 +11,8 @@ import '../onboarding/onboarding_models.dart'
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/onboarding_flow.dart' show resolveCategoriesForSkills;
-import '../onboarding/skill_options.dart' show onboardingInterestLabel;
+import '../onboarding/skill_options.dart'
+    show onboardingInterestLabel, selectableSkillLabelForId;
 import '../screen/utils/schedule_format.dart';
 import '../utils/media_url.dart';
 import 'match_api.dart';
@@ -844,7 +845,7 @@ class ProfileService {
       } else if (!skill.startsWith(kOtherPrefix) &&
           skill.toLowerCase() != 'other' &&
           skill.toLowerCase() != 'others') {
-        resolved = _toTitleCase(skill);
+        resolved = selectableSkillLabelForId(skill) ?? _toTitleCase(skill);
       }
       if (resolved != null && resolved.isNotEmpty) {
         final note = updatedProfile.learningNotes[skill] ?? '';
@@ -893,7 +894,7 @@ class ProfileService {
       } else if (!skill.startsWith(kOtherPrefix) &&
           skill.toLowerCase() != 'other' &&
           skill.toLowerCase() != 'others') {
-        formatted = _toTitleCase(skill);
+        formatted = selectableSkillLabelForId(skill) ?? _toTitleCase(skill);
         skillIdToResolvedName[skill] = formatted;
       }
       if (formatted != null && formatted.isNotEmpty) {

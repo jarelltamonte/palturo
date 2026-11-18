@@ -55,7 +55,11 @@ void main() async {
   await DraftService.instance.init();
   unawaited(ConnectivityService.instance.init());
   AppBadgeService.instance.init();
-  unawaited(ChatPrivacyService.instance.loadIfNeeded());
+  // Only load privacy once a session exists; on a signed-out launch the RPC
+  // would 401 and log console noise. ChatStateService retries on sign-in.
+  if (Supabase.instance.client.auth.currentUser != null) {
+    unawaited(ChatPrivacyService.instance.loadIfNeeded());
+  }
   unawaited(SoundService.instance.init());
   if (PreferencesService.instance.soundEnabled) {
     unawaited(SoundService.instance.play(AppSound.success));

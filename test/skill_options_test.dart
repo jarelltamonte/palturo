@@ -21,32 +21,54 @@ void main() {
     expect(kTeachingOptions, same(kLearningOptions));
   });
 
-  test('every selectable option maps to one of the four match buckets', () {
+  test('every selectable option maps to one of the taxonomy roots', () {
+    const roots = {
+      'agriculture_livelihood',
+      'cooking_culinary',
+      'household_skills',
+      'language_writing',
+      'martial_arts',
+      'modern_practical_skills',
+      'performing_arts',
+      'traditional_crafts',
+      'visual_arts_design',
+    };
     for (final option in kSelectableSkills) {
       if (option.id == 'others') continue;
+      final mapped = kSkillToCategorySlug[option.id];
       expect(
-        kSkillToCategorySlug.containsKey(option.id),
-        isTrue,
+        mapped,
+        isNotNull,
         reason: '${option.label} has no category mapping',
+      );
+      expect(
+        roots,
+        contains(mapped),
+        reason: '${option.label} maps to a retired bucket ($mapped)',
       );
     }
   });
 
-  test('labels and ids both resolve to a category', () {
+  test('labels and ids both resolve to the current root category', () {
     expect(resolveCategoriesForSkills(['filipino_cooking']), [
-      'everyday_skills',
+      'cooking_culinary',
     ]);
     expect(resolveCategoriesForSkills(['Filipino Dessert Making']), [
-      'everyday_skills',
+      'cooking_culinary',
     ]);
     expect(resolveCategoriesForSkills(['Python Programming']), [
-      'everyday_skills',
+      'modern_practical_skills',
     ]);
     expect(resolveCategoriesForSkills(['Farming']), ['agriculture_livelihood']);
     expect(resolveCategoriesForSkills(['Filipino Embroidery']), [
-      'arts_design',
+      'traditional_crafts',
     ]);
-    expect(resolveCategoriesForSkills(['Vocal Music']), ['language_culture']);
+    expect(resolveCategoriesForSkills(['Vocal Music']), ['performing_arts']);
+    // Legacy bucket slugs from older saves are rewritten, not kept.
+    expect(resolveCategoriesForSkills(['everyday_skills']), [
+      'modern_practical_skills',
+    ]);
+    expect(resolveCategoriesForSkills(['arts_design']), ['visual_arts_design']);
   });
 
   test('option ids resolve back to their labels', () {
@@ -92,4 +114,3 @@ void main() {
     expect(onboardingInterestLabel('others'), 'Others');
   });
 }
-

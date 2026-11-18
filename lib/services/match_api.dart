@@ -421,31 +421,36 @@ class MatchApi {
     final key = _deckKey(asRoleDb);
     final matches = await getMatches(asRole: asRoleDb, useCache: !force);
     final targetMatches = matches.take(enrichLimit).toList();
-    final out = <Person>[];
-    for (final m in targetMatches) {
-      final person = await getPersonFromPublicProfile(m.userId);
-      if (person == null) continue;
-      // carry the compatibility score onto the card (spec §6.3 indicator)
-      final compat = m.compatibility;
-      out.add(
-        Person(
-          id: person.id,
-          name: person.name,
-          schedule: person.schedule,
-          language: person.language,
-          learningStyle: person.learningStyle,
-          skillName: person.skillName,
-          skillPath: person.skillPath,
-          role: person.role,
-          bio: person.bio,
-          skillNote: person.skillNote,
-          photoUrls: person.photoUrls,
-          showcaseUrls: person.showcaseUrls,
-          compatibility: compat,
-          pipeline: m.pipeline,
-        ),
-      );
-    }
+    // Enrich concurrently: a cold deck used to make ten sequential profile
+    // round trips and could exceed the screen's load budget on its own.
+    final enriched = await Future.wait(
+      targetMatches.map((m) async {
+        try {
+          final person = await getPersonFromPublicProfile(m.userId);
+          if (person == null) return null;
+          // carry the compatibility score onto the card (spec §6.3 indicator)
+          return Person(
+            id: person.id,
+            name: person.name,
+            schedule: person.schedule,
+            language: person.language,
+            learningStyle: person.learningStyle,
+            skillName: person.skillName,
+            skillPath: person.skillPath,
+            role: person.role,
+            bio: person.bio,
+            skillNote: person.skillNote,
+            photoUrls: person.photoUrls,
+            showcaseUrls: person.showcaseUrls,
+            compatibility: m.compatibility,
+            pipeline: m.pipeline,
+          );
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    final out = enriched.whereType<Person>().toList();
     // Guard against a user switch during the fetch.
     if (key == _deckKey(asRoleDb)) {
       _deckCache[key] = out;

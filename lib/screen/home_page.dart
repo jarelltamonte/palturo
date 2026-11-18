@@ -36,8 +36,11 @@ enum RoleFilter { all, learner, mentor }
 const kDeckSlowThreshold = Duration(seconds: 4);
 
 /// Hard cap for a cold deck load. After this the UI offers a retry.
+///
+/// The matcher may spend its full rerank budget (9s) on a cold edge-function
+/// start, so this leaves room for that plus the profile reads.
 @visibleForTesting
-const kDeckTimeout = Duration(seconds: 12);
+const kDeckTimeout = Duration(seconds: 18);
 
 /// Hard cap for sending a connection request. A hanging request must not leave
 /// the deck stuck on its "Sending request…" surface forever.

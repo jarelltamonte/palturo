@@ -88,7 +88,11 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       data,
     ) {
       final event = data.event;
-      if (event == AuthChangeEvent.signedIn) {
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.initialSession) {
+        // initialSession covers a restored web session: signedIn does not fire
+        // when the session comes from storage on a reload.
+        if (Supabase.instance.client.auth.currentUser == null) return;
         unawaited(ChatPrivacyService.instance.load());
         loadConversations();
         _startRefreshTimer();

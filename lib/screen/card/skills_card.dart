@@ -19,21 +19,42 @@ const kMaxSuggestions = 5;
 const kSkillFieldHeight = 56.0;
 
 const kSkillCategories = <({String id, String label, IconData icon})>[
-  (id: 'arts_design', label: 'Arts and Design', icon: Icons.palette_outlined),
   (
-    id: 'language_culture',
-    label: 'Language and Cultural Knowledge',
-    icon: Icons.translate,
+    id: 'agriculture_livelihood',
+    label: 'Agriculture & Livelihood',
+    icon: Icons.agriculture_outlined,
   ),
   (
-    id: 'everyday_skills',
-    label: 'Everyday Practical Skills',
+    id: 'cooking_culinary',
+    label: 'Cooking & Culinary',
+    icon: Icons.restaurant_outlined,
+  ),
+  (
+    id: 'household_skills',
+    label: 'Household Skills',
+    icon: Icons.home_repair_service_outlined,
+  ),
+  (id: 'language_writing', label: 'Language & Writing', icon: Icons.translate),
+  (id: 'martial_arts', label: 'Martial Arts', icon: Icons.sports_martial_arts),
+  (
+    id: 'modern_practical_skills',
+    label: 'Modern Practical Skills',
     icon: Icons.handyman_outlined,
   ),
   (
-    id: 'agriculture_livelihood',
-    label: 'Agriculture and Livelihood',
-    icon: Icons.agriculture_outlined,
+    id: 'performing_arts',
+    label: 'Performing Arts',
+    icon: Icons.music_note_outlined,
+  ),
+  (
+    id: 'traditional_crafts',
+    label: 'Traditional Crafts',
+    icon: Icons.palette_outlined,
+  ),
+  (
+    id: 'visual_arts_design',
+    label: 'Visual Arts & Design',
+    icon: Icons.brush_outlined,
   ),
 ];
 
@@ -55,25 +76,50 @@ const _kSmallWords = <String>{
 };
 
 const _kKeywordCategories = <String, String>{
-  'cook': 'everyday_skills',
-  'bake': 'everyday_skills',
-  'repair': 'everyday_skills',
-  'martial': 'everyday_skills',
-  'sew': 'arts_design',
-  'weav': 'arts_design',
-  'embroid': 'arts_design',
-  'paint': 'arts_design',
-  'draw': 'arts_design',
-  'craft': 'arts_design',
-  'pottery': 'arts_design',
-  'carv': 'arts_design',
-  'dance': 'language_culture',
-  'sing': 'language_culture',
-  'music': 'language_culture',
-  'drum': 'language_culture',
-  'script': 'language_culture',
-  'language': 'language_culture',
-  'tagalog': 'language_culture',
+  'cook': 'cooking_culinary',
+  'bake': 'cooking_culinary',
+  'dish': 'cooking_culinary',
+  'adobo': 'cooking_culinary',
+  'sinigang': 'cooking_culinary',
+  'pinakbet': 'cooking_culinary',
+  'kakanin': 'cooking_culinary',
+  'dessert': 'cooking_culinary',
+  'recipe': 'cooking_culinary',
+  'food': 'cooking_culinary',
+  'ulam': 'cooking_culinary',
+  'puto': 'cooking_culinary',
+  'kitchen': 'household_skills',
+  'home': 'household_skills',
+  'repair': 'household_skills',
+  'sew': 'household_skills',
+  'martial': 'martial_arts',
+  'arnis': 'martial_arts',
+  'eskrima': 'martial_arts',
+  'weav': 'traditional_crafts',
+  'embroid': 'traditional_crafts',
+  'craft': 'traditional_crafts',
+  'pottery': 'traditional_crafts',
+  'carv': 'traditional_crafts',
+  'lantern': 'traditional_crafts',
+  'parol': 'traditional_crafts',
+  'barong': 'traditional_crafts',
+  'inabel': 'traditional_crafts',
+  'paint': 'visual_arts_design',
+  'draw': 'visual_arts_design',
+  'design': 'visual_arts_design',
+  'dance': 'performing_arts',
+  'sing': 'performing_arts',
+  'music': 'performing_arts',
+  'drum': 'performing_arts',
+  'tinikling': 'performing_arts',
+  'kundiman': 'performing_arts',
+  'kulintang': 'performing_arts',
+  'script': 'language_writing',
+  'language': 'language_writing',
+  'tagalog': 'language_writing',
+  'baybayin': 'language_writing',
+  'write': 'language_writing',
+  'calligraph': 'language_writing',
   'farm': 'agriculture_livelihood',
   'plant': 'agriculture_livelihood',
   'garden': 'agriculture_livelihood',
@@ -87,7 +133,7 @@ String guessSkillCategory(String text) {
   for (final entry in _kKeywordCategories.entries) {
     if (lower.contains(entry.key)) return entry.value;
   }
-  return 'everyday_skills';
+  return 'modern_practical_skills';
 }
 
 ({String id, String label, IconData icon})? categoryById(String? id) {

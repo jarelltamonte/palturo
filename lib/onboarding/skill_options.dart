@@ -48,41 +48,57 @@ const kSelectableSkills = <OnboardingOption>[
   OnboardingOption('others', 'Others'),
 ];
 
-/// The four broad buckets used by profile matching, mapped from the depth-2
-/// taxonomy node ids.
+/// The taxonomy root each selectable skill belongs to.
+///
+/// Keys are the selectable (depth-2) ids; values are the root category paths
+/// used by Browse, the profile card, and `profiles.skill_categories`.
 const Map<String, String> kSkillToCategorySlug = {
   'farming': 'agriculture_livelihood',
   'fishing': 'agriculture_livelihood',
   'local_trades': 'agriculture_livelihood',
 
-  'filipino_dessert_making': 'everyday_skills',
-  'filipino_cooking': 'everyday_skills',
-  'home_decorating': 'everyday_skills',
-  'kitchen_basics': 'everyday_skills',
-  'filipino_martial_arts': 'everyday_skills',
-  'flairtending': 'everyday_skills',
-  'graphic_design': 'everyday_skills',
-  'motorcycle_maintenance': 'everyday_skills',
-  'nail_art': 'everyday_skills',
-  'general_programming': 'everyday_skills',
-  'python_programming': 'everyday_skills',
-  'c_sharp_programming': 'everyday_skills',
-  'web_development': 'everyday_skills',
-  'sewing': 'everyday_skills',
-  'tshirt_printing': 'everyday_skills',
-  'woodworking': 'everyday_skills',
+  'filipino_dessert_making': 'cooking_culinary',
+  'filipino_cooking': 'cooking_culinary',
 
-  'calligraphy': 'language_culture',
-  'philippine_script_writing': 'language_culture',
-  'folk_dance': 'language_culture',
-  'traditional_music': 'language_culture',
-  'vocal_music': 'language_culture',
+  'home_decorating': 'household_skills',
+  'kitchen_basics': 'household_skills',
 
-  'costume_making': 'arts_design',
-  'filipino_embroidery': 'arts_design',
-  'parol_lantern_making': 'arts_design',
-  'philippine_handweaving': 'arts_design',
-  'painting': 'arts_design',
+  'calligraphy': 'language_writing',
+  'philippine_script_writing': 'language_writing',
+
+  'filipino_martial_arts': 'martial_arts',
+
+  'flairtending': 'modern_practical_skills',
+  'graphic_design': 'modern_practical_skills',
+  'motorcycle_maintenance': 'modern_practical_skills',
+  'nail_art': 'modern_practical_skills',
+  'general_programming': 'modern_practical_skills',
+  'python_programming': 'modern_practical_skills',
+  'c_sharp_programming': 'modern_practical_skills',
+  'web_development': 'modern_practical_skills',
+  'sewing': 'modern_practical_skills',
+  'tshirt_printing': 'modern_practical_skills',
+  'woodworking': 'modern_practical_skills',
+
+  'folk_dance': 'performing_arts',
+  'traditional_music': 'performing_arts',
+  'vocal_music': 'performing_arts',
+
+  'costume_making': 'traditional_crafts',
+  'filipino_embroidery': 'traditional_crafts',
+  'parol_lantern_making': 'traditional_crafts',
+  'philippine_handweaving': 'traditional_crafts',
+
+  'painting': 'visual_arts_design',
+};
+
+/// Pre-taxonomy bucket slugs that can still appear in saved profiles and
+/// drafts. They map to the root category that replaced them so a re-save
+/// rewrites the value instead of keeping a dead slug.
+const Map<String, String> kLegacyCategoryAliases = {
+  'everyday_skills': 'modern_practical_skills',
+  'language_culture': 'language_writing',
+  'arts_design': 'visual_arts_design',
 };
 
 /// Drafts and cached selections can still carry the pre-rename ids. Map them
@@ -168,6 +184,11 @@ List<String> resolveCategoriesForSkills(Iterable<String> skills) {
     if (value.isEmpty) continue;
 
     final lower = value.toLowerCase();
+    final legacy = kLegacyCategoryAliases[lower];
+    if (legacy != null) {
+      categories.add(legacy);
+      continue;
+    }
     final canonicalId =
         kLegacySkillIdAliases[lower] ?? kLegacySkillLabelAliases[lower];
     final direct = kSkillToCategorySlug[canonicalId ?? lower];
@@ -194,4 +215,3 @@ List<String> resolveCategoriesForSkills(Iterable<String> skills) {
   }
   return categories.toList();
 }
-

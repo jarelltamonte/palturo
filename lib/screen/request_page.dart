@@ -149,6 +149,22 @@ enum SortFilter { newest, oldest, ascending, descending }
 
 enum RequestView { incoming, sent }
 
+/// Requests store the skill name as it was sent, which older rows saved in
+/// lower case. Filter labels title-case it without changing the filter value.
+String _titleCaseSkill(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return trimmed;
+  return trimmed
+      .split(RegExp(r'\s+'))
+      .map(
+        (word) =>
+            word.isEmpty
+                ? word
+                : word[0].toUpperCase() + word.substring(1).toLowerCase(),
+      )
+      .join(' ');
+}
+
 class RequestPage extends StatefulWidget {
   final ValueListenable<int>? refreshSignal;
   final RequestView initialView;
@@ -209,7 +225,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
           title: 'Skill',
           options: [
             const FilterOption('All skills', 'all'),
-            for (final skill in skills) FilterOption(skill, skill),
+            for (final skill in skills)
+              FilterOption(_titleCaseSkill(skill), skill),
           ],
         ),
       const FilterSection(
@@ -384,8 +401,21 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       final incoming = await MatchApi.getIncomingRequests();
       if (!mounted) return;
       setState(() {
-        _requests = incoming.map((r) => r.toConnectionRequest()).toList();
-        _declinedIds.clear();
+        final fresh = incoming.map((r) => r.toConnectionRequest()).toList();
+        final freshIds = fresh.map((request) => request.id).toSet();
+        // A decline flips the card in place and offers Undo for five seconds.
+        // The server stops returning the request immediately, so keep the
+        // local copy until that window closes or the card would vanish before
+        // the user can undo.
+        final pendingUndo =
+            _requests
+                .where(
+                  (request) =>
+                      _declinedIds.contains(request.id) &&
+                      !freshIds.contains(request.id),
+                )
+                .toList();
+        _requests = [...pendingUndo, ...fresh];
         _loading = false;
         _loadError = null;
       });

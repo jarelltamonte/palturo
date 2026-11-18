@@ -183,8 +183,9 @@ class _ExplorePageState extends State<ExplorePage> {
     return (roots: filtered, hasMentorSkills: mentorPaths.isNotEmpty);
   }
 
-  /// Counts the people available under each root for the active role. Empty
-  /// branches are hidden and the counts make the remaining cards informative.
+  /// Counts the people available under each root for the active role. The
+  /// counts make every card informative; empty roots stay listed with a
+  /// "No mentors yet" label instead of disappearing.
   Future<Map<String, int>> _rootCountsFor(
     List<Map<String, dynamic>> roots,
   ) async {

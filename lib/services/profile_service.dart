@@ -511,6 +511,12 @@ class ProfileService {
       resolvedTeaching.map((name) => {'name': name}).toList(),
     );
 
+    // Prefer the categories the RPC actually stored: a custom skill may have
+    // classified to a taxonomy node the client map does not contain.
+    final savedCategories = await _categoryRootsFromSkills();
+    final categorySlugs =
+        savedCategories.isNotEmpty ? savedCategories : calculatedCategories;
+
     Map<String, dynamic>? saved;
     try {
       saved =
@@ -522,7 +528,7 @@ class ProfileService {
                 'teaching_styles': controller.teachingStyles.toList(),
                 'languages': controller.languages.toList(),
                 'availability': availableDays,
-                'skill_categories': calculatedCategories,
+                'skill_categories': categorySlugs,
                 'has_completed_onboarding': true,
                 'is_profile_completed': isComplete,
                 'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -835,12 +841,13 @@ class ProfileService {
             );
           }
           resolved = classified.name;
+          // The classifier returns the taxonomy node; its root is the only
+          // reliable category for a custom skill.
+          final root = classified.path.split('.').first.trim();
+          if (root.isNotEmpty) allCategorySlugs.add(root);
         } on SkillModerationException catch (e) {
           rejectedSkills.addAll(e.skills);
           continue;
-        }
-        if (custom.categoryId.isNotEmpty) {
-          allCategorySlugs.add(custom.categoryId);
         }
       } else if (!skill.startsWith(kOtherPrefix) &&
           skill.toLowerCase() != 'other' &&
@@ -882,15 +889,14 @@ class ProfileService {
             );
           }
           formatted = classified.name;
+          final root = classified.path.split('.').first.trim();
+          if (root.isNotEmpty) allCategorySlugs.add(root);
         } on SkillModerationException catch (e) {
           rejectedSkills.addAll(e.skills);
           continue;
         }
         skillIdToResolvedName[skill] = formatted;
         skillIdToResolvedName[custom.text] = formatted;
-        if (custom.categoryId.isNotEmpty) {
-          allCategorySlugs.add(custom.categoryId);
-        }
       } else if (!skill.startsWith(kOtherPrefix) &&
           skill.toLowerCase() != 'other' &&
           skill.toLowerCase() != 'others') {
@@ -1109,6 +1115,15 @@ class ProfileService {
     // the UI reports the failure and the save is safe to retry.
     await _saveUserSkills(learningPayload, teachingPayload);
 
+    // Derive the cached category buckets from what the RPC actually stored.
+    // Custom skills classify to nodes the client map cannot know (for example
+    // a focus such as "Cooking Adobo"), so the DB is the source of truth.
+    final savedCategories = await _categoryRootsFromSkills();
+    final categorySlugs =
+        savedCategories.isNotEmpty
+            ? savedCategories
+            : allCategorySlugs.toList();
+
     await _supabase
         .from('profiles')
         .update({
@@ -1117,7 +1132,7 @@ class ProfileService {
           'photos': safePhotos,
           'teaching_skill_images': safeSkillImages,
           'role': updatedProfile.role?.dbValue ?? 'learner',
-          'skill_categories': allCategorySlugs.toList(),
+          'skill_categories': categorySlugs,
           'learning_styles': updatedProfile.interests,
           'teaching_styles': updatedProfile.teachingStyles,
           'languages': updatedProfile.languages,
@@ -1164,6 +1179,29 @@ class ProfileService {
       );
     } catch (e) {
       throw Exception('Failed to save skills: $e');
+    }
+  }
+
+  /// Root taxonomy categories for the user's saved skills.
+  ///
+  /// `profiles.skill_categories` is a derived cache (it feeds the search
+  /// vector). Reading the paths back after `save_user_skills` keeps it in step
+  /// with custom skills that the client-side skill map cannot classify.
+  Future<List<String>> _categoryRootsFromSkills() async {
+    try {
+      final rows =
+          await _supabase.from('user_skills').select('skill:skill_id(path)')
+              as List;
+      final roots = <String>{};
+      for (final row in rows.whereType<Map>()) {
+        final skill = (row['skill'] as Map?) ?? const {};
+        final root = (skill['path'] ?? '').toString().split('.').first.trim();
+        if (root.isNotEmpty) roots.add(root);
+      }
+      return roots.toList()..sort();
+    } catch (_) {
+      // The cached column is optional; a failed read must not fail the save.
+      return const [];
     }
   }
 }

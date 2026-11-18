@@ -73,6 +73,10 @@ class _ExplorePageState extends State<ExplorePage> {
   Map<String, ({int total, int fresh, int newcomers})> _rootCounts = const {};
   bool _hasMentorSkills = false;
   bool _loading = true;
+  bool _roleLoading = false;
+  ExploreRole? _roleLoadingFor;
+  final Map<ExploreRole, _RoleSnapshot> _roleCache = {};
+  List<Map<String, dynamic>>? _mySkillsCache;
   String? _error;
   String _query = '';
 
@@ -178,8 +182,12 @@ class _ExplorePageState extends State<ExplorePage> {
       Map<String, List<String>> skillsByRoot,
     })
   >
-  _filterByRole(List<Map<String, dynamic>> roots) async {
-    if (_role == ExploreRole.learner) {
+  _filterByRole(
+    List<Map<String, dynamic>> roots, {
+    required ExploreRole role,
+    bool force = false,
+  }) async {
+    if (role == ExploreRole.learner) {
       return (
         roots: roots,
         hasMentorSkills: false,
@@ -187,10 +195,13 @@ class _ExplorePageState extends State<ExplorePage> {
       );
     }
 
+    final cachedSkills = force ? null : _mySkillsCache;
     final skills =
-        widget.skillsLoader != null
+        cachedSkills ??
+        (widget.skillsLoader != null
             ? await widget.skillsLoader!()
-            : await MatchApi.mySkills();
+            : await MatchApi.mySkills());
+    _mySkillsCache = skills;
     final teaching = skills.where((skill) => skill['kind'] == 'teach');
     final mentorPaths =
         teaching
@@ -239,12 +250,13 @@ class _ExplorePageState extends State<ExplorePage> {
   /// in the last seven days. The cards show the total and only add a "new"
   /// suffix when people actually joined recently.
   Future<Map<String, ({int total, int fresh, int newcomers})>> _rootCountsFor(
-    List<Map<String, dynamic>> roots,
-  ) async {
+    List<Map<String, dynamic>> roots, {
+    required ExploreRole role,
+  }) async {
     if (roots.isEmpty) {
       return const <String, ({int total, int fresh, int newcomers})>{};
     }
-    final kind = _role == ExploreRole.mentor ? 'learn' : 'teach';
+    final kind = role == ExploreRole.mentor ? 'learn' : 'teach';
 
     if (widget.domainCountsLoader != null) {
       try {
@@ -287,7 +299,10 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
-  Future<void> _loadTaxonomy({bool notifyFailure = false}) async {
+  Future<void> _loadTaxonomy({
+    bool notifyFailure = false,
+    bool force = false,
+  }) async {
     final requestId = ++_requestId;
     final hadData = _roots.isNotEmpty;
     if (!hadData) {
@@ -297,33 +312,17 @@ class _ExplorePageState extends State<ExplorePage> {
       });
     }
     try {
-      final nodes =
-          widget.taxonomyLoader != null
-              ? await widget.taxonomyLoader!()
-              : await MatchApi.taxonomyVisible();
-      final roots =
-          nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
-      final roleResult = await _filterByRole(roots);
-      // Count every root: Mentor mode shows the teaching domains as cards and
-      // the rest in an "Explore other domains" grid.
-      final counts = await _rootCountsFor(roots);
-      if (!mounted || requestId != _requestId) return;
-      // Keep every domain visible: empty ones still lead to their skills and
-      // the empty state, and the daily featured domain should not disappear.
-      setState(() {
-        _roots = roots;
-        _teachingPaths =
-            _role == ExploreRole.mentor
-                ? roleResult.roots
-                    .map((root) => (root['path'] ?? '').toString())
-                    .where((path) => path.isNotEmpty)
-                    .toSet()
-                : const <String>{};
-        _mentorSkills = roleResult.skillsByRoot;
-        _rootCounts = counts;
-        _hasMentorSkills = roleResult.hasMentorSkills;
-        _loading = false;
-      });
+      if (!hadData || force) {
+        final nodes =
+            widget.taxonomyLoader != null
+                ? await widget.taxonomyLoader!()
+                : await MatchApi.taxonomyVisible();
+        final roots =
+            nodes.where((n) => (n['depth'] as num?)?.toInt() == 1).toList();
+        if (!mounted || requestId != _requestId) return;
+        setState(() => _roots = roots);
+      }
+      await _loadRole(_role, force: force, notifyFailure: notifyFailure);
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
       final message = friendlyError(
@@ -338,22 +337,107 @@ class _ExplorePageState extends State<ExplorePage> {
     }
   }
 
-  Future<void> _refreshTaxonomy() => _loadTaxonomy(notifyFailure: true);
+  /// Loads the data for one role and caches it.
+  ///
+  /// Switching roles applies the cached snapshot immediately; a missing cache
+  /// shows the skeleton instead of flashing the "no mentor skills" empty state
+  /// while the skills and counts are still loading.
+  Future<void> _loadRole(
+    ExploreRole role, {
+    bool force = false,
+    bool notifyFailure = false,
+  }) async {
+    if (_roots.isEmpty) return;
+    // A role switch and the initial taxonomy load can race; keep one fetch per
+    // role in flight so the skills loader is not called twice.
+    if (!force && _roleLoadingFor == role) return;
+    _roleLoadingFor = role;
+    final requestId = ++_requestId;
+    final cached = _roleCache[role];
+    if (cached == null) {
+      setState(() => _roleLoading = true);
+    }
+    try {
+      final roleResult = await _filterByRole(_roots, role: role, force: force);
+      // Count every root: Mentor mode shows the teaching domains as cards and
+      // the rest in an "Explore other domains" grid.
+      final counts = await _rootCountsFor(_roots, role: role);
+      if (!mounted || requestId != _requestId || role != _role) return;
+      final snapshot = _RoleSnapshot(
+        teachingPaths:
+            role == ExploreRole.mentor
+                ? roleResult.roots
+                    .map((root) => (root['path'] ?? '').toString())
+                    .where((path) => path.isNotEmpty)
+                    .toSet()
+                : const <String>{},
+        skillsByRoot: roleResult.skillsByRoot,
+        hasMentorSkills: roleResult.hasMentorSkills,
+        counts: counts,
+      );
+      _roleCache[role] = snapshot;
+      setState(() {
+        _applyRoleSnapshot(snapshot);
+        _roleLoading = false;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted || requestId != _requestId || role != _role) return;
+      final message = friendlyError(
+        e,
+        fallback: "Couldn't load domains. Please try again.",
+      );
+      setState(() {
+        _roleLoading = false;
+        if (cached == null) {
+          _loading = false;
+          _error = message;
+        }
+      });
+      if (cached != null && notifyFailure) showAppError(context, message);
+    } finally {
+      if (_roleLoadingFor == role) _roleLoadingFor = null;
+    }
+  }
+
+  void _applyRoleSnapshot(_RoleSnapshot snapshot) {
+    _teachingPaths = snapshot.teachingPaths;
+    _mentorSkills = snapshot.skillsByRoot;
+    _hasMentorSkills = snapshot.hasMentorSkills;
+    _rootCounts = snapshot.counts;
+  }
+
+  Future<void> _refreshTaxonomy() =>
+      _loadTaxonomy(notifyFailure: true, force: true);
 
   void _onRoleChanged(ExploreRole role) {
     if (role == _role) return;
-    setState(() => _role = role);
+    final cached = _roleCache[role];
+    setState(() {
+      _role = role;
+      if (cached != null) {
+        _applyRoleSnapshot(cached);
+        _roleLoading = false;
+      } else {
+        _roleLoading = true;
+      }
+    });
     PreferencesService.instance
         .setBool(_roleKey, role == ExploreRole.mentor)
         .catchError((Object _) {});
-    _loadTaxonomy();
+    if (_roots.isEmpty) {
+      _loadTaxonomy();
+    } else {
+      _loadRole(role);
+    }
   }
 
-  void _openCategory(Map<String, dynamic> root) {
+  Future<void> _openCategory(Map<String, dynamic> root) async {
     final path = (root['path'] ?? '').toString();
     final label = (root['name'] ?? '').toString();
     if (path.isEmpty || label.isEmpty) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -365,6 +449,9 @@ class _ExplorePageState extends State<ExplorePage> {
             ),
       ),
     );
+    // Requests sent from the deck change who is available; refresh silently
+    // from the cached snapshot so returning here never flashes a skeleton.
+    if (mounted) _loadRole(_role, force: true);
   }
 
   Future<void> _openProfileEditor() async {
@@ -382,7 +469,7 @@ class _ExplorePageState extends State<ExplorePage> {
       context,
       MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
     );
-    if (mounted) _loadTaxonomy();
+    if (mounted) _loadTaxonomy(force: true);
   }
 
   @override
@@ -481,7 +568,7 @@ class _ExplorePageState extends State<ExplorePage> {
               },
             ),
             const SizedBox(height: 14),
-            if (_loading)
+            if (_loading || _roleLoading)
               const _FieldGuideSkeleton()
             else if (_error != null)
               _buildErrorState(context)
@@ -1055,6 +1142,20 @@ String _domainCountText(int total, int newcomers, String countLabel) {
   return '$base · $freshText';
 }
 
+class _RoleSnapshot {
+  const _RoleSnapshot({
+    required this.teachingPaths,
+    required this.skillsByRoot,
+    required this.hasMentorSkills,
+    required this.counts,
+  });
+
+  final Set<String> teachingPaths;
+  final Map<String, List<String>> skillsByRoot;
+  final bool hasMentorSkills;
+  final Map<String, ({int total, int fresh, int newcomers})> counts;
+}
+
 class _FieldGuideSearch extends StatelessWidget {
   const _FieldGuideSearch({
     required this.controller,
@@ -1269,8 +1370,7 @@ class _TeachingDomainCard extends StatelessWidget {
       label:
           '$label. $description. '
           '${_domainCountText(total, newcomers, countLabel)}. '
-          '${skills.isEmpty ? '' : '${skills.join(', ')}. '}'
-          'Browse ${countLabel}s.',
+          '${skills.isEmpty ? '' : '${skills.join(', ')}. '}',
       onTap: onTap,
       excludeSemantics: true,
       child: Material(
@@ -1381,24 +1481,10 @@ class _TeachingDomainCard extends StatelessWidget {
                       'YOU TEACH HERE',
                       style: AppTextStyles.boldText.copyWith(
                         fontSize: 9,
-                        letterSpacing: 0.7,
+                        letterSpacing: 1.2,
                         color: accent,
                       ),
                     ),
-                    const Spacer(),
-                    Flexible(
-                      child: Text(
-                        'Browse ${countLabel}s',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.boldText.copyWith(
-                          fontSize: 11.5,
-                          color: accent,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Icon(Icons.chevron_right, size: 18, color: accent),
                   ],
                 ),
               ],

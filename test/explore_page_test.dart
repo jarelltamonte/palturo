@@ -206,6 +206,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'role switching uses the cache and never flashes the empty state',
+    (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(
+        _app(
+          theme: lightMode,
+          skillsLoader: () async {
+            calls++;
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+            return [
+              {
+                'kind': 'teach',
+                'path': 'cooking_culinary.filipino_cooking',
+                'name': 'Filipino Cooking',
+              },
+            ];
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Mentor'));
+      await tester.pump(const Duration(milliseconds: 50));
+      // The empty prompt must wait for the skills fetch; the skeleton shows.
+      expect(find.textContaining("haven't added"), findsNothing);
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+      final callsAfterMentor = calls;
+
+      // The learner snapshot was cached on the first load.
+      await tester.tap(find.text('Learner'));
+      await tester.pump();
+      expect(find.text('FEATURED'), findsOneWidget);
+
+      // The mentor snapshot is cached too: no second fetch and no skeleton.
+      await tester.tap(find.text('Mentor'));
+      await tester.pump();
+      expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+      expect(calls, callsAfterMentor);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('mentor mode without skills points at the profile editor', (
     tester,
   ) async {

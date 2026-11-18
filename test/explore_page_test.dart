@@ -252,6 +252,46 @@ void main() {
     },
   );
 
+  testWidgets(
+    'mentor tapping a non-teaching domain prompts for teaching skills',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          theme: lightMode,
+          surface: const Size(390, 1600),
+          skillsLoader:
+              () async => [
+                {
+                  'kind': 'teach',
+                  'path': 'cooking_culinary.filipino_cooking',
+                  'name': 'Filipino Cooking',
+                },
+              ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mentor'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Household Skills'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Household Skills'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Teach Household Skills?'), findsOneWidget);
+      expect(
+        find.textContaining('browsing learners is limited'),
+        findsOneWidget,
+      );
+      expect(find.text('Update teaching skills'), findsOneWidget);
+
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+      expect(find.text('Teach Household Skills?'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('mentor mode without skills points at the profile editor', (
     tester,
   ) async {

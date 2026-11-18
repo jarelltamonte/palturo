@@ -14,6 +14,7 @@ import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/screen/explore_category_page.dart';
 import 'package:palturo/screen/explore_taxonomy.dart';
+import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -69,6 +70,7 @@ class _ExplorePageState extends State<ExplorePage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _roots = const [];
   Set<String> _teachingPaths = const {};
+  Set<String> _teachingSkillPaths = const {};
   Map<String, List<String>> _mentorSkills = const {};
   Map<String, ({int total, int fresh, int newcomers})> _rootCounts = const {};
   bool _hasMentorSkills = false;
@@ -180,6 +182,7 @@ class _ExplorePageState extends State<ExplorePage> {
       List<Map<String, dynamic>> roots,
       bool hasMentorSkills,
       Map<String, List<String>> skillsByRoot,
+      List<String> skillPaths,
     })
   >
   _filterByRole(
@@ -192,6 +195,7 @@ class _ExplorePageState extends State<ExplorePage> {
         roots: roots,
         hasMentorSkills: false,
         skillsByRoot: const <String, List<String>>{},
+        skillPaths: const <String>[],
       );
     }
 
@@ -240,6 +244,7 @@ class _ExplorePageState extends State<ExplorePage> {
       roots: filtered,
       hasMentorSkills: mentorPaths.isNotEmpty,
       skillsByRoot: skillsByRoot,
+      skillPaths: mentorPaths,
     );
   }
 
@@ -373,6 +378,10 @@ class _ExplorePageState extends State<ExplorePage> {
                 : const <String>{},
         skillsByRoot: roleResult.skillsByRoot,
         hasMentorSkills: roleResult.hasMentorSkills,
+        teachingSkillPaths:
+            role == ExploreRole.mentor
+                ? roleResult.skillPaths.toSet()
+                : const <String>{},
         counts: counts,
       );
       _roleCache[role] = snapshot;
@@ -403,6 +412,7 @@ class _ExplorePageState extends State<ExplorePage> {
 
   void _applyRoleSnapshot(_RoleSnapshot snapshot) {
     _teachingPaths = snapshot.teachingPaths;
+    _teachingSkillPaths = snapshot.teachingSkillPaths;
     _mentorSkills = snapshot.skillsByRoot;
     _hasMentorSkills = snapshot.hasMentorSkills;
     _rootCounts = snapshot.counts;
@@ -446,12 +456,46 @@ class _ExplorePageState extends State<ExplorePage> {
               nodeLabel: label,
               description: _descriptionFor(root),
               mentor: _role == ExploreRole.mentor,
+              teachingPaths:
+                  _role == ExploreRole.mentor
+                      ? _teachingSkillPaths
+                      : const <String>{},
             ),
       ),
     );
     // Requests sent from the deck change who is available; refresh silently
     // from the cached snapshot so returning here never flashes a skeleton.
     if (mounted) _loadRole(_role, force: true);
+  }
+
+  /// Mentors can inspect every domain, but only browse learners in a domain
+  /// they teach. Anything else points at the teaching skills editor.
+  Future<void> _handleDomainTap(Map<String, dynamic> root) async {
+    if (_role == ExploreRole.mentor) {
+      final path = (root['path'] ?? '').toString();
+      if (!_teachingPaths.contains(path)) {
+        await _promptTeachSkill(root);
+        return;
+      }
+    }
+    await _openCategory(root);
+  }
+
+  Future<void> _promptTeachSkill(Map<String, dynamic> root) async {
+    final label = (root['name'] ?? '').toString();
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Teach $label?',
+      message:
+          'You can explore $label, but browsing learners is limited to the '
+          'skills you teach. Add $label to your teaching skills to mentor '
+          'learners here.',
+      confirmLabel: 'Update teaching skills',
+      cancelLabel: 'Not now',
+      destructive: false,
+    );
+    if (!confirmed || !mounted) return;
+    await _openProfileEditor();
   }
 
   Future<void> _openProfileEditor() async {
@@ -726,7 +770,7 @@ class _ExplorePageState extends State<ExplorePage> {
                   (_rootCounts[path] ?? (total: 0, fresh: 0, newcomers: 0))
                       .newcomers,
               countLabel: _roleNoun,
-              onTap: () => _openCategory(node),
+              onTap: () => _handleDomainTap(node),
             );
           },
         );
@@ -1145,12 +1189,14 @@ String _domainCountText(int total, int newcomers, String countLabel) {
 class _RoleSnapshot {
   const _RoleSnapshot({
     required this.teachingPaths,
+    required this.teachingSkillPaths,
     required this.skillsByRoot,
     required this.hasMentorSkills,
     required this.counts,
   });
 
   final Set<String> teachingPaths;
+  final Set<String> teachingSkillPaths;
   final Map<String, List<String>> skillsByRoot;
   final bool hasMentorSkills;
   final Map<String, ({int total, int fresh, int newcomers})> counts;

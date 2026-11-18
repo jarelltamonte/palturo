@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/screen/explore_taxonomy.dart';
+import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -25,6 +27,7 @@ class ExploreCategoryPage extends StatefulWidget {
     required this.nodeLabel,
     required this.description,
     required this.mentor,
+    this.teachingPaths = const <String>{},
     this.taxonomyLoader,
     this.usersLoader,
     this.countsLoader,
@@ -34,6 +37,10 @@ class ExploreCategoryPage extends StatefulWidget {
   final String nodeLabel;
   final String description;
   final bool mentor;
+
+  /// The exact skill paths the mentor teaches. Learner browsing is limited to
+  /// these nodes; the rest of the domain stays readable.
+  final Set<String> teachingPaths;
 
   /// Test hooks. Production leaves these null.
   final Future<List<Map<String, dynamic>>> Function(String path)?
@@ -55,6 +62,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   static const double _pageReserve = 120;
 
   bool get _mentor => widget.mentor;
+  late Set<String> _teachingPaths;
   List<Map<String, dynamic>> _children = const [];
   Map<String, int> _childCounts = const {};
   List<Person> _people = const [];
@@ -72,11 +80,17 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 
   String get _nounHere => '$_noun${_total == 1 ? '' : 's'} here';
 
-  bool get _showDeckCta => !_loading && _error == null && _people.isNotEmpty;
+  /// Mentors can read every domain and skill, but the learner deck is limited
+  /// to the exact skills they teach.
+  bool get _canBrowse => !_mentor || _teachingPaths.contains(widget.nodePath);
+
+  bool get _showDeckCta =>
+      _canBrowse && !_loading && _error == null && _people.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    _teachingPaths = widget.teachingPaths;
     _load();
   }
 
@@ -277,6 +291,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               nodeLabel: label,
               description: 'Explore $label in the PalTuro community.',
               mentor: _mentor,
+              teachingPaths: _teachingPaths,
               taxonomyLoader: widget.taxonomyLoader,
               usersLoader: widget.usersLoader,
               countsLoader: widget.countsLoader,
@@ -426,6 +441,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     final muted = AppColors.mutedText(context);
     final accent = AppColors.accentText(context);
     final count = _total;
+    final teachBlocked = _mentor && !_canBrowse;
 
     return Container(
       width: double.infinity,
@@ -465,18 +481,22 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
           ),
           const SizedBox(height: 14),
           if (count == 0) ...[
-            _buildEmptyPanel(muted),
+            if (teachBlocked)
+              _buildTeachPanel(muted)
+            else
+              _buildEmptyPanel(muted),
             if (_otherCount > 0) ...[
               const SizedBox(height: 10),
               _buildOtherCount(muted),
             ],
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: _load,
-                child: const Text('Check again'),
+            if (!teachBlocked)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _load,
+                  child: const Text('Check again'),
+                ),
               ),
-            ),
           ] else ...[
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -511,7 +531,10 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                 if (_otherCount > 0) _buildOtherCount(muted),
               ],
             ),
-            if (_people.isEmpty) ...[
+            if (teachBlocked) ...[
+              const SizedBox(height: 12),
+              _buildTeachPanel(muted),
+            ] else if (_people.isEmpty) ...[
               const SizedBox(height: 12),
               _buildEmptyPanel(muted),
               Align(
@@ -596,6 +619,84 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildTeachPanel(Color muted) {
+    final accent = AppColors.accentText(context);
+    final teachesUnder = _teachingPaths.any(
+      (path) => path.startsWith('${widget.nodePath}.'),
+    );
+    final text =
+        teachesUnder
+            ? 'Choose a skill you teach below to browse learners.'
+            : 'Add ${widget.nodeLabel} to your teaching skills to browse '
+                'learners here.';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.mutedSurface(context),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.school_outlined, size: 20, color: accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: muted,
+                    fontSize: 12,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: _openTeachingEditor,
+              child: const Text('Update teaching skills'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openTeachingEditor() async {
+    final profile = await ProfileService().getCurrentUserProfile();
+    if (!mounted) return;
+    if (profile == null) {
+      showAppError(context, 'Couldn’t load your profile. Please try again.');
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
+    );
+    if (!mounted) return;
+    // Refresh the gate so a newly added skill unlocks the deck immediately.
+    try {
+      final skills = await MatchApi.mySkills();
+      final paths =
+          skills
+              .where((skill) => skill['kind'] == 'teach')
+              .map((skill) => (skill['path'] ?? '') as String)
+              .where((path) => path.isNotEmpty)
+              .toSet();
+      if (!mounted) return;
+      setState(() => _teachingPaths = paths);
+    } catch (_) {
+      // Keep the previous paths if the read fails.
+    }
+    _load();
   }
 
   Widget _buildSectionLabel(String label) {

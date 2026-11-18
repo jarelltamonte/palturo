@@ -87,6 +87,10 @@ Widget _app({
   users,
   Size? surface,
   double textScale = 1,
+  bool mentor = false,
+  String nodePath = 'cooking_culinary',
+  String nodeLabel = 'Cooking & Culinary',
+  Set<String> teachingPaths = const <String>{},
   Future<({int total, int fresh, int newcomers})> Function(
     String path, {
     required String kind,
@@ -102,10 +106,11 @@ Widget _app({
         textScaler: TextScaler.linear(textScale),
       ),
       child: ExploreCategoryPage(
-        nodePath: 'cooking_culinary',
-        nodeLabel: 'Cooking & Culinary',
+        nodePath: nodePath,
+        nodeLabel: nodeLabel,
         description: 'Recipes, flavors, and kitchen traditions',
-        mentor: false,
+        mentor: mentor,
+        teachingPaths: teachingPaths,
         taxonomyLoader: (path) async => _taxonomy(path),
         usersLoader: users,
         countsLoader: countsLoader,
@@ -121,6 +126,10 @@ Future<void> _pump(
   users,
   Size surface = const Size(390, 844),
   double textScale = 1,
+  bool mentor = false,
+  String nodePath = 'cooking_culinary',
+  String nodeLabel = 'Cooking & Culinary',
+  Set<String> teachingPaths = const <String>{},
   Future<({int total, int fresh, int newcomers})> Function(
     String path, {
     required String kind,
@@ -135,6 +144,10 @@ Future<void> _pump(
       users: users,
       surface: surface,
       textScale: textScale,
+      mentor: mentor,
+      nodePath: nodePath,
+      nodeLabel: nodeLabel,
+      teachingPaths: teachingPaths,
       countsLoader: countsLoader,
     ),
   );
@@ -247,6 +260,46 @@ void main() {
       find.textContaining('Matched with 1 mentor in this domain'),
       findsOneWidget,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mentor cannot browse learners outside their teaching skills', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: _FakeUsers().call,
+      mentor: true,
+      nodePath: 'cooking_culinary.filipino_cooking',
+      nodeLabel: 'Filipino Cooking',
+      teachingPaths: const {'cooking_culinary.filipino_dessert_making'},
+    );
+
+    expect(
+      find.textContaining('Add Filipino Cooking to your teaching skills'),
+      findsOneWidget,
+    );
+    expect(find.text('Update teaching skills'), findsOneWidget);
+    expect(find.text('Start browsing learners'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mentor can browse learners on a skill they teach', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: _FakeUsers().call,
+      mentor: true,
+      nodePath: 'cooking_culinary.filipino',
+      nodeLabel: 'Filipino cooking',
+      teachingPaths: const {'cooking_culinary.filipino'},
+    );
+
+    expect(find.text('Start browsing learners'), findsOneWidget);
+    expect(find.text('Update teaching skills'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

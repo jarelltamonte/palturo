@@ -761,12 +761,14 @@ class ProfileService {
     String name,
     String kind, {
     String skillId = '',
+    String? category,
     bool dryRun = false,
   }) async {
     try {
       final verdict = await MatchApi.classifySkill(
         name: name,
         kind: kind,
+        category: category,
         dryRun: dryRun,
       );
       final status = verdict?['status']?.toString();
@@ -819,6 +821,7 @@ class ProfileService {
             custom.text,
             'learn',
             skillId: skill,
+            category: custom.categoryId,
           );
           if (classified == null || classified.name.trim().isEmpty) {
             throw Exception(
@@ -863,6 +866,7 @@ class ProfileService {
             custom.text,
             'teach',
             skillId: skill,
+            category: custom.categoryId,
           );
           if (classified == null || classified.name.trim().isEmpty) {
             throw Exception(

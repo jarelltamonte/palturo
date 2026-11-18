@@ -1017,11 +1017,16 @@ class MatchApi {
   /// Custom ("Others") skill flow. Body: {name, note, kind: learn|teach}.
   /// Returns the raw verdict:
   /// {status: attached|pending|queued|rejected, node: {id,name,path}, ...}
+  ///
+  /// [category] is the domain the editor's custom row picked. New skills are
+  /// created under it so the user's name survives instead of becoming a focus
+  /// of an unrelated existing skill.
   static Future<Map<String, dynamic>?> classifySkill({
     required String name,
     String? note,
     required String kind,
     bool dryRun = false,
+    String? category,
   }) async {
     final res = await _Client.c.functions.invoke(
       'classify-skill',
@@ -1029,6 +1034,7 @@ class MatchApi {
         'name': name,
         if (note != null && note.isNotEmpty) 'note': note,
         'kind': kind,
+        if (category != null && category.isNotEmpty) 'category': category,
         if (dryRun) 'dry_run': true,
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart'
     show kLearningOptions, kTeachingOptions;
 import 'package:palturo/onboarding/skill_options.dart';
+import 'package:palturo/screen/card/skills_card.dart' show CustomSkill;
 
 void main() {
   test('onboarding offers the selectable skill layer, not single dishes', () {
@@ -90,5 +91,18 @@ void main() {
     expect(onboardingInterestLabel('other:arts_design:Parol Art'), 'Parol Art');
     expect(onboardingInterestLabel('filipino_cooking'), 'Filipino Cooking');
     expect(onboardingInterestLabel('others'), 'Others');
+  });
+
+  test('custom skill ids carry the domain the editor picked', () {
+    const custom = CustomSkill(
+      categoryId: 'performing_arts',
+      text: 'Roller Skating',
+    );
+    expect(custom.encode(), 'other:performing_arts:Roller Skating');
+
+    final parsed = CustomSkill.tryParse(custom.encode())!;
+    expect(parsed.categoryId, 'performing_arts');
+    expect(parsed.text, 'Roller Skating');
+    expect(parsed.isValid, isTrue);
   });
 }

@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
     }
 
     // ---------- input ----------
-    let payload: { name?: string; note?: string; kind?: string; dry_run?: boolean };
+    let payload: { name?: string; note?: string; kind?: string; dry_run?: boolean; category?: string };
     try {
       payload = await req.json();
     } catch {
@@ -169,6 +169,10 @@ Deno.serve(async (req) => {
     const note = (payload.note ?? "").toString().trim().slice(0, 500);
     const kind = payload.kind === "teach" ? "teach" : "learn";
     const dryRun = payload.dry_run === true;
+    // The editor's custom-skill row carries the domain the user picked. When a
+    // genuinely new skill is created, honour that domain instead of letting the
+    // model bury the name as a focus under an unrelated existing skill.
+    const category = (payload.category ?? "").toString().trim().slice(0, 80);
     if (name.length < 2 || name.length > 80) {
       return json({ error: "Skill name must be 2-80 characters" }, 400);
     }
@@ -197,13 +201,24 @@ Deno.serve(async (req) => {
     // ---------- taxonomy ----------
     const { data: nodes, error: nodesErr } = await admin
       .from("skill_nodes")
-      .select("id,name,path,depth,is_leaf,is_visible,status")
+      .select("id,name,path,depth,kind,is_leaf,is_visible,status")
       .order("path");
     if (nodesErr || !nodes) return json({ error: "Failed to load taxonomy" }, 500);
 
     const roots = nodes.filter((n) => n.depth === 1);
     const groups = nodes.filter((n) => n.depth === 2);
     const leaves = nodes.filter((n) => n.is_leaf && n.status === "approved");
+
+    // A category hint from the editor wins for new submissions; it is a root
+    // domain id such as `performing_arts` (or its display name).
+    const categoryKey = normalize(category);
+    const preferredRoot = categoryKey.length > 0
+      ? roots.find(
+        (r) =>
+          normalize(String(r.path)) === categoryKey ||
+          normalize(r.name) === categoryKey,
+      ) ?? null
+      : null;
 
     // Semantic matching should see every real skill, including ones hidden
     // from the picker and pending submissions from other users, so a Filipino
@@ -246,10 +261,11 @@ Deno.serve(async (req) => {
       dryRun
         ? Promise.resolve({ id: null as string | null, error: null as string | null })
         : placeSkill(admin, user.id, skillId, kind, null);
-    const pendingNode = (parent: { path: string } | null, display: string) => ({
+    const pendingNode = (parent: { path: string; kind?: string } | null, display: string) => ({
       id: null,
       name: display,
       path: parent ? `${parent.path}.${normalize(display)}` : normalize(display),
+      kind: childKind(parent),
       status: "pending",
     });
 
@@ -360,6 +376,19 @@ Deno.serve(async (req) => {
 
       const groupNode = groups.find((g) => normalize(g.name) === a1.subgroup?.choice);
       const rootChoice = a1.root_category?.choice as string | undefined;
+      // The model returns the normalized choice key, not the display name.
+      const rootFromModel = roots.find(
+        (r) => normalize(r.name) === rootChoice || String(r.path) === rootChoice,
+      );
+      // A genuinely new submission becomes a skill in a domain. Only use the
+      // model's subgroup directly when it is itself a category (for example
+      // Programming), because a skill may only contain focus nodes.
+      const createParent =
+        preferredRoot ??
+        (groupNode?.kind === "category" ? groupNode : null) ??
+        rootFromModel ??
+        groupNode ??
+        null;
 
       const semanticKey =
         (a1.taxonomy_skill?.choice as string | undefined) ?? "";
@@ -392,25 +421,26 @@ Deno.serve(async (req) => {
             const placed = await place(best.n.id);
             if (placed.error) return json({ error: placed.error, status: "error" }, 409);
             skillDecision = { status: "attached", node: pick(best.n), action: "attach_existing", confidence: actionConf, placementId: placed.id };
-          } else if (groupNode) {
+          } else {
             // The model was confident the submission fits this group but could
             // not name an equivalent skill: register it as a pending skill
             // instead of silently dropping it as unresolved.
-            if (dryRun) {
-              skillDecision = { status: "pending", node: pendingNode(groupNode, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
+            const parent = createParent;
+            if (!parent) {
+              skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+            } else if (dryRun) {
+              skillDecision = { status: "pending", node: pendingNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
             } else {
-              const { data: newNode, error: nodeErr } = await admin
-                .from("skill_nodes")
-                .insert({ name: cleanedName, parent_id: groupNode.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
-                .select("id,name,path,status")
-                .single();
-              if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
-              const placed = await place((newNode as any).id);
+              const created = await createPendingNode(
+                admin, parent, cleanedName, user.id,
+              );
+              if (created.error || !created.node) {
+                return json({ error: created.error ?? "Could not create the skill", status: "error" }, 500);
+              }
+              const placed = await place((created.node as any).id);
               if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-              skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+              skillDecision = { status: "pending", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
             }
-          } else {
-            skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
           }
         }
       } else if (actionChoice === "create_new") {
@@ -421,21 +451,21 @@ Deno.serve(async (req) => {
           if (placed.error) return json({ error: placed.error, status: "error" }, 409);
           skillDecision = { status: "attached", node: pick(semanticMatch), action: "attach_existing", confidence: semanticConf, placementId: placed.id };
         } else {
-          const parent = groupNode ?? roots.find((r) => r.name === rootChoice);
+          const parent = createParent;
           if (!parent) {
             skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
           } else if (dryRun) {
             skillDecision = { status: "pending", node: pendingNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
           } else {
-            const { data: newNode, error: nodeErr } = await admin
-              .from("skill_nodes")
-              .insert({ name: cleanedName, parent_id: parent.id, is_leaf: true, origin: "user_submitted", status: "pending", submitted_by: user.id })
-              .select("id,name,path,status")
-              .single();
-            if (nodeErr) return json({ error: nodeErr.message, status: "error" }, 500);
-            const placed = await place((newNode as any).id);
+            const created = await createPendingNode(
+              admin, parent, cleanedName, user.id,
+            );
+            if (created.error || !created.node) {
+              return json({ error: created.error ?? "Could not create the skill", status: "error" }, 500);
+            }
+            const placed = await place((created.node as any).id);
             if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-            skillDecision = { status: "pending", node: newNode as any, action: "create_new", confidence: actionConf, placementId: placed.id };
+            skillDecision = { status: "pending", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
           }
         }
       } else {
@@ -547,6 +577,54 @@ async function jevCall(model: string, state: string, questions: unknown, admin: 
   });
 }
 
+// A category can only contain categories or skills, and a skill or focus can
+// only contain focus nodes. New submissions become skills under a category and
+// focuses under a skill, matching skill_node_write_guard().
+function childKind(
+  parent: { kind?: string } | null,
+): "category" | "skill" | "focus" {
+  if (!parent) return "category";
+  return parent.kind === "category" ? "skill" : "focus";
+}
+
+async function createPendingNode(
+  admin: ReturnType<typeof createClient>,
+  parent: { id: string; kind?: string },
+  name: string,
+  userId: string,
+): Promise<{ node: Record<string, unknown> | null; error: string | null }> {
+  const { data, error } = await admin
+    .from("skill_nodes")
+    .insert({
+      name,
+      parent_id: parent.id,
+      kind: childKind(parent),
+      is_leaf: true,
+      origin: "user_submitted",
+      status: "pending",
+      submitted_by: userId,
+    })
+    .select("id,name,path,status,kind")
+    .single();
+  if (!error) return { node: data as any, error: null };
+
+  // Concurrent submissions of the same name under the same parent hit the
+  // unique index (parent_id, lower(name)). Reuse that node instead of
+  // failing the profile save.
+  if ((error as any).code === "23505") {
+    const { data: siblings } = await admin
+      .from("skill_nodes")
+      .select("id,name,path,status,kind")
+      .eq("parent_id", parent.id)
+      .neq("status", "rejected");
+    const existing = (siblings ?? []).find(
+      (n: any) => String(n.name).toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) return { node: existing as any, error: null };
+  }
+  return { node: null, error: error.message };
+}
+
 async function placeSkill(
   admin: ReturnType<typeof createClient>,
   userId: string,
@@ -554,16 +632,55 @@ async function placeSkill(
   kind: string,
   note: string | null,
 ): Promise<{ id: string | null; error: string | null }> {
-  // Selections live at depth 2. The classifier matches leaves, so place the
-  // parent and keep the leaf as the matching focus.
-  const { data: node } = await admin
+  // user_skills.skill_id must point at a skill node. A focus is stored next to
+  // the skill it belongs to, and a category resolves to its general skill.
+  const { data: start } = await admin
     .from("skill_nodes")
-    .select("id, parent_id, depth")
+    .select("id, parent_id, depth, kind, is_general")
     .eq("id", skillId)
     .maybeSingle();
-  const leafId = node && (node as any).depth > 2 ? (node as any).id : null;
-  const selectableId =
-    leafId && (node as any).parent_id ? (node as any).parent_id : skillId;
+  if (!start) return { id: null, error: "Skill node not found" };
+
+  let node = start as any;
+  if (node.kind === "category") {
+    const { data: skills } = await admin
+      .from("skill_nodes")
+      .select("id, parent_id, kind, is_general")
+      .eq("parent_id", node.id)
+      .eq("kind", "skill")
+      .order("is_general", { ascending: false })
+      .order("usage_count", { ascending: false })
+      .limit(1);
+    const general = (skills ?? [])[0] ?? null;
+    if (!general) return { id: null, error: "Category has no selectable skill" };
+    node = general;
+  }
+
+  let focusId: string | null = null;
+  let selectableId: string;
+  if (node.kind === "skill") {
+    selectableId = node.id;
+  } else {
+    // Walk up from the focus until its owning skill. Focuses may be nested.
+    focusId = node.id;
+    let cursor = node;
+    let selectable: string | null = null;
+    for (let level = 0; level < 8 && cursor?.parent_id; level++) {
+      const { data: parent } = await admin
+        .from("skill_nodes")
+        .select("id, parent_id, kind")
+        .eq("id", cursor.parent_id)
+        .maybeSingle();
+      if (!parent) break;
+      if ((parent as any).kind === "skill") {
+        selectable = (parent as any).id;
+        break;
+      }
+      cursor = parent;
+    }
+    if (!selectable) return { id: null, error: "Focus is not under a skill" };
+    selectableId = selectable;
+  }
 
   const { data: existing } = await admin
     .from("user_skills")
@@ -573,10 +690,10 @@ async function placeSkill(
     .eq("kind", kind)
     .maybeSingle();
   if (existing) {
-    if (leafId) {
+    if (focusId) {
       await admin
         .from("user_skills")
-        .update({ focus_skill_id: leafId })
+        .update({ focus_skill_id: focusId })
         .eq("id", (existing as any).id);
     }
     return { id: (existing as any).id, error: null };
@@ -587,7 +704,7 @@ async function placeSkill(
     .insert({
       user_id: userId,
       skill_id: selectableId,
-      focus_skill_id: leafId,
+      focus_skill_id: focusId,
       kind,
       note,
     })

@@ -21,7 +21,8 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text(kDeckSlowMessage), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
+    expect(find.text(kDeckSlowHint), findsNothing);
     expect(find.text('Retry'), findsNothing);
 
     await tester.pump(kDeckSlowThreshold);
@@ -73,7 +74,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text(kDeckSlowMessage), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
 
     done.complete(const []);
     await tester.pump();
@@ -108,7 +109,8 @@ void main() {
     await tester.tap(find.text('Retry'));
     await tester.pump();
     expect(calls, hasLength(2));
-    expect(find.text(kDeckSlowMessage), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
+    expect(find.text('Retry'), findsNothing);
 
     await tester.pump(kDeckSlowThreshold);
     expect(find.text(kDeckSlowMessage), findsOneWidget);

@@ -1080,30 +1080,35 @@ class _HomePageState extends State<HomePage> {
       fit: StackFit.expand,
       children: [
         const PersonCardSkeleton(),
-        if (_slowLoad)
-          Positioned(
-            left: AppSpacing.pageHorizontal,
-            right: AppSpacing.pageHorizontal,
-            bottom: 16,
-            child: Semantics(
-              liveRegion: true,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                decoration: BoxDecoration(
-                  color: AppColors.elevatedSurface(context),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border(context)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      kDeckSlowMessage,
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.regularText.copyWith(
-                        color: Theme.of(context).colorScheme.secondary,
-                      ),
+        Positioned(
+          left: AppSpacing.pageHorizontal,
+          right: AppSpacing.pageHorizontal,
+          bottom: 16,
+          child: Semantics(
+            liveRegion: true,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                _slowLoad ? 14 : 10,
+                16,
+                _slowLoad ? 8 : 10,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.elevatedSurface(context),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border(context)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    kDeckSlowMessage,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.regularText.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
+                  ),
+                  if (_slowLoad) ...[
                     const SizedBox(height: 2),
                     Text(
                       kDeckSlowHint,
@@ -1119,10 +1124,11 @@ class _HomePageState extends State<HomePage> {
                       child: const Text('Retry'),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
+        ),
       ],
     );
   }

@@ -8,7 +8,7 @@ import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 
 void main() {
-  testWidgets('cold deck shows slow copy at 4s and timeout retry at 45s', (
+  testWidgets('cold deck shows slow copy at 4s and timeout retry at 60s', (
     tester,
   ) async {
     final never = Completer<List<Person>>();

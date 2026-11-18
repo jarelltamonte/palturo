@@ -37,19 +37,20 @@ const kDeckSlowThreshold = Duration(seconds: 4);
 
 /// Copy shown while a cold deck is still matching.
 @visibleForTesting
-const kDeckSlowMessage = 'Finding the Pals who fit you best…';
+const kDeckSlowMessage = 'Looking for the perfect matches…';
 
 /// Explains why a new profile can take a little longer.
 @visibleForTesting
-const kDeckSlowHint = 'New profiles can take a little longer to match.';
+const kDeckSlowHint =
+    'New profiles can take a little longer while we build your matches.';
 
 /// Hard cap for a cold deck load. After this the UI offers a retry.
 ///
 /// A brand-new profile has to embed its passages before the matcher can rank
-/// anyone; the embedding step alone allows up to 30s, followed by the 9s
-/// rerank budget and the profile reads.
+/// anyone; each embedding batch allows up to 30s, followed by the 9s rerank
+/// budget and the profile reads.
 @visibleForTesting
-const kDeckTimeout = Duration(seconds: 45);
+const kDeckTimeout = Duration(seconds: 60);
 
 /// Hard cap for sending a connection request. A hanging request must not leave
 /// the deck stuck on its "Sending request…" surface forever.

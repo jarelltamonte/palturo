@@ -267,6 +267,69 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  bool get _needsShowcaseReminder =>
+      _hasMissingShowcase(_teachingSkillIds, _teachingSkillImages);
+
+  bool _hasMissingShowcase(
+    List<String> teachingSkills,
+    Map<String, String> images,
+  ) {
+    if (_role != OnboardingRole.teach && _role != OnboardingRole.both) {
+      return false;
+    }
+    if (teachingSkills.isEmpty) return false;
+    return teachingSkills.any((id) => (images[id]?.trim() ?? '').isEmpty);
+  }
+
+  /// Reminds a mentor that a teaching skill without a showcase keeps the
+  /// profile out of discovery. Returns true when it is safe to leave/save.
+  Future<bool> _confirmShowcaseReminder({
+    bool saving = false,
+    List<String>? skills,
+    Map<String, String>? images,
+  }) async {
+    final teaching = skills ?? _teachingSkillIds;
+    final media = images ?? _teachingSkillImages;
+    if (!_hasMissingShowcase(teaching, media)) return true;
+
+    final missing =
+        teaching.where((id) => (media[id]?.trim() ?? '').isEmpty).length;
+    final add = await showConfirmDialog(
+      context,
+      title: 'Add a showcase?',
+      message:
+          '${missing == 1 ? 'One of your teaching skills has' : '$missing of your teaching skills have'} '
+          'no showcase yet. Your mentor profile will not appear in For You, '
+          'Browse, or Explore until every teaching skill has one.',
+      confirmLabel: 'Add showcase',
+      cancelLabel: saving ? 'Save anyway' : 'Leave anyway',
+      destructive: false,
+    );
+    if (!add) return true;
+    await _scrollToTeachingSkills();
+    return false;
+  }
+
+  Future<void> _scrollToTeachingSkills() async {
+    final target = _teachingSkillsKey.currentContext;
+    if (target == null) return;
+    await Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  Future<void> _handleBack() async {
+    if (_isSaving) return;
+    if (_hasUnsavedChanges()) {
+      final canDiscard = await _confirmDiscardChanges();
+      if (!canDiscard || !mounted) return;
+    }
+    if (!await _confirmShowcaseReminder()) return;
+    if (mounted) Navigator.of(context).pop();
+  }
+
   ButtonStyle get _doneButtonStyle => ElevatedButton.styleFrom(
     backgroundColor: AppColors.primary,
     foregroundColor: Colors.black,
@@ -688,6 +751,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
+    if (!await _confirmShowcaseReminder(
+      saving: true,
+      skills: teachingSkills,
+      images: teachingSkillImages,
+    )) {
+      return;
+    }
+
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
 
@@ -771,16 +842,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
     final hasChanges = _hasUnsavedChanges();
     final canSave = hasChanges && !_isSaving;
+    final needsShowcaseReminder = _needsShowcaseReminder;
     final largeText = MediaQuery.textScalerOf(context).scale(20) > 28;
 
     return PopScope(
-      canPop: !hasChanges && !_isSaving,
+      canPop: !hasChanges && !_isSaving && !needsShowcaseReminder,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop || _isSaving) return;
-        final canDiscard = await _confirmDiscardChanges();
-        if (canDiscard && context.mounted) {
-          Navigator.of(context).pop();
-        }
+        await _handleBack();
       },
       child: Scaffold(
         backgroundColor: lightColor,
@@ -790,17 +859,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             tooltip: 'Back',
             color: textTheme,
             size: 16,
-            onPressed: () async {
-              if (_isSaving) return;
-              if (_hasUnsavedChanges()) {
-                final canDiscard = await _confirmDiscardChanges();
-                if (canDiscard && context.mounted) {
-                  Navigator.of(context).pop();
-                }
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: _handleBack,
           ),
           title: Text(
             largeText ? 'Edit' : 'Edit Profile',
@@ -1151,15 +1210,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             _role == OnboardingRole.both) ...[
                           const SizedBox(height: 4),
                           TextButton.icon(
-                            onPressed: () async {
-                              final target = _teachingSkillsKey.currentContext;
-                              if (target == null) return;
-                              await Scrollable.ensureVisible(
-                                target,
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeInOut,
-                              );
-                            },
+                            onPressed: _scrollToTeachingSkills,
                             icon: const Icon(
                               Icons.video_library_outlined,
                               size: 18,

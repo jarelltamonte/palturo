@@ -229,7 +229,9 @@ void main() {
     expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
   });
 
-  testWidgets('teaching profile can save without a showcase', (tester) async {
+  testWidgets('teaching profile prompts but can save without a showcase', (
+    tester,
+  ) async {
     final service = _SlowProfileService();
     await pumpEdit(
       tester,
@@ -247,13 +249,55 @@ void main() {
     await tester.enterText(bioField, 'Updated bio');
     await tester.pump();
     await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    // The reminder names the discovery cost, but it is not a hard block.
+    expect(find.text('Add a showcase?'), findsOneWidget);
+    expect(
+      find.textContaining('will not appear in For You, Browse, or Explore'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Save anyway'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    // The save starts; the showcase is a discovery requirement, not a block.
+    expect(find.text('Add a showcase?'), findsNothing);
     expect(find.text('Showcase Required'), findsNothing);
     expect(find.textContaining('to PalTuro'), findsOneWidget);
     expect(service.completer.isCompleted, isFalse);
+  });
+
+  testWidgets('showcase reminder keeps the editor open to add media', (
+    tester,
+  ) async {
+    final service = _SlowProfileService();
+    await pumpEdit(
+      tester,
+      service: service,
+      data: profile().copyWith(teachingSkillImages: const {}),
+    );
+
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add showcase'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add a showcase?'), findsNothing);
+    expect(find.text('Edit Profile'), findsOneWidget);
+    // The save never started.
+    expect(service.completer.isCompleted, isFalse);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('role change preview keeps hidden skill counts', (tester) async {

@@ -855,24 +855,24 @@ class MatchApi {
         .toList();
   }
 
-  /// Every domain's population and how many are new to the viewer.
+  /// Every domain's population, fresh count, and recent joiners.
   ///
-  /// `total` includes people the viewer is already connected with; `fresh`
-  /// excludes them. Browse shows both so a domain full of existing Pals does
-  /// not read as empty.
-  static Future<Map<String, ({int total, int fresh})>> browseDomainCounts({
-    String kind = 'teach',
-  }) async {
+  /// `total` is everyone in the domain, `fresh` excludes existing connections
+  /// (used to pick the featured domain), and `newcomers` counts people who
+  /// registered in the last seven days.
+  static Future<Map<String, ({int total, int fresh, int newcomers})>>
+  browseDomainCounts({String kind = 'teach'}) async {
     final res =
         await _Client.c.rpc('browse_domain_counts', params: {'p_kind': kind})
             as List;
-    final out = <String, ({int total, int fresh})>{};
+    final out = <String, ({int total, int fresh, int newcomers})>{};
     for (final row in res.whereType<Map>()) {
       final path = (row['root_path'] ?? '').toString();
       if (path.isEmpty) continue;
       out[path] = (
         total: (row['total'] as num?)?.toInt() ?? 0,
         fresh: (row['fresh'] as num?)?.toInt() ?? 0,
+        newcomers: (row['newcomers'] as num?)?.toInt() ?? 0,
       );
     }
     return out;

@@ -28,7 +28,9 @@ Widget _app({
   double textScale = 1,
   DateTime? now,
   Future<int> Function(String path, {required String kind})? countLoader,
-  Future<Map<String, ({int total, int fresh})>> Function(String kind)?
+  Future<Map<String, ({int total, int fresh, int newcomers})>> Function(
+    String kind,
+  )?
   domainCountsLoader,
 }) {
   final size = surface ?? const Size(390, 844);
@@ -135,23 +137,24 @@ void main() {
         surface: const Size(390, 1600),
         domainCountsLoader:
             (kind) async => {
-              'agriculture_livelihood': (total: 0, fresh: 0),
-              'cooking_culinary': (total: 4, fresh: 2),
-              'household_skills': (total: 3, fresh: 0),
-              'language_writing': (total: 1, fresh: 1),
-              'martial_arts': (total: 0, fresh: 0),
-              'modern_practical_skills': (total: 2, fresh: 2),
-              'performing_arts': (total: 2, fresh: 1),
-              'traditional_crafts': (total: 6, fresh: 6),
-              'visual_arts_design': (total: 0, fresh: 0),
+              'agriculture_livelihood': (total: 0, fresh: 0, newcomers: 0),
+              'cooking_culinary': (total: 4, fresh: 2, newcomers: 2),
+              'household_skills': (total: 3, fresh: 0, newcomers: 0),
+              'language_writing': (total: 1, fresh: 1, newcomers: 0),
+              'martial_arts': (total: 0, fresh: 0, newcomers: 0),
+              'modern_practical_skills': (total: 2, fresh: 2, newcomers: 1),
+              'performing_arts': (total: 2, fresh: 1, newcomers: 0),
+              'traditional_crafts': (total: 6, fresh: 6, newcomers: 0),
+              'visual_arts_design': (total: 0, fresh: 0, newcomers: 0),
             },
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('4 mentors · 2 new'), findsOneWidget);
-    expect(find.text('3 mentors · all Pals'), findsOneWidget);
+    expect(find.text('3 mentors'), findsOneWidget);
     expect(find.text('1 mentor'), findsOneWidget);
+    expect(find.text('2 mentors · 1 new'), findsOneWidget);
     expect(find.text('No mentors yet'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
   });
@@ -242,7 +245,7 @@ void main() {
         domainCountsLoader:
             (kind) async => {
               for (final node in _roots())
-                (node['path'] as String): (total: 25, fresh: 12),
+                (node['path'] as String): (total: 25, fresh: 12, newcomers: 12),
             },
       ),
     );

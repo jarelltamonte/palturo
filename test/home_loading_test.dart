@@ -8,7 +8,7 @@ import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 
 void main() {
-  testWidgets('cold deck shows slow copy at 4s and timeout retry at 12s', (
+  testWidgets('cold deck shows slow copy at 4s and timeout retry at 45s', (
     tester,
   ) async {
     final never = Completer<List<Person>>();
@@ -21,11 +21,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Still looking for matches…'), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsNothing);
     expect(find.text('Retry'), findsNothing);
 
     await tester.pump(kDeckSlowThreshold);
-    expect(find.text('Still looking for matches…'), findsOneWidget);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
+    expect(find.text(kDeckSlowHint), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
 
     await tester.pump(kDeckTimeout);
@@ -33,6 +34,33 @@ void main() {
 
     expect(find.textContaining('taking longer'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
+  });
+
+  testWidgets('slow copy fits a small phone at 200% text', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 640);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final never = Completer<List<Person>>();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: HomePage(deckLoader: ({bool force = false}) => never.future),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(kDeckSlowThreshold);
+
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
+    expect(find.text(kDeckSlowHint), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a completed cold deck replaces the skeleton', (tester) async {
@@ -45,7 +73,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Still looking for matches…'), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsNothing);
 
     done.complete(const []);
     await tester.pump();
@@ -56,7 +84,7 @@ void main() {
       find.textContaining('You have seen all the top matches'),
       findsOneWidget,
     );
-    expect(find.text('Still looking for matches…'), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsNothing);
     expect(find.text('Retry'), findsNothing);
   });
 
@@ -75,21 +103,21 @@ void main() {
     );
     await tester.pump();
     await tester.pump(kDeckSlowThreshold);
-    expect(find.text('Still looking for matches…'), findsOneWidget);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
 
     await tester.tap(find.text('Retry'));
     await tester.pump();
     expect(calls, hasLength(2));
-    expect(find.text('Still looking for matches…'), findsNothing);
+    expect(find.text(kDeckSlowMessage), findsNothing);
 
     await tester.pump(kDeckSlowThreshold);
-    expect(find.text('Still looking for matches…'), findsOneWidget);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
 
     // The superseded first load must not cancel the retry's timers.
     calls.first.complete(const []);
     await tester.pump();
     await tester.pump();
-    expect(find.text('Still looking for matches…'), findsOneWidget);
+    expect(find.text(kDeckSlowMessage), findsOneWidget);
 
     await tester.pump(kDeckTimeout);
     await tester.pump();

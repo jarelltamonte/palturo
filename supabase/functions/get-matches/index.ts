@@ -254,7 +254,7 @@ Deno.serve(async (req) => {
       })}`;
     });
 
-    // Reranking must fit inside the client's 18s deck budget. Direction A is a
+    // Reranking must fit inside the client's 45s deck budget. Direction A is a
     // single call; direction B is bounded to the strongest candidates and both
     // stop at the deadline, falling back to A-only scores for the tail.
     const RERANK_BUDGET_MS = 9000;

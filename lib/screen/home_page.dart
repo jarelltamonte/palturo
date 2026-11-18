@@ -35,12 +35,21 @@ enum RoleFilter { all, learner, mentor }
 @visibleForTesting
 const kDeckSlowThreshold = Duration(seconds: 4);
 
+/// Copy shown while a cold deck is still matching.
+@visibleForTesting
+const kDeckSlowMessage = 'Finding the Pals who fit you best…';
+
+/// Explains why a new profile can take a little longer.
+@visibleForTesting
+const kDeckSlowHint = 'New profiles can take a little longer to match.';
+
 /// Hard cap for a cold deck load. After this the UI offers a retry.
 ///
-/// The matcher may spend its full rerank budget (9s) on a cold edge-function
-/// start, so this leaves room for that plus the profile reads.
+/// A brand-new profile has to embed its passages before the matcher can rank
+/// anyone; the embedding step alone allows up to 30s, followed by the 9s
+/// rerank budget and the profile reads.
 @visibleForTesting
-const kDeckTimeout = Duration(seconds: 18);
+const kDeckTimeout = Duration(seconds: 45);
 
 /// Hard cap for sending a connection request. A hanging request must not leave
 /// the deck stuck on its "Sending request…" surface forever.
@@ -1088,10 +1097,20 @@ class _HomePageState extends State<HomePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Still looking for matches…',
+                      kDeckSlowMessage,
                       textAlign: TextAlign.center,
                       style: AppTextStyles.regularText.copyWith(
                         color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      kDeckSlowHint,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 11,
+                        height: 1.4,
                       ),
                     ),
                     TextButton(

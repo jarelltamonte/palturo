@@ -294,20 +294,31 @@ class MatchApi {
   }
 
   /// Build a rich Person (for PersonCard) from the public-profile RPC.
-  static Future<Person?> getPersonFromPublicProfile(String userId) async {
+  static Future<Person?> getPersonFromPublicProfile(
+    String userId, {
+    String? preferRole,
+  }) async {
     final p = await getPublicProfile(userId);
     if (p == null) return null;
-    return personFromPublicProfileMap(p, userId);
+    return personFromPublicProfileMap(p, userId, preferRole: preferRole);
   }
 
   /// Pure mapping used by deck enrichment and tests.
+  ///
+  /// [preferRole] lets a deck show the side it is actually browsing: a `both`
+  /// profile appears as a learner in the learner deck and as a mentor in the
+  /// mentor deck, instead of always showing its teaching side.
   static Person personFromPublicProfileMap(
     Map<String, dynamic> p,
-    String userId,
-  ) {
+    String userId, {
+    String? preferRole,
+  }) {
     String name = ((p['p_name'] ?? '') as String).trim();
     if (name.isEmpty) name = 'Community member';
-    final isLearner = p['p_role'] == 'learner';
+    final profileRole = p['p_role']?.toString();
+    final isLearner =
+        preferRole == 'learner' ||
+        (preferRole == null && profileRole == 'learner');
     final teaching = (p['p_teaching'] as List?) ?? [];
     final learning = (p['p_learning'] as List?) ?? [];
     final preferred = isLearner ? learning : teaching;
@@ -348,7 +359,7 @@ class MatchApi {
       teachingStyle: (p['p_teaching_styles'] ?? '') as String,
       skillName: skill,
       skillPath: skillPath,
-      role: (p['p_role'] == 'learner') ? PersonRole.learner : PersonRole.mentor,
+      role: isLearner ? PersonRole.learner : PersonRole.mentor,
       bio: (p['p_bio'] ?? '') as String,
       skillNote: skillNote,
       photoUrls: [(p['p_avatar'] as String?)],
@@ -426,7 +437,10 @@ class MatchApi {
     final enriched = await Future.wait(
       targetMatches.map((m) async {
         try {
-          final person = await getPersonFromPublicProfile(m.userId);
+          final person = await getPersonFromPublicProfile(
+            m.userId,
+            preferRole: asRoleDb,
+          );
           if (person == null) return null;
           // carry the compatibility score onto the card (spec §6.3 indicator)
           return Person(

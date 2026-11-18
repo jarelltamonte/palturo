@@ -103,6 +103,50 @@ void main() {
     expect(person.skillNote, 'Learning note');
   });
 
+  test('both mapping follows the deck role', () {
+    final profile = <String, dynamic>{
+      'p_name': 'Aling Rosa',
+      'p_role': 'both',
+      'p_bio': 'Profile bio',
+      'p_languages': 'Tagalog',
+      'p_styles': 'Discussion',
+      'p_availability': <dynamic>[],
+      'p_teaching': [
+        {
+          'skill': 'Barong Embroidery',
+          'path': 'arts_design.barong_embroidery',
+          'note': 'Teaching note',
+        },
+      ],
+      'p_learning': [
+        {
+          'skill': 'Cooking Adobo',
+          'path': 'everyday_skills.cooking_adobo',
+          'note': 'Learning note',
+        },
+      ],
+      'p_showcases': <dynamic>[],
+    };
+
+    final learner = MatchApi.personFromPublicProfileMap(
+      profile,
+      'p1',
+      preferRole: 'learner',
+    );
+    expect(learner.skillName, 'Cooking Adobo');
+    expect(learner.skillNote, 'Learning note');
+    expect(learner.role, PersonRole.learner);
+
+    final mentor = MatchApi.personFromPublicProfileMap(
+      profile,
+      'p1',
+      preferRole: 'mentor',
+    );
+    expect(mentor.skillName, 'Barong Embroidery');
+    expect(mentor.skillNote, 'Teaching note');
+    expect(mentor.role, PersonRole.mentor);
+  });
+
   testWidgets('For You card shows skill note, not bio', (tester) async {
     await tester.pumpWidget(_card(_person()));
 
@@ -158,4 +202,3 @@ void main() {
     );
   });
 }
-

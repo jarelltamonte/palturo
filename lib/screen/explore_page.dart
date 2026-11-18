@@ -120,8 +120,16 @@ class _ExplorePageState extends State<ExplorePage> {
     }).toList();
   }
 
-  Map<String, dynamic>? get _featuredRoot =>
-      featuredDomainForDay(_roots, (widget.now ?? DateTime.now)());
+  /// The daily featured domain prefers one with people so the field guide
+  /// still opens on a populated card; it falls back to the full list only when
+  /// every domain is empty.
+  Map<String, dynamic>? get _featuredRoot {
+    final populated = _roots.where((node) => _countFor(node) > 0).toList();
+    return featuredDomainForDay(
+      populated.isEmpty ? _roots : populated,
+      (widget.now ?? DateTime.now)(),
+    );
+  }
 
   String get _roleNoun => _role == ExploreRole.mentor ? 'learner' : 'mentor';
 
@@ -221,14 +229,10 @@ class _ExplorePageState extends State<ExplorePage> {
       final roleResult = await _filterByRole(roots);
       final counts = await _rootCountsFor(roleResult.roots);
       if (!mounted || requestId != _requestId) return;
-      final visible =
-          roleResult.roots
-              .where(
-                (root) => (counts[(root['path'] ?? '').toString()] ?? 1) > 0,
-              )
-              .toList();
+      // Keep every domain visible: empty ones still lead to their skills and
+      // the empty state, and the daily featured domain should not disappear.
       setState(() {
-        _roots = visible;
+        _roots = roleResult.roots;
         _rootCounts = counts;
         _hasMentorSkills = roleResult.hasMentorSkills;
         _loading = false;
@@ -860,6 +864,14 @@ String _countLabelText(int count, String countLabel) {
   return '$count $countLabel${count == 1 ? '' : 's'}';
 }
 
+String _countText(int count, String countLabel) =>
+    count <= 0 ? 'No ${countLabel}s yet' : _countLabelText(count, countLabel);
+
+String _availabilityText(int count, String countLabel) =>
+    count <= 0
+        ? 'No ${countLabel}s yet'
+        : '${_countLabelText(count, countLabel)} available';
+
 class _FieldGuideSearch extends StatelessWidget {
   const _FieldGuideSearch({
     required this.controller,
@@ -1005,10 +1017,10 @@ class _FeaturedDomainCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${_countLabelText(count, countLabel)} available',
+                      _availabilityText(count, countLabel),
                       style: AppTextStyles.boldText.copyWith(
                         fontSize: 11,
-                        color: accent,
+                        color: count > 0 ? accent : muted,
                       ),
                     ),
                   ],
@@ -1064,7 +1076,7 @@ class _DomainCard extends StatelessWidget {
     return Semantics(
       container: true,
       button: true,
-      label: '$label. $description. ${_countLabelText(count, countLabel)}.',
+      label: '$label. $description. ${_countText(count, countLabel)}.',
       onTap: onTap,
       excludeSemantics: true,
       child: Material(
@@ -1122,10 +1134,10 @@ class _DomainCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _countLabelText(count, countLabel),
+                  _countText(count, countLabel),
                   style: AppTextStyles.boldText.copyWith(
                     fontSize: 10,
-                    color: AppColors.accentText(context),
+                    color: count > 0 ? AppColors.accentText(context) : muted,
                   ),
                 ),
               ],

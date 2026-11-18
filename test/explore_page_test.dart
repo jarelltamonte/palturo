@@ -27,6 +27,7 @@ Widget _app({
   Size? surface,
   double textScale = 1,
   DateTime? now,
+  Future<int> Function(String path, {required String kind})? countLoader,
 }) {
   final size = surface ?? const Size(390, 844);
   return MaterialApp(
@@ -38,7 +39,7 @@ Widget _app({
       ),
       child: ExplorePage(
         taxonomyLoader: () async => _roots(),
-        countLoader: _count,
+        countLoader: countLoader ?? _count,
         skillsLoader: skillsLoader,
         now: () => now ?? _today,
       ),
@@ -100,6 +101,24 @@ void main() {
       findsNothing,
     );
     expect(find.text((featured['name'] ?? '').toString()), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty domains stay listed with a no-one-yet label', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        theme: lightMode,
+        surface: const Size(390, 1600),
+        countLoader:
+            (path, {required kind}) async => path == 'martial_arts' ? 0 : 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Martial Arts'), findsOneWidget);
+    expect(find.text('No mentors yet'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
   });
 

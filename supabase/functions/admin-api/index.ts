@@ -414,6 +414,29 @@ Deno.serve(async (req) => {
         const reason = String(payload.reason ?? "").trim();
         if (!id) return json({ error: "User id is required" }, 400);
         if (!reason) return json({ error: "A reason is required" }, 400);
+        if (id === user.id) {
+          return json({ error: "You cannot suspend or restore your own account" }, 409);
+        }
+        const { data: targetAdmin } = await admin
+          .from("admin_users")
+          .select("role")
+          .eq("user_id", id)
+          .maybeSingle();
+        if (targetAdmin) {
+          if (adminRow.role !== "owner") {
+            return json({ error: "Only an owner can change another admin's auth state" }, 403);
+          }
+          if (targetAdmin.role === "owner") {
+            const { count } = await admin
+              .from("admin_users")
+              .select("*", { count: "exact", head: true })
+              .eq("role", "owner")
+              .eq("status", "active");
+            if ((count ?? 0) <= 1) {
+              return json({ error: "Cannot suspend the last active owner" }, 409);
+            }
+          }
+        }
         const ban = action === "users.ban";
         const { error: authMutation } = await admin.auth.admin.updateUserById(id, {
           ban_duration: ban ? "876000h" : "none",
@@ -437,6 +460,27 @@ Deno.serve(async (req) => {
         const reason = String(payload.reason ?? "").trim();
         if (!id) return json({ error: "User id is required" }, 400);
         if (!reason) return json({ error: "A reason is required" }, 400);
+        if (id === user.id) {
+          return json({ error: "You cannot delete your own account" }, 409);
+        }
+        const { data: targetAdmin } = await admin
+          .from("admin_users")
+          .select("role")
+          .eq("user_id", id)
+          .maybeSingle();
+        if (targetAdmin && adminRow.role !== "owner") {
+          return json({ error: "Only an owner can delete an admin account" }, 403);
+        }
+        if (targetAdmin?.role === "owner") {
+          const { count } = await admin
+            .from("admin_users")
+            .select("*", { count: "exact", head: true })
+            .eq("role", "owner")
+            .eq("status", "active");
+          if ((count ?? 0) <= 1) {
+            return json({ error: "Cannot delete the last active owner" }, 409);
+          }
+        }
         const buckets = ["profile-media", "skill-proofs", "avatars", "profile-photos", "skill-showcases"];
         for (const bucket of buckets) {
           const paths = await listStoragePaths(admin, bucket, id);
@@ -456,6 +500,14 @@ Deno.serve(async (req) => {
         const id = String(payload.id ?? "");
         const reason = String(payload.reason ?? "").trim();
         if (!id || !reason) return json({ error: "User id and reason are required" }, 400);
+        const { data: targetAdmin } = await admin
+          .from("admin_users")
+          .select("role")
+          .eq("user_id", id)
+          .maybeSingle();
+        if (targetAdmin?.role === "owner" && adminRow.role !== "owner") {
+          return json({ error: "Only an owner can reset another owner's MFA" }, 403);
+        }
         const { error } = await admin.rpc("admin_clear_mfa", { p_user: id });
         if (error) throw error;
         await audit("user.reset_mfa", "profile", id, null, reason);
@@ -1077,7 +1129,7 @@ Deno.serve(async (req) => {
         return json({
           ok: true,
           data: (data ?? []).filter(
-            (v: any) => v.shared || v.owner_id === user.id || can(adminRow.role, "admins.read"),
+            (v: any) => v.shared || v.owner_id === user.id || adminRow.role === "owner",
           ),
         });
       }
@@ -1211,6 +1263,19 @@ Deno.serve(async (req) => {
             .eq("role", "owner")
             .eq("status", "active");
           if ((count ?? 0) <= 1) return json({ error: "Cannot remove the last owner" }, 409);
+        }
+        if (current.role === "owner" && updates.status === "disabled") {
+          const { count } = await admin
+            .from("admin_users")
+            .select("*", { count: "exact", head: true })
+            .eq("role", "owner")
+            .eq("status", "active");
+          if ((count ?? 0) <= 1) {
+            return json({ error: "Cannot disable the last active owner" }, 409);
+          }
+        }
+        if (targetId === user.id && updates.status === "disabled") {
+          return json({ error: "You cannot disable your own admin account" }, 409);
         }
         const { error } = await admin.from("admin_users").update(updates).eq("user_id", targetId);
         if (error) throw error;

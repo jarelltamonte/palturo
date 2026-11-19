@@ -21,7 +21,26 @@ export interface PipelineCfg {
   wContext: number;
   topK: number;
   configRevision: number;
+  reciprocalFormula: string;
+  rerankAWeight: number;
+  rerankBWeight: number;
+  rerankBLimit: number;
+  rerankBConcurrency: number;
+  rerankBudgetMs: number;
+  rerankATimeoutMs: number;
+  rerankBTimeoutMs: number;
+  rateLimitGetMatches: number;
+  rateLimitWindowSeconds: number;
+  maxDeckSize: number;
 }
+
+const intIn = (v: unknown, dflt: number, min: number, max: number) => {
+  const n = Math.trunc(num(v, dflt));
+  return Math.max(min, Math.min(max, Number.isFinite(n) ? n : dflt));
+};
+
+const numIn = (v: unknown, dflt: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, num(v, dflt)));
 
 export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   const { data: rows } = await admin.from("pipeline_config").select("key,value");
@@ -31,16 +50,27 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   return {
     embeddingModel: unstr(cfg.embedding_model, "nvidia/nemotron-3.5-embed-1b"),
     rerankModel: unstr(cfg.rerank_model, "nvidia/nemotron-3.5-rerank-8b"),
-    embeddingDim: num(cfg.embedding_dim, 1024),
+    embeddingDim: intIn(cfg.embedding_dim, 1024, 64, 4096),
     embeddingApi: unstr(cfg.embedding_api, "https://integrate.api.nvidia.com/v1/embeddings"),
     rerankApi: unstr(
       cfg.rerank_api,
       "https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking",
     ),
-    wSkills: Number(weights.skills ?? 0.7),
-    wContext: Number(weights.context ?? 0.3),
-    topK: num(cfg.candidate_pool_k, 50),
+    wSkills: numIn(weights.skills, 0.7, 0, 1),
+    wContext: numIn(weights.context, 0.3, 0, 1),
+    topK: intIn(cfg.candidate_pool_k, 50, 5, 500),
     configRevision: num(cfg.__revision, 0),
+    reciprocalFormula: unstr(cfg.reciprocal_formula, "geometric_mean").toLowerCase(),
+    rerankAWeight: numIn(cfg.rerank_a_weight, 0.6, 0, 10),
+    rerankBWeight: numIn(cfg.rerank_b_weight, 0.4, 0, 10),
+    rerankBLimit: intIn(cfg.rerank_b_limit, 10, 0, 500),
+    rerankBConcurrency: intIn(cfg.rerank_b_concurrency, 10, 1, 50),
+    rerankBudgetMs: intIn(cfg.rerank_budget_ms, 9000, 500, 40000),
+    rerankATimeoutMs: intIn(cfg.rerank_a_timeout_ms, 7000, 500, 40000),
+    rerankBTimeoutMs: intIn(cfg.rerank_b_timeout_ms, 4000, 250, 40000),
+    rateLimitGetMatches: intIn(cfg.get_matches_rate_limit, 60, 1, 10000),
+    rateLimitWindowSeconds: intIn(cfg.get_matches_rate_window_seconds, 3600, 60, 86400),
+    maxDeckSize: intIn(cfg.max_deck_size, 20, 1, 100),
   };
 }
 

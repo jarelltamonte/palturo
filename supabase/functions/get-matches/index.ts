@@ -58,6 +58,34 @@ async function excludedUserIds(
   return ids;
 }
 
+/// Combine the two sigmoid-calibrated rerank directions. Defaults preserve the
+/// historical sqrt(a*b) behavior; every alternative is clamped to 0..1.
+function combineReciprocal(
+  a: number,
+  b: number,
+  formula: string,
+  aWeight: number,
+  bWeight: number,
+): number {
+  const pa = Math.max(0, Math.min(1, a));
+  const pb = Math.max(0, Math.min(1, b));
+  switch (formula) {
+    case "arithmetic_mean":
+      return (pa + pb) / 2;
+    case "weighted_mean": {
+      const total = aWeight + bWeight;
+      return total > 0 ? (aWeight * pa + bWeight * pb) / total : (pa + pb) / 2;
+    }
+    case "harmonic_mean":
+      return pa + pb > 0 ? (2 * pa * pb) / (pa + pb) : 0;
+    case "min":
+      return Math.min(pa, pb);
+    case "geometric_mean":
+    default:
+      return Math.sqrt(pa * pb);
+  }
+}
+
 async function cacheResults(
   admin: ReturnType<typeof createClient>,
   userId: string,
@@ -153,8 +181,8 @@ Deno.serve(async (req) => {
       {
         p_subject: user.id,
         p_action: "get_matches",
-        p_limit: 60,
-        p_window_seconds: 3600,
+        p_limit: cfg.rateLimitGetMatches,
+        p_window_seconds: cfg.rateLimitWindowSeconds,
       },
     );
     if (rateErr) {
@@ -267,11 +295,11 @@ Deno.serve(async (req) => {
     // Reranking must fit inside the client's 45s deck budget. Direction A is a
     // single call; direction B is bounded to the strongest candidates and both
     // stop at the deadline, falling back to A-only scores for the tail.
-    const RERANK_BUDGET_MS = 9000;
-    const A_TIMEOUT_MS = 7000;
-    const B_LIMIT = 10;
-    const B_CONCURRENCY = 10;
-    const B_TIMEOUT_MS = 4000;
+    const RERANK_BUDGET_MS = cfg.rerankBudgetMs;
+    const A_TIMEOUT_MS = cfg.rerankATimeoutMs;
+    const B_LIMIT = cfg.rerankBLimit;
+    const B_CONCURRENCY = cfg.rerankBConcurrency;
+    const B_TIMEOUT_MS = cfg.rerankBTimeoutMs;
     const rerankStarted = Date.now();
 
     let mode = "full";
@@ -356,7 +384,13 @@ Deno.serve(async (req) => {
       const biScore = c.bi_score;
       let reciprocal: number;
       if (pa !== null && pb !== null) {
-        reciprocal = Math.sqrt(pa * pb);
+        reciprocal = combineReciprocal(
+          pa,
+          pb,
+          cfg.reciprocalFormula,
+          cfg.rerankAWeight,
+          cfg.rerankBWeight,
+        );
       } else if (pa !== null) {
         // Direction B is bounded (or failed) for this candidate. Use A, which
         // is on the same 0..1 scale as the reciprocal head; raw cosine is not
@@ -382,9 +416,15 @@ Deno.serve(async (req) => {
     const excluded = await excludedUserIds(admin, user.id);
     const visible = ranked.filter((s) => !excluded.has(s.candidate_id));
 
-    await refreshCache(admin, user.id, targetRole, visible, cfg, mode, byId);
+    // Enforce the deck cap after exclusions and normalize ranks 1..N so cached
+    // decks never expose gaps or more cards than the configured cap.
+    const deck = visible
+      .slice(0, cfg.maxDeckSize)
+      .map((s, i) => ({ ...s, rank: i + 1 }));
 
-    const results = visible.map((s) => {
+    await refreshCache(admin, user.id, targetRole, deck, cfg, mode, byId);
+
+    const results = deck.map((s) => {
       const p = byId.get(s.candidate_id)!;
       return {
         user_id: s.candidate_id,

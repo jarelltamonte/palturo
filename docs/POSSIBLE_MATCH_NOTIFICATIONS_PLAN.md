@@ -35,8 +35,8 @@ and changelog as work lands.
 - Verification: 315 Flutter tests pass, analyzer clean. Live E2E with Grace Lim
   as candidate and `palturo-e2e@testmail.local` as recipient produced one
   notification, Activity showed Matches 1 / Requests 4, tapping opened the
-  candidate profile and marked the row read. Block, connection, and moderation
-  cleanup each removed the row and suppressed the event. Re-running a job
+  candidate profile and marked the row read. Block, connection, report, and
+  moderation cleanup each removed the row and suppressed the event. Re-running a job
   produced zero duplicates.
 - Report `PalTuro-Feature-Showcase-2026-11-19.pdf` updated with the Matches
   filter and possible-match Activity card.

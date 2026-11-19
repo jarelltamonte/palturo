@@ -57,7 +57,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: [
     "analytics.read", "users.read", "users.write", "pii.read",
     "moderation.read", "moderation.write", "skills.read", "skills.write",
-    "config.read", "config.write", "sandbox.run", "audit.read",
+    "config.read", "config.write", "sandbox.run", "audit.read", "audit.revert",
+    "backups.read", "backups.write",
     "exports.write", "saved_views.read", "saved_views.write", "admins.read",
   ],
   analyst: [
@@ -96,6 +97,7 @@ const ACTION_PERMISSION: Record<string, string> = {
   "skills.create": "skills.write",
   "skills.merge": "skills.write",
   "skills.import": "skills.write",
+  "skills.move": "skills.write",
   "config.get": "config.read",
   "config.saveDraft": "config.write",
   "config.publish": "config.write",
@@ -104,6 +106,13 @@ const ACTION_PERMISSION: Record<string, string> = {
   "sandbox.list": "sandbox.run",
   "sandbox.get": "sandbox.run",
   "audit.list": "audit.read",
+  "audit.revert": "audit.revert",
+  "backups.list": "backups.read",
+  "backups.create": "backups.write",
+  "backups.download": "backups.read",
+  "backups.delete": "backups.write",
+  "backups.verify": "backups.read",
+  "backups.prune": "backups.write",
   "exports.log": "exports.write",
   "savedViews.list": "saved_views.read",
   "savedViews.save": "saved_views.write",
@@ -142,6 +151,131 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
 
 function mapError(error: { message?: string } | null): string {
   return error?.message ?? "Unexpected error";
+}
+
+const BACKUP_BUCKET = "admin-backups";
+const BACKUP_MAX_ROWS = 50000;
+const BACKUP_GROUPS: Record<string, string[]> = {
+  core: [
+    "profiles",
+    "user_skills",
+    "skill_nodes",
+    "connections",
+    "messages",
+    "skill_showcases",
+  ],
+  moderation: [
+    "reports",
+    "blocks",
+    "moderation_actions",
+    "note_moderation_queue",
+    "skill_moderation_log",
+    "feedback",
+    "app_feedback",
+  ],
+  matching: [
+    "pipeline_config",
+    "pipeline_config_versions",
+    "match_cache",
+    "profile_embeddings",
+  ],
+  admin: [
+    "admin_users",
+    "admin_saved_views",
+    "admin_exports",
+    "admin_audit_log",
+    "skill_change_log",
+    "sandbox_runs",
+    "sandbox_results",
+  ],
+};
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function selectAllRows(
+  admin: any,
+  table: string,
+  maxRows = BACKUP_MAX_ROWS,
+): Promise<{ rows: any[]; truncated: boolean }> {
+  const rows: any[] = [];
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await admin
+      .from(table)
+      .select("*")
+      .range(offset, offset + 999);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < 1000) break;
+    offset += 1000;
+    if (rows.length >= maxRows) {
+      return { rows: rows.slice(0, maxRows), truncated: true };
+    }
+  }
+  return { rows, truncated: false };
+}
+
+async function moderationSnapshot(admin: any, userId: string) {
+  const [{ data: profile }, { data: authUser }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("moderation_status,suspended_at,warning_count,last_warned_at")
+      .eq("id", userId)
+      .maybeSingle(),
+    admin.auth.admin.getUserById(userId),
+  ]);
+  return {
+    profile: profile ?? null,
+    banned_until: authUser?.user?.banned_until ?? null,
+  };
+}
+
+async function activeOwnerCount(admin: any): Promise<number> {
+  const { count } = await admin
+    .from("admin_users")
+    .select("*", { count: "exact", head: true })
+    .eq("role", "owner")
+    .eq("status", "active");
+  return count ?? 0;
+}
+
+function isRevertible(row: { action: string; detail: any; reverted_at?: string | null }) {
+  if (row.reverted_at) return false;
+  const detail = row.detail ?? {};
+  switch (row.action) {
+    case "report.resolve":
+      return Boolean(detail.before?.report);
+    case "user.ban":
+    case "user.unban":
+      return Boolean(detail.before);
+    case "skill.update":
+    case "skill.approve":
+    case "skill.reject":
+    case "skill.retire":
+      return Boolean(detail.before);
+    case "skill.move":
+      return Boolean(detail.before?.parent_id !== undefined);
+    case "skill.create":
+      return Boolean(detail.after?.id);
+    case "skill.import":
+      return Array.isArray(detail.node_ids) && detail.node_ids.length > 0;
+    case "config.publish":
+    case "config.rollback":
+      return Boolean(detail.before_config);
+    case "admin.add":
+      return Boolean(row.detail?.target_id);
+    case "admin.update":
+    case "admin.remove":
+      return Boolean(detail.before);
+    default:
+      return false;
+  }
 }
 
 async function listStoragePaths(
@@ -361,27 +495,41 @@ Deno.serve(async (req) => {
         const id = String(payload.id ?? "");
         if (!id) return json({ error: "User id is required" }, 400);
         const reveal = can(adminRow.role, "pii.read");
-        const [{ data: profile }, { data: skills }, { data: reports }, { data: auditRows }, { data: authUser }] =
-          await Promise.all([
-            admin.from("profiles").select("*").eq("id", id).maybeSingle(),
-            admin
-              .from("user_skills")
-              .select("kind,note,skill:skill_id(id,name,path,kind),focus:focus_skill_id(name)")
-              .eq("user_id", id),
-            admin
-              .from("reports")
-              .select("id,reporter_id,reported_id,reason,details,status,created_at,resolved_at,messages_snapshot")
-              .or(`reporter_id.eq.${id},reported_id.eq.${id}`)
-              .order("created_at", { ascending: false })
-              .limit(20),
-            admin
-              .from("admin_audit_log")
-              .select("*")
-              .eq("target_id", id)
-              .order("created_at", { ascending: false })
-              .limit(20),
-            admin.auth.admin.getUserById(id),
-          ]);
+        const [
+          { data: profile },
+          { data: skills },
+          { data: reports },
+          { data: auditRows },
+          { data: authUser },
+          { data: warnings },
+        ] = await Promise.all([
+          admin.from("profiles").select("*").eq("id", id).maybeSingle(),
+          admin
+            .from("user_skills")
+            .select("kind,note,skill:skill_id(id,name,path,kind),focus:focus_skill_id(name)")
+            .eq("user_id", id),
+          admin
+            .from("reports")
+            .select(
+              "id,reporter_id,reported_id,reason,details,status,created_at,resolved_at,messages_snapshot,action_taken,action_at",
+            )
+            .or(`reporter_id.eq.${id},reported_id.eq.${id}`)
+            .order("created_at", { ascending: false })
+            .limit(20),
+          admin
+            .from("admin_audit_log")
+            .select("*")
+            .eq("target_id", id)
+            .order("created_at", { ascending: false })
+            .limit(20),
+          admin.auth.admin.getUserById(id),
+          admin
+            .from("moderation_actions")
+            .select("id,action,reason,report_id,actor_id,created_at")
+            .eq("user_id", id)
+            .order("created_at", { ascending: false })
+            .limit(50),
+        ]);
         if (!profile) return json({ error: "User not found" }, 404);
         if (!reveal) profile.email = maskEmail(profile.email);
         if (reveal) {
@@ -393,6 +541,7 @@ Deno.serve(async (req) => {
             profile,
             skills: skills ?? [],
             reports: reports ?? [],
+            warnings: warnings ?? [],
             audit: auditRows ?? [],
             auth: authUser?.user
               ? {
@@ -438,20 +587,28 @@ Deno.serve(async (req) => {
           }
         }
         const ban = action === "users.ban";
+        const before = await moderationSnapshot(admin, id);
         const { error: authMutation } = await admin.auth.admin.updateUserById(id, {
           ban_duration: ban ? "876000h" : "none",
         });
         if (authMutation) throw authMutation;
+        const afterProfile = {
+          moderation_status: ban ? "suspended" : "active",
+          suspended_at: ban ? new Date().toISOString() : null,
+        };
         const { error: profileMutation } = await admin
           .from("profiles")
-          .update({
-            moderation_status: ban ? "suspended" : "active",
-            suspended_at: ban ? new Date().toISOString() : null,
-          })
+          .update(afterProfile)
           .eq("id", id);
         if (profileMutation) throw profileMutation;
         await admin.from("match_cache").delete().or(`user_id.eq.${id},candidate_id.eq.${id}`);
-        await audit(ban ? "user.ban" : "user.unban", "profile", id, null, reason);
+        await audit(
+          ban ? "user.ban" : "user.unban",
+          "profile",
+          id,
+          { before, after: afterProfile },
+          reason,
+        );
         return json({ ok: true, data: { id, status: ban ? "suspended" : "active" } });
       }
 
@@ -518,7 +675,7 @@ Deno.serve(async (req) => {
         const { data, error } = await admin
           .from("reports")
           .select(
-            "id,reporter_id,reported_id,reason,details,status,created_at,resolved_at,assigned_to,messages_snapshot,reporter:reporter_id(id,display_name,email),reported:reported_id(id,display_name,email),assigned:assigned_to(id,display_name)",
+            "id,reporter_id,reported_id,reason,details,status,created_at,resolved_at,assigned_to,messages_snapshot,action_taken,action_by,action_at,reporter:reporter_id(id,display_name,email),reported:reported_id(id,display_name,email,moderation_status,warning_count),assigned:assigned_to(id,display_name)",
           )
           .order("created_at", { ascending: false })
           .limit(200);
@@ -539,31 +696,125 @@ Deno.serve(async (req) => {
       case "moderation.resolveReport": {
         const id = String(payload.id ?? "");
         const status = String(payload.status ?? "reviewed");
+        const actionTaken = String(payload.moderation_action ?? "pass").toLowerCase();
         const resolution = String(payload.resolution ?? "").trim();
         const reason = String(payload.reason ?? "").trim();
         if (!id || !reason) return json({ error: "Report id and reason are required" }, 400);
         if (!["open", "reviewed", "dismissed", "actioned"].includes(status)) {
           return json({ error: "Invalid report status" }, 400);
         }
+        if (!["pass", "warn", "suspend", "ban"].includes(actionTaken)) {
+          return json({ error: "Invalid moderation action" }, 400);
+        }
+
+        const { data: report } = await admin
+          .from("reports")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (!report) return json({ error: "Report not found" }, 404);
+
+        const reportedId = report.reported_id as string | null;
+        if (!reportedId) {
+          return json({ error: "Report has no target profile" }, 409);
+        }
+        if (actionTaken !== "pass" && reportedId === user.id) {
+          return json({ error: "You cannot action your own account" }, 409);
+        }
+
+        const { data: targetAdmin } = await admin
+          .from("admin_users")
+          .select("role")
+          .eq("user_id", reportedId)
+          .maybeSingle();
+        if (targetAdmin && actionTaken !== "pass" && adminRow.role !== "owner") {
+          return json({ error: "Only an owner can action another admin" }, 403);
+        }
+        if (
+          targetAdmin?.role === "owner" &&
+          (actionTaken === "suspend" || actionTaken === "ban")
+        ) {
+          if ((await activeOwnerCount(admin)) <= 1) {
+            return json({ error: "Cannot suspend or ban the last active owner" }, 409);
+          }
+        }
+
+        const before = await moderationSnapshot(admin, reportedId);
+        let userAfter: any = before.profile;
+        const now = new Date().toISOString();
+
+        if (actionTaken === "warn") {
+          const { data, error } = await admin
+            .from("profiles")
+            .update({
+              warning_count: Number(before.profile?.warning_count ?? 0) + 1,
+              last_warned_at: now,
+            })
+            .eq("id", reportedId)
+            .select("moderation_status,suspended_at,warning_count,last_warned_at")
+            .single();
+          if (error) throw error;
+          userAfter = data;
+        } else if (actionTaken === "suspend" || actionTaken === "ban") {
+          const { error: authError } = await admin.auth.admin.updateUserById(reportedId, {
+            ban_duration: actionTaken === "ban" ? "876000h" : "720h",
+          });
+          if (authError) throw authError;
+          const nextStatus = actionTaken === "ban" ? "banned" : "suspended";
+          const { data, error } = await admin
+            .from("profiles")
+            .update({ moderation_status: nextStatus, suspended_at: now })
+            .eq("id", reportedId)
+            .select("moderation_status,suspended_at,warning_count,last_warned_at")
+            .single();
+          if (error) throw error;
+          userAfter = data;
+          await admin.from("match_cache").delete().or(`user_id.eq.${reportedId},candidate_id.eq.${reportedId}`);
+        }
+
+        const { error: actionError } = await admin.from("moderation_actions").insert({
+          report_id: id,
+          user_id: reportedId,
+          action: actionTaken,
+          reason,
+          actor_id: user.id,
+        });
+        if (actionError) throw actionError;
+
+        const afterReport = {
+          status,
+          resolution: resolution || null,
+          assigned_to: user.id,
+          resolved_at: status === "open" ? null : now,
+          action_taken: actionTaken,
+          action_by: user.id,
+          action_at: now,
+        };
         const { error } = await admin
           .from("reports")
-          .update({
-            status,
-            resolution: resolution || null,
-            assigned_to: user.id,
-            resolved_at: status === "open" ? null : new Date().toISOString(),
-          })
+          .update(afterReport)
           .eq("id", id);
         if (error) throw error;
-        await audit("report.resolve", "report", id, { status, resolution }, reason);
-        return json({ ok: true });
+
+        await audit(
+          "report.resolve",
+          "report",
+          id,
+          {
+            before: { report, user: before },
+            after: { report: afterReport, user: userAfter },
+            action: actionTaken,
+          },
+          reason,
+        );
+        return json({ ok: true, data: { action: actionTaken, user: userAfter } });
       }
 
       case "moderation.skills": {
         const { data, error } = await admin
           .from("skill_nodes")
           .select(
-            "id,name,path,kind,status,origin,auto_approved,is_visible,created_at,parent:parent_id(id,name,path,kind),submitted:submitted_by(id,display_name)",
+            "id,name,path,kind,status,origin,auto_approved,approval_source,is_visible,is_general,depth,created_at,parent:parent_id(id,name,path,kind),submitted:submitted_by(id,display_name)",
           )
           .eq("status", "pending")
           .order("created_at", { ascending: true })
@@ -583,25 +834,28 @@ Deno.serve(async (req) => {
         const status = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : "retired";
         const { data: before } = await admin.from("skill_nodes").select("*").eq("id", id).maybeSingle();
         if (!before) return json({ error: "Skill not found" }, 404);
+        const after = {
+          status,
+          is_visible: decision === "approve",
+          auto_approved: false,
+          approval_source: "manual",
+          updated_at: new Date().toISOString(),
+        };
         const { error } = await admin
           .from("skill_nodes")
-          .update({
-            status,
-            is_visible: decision === "approve",
-            updated_at: new Date().toISOString(),
-          })
+          .update(after)
           .eq("id", id);
         if (error) throw error;
         await admin.from("skill_change_log").insert({
           node_id: id,
           action: decision,
           before,
-          after: { status, is_visible: decision === "approve" },
+          after,
           reason,
           actor_id: user.id,
         });
         await admin.from("match_cache").delete().gte("rank", 0);
-        await audit(`skill.${decision}`, "skill_node", id, { status }, reason);
+        await audit(`skill.${decision}`, "skill_node", id, { before, after }, reason);
         return json({ ok: true });
       }
 
@@ -655,13 +909,41 @@ Deno.serve(async (req) => {
       }
 
       case "skills.list": {
-        const { data, error } = await admin
+        const boolValue = (value: unknown): boolean | null => {
+          if (value === true || value === "true") return true;
+          if (value === false || value === "false") return false;
+          return null;
+        };
+        let query = admin
           .from("skill_nodes")
           .select(
-            "id,name,path,depth,kind,status,origin,auto_approved,is_visible,is_general,usage_count,created_at,parent:parent_id(id,name)",
+            "id,name,path,depth,kind,status,origin,auto_approved,approval_source,is_visible,is_general,is_leaf,usage_count,created_at,parent:parent_id(id,name),submitted_by",
           )
           .order("path")
-          .limit(1000);
+          .limit(clampInt(payload.limit, 5000, 1, 5000));
+        if (payload.search) {
+          const q = String(payload.search)
+            .replace(/[^a-zA-Z0-9 @._-]/g, "")
+            .trim()
+            .slice(0, 80);
+          if (q) query = query.ilike("name", `%${q}%`);
+        }
+        for (const key of ["kind", "status", "origin", "approval_source", "parent_id"]) {
+          if (payload[key]) query = query.eq(key, String(payload[key]));
+        }
+        const visible = boolValue(payload.is_visible);
+        if (visible !== null) query = query.eq("is_visible", visible);
+        const general = boolValue(payload.is_general);
+        if (general !== null) query = query.eq("is_general", general);
+        const autoApproved = boolValue(payload.auto_approved);
+        if (autoApproved !== null) query = query.eq("auto_approved", autoApproved);
+        if (payload.depth !== undefined) {
+          query = query.eq("depth", clampInt(payload.depth, 1, 1, 10));
+        }
+        if (payload.min_usage !== undefined) {
+          query = query.gte("usage_count", clampInt(payload.min_usage, 0, 0, 1000000));
+        }
+        const { data, error } = await query;
         if (error) throw error;
         return json({ ok: true, data: data ?? [] });
       }
@@ -670,24 +952,59 @@ Deno.serve(async (req) => {
         const id = String(payload.id ?? "");
         const reason = String(payload.reason ?? "").trim();
         if (!id || !reason) return json({ error: "Skill id and reason are required" }, 400);
+        const { data: before } = await admin.from("skill_nodes").select("*").eq("id", id).maybeSingle();
+        if (!before) return json({ error: "Skill not found" }, 404);
+
         const allowed: Record<string, any> = {};
-        for (const key of ["name", "status", "is_visible", "is_general"]) {
+        for (const key of ["name", "status", "is_visible", "is_general", "approval_source", "auto_approved"]) {
           if (payload[key] !== undefined) allowed[key] = payload[key];
         }
         if (Object.keys(allowed).length === 0) return json({ error: "No fields to update" }, 400);
-        const { data: before } = await admin.from("skill_nodes").select("*").eq("id", id).maybeSingle();
-        const { error } = await admin.from("skill_nodes").update(allowed).eq("id", id);
-        if (error) return json({ error: error.message }, 409);
+        if (allowed.status !== undefined && !["approved", "pending", "rejected", "retired"].includes(allowed.status)) {
+          return json({ error: "Invalid status" }, 400);
+        }
+        if (
+          allowed.approval_source !== undefined &&
+          !["inference", "manual", "seed", "import"].includes(allowed.approval_source)
+        ) {
+          return json({ error: "Invalid approval source" }, 400);
+        }
+
+        let renameResult: any = null;
+        if (allowed.name !== undefined) {
+          const nextName = String(allowed.name).trim();
+          if (!nextName) return json({ error: "Name must not be empty" }, 400);
+          delete allowed.name;
+          if (nextName !== before.name) {
+            const { data, error } = await admin.rpc("admin_rename_skill", {
+              p_node: id,
+              p_name: nextName,
+              p_actor: user.id,
+              p_reason: reason,
+            });
+            if (error) return json({ error: error.message }, 409);
+            renameResult = data;
+          }
+        }
+
+        if (Object.keys(allowed).length > 0) {
+          allowed.updated_at = new Date().toISOString();
+          const { error } = await admin.from("skill_nodes").update(allowed).eq("id", id);
+          if (error) return json({ error: error.message }, 409);
+        }
+
+        const after = { ...allowed, ...(renameResult ? { name: String(payload.name).trim(), path: renameResult.path } : {}) };
         await admin.from("skill_change_log").insert({
           node_id: id,
           action: "update",
           before,
-          after: allowed,
+          after,
           reason,
           actor_id: user.id,
         });
-        await audit("skill.update", "skill_node", id, allowed, reason);
-        return json({ ok: true });
+        await admin.from("match_cache").delete().gte("rank", 0);
+        await audit("skill.update", "skill_node", id, { before, after }, reason);
+        return json({ ok: true, data: { id, ...after } });
       }
 
       case "skills.create": {
@@ -714,8 +1031,10 @@ Deno.serve(async (req) => {
             is_visible: true,
             origin: "official",
             status: "approved",
+            auto_approved: false,
+            approval_source: "manual",
           })
-          .select("id,name,path,kind,status")
+          .select("id,name,path,kind,status,approval_source")
           .single();
         if (error) return json({ error: error.message }, 409);
         await admin.from("skill_change_log").insert({
@@ -727,7 +1046,7 @@ Deno.serve(async (req) => {
           actor_id: user.id,
         });
         await admin.from("match_cache").delete().gte("rank", 0);
-        await audit("skill.create", "skill_node", data.id, data, reason);
+        await audit("skill.create", "skill_node", data.id, { after: data }, reason);
         return json({ ok: true, data });
       }
 
@@ -758,6 +1077,7 @@ Deno.serve(async (req) => {
         const byPath = new Map((nodes ?? []).map((n: any) => [String(n.path), n]));
         let inserted = 0;
         let skipped = 0;
+        const nodeIds: string[] = [];
         for (const item of items.slice(0, 500)) {
           const name = String(item.name ?? "").trim();
           const parentPath = String(item.parent_path ?? "").trim();
@@ -775,11 +1095,15 @@ Deno.serve(async (req) => {
               is_visible: item.is_visible !== false,
               origin: "official",
               status: item.status === "pending" ? "pending" : "approved",
+              auto_approved: false,
+              approval_source: "import",
             })
-            .select("id,name,path,kind,status")
+            .select("id,name,path,kind,status,approval_source")
             .single();
           if (error) { skipped++; continue; }
           inserted++;
+          nodeIds.push(data.id);
+          byPath.set(String(data.path), data);
           await admin.from("skill_change_log").insert({
             node_id: data.id,
             action: "import",
@@ -790,8 +1114,31 @@ Deno.serve(async (req) => {
           });
         }
         await admin.from("match_cache").delete().gte("rank", 0);
-        await audit("skill.import", "skill_nodes", null, { inserted, skipped }, reason);
-        return json({ ok: true, data: { inserted, skipped } });
+        await audit("skill.import", "skill_nodes", null, { inserted, skipped, node_ids: nodeIds }, reason);
+        return json({ ok: true, data: { inserted, skipped, node_ids: nodeIds } });
+      }
+
+      case "skills.move": {
+        const id = String(payload.id ?? "");
+        const parentId = payload.parent_id ? String(payload.parent_id) : null;
+        const reason = String(payload.reason ?? "").trim();
+        if (!id || !reason) return json({ error: "Skill id and reason are required" }, 400);
+        const { data: before } = await admin
+          .from("skill_nodes")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (!before) return json({ error: "Skill not found" }, 404);
+        const { data, error } = await admin.rpc("admin_move_skill", {
+          p_node: id,
+          p_new_parent: parentId,
+          p_actor: user.id,
+          p_reason: reason,
+        });
+        if (error) return json({ error: error.message }, 409);
+        await admin.from("match_cache").delete().gte("rank", 0);
+        await audit("skill.move", "skill_node", id, { before, after: data }, reason);
+        return json({ ok: true, data });
       }
 
       case "config.get": {
@@ -867,6 +1214,15 @@ Deno.serve(async (req) => {
         if (Object.keys(clean).length === 0) {
           return json({ error: "Config must not be empty" }, 400);
         }
+        const { data: currentRows } = await admin
+          .from("pipeline_config")
+          .select("key,value");
+        const beforeConfig: Record<string, unknown> = {};
+        let beforeRevision = 0;
+        for (const row of currentRows ?? []) {
+          if (row.key === "__revision") beforeRevision = Number(row.value ?? 0);
+          else beforeConfig[row.key] = row.value;
+        }
         const { data: published, error: publishErr } = await admin.rpc(
           "admin_publish_config",
           {
@@ -883,7 +1239,12 @@ Deno.serve(async (req) => {
           action === "config.rollback" ? "config.rollback" : "config.publish",
           "pipeline_config",
           String(published?.revision ?? ""),
-          { version_id: published?.version_id ?? versionId },
+          {
+            version_id: published?.version_id ?? versionId,
+            before_config: beforeConfig,
+            before_revision: beforeRevision,
+            after_revision: published?.revision ?? null,
+          },
           reason,
         );
         return json({ ok: true, data: published });
@@ -915,17 +1276,23 @@ Deno.serve(async (req) => {
         if (runErr) throw runErr;
 
         try {
-          const { data: cache, error: cacheErr } = await admin
+          let cacheQuery = admin
             .from("match_cache")
             .select("user_id,as_role,candidate_id,rank,bi_score,rerank_score_a,rerank_score_b,calibrated_score,pipeline_mode")
             .order("user_id")
             .limit(10000);
+          const roleFilter = String(payload.as_role ?? "");
+          if (roleFilter === "mentor" || roleFilter === "learner") {
+            cacheQuery = cacheQuery.eq("as_role", roleFilter);
+          }
+          const { data: cache, error: cacheErr } = await cacheQuery;
           if (cacheErr) throw cacheErr;
 
           const aWeight = Number(candidateConfig.rerank_a_weight ?? 0.6);
           const bWeight = Number(candidateConfig.rerank_b_weight ?? 0.4);
           const formula = String(candidateConfig.reciprocal_formula ?? "geometric_mean");
           const bLimit = clampInt(candidateConfig.rerank_b_limit, 10, 0, 500);
+          const deckCap = clampInt(candidateConfig.max_deck_size, 20, 1, 100);
           const groups = new Map<string, any[]>();
           for (const row of cache ?? []) {
             const key = `${row.user_id}|${row.as_role}`;
@@ -944,16 +1311,34 @@ Deno.serve(async (req) => {
           let top10Dropped = 0;
           let scoreDeltaTotal = 0;
           let candidateAOnly = 0;
+          let absRankShiftTotal = 0;
+          let maxRankShift = 0;
+          let correlationTotal = 0;
+          let correlationDecks = 0;
+          let cappedCandidates = 0;
 
           const scoreOf = (row: any, aRank: number) => {
             const pa = row.rerank_score_a === null ? null : Number(row.rerank_score_a);
             let pb = row.rerank_score_b === null ? null : Number(row.rerank_score_b);
             if (aRank > bLimit) pb = null;
             if (pa !== null && pb !== null) {
-              if (formula === "weighted_mean") {
-                return (aWeight * pa + bWeight * pb) / Math.max(0.0001, aWeight + bWeight);
+              const a = Math.max(0, Math.min(1, pa));
+              const b = Math.max(0, Math.min(1, pb));
+              switch (formula) {
+                case "arithmetic_mean":
+                  return (a + b) / 2;
+                case "weighted_mean": {
+                  const total = aWeight + bWeight;
+                  return total > 0 ? (aWeight * a + bWeight * b) / total : (a + b) / 2;
+                }
+                case "harmonic_mean":
+                  return a + b > 0 ? (2 * a * b) / (a + b) : 0;
+                case "min":
+                  return Math.min(a, b);
+                case "geometric_mean":
+                default:
+                  return Math.sqrt(a * b);
               }
-              return Math.sqrt(Math.max(0, pa) * Math.max(0, pb));
             }
             if (pa !== null) return pa;
             return Math.max(Number(row.bi_score ?? 0), 0);
@@ -971,7 +1356,24 @@ Deno.serve(async (req) => {
               candidate_score: scoreOf(row, aRank.get(row.candidate_id) ?? 999),
             }));
             scored.sort((a, b) => b.candidate_score - a.candidate_score);
-            scored.forEach((row, index) => {
+            const deckScored = scored.slice(0, deckCap);
+            cappedCandidates += Math.max(0, scored.length - deckScored.length);
+
+            if (deckScored.length > 1) {
+              const candidateRankMap = new Map(
+                deckScored.map((row, index) => [row.candidate_id, index + 1]),
+              );
+              let d2 = 0;
+              for (const row of deckScored) {
+                const d = Number(row.rank) - Number(candidateRankMap.get(row.candidate_id) ?? 0);
+                d2 += d * d;
+              }
+              const n = deckScored.length;
+              correlationTotal += 1 - (6 * d2) / (n * (n * n - 1));
+              correlationDecks++;
+            }
+
+            deckScored.forEach((row, index) => {
               const candidateRank = index + 1;
               const baselineRank = Number(row.rank);
               const baselineScore = Number(row.calibrated_score);
@@ -979,6 +1381,9 @@ Deno.serve(async (req) => {
               candidates++;
               if (row.rerank_score_b === null) candidateAOnly++;
               scoreDeltaTotal += delta;
+              const rankShift = Math.abs(candidateRank - baselineRank);
+              absRankShiftTotal += rankShift;
+              if (rankShift > maxRankShift) maxRankShift = rankShift;
               if (candidateRank !== baselineRank) {
                 changed++;
                 if (candidateRank < baselineRank) improved++;
@@ -1004,6 +1409,16 @@ Deno.serve(async (req) => {
             });
           }
 
+          const scoredKeys = [
+            "reciprocal_formula",
+            "rerank_a_weight",
+            "rerank_b_weight",
+            "rerank_b_limit",
+            "max_deck_size",
+          ];
+          const ignoredKeys = Object.keys(candidateConfig).filter(
+            (key) => !scoredKeys.includes(key) && key !== "__revision",
+          );
           const summary = {
             users,
             candidates,
@@ -1013,11 +1428,26 @@ Deno.serve(async (req) => {
             top10_overlap: top10Overlap,
             top10_new: top10New,
             top10_dropped: top10Dropped,
+            top10_overlap_pct:
+              top10Overlap + top10New + top10Dropped > 0
+                ? top10Overlap / (top10Overlap + top10New + top10Dropped)
+                : 1,
             avg_score_delta: candidates ? scoreDeltaTotal / candidates : 0,
+            changed_share: candidates ? changed / candidates : 0,
+            avg_abs_rank_shift: candidates ? absRankShiftTotal / candidates : 0,
+            max_rank_shift: maxRankShift,
+            rank_correlation:
+              correlationDecks > 0 ? correlationTotal / correlationDecks : 1,
             a_only_share: candidates ? candidateAOnly / candidates : 0,
             formula,
             b_limit: bLimit,
-            note: "Cached-score replay only; no re-embedding or NIM rerank was run.",
+            deck_cap: deckCap,
+            capped_candidates: cappedCandidates,
+            as_role: roleFilter || "all",
+            baseline_rows: (cache ?? []).length,
+            simulated_keys: scoredKeys,
+            ignored_keys: ignoredKeys,
+            note: "Cached-score replay only. Scoring, B limit, and deck sizing are simulated; retrieval, embeddings, rerank models, and timeouts are not.",
           };
           await admin
             .from("sandbox_runs")
@@ -1100,7 +1530,535 @@ Deno.serve(async (req) => {
         if (payload.actor_id) query = query.eq("actor_id", String(payload.actor_id));
         const { data, error } = await query;
         if (error) throw error;
-        return json({ ok: true, data: data ?? [] });
+        return json({
+          ok: true,
+          data: (data ?? []).map((row: any) => ({
+            ...row,
+            reversible: isRevertible(row),
+          })),
+        });
+      }
+
+      case "audit.revert": {
+        const id = Number(payload.id);
+        const reason = String(payload.reason ?? "").trim();
+        if (!Number.isFinite(id) || id <= 0) {
+          return json({ error: "Audit id is required" }, 400);
+        }
+        if (!reason) return json({ error: "A reason is required" }, 400);
+
+        const { data: original } = await admin
+          .from("admin_audit_log")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (!original) return json({ error: "Audit entry not found" }, 404);
+        if (original.reverted_at) {
+          return json({ error: "This action was already reverted" }, 409);
+        }
+        if (!isRevertible(original)) {
+          return json({ error: "This action cannot be reverted" }, 400);
+        }
+
+        const detail = original.detail ?? {};
+        let result: any = {};
+
+        try {
+          switch (original.action) {
+            case "report.resolve": {
+              const reportBefore = detail.before?.report;
+              if (!reportBefore) throw new Error("No report snapshot");
+              const { error } = await admin
+                .from("reports")
+                .update({
+                  status: reportBefore.status,
+                  resolution: reportBefore.resolution,
+                  assigned_to: reportBefore.assigned_to,
+                  resolved_at: reportBefore.resolved_at,
+                  action_taken: reportBefore.action_taken,
+                  action_by: reportBefore.action_by,
+                  action_at: reportBefore.action_at,
+                })
+                .eq("id", original.target_id);
+              if (error) throw error;
+
+              const userId = reportBefore.reported_id;
+              const userBefore = detail.before?.user;
+              if (userId && userBefore?.profile) {
+                const { error: profileError } = await admin
+                  .from("profiles")
+                  .update({
+                    moderation_status: userBefore.profile.moderation_status,
+                    suspended_at: userBefore.profile.suspended_at,
+                    warning_count: userBefore.profile.warning_count,
+                    last_warned_at: userBefore.profile.last_warned_at,
+                  })
+                  .eq("id", userId);
+                if (profileError) throw profileError;
+                const stillBanned =
+                  userBefore.banned_until &&
+                  new Date(userBefore.banned_until).getTime() > Date.now();
+                await admin.auth.admin.updateUserById(userId, {
+                  ban_duration: stillBanned ? "876000h" : "none",
+                });
+                await admin.from("match_cache").delete().or(`user_id.eq.${userId},candidate_id.eq.${userId}`);
+              }
+              result = { report_id: original.target_id, restored: true };
+              break;
+            }
+
+            case "user.ban":
+            case "user.unban": {
+              const before = detail.before;
+              if (!before?.profile) throw new Error("No user snapshot");
+              const userId = original.target_id;
+              const { error } = await admin
+                .from("profiles")
+                .update({
+                  moderation_status: before.profile.moderation_status,
+                  suspended_at: before.profile.suspended_at,
+                  warning_count: before.profile.warning_count,
+                  last_warned_at: before.profile.last_warned_at,
+                })
+                .eq("id", userId);
+              if (error) throw error;
+              const wasBanned =
+                before.banned_until &&
+                new Date(before.banned_until).getTime() > Date.now();
+              await admin.auth.admin.updateUserById(userId, {
+                ban_duration: wasBanned ? "876000h" : "none",
+              });
+              await admin.from("match_cache").delete().or(`user_id.eq.${userId},candidate_id.eq.${userId}`);
+              result = { user_id: userId, restored: true };
+              break;
+            }
+
+            case "skill.update":
+            case "skill.approve":
+            case "skill.reject":
+            case "skill.retire": {
+              const before = detail.before;
+              if (!before?.id) throw new Error("No skill snapshot");
+              const { data: current } = await admin
+                .from("skill_nodes")
+                .select("*")
+                .eq("id", before.id)
+                .maybeSingle();
+              if (!current) throw new Error("Skill not found");
+              if (before.name && before.name !== current.name) {
+                const { error } = await admin.rpc("admin_rename_skill", {
+                  p_node: before.id,
+                  p_name: before.name,
+                  p_actor: user.id,
+                  p_reason: `Revert audit #${id}: ${reason}`,
+                });
+                if (error) throw error;
+              }
+              const { error } = await admin
+                .from("skill_nodes")
+                .update({
+                  status: before.status,
+                  is_visible: before.is_visible,
+                  is_general: before.is_general,
+                  approval_source: before.approval_source,
+                  auto_approved: before.auto_approved,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", before.id);
+              if (error) throw error;
+              await admin.from("match_cache").delete().gte("rank", 0);
+              result = { node_id: before.id, restored: true };
+              break;
+            }
+
+            case "skill.move": {
+              const before = detail.before;
+              if (!before?.id) throw new Error("No skill snapshot");
+              const { data, error } = await admin.rpc("admin_move_skill", {
+                p_node: before.id,
+                p_new_parent: before.parent_id ?? null,
+                p_actor: user.id,
+                p_reason: `Revert audit #${id}: ${reason}`,
+              });
+              if (error) throw error;
+              await admin.from("match_cache").delete().gte("rank", 0);
+              result = data;
+              break;
+            }
+
+            case "skill.create": {
+              const nodeId = detail.after?.id ?? original.target_id;
+              if (!nodeId) throw new Error("No created node id");
+              const { error } = await admin
+                .from("skill_nodes")
+                .update({ status: "retired", is_visible: false, updated_at: new Date().toISOString() })
+                .eq("id", nodeId);
+              if (error) throw error;
+              await admin.from("match_cache").delete().gte("rank", 0);
+              result = { node_id: nodeId, retired: true };
+              break;
+            }
+
+            case "skill.import": {
+              const nodeIds: string[] = detail.node_ids ?? [];
+              if (nodeIds.length === 0) throw new Error("No imported node ids");
+              const { error } = await admin
+                .from("skill_nodes")
+                .update({ status: "retired", is_visible: false, updated_at: new Date().toISOString() })
+                .in("id", nodeIds);
+              if (error) throw error;
+              await admin.from("match_cache").delete().gte("rank", 0);
+              result = { retired: nodeIds.length };
+              break;
+            }
+
+            case "config.publish":
+            case "config.rollback": {
+              const beforeConfig = detail.before_config;
+              if (!beforeConfig || typeof beforeConfig !== "object") {
+                throw new Error("No config snapshot");
+              }
+              const { data: published, error } = await admin.rpc("admin_publish_config", {
+                p_config: beforeConfig,
+                p_actor: user.id,
+                p_reason: `Revert audit #${id}: ${reason}`,
+                p_label: `Revert audit #${id}`,
+                p_version_id: null,
+              });
+              if (error) throw error;
+              await admin.from("match_cache").delete().gte("rank", 0);
+              result = published;
+              break;
+            }
+
+            case "admin.add": {
+              const targetId = detail.target_id ?? original.target_id;
+              if (!targetId) throw new Error("No admin target");
+              if (targetId === user.id) throw new Error("You cannot revert your own access grant");
+              if (detail.before?.user_id) {
+                const { error } = await admin.from("admin_users").upsert({
+                  user_id: detail.before.user_id,
+                  role: detail.before.role,
+                  status: detail.before.status,
+                  mfa_required: detail.before.mfa_required,
+                  created_by: detail.before.created_by,
+                });
+                if (error) throw error;
+                result = { user_id: targetId, restored: true };
+              } else {
+                const { data: current } = await admin
+                  .from("admin_users")
+                  .select("*")
+                  .eq("user_id", targetId)
+                  .maybeSingle();
+                if (current?.role === "owner" && (await activeOwnerCount(admin)) <= 1) {
+                  throw new Error("Cannot remove the last active owner");
+                }
+                const { error } = await admin.from("admin_users").delete().eq("user_id", targetId);
+                if (error) throw error;
+                result = { user_id: targetId, removed: true };
+              }
+              break;
+            }
+
+            case "admin.update": {
+              const before = detail.before;
+              if (!before?.user_id) throw new Error("No admin snapshot");
+              const { data: current } = await admin
+                .from("admin_users")
+                .select("*")
+                .eq("user_id", before.user_id)
+                .maybeSingle();
+              if (!current) throw new Error("Admin row not found");
+              if (
+                current.role === "owner" &&
+                before.role !== "owner" &&
+                (await activeOwnerCount(admin)) <= 1
+              ) {
+                throw new Error("Cannot remove the last active owner");
+              }
+              const { error } = await admin
+                .from("admin_users")
+                .update({
+                  role: before.role,
+                  status: before.status,
+                  mfa_required: before.mfa_required,
+                })
+                .eq("user_id", before.user_id);
+              if (error) throw error;
+              result = { user_id: before.user_id, restored: true };
+              break;
+            }
+
+            case "admin.remove": {
+              const before = detail.before;
+              if (!before?.user_id) throw new Error("No admin snapshot");
+              const { error } = await admin.from("admin_users").upsert({
+                user_id: before.user_id,
+                role: before.role,
+                status: before.status,
+                mfa_required: before.mfa_required,
+                created_by: before.created_by,
+              });
+              if (error) throw error;
+              result = { user_id: before.user_id, restored: true };
+              break;
+            }
+
+            default:
+              throw new Error("This action cannot be reverted");
+          }
+        } catch (error) {
+          return json({ error: mapError(error as any) }, 409);
+        }
+
+        const { data: revertRow, error: revertError } = await admin
+          .from("admin_audit_log")
+          .insert({
+            actor_id: user.id,
+            actor_email: user.email,
+            action: "audit.revert",
+            target_type: original.target_type,
+            target_id: original.target_id,
+            detail: {
+              original_id: id,
+              original_action: original.action,
+              result,
+            },
+            reason,
+            ip: ip || null,
+            user_agent: userAgent || null,
+          })
+          .select("id")
+          .single();
+        if (revertError) throw revertError;
+
+        const { error: markError } = await admin
+          .from("admin_audit_log")
+          .update({
+            reverted_at: new Date().toISOString(),
+            reverted_by: user.id,
+            revert_audit_id: revertRow.id,
+          })
+          .eq("id", id);
+        if (markError) throw markError;
+
+        return json({
+          ok: true,
+          data: { original_id: id, revert_audit_id: revertRow.id, result },
+        });
+      }
+
+      case "backups.create": {
+        const requested = Array.isArray(payload.scope) ? payload.scope : [];
+        const scope = requested.length
+          ? requested.map(String).filter((s) => BACKUP_GROUPS[s])
+          : ["core", "moderation", "matching", "admin"];
+        if (scope.length === 0) return json({ error: "Invalid backup scope" }, 400);
+        const tableSet = new Set(scope.flatMap((group) => BACKUP_GROUPS[group] ?? []));
+        const label = String(payload.label ?? "").trim() || `Manual backup ${new Date().toISOString()}`;
+        const days = clampInt(payload.days, 30, 1, 365);
+        const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+
+        const { data: backup, error: createError } = await admin
+          .from("admin_backups")
+          .insert({
+            label,
+            scope,
+            status: "running",
+            created_by: user.id,
+            expires_at: expiresAt,
+          })
+          .select("*")
+          .single();
+        if (createError) throw createError;
+
+        try {
+          const tables: Record<string, any[]> = {};
+          const counts: Record<string, number> = {};
+          const truncated: Record<string, boolean> = {};
+          let totalRows = 0;
+          for (const table of tableSet) {
+            const result = await selectAllRows(admin, table);
+            tables[table] = result.rows;
+            counts[table] = result.rows.length;
+            if (result.truncated) truncated[table] = true;
+            totalRows += result.rows.length;
+          }
+
+          const document = {
+            format: "palturo-admin-backup-v1",
+            project_ref: "yjcrfgvenilptrnudvcb",
+            created_at: new Date().toISOString(),
+            scope,
+            counts,
+            truncated,
+            tables,
+          };
+          const serialized = JSON.stringify(document);
+          const bytes = new TextEncoder().encode(serialized);
+          const checksum = await sha256Hex(bytes);
+          const storagePath = `${backup.id}.json`;
+          const { error: uploadError } = await admin.storage
+            .from(BACKUP_BUCKET)
+            .upload(storagePath, new Blob([serialized], { type: "application/json" }), {
+              contentType: "application/json",
+              upsert: true,
+            });
+          if (uploadError) throw uploadError;
+
+          const { data: done, error: updateError } = await admin
+            .from("admin_backups")
+            .update({
+              status: "complete",
+              storage_path: storagePath,
+              size_bytes: bytes.byteLength,
+              checksum,
+              table_counts: counts,
+              total_rows: totalRows,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", backup.id)
+            .select("*")
+            .single();
+          if (updateError) throw updateError;
+
+          await audit(
+            "backup.create",
+            "admin_backup",
+            backup.id,
+            { scope, total_rows: totalRows, size_bytes: bytes.byteLength, checksum },
+            label,
+          );
+          return json({ ok: true, data: done });
+        } catch (error) {
+          await admin
+            .from("admin_backups")
+            .update({
+              status: "failed",
+              error: mapError(error as any),
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", backup.id);
+          throw error;
+        }
+      }
+
+      case "backups.list": {
+        const { data, error } = await admin
+          .from("admin_backups")
+          .select("*")
+          .neq("status", "deleted")
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (error) throw error;
+        return json({
+          ok: true,
+          data: (data ?? []).map((row: any) => ({
+            ...row,
+            downloadable: row.status === "complete" && Boolean(row.storage_path),
+          })),
+        });
+      }
+
+      case "backups.download": {
+        const id = String(payload.id ?? "");
+        if (!id) return json({ error: "Backup id is required" }, 400);
+        const { data: row, error } = await admin
+          .from("admin_backups")
+          .select("id,storage_path,status")
+          .eq("id", id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!row?.storage_path || row.status !== "complete") {
+          return json({ error: "Backup is not downloadable" }, 404);
+        }
+        const { data: signed, error: signError } = await admin.storage
+          .from(BACKUP_BUCKET)
+          .createSignedUrl(row.storage_path, 3600);
+        if (signError) throw signError;
+        await audit("backup.download", "admin_backup", id, null, "Signed download link");
+        return json({ ok: true, data: { url: signed.signedUrl, expires_in: 3600 } });
+      }
+
+      case "backups.verify": {
+        const id = String(payload.id ?? "");
+        if (!id) return json({ error: "Backup id is required" }, 400);
+        const { data: row, error } = await admin
+          .from("admin_backups")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!row) return json({ error: "Backup not found" }, 404);
+        if (!row.storage_path) return json({ ok: true, data: { exists: false } });
+        const filename = String(row.storage_path).split("/").pop() ?? "";
+        const folder = String(row.storage_path).includes("/")
+          ? String(row.storage_path).slice(0, String(row.storage_path).lastIndexOf("/"))
+          : "";
+        const { data: objects, error: listError } = await admin.storage
+          .from(BACKUP_BUCKET)
+          .list(folder, { search: filename, limit: 10 });
+        if (listError) throw listError;
+        const found = (objects ?? []).find((object: any) => object.name === filename);
+        const sizeMatch = found ? Number(found.metadata?.size ?? 0) === Number(row.size_bytes) : false;
+        return json({
+          ok: true,
+          data: {
+            exists: Boolean(found),
+            size_match: sizeMatch,
+            storage_size: found?.metadata?.size ?? null,
+            recorded_size: row.size_bytes,
+          },
+        });
+      }
+
+      case "backups.delete": {
+        const id = String(payload.id ?? "");
+        const reason = String(payload.reason ?? "").trim();
+        if (!id || !reason) return json({ error: "Backup id and reason are required" }, 400);
+        const { data: row } = await admin
+          .from("admin_backups")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+        if (!row) return json({ error: "Backup not found" }, 404);
+        if (row.storage_path) {
+          await admin.storage.from(BACKUP_BUCKET).remove([row.storage_path]);
+        }
+        const { error } = await admin
+          .from("admin_backups")
+          .update({ status: "deleted", storage_path: null, error: reason })
+          .eq("id", id);
+        if (error) throw error;
+        await audit("backup.delete", "admin_backup", id, { label: row.label }, reason);
+        return json({ ok: true });
+      }
+
+      case "backups.prune": {
+        const now = new Date().toISOString();
+        const { data: expired, error } = await admin
+          .from("admin_backups")
+          .select("id,storage_path,label")
+          .eq("status", "complete")
+          .lt("expires_at", now)
+          .limit(100);
+        if (error) throw error;
+        let removed = 0;
+        for (const row of expired ?? []) {
+          if (row.storage_path) {
+            await admin.storage.from(BACKUP_BUCKET).remove([row.storage_path]);
+          }
+          await admin
+            .from("admin_backups")
+            .update({ status: "deleted", storage_path: null, error: "Expired" })
+            .eq("id", row.id);
+          removed++;
+        }
+        if (removed > 0) {
+          await audit("backup.prune", "admin_backup", null, { removed });
+        }
+        return json({ ok: true, data: { removed } });
       }
 
       case "exports.log": {
@@ -1217,6 +2175,11 @@ Deno.serve(async (req) => {
           targetId = profile?.id ?? "";
         }
         if (!targetId) return json({ error: "User not found" }, 404);
+        const { data: before } = await admin
+          .from("admin_users")
+          .select("*")
+          .eq("user_id", targetId)
+          .maybeSingle();
         const { error } = await admin.from("admin_users").upsert({
           user_id: targetId,
           role,
@@ -1225,7 +2188,12 @@ Deno.serve(async (req) => {
           created_by: user.id,
         });
         if (error) throw error;
-        await audit("admin.add", "admin_user", targetId, { role, mfa_required: mfaRequired });
+        await audit("admin.add", "admin_user", targetId, {
+          target_id: targetId,
+          before,
+          role,
+          mfa_required: mfaRequired,
+        });
         return json({ ok: true });
       }
 
@@ -1285,7 +2253,7 @@ Deno.serve(async (req) => {
         }
         const { error } = await admin.from("admin_users").update(updates).eq("user_id", targetId);
         if (error) throw error;
-        await audit("admin.update", "admin_user", targetId, updates);
+        await audit("admin.update", "admin_user", targetId, { before: current, updates });
         return json({ ok: true });
       }
 
@@ -1310,7 +2278,7 @@ Deno.serve(async (req) => {
         }
         const { error } = await admin.from("admin_users").delete().eq("user_id", targetId);
         if (error) throw error;
-        await audit("admin.remove", "admin_user", targetId);
+        await audit("admin.remove", "admin_user", targetId, { before: current });
         return json({ ok: true });
       }
 

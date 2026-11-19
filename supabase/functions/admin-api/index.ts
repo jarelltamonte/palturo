@@ -93,6 +93,7 @@ const ACTION_PERMISSION: Record<string, string> = {
   "moderation.notes": "moderation.read",
   "moderation.noteAction": "moderation.write",
   "skills.list": "skills.read",
+  "skills.detail": "skills.read",
   "skills.update": "skills.write",
   "skills.create": "skills.write",
   "skills.merge": "skills.write",
@@ -917,7 +918,7 @@ Deno.serve(async (req) => {
         let query = admin
           .from("skill_nodes")
           .select(
-            "id,name,path,depth,kind,status,origin,auto_approved,approval_source,is_visible,is_general,is_leaf,usage_count,created_at,parent:parent_id(id,name),submitted_by",
+            "id,name,path,depth,kind,status,origin,auto_approved,approval_source,is_visible,is_general,is_leaf,usage_count,created_at,updated_at,parent:parent_id(id,name),submitted_by",
           )
           .order("path")
           .limit(clampInt(payload.limit, 5000, 1, 5000));
@@ -946,6 +947,91 @@ Deno.serve(async (req) => {
         const { data, error } = await query;
         if (error) throw error;
         return json({ ok: true, data: data ?? [] });
+      }
+
+      case "skills.detail": {
+        const id = String(payload.id ?? "");
+        if (!id) return json({ error: "Skill id is required" }, 400);
+        const { data: node, error: nodeError } = await admin
+          .from("skill_nodes")
+          .select("*,parent:parent_id(id,name)")
+          .eq("id", id)
+          .maybeSingle();
+        if (nodeError) throw nodeError;
+        if (!node) return json({ error: "Skill not found" }, 404);
+
+        const { data: allNodes, error: nodesError } = await admin
+          .from("skill_nodes")
+          .select("id,name,path,parent_id,depth,kind,status,is_visible")
+          .order("path")
+          .limit(5000);
+        if (nodesError) throw nodesError;
+
+        const subtree = (allNodes ?? []).filter(
+          (item: any) =>
+            item.path === node.path ||
+            String(item.path).startsWith(`${node.path}.`),
+        );
+        const ids = subtree.map((item: any) => item.id);
+        const children = (allNodes ?? []).filter(
+          (item: any) => item.parent_id === id,
+        );
+
+        const userRows: any[] = [];
+        for (let offset = 0; offset < ids.length; offset += 100) {
+          const chunk = ids.slice(offset, offset + 100);
+          const { data, error } = await admin
+            .from("user_skills")
+            .select(
+              "id,user_id,kind,note,focus_skill_id,skill:skill_id(id,name,path,kind),focus:focus_skill_id(name),user:user_id(id,display_name,email,role,avatar_url,moderation_status)",
+            )
+            .in("skill_id", chunk)
+            .limit(1000);
+          if (error) throw error;
+          userRows.push(...(data ?? []));
+        }
+
+        const reveal = can(adminRow.role, "pii.read");
+        const users = userRows
+          .filter((row: any) => row.user)
+          .map((row: any) => ({
+            ...row,
+            user: {
+              ...row.user,
+              email: reveal ? row.user.email : maskEmail(row.user.email),
+            },
+          }))
+          .sort((a: any, b: any) =>
+            String(a.user.display_name ?? a.user.email ?? "").localeCompare(
+              String(b.user.display_name ?? b.user.email ?? ""),
+            ),
+          );
+
+        const distinct = new Set(users.map((row: any) => row.user_id));
+        const mentors = new Set(
+          users.filter((row: any) => row.kind === "teach").map((row: any) => row.user_id),
+        );
+        const learners = new Set(
+          users.filter((row: any) => row.kind === "learn").map((row: any) => row.user_id),
+        );
+
+        return json({
+          ok: true,
+          data: {
+            node,
+            descendants: Math.max(0, subtree.length - 1),
+            children,
+            users,
+            counts: {
+              users: distinct.size,
+              mentors: mentors.size,
+              learners: learners.size,
+              rows: users.length,
+            },
+            truncated: users.length >= 1000,
+            pii_masked: !reveal,
+          },
+        });
       }
 
       case "skills.update": {

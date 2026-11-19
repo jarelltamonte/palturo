@@ -1203,7 +1203,7 @@ Deno.serve(async (req) => {
         const userId = String(payload.user_id ?? "");
         const email = String(payload.email ?? "").trim();
         const role = String(payload.role ?? "analyst");
-        const mfaRequired = payload.mfa_required !== false;
+        const mfaRequired = role === "owner" ? true : payload.mfa_required !== false;
         if (!["owner", "admin", "analyst", "moderator", "support"].includes(role)) {
           return json({ error: "Invalid role" }, 400);
         }
@@ -1276,6 +1276,12 @@ Deno.serve(async (req) => {
         }
         if (targetId === user.id && updates.status === "disabled") {
           return json({ error: "You cannot disable your own admin account" }, 409);
+        }
+        if (
+          updates.mfa_required === false &&
+          (current.role === "owner" || updates.role === "owner")
+        ) {
+          return json({ error: "Owner accounts must keep MFA enabled" }, 409);
         }
         const { error } = await admin.from("admin_users").update(updates).eq("user_id", targetId);
         if (error) throw error;

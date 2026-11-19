@@ -87,6 +87,8 @@ class _ExplorePageState extends State<ExplorePage> {
   ExploreRole _role = ExploreRole.learner;
 
   int _requestId = 0;
+  bool _openingEditor = false;
+  bool _openingCategory = false;
 
   static const Map<String, String> _descriptionRules = {
     'cook': 'Recipes, flavors, and kitchen traditions',
@@ -444,25 +446,31 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Future<void> _openCategory(Map<String, dynamic> root) async {
+    if (_openingCategory) return;
     final path = (root['path'] ?? '').toString();
     final label = (root['name'] ?? '').toString();
     if (path.isEmpty || label.isEmpty) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => ExploreCategoryPage(
-              nodePath: path,
-              nodeLabel: label,
-              description: _descriptionFor(root),
-              mentor: _role == ExploreRole.mentor,
-              teachingPaths:
-                  _role == ExploreRole.mentor
-                      ? _teachingSkillPaths
-                      : const <String>{},
-            ),
-      ),
-    );
+    _openingCategory = true;
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => ExploreCategoryPage(
+                nodePath: path,
+                nodeLabel: label,
+                description: _descriptionFor(root),
+                mentor: _role == ExploreRole.mentor,
+                teachingPaths:
+                    _role == ExploreRole.mentor
+                        ? _teachingSkillPaths
+                        : const <String>{},
+              ),
+        ),
+      );
+    } finally {
+      _openingCategory = false;
+    }
     // Requests sent from the deck change who is available; refresh silently
     // from the cached snapshot so returning here never flashes a skeleton.
     if (mounted) _loadRole(_role, force: true);
@@ -499,21 +507,27 @@ class _ExplorePageState extends State<ExplorePage> {
   }
 
   Future<void> _openProfileEditor() async {
-    final profile = await ProfileService().getCurrentUserProfile();
-    if (!mounted) return;
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Couldn’t load your profile. Please try again.'),
-        ),
+    if (_openingEditor) return;
+    _openingEditor = true;
+    try {
+      final profile = await ProfileService().getCurrentUserProfile();
+      if (!mounted) return;
+      if (profile == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Couldn’t load your profile. Please try again.'),
+          ),
+        );
+        return;
+      }
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
       );
-      return;
+      if (mounted) _loadTaxonomy(force: true);
+    } finally {
+      _openingEditor = false;
     }
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
-    );
-    if (mounted) _loadTaxonomy(force: true);
   }
 
   @override
@@ -1134,6 +1148,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
     }
 
     return AlertDialog(
+      scrollable: true,
       backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: title,

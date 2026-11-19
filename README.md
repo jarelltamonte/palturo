@@ -236,18 +236,16 @@ notes stay owner-only until approved; custom-skill notes remain private in
 ## Web deployment
 
 The app is built to `build/web`, merged with the auth assets into
-`build/web-merged`, and deployed with the Worker config:
+`build/web-merged`, and deployed with the Worker config. Use the script so the
+`/reset` and `/confirm` pages are always copied from `../palturo-auth-web`:
 
 ```sh
-flutter build web --release --dart-define-from-file=.env.production
-Copy-Item build\web\* build\web-merged -Recurse -Force
-Copy-Item web\_headers build\web-merged\_headers -Force
-npx wrangler deploy --config cloudflare/wrangler.jsonc
+powershell -ExecutionPolicy Bypass -File tool/deploy_web.ps1
 ```
 
-`web/_headers` contains the CSP. `media-src` must include the Supabase origin or
-showcase videos are blocked. The auth pages (`/reset`, `/confirm`) live in
-`build/web-merged` and must survive the merge.
+The script fails if either auth page is missing after the merge. `web/_headers`
+contains the CSP. `media-src` must include the Supabase origin or showcase
+videos are blocked.
 
 The static confirmation and reset project is `../palturo-auth-web`. See
 [`docs/AUTH_EMAIL_LINKS.md`](docs/AUTH_EMAIL_LINKS.md) for the email templates,

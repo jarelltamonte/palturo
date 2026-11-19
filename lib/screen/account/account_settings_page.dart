@@ -287,8 +287,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final adaptiveHeight =
-        AppSpacing.topBarHeight();
+    final adaptiveHeight = AppSpacing.topBarHeight();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -490,13 +489,10 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error =
-            e is PostgrestException
-                ? e.message
-                : friendlyError(
-                  e,
-                  fallback: 'Could not change your name. Please try again.',
-                );
+        _error = friendlyError(
+          e,
+          fallback: 'Could not change your name. Please try again.',
+        );
       });
     }
   }

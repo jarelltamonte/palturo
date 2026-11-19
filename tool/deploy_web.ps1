@@ -1,0 +1,49 @@
+# Build the Flutter web app, merge the auth pages, and deploy the Worker.
+# Run from anywhere: powershell -ExecutionPolicy Bypass -File tool\deploy_web.ps1
+$ErrorActionPreference = 'Stop'
+
+$appRoot = Split-Path $PSScriptRoot -Parent
+Set-Location $appRoot
+
+if (-not (Test-Path '.env.production')) {
+  throw 'Missing .env.production (SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY).'
+}
+
+flutter build web --release --dart-define-from-file=.env.production
+
+$merged = Join-Path $appRoot 'build\web-merged'
+if (Test-Path $merged) { Remove-Item $merged -Recurse -Force }
+New-Item -ItemType Directory -Path $merged | Out-Null
+Copy-Item 'build\web\*' $merged -Recurse -Force
+
+$auth = Join-Path (Split-Path $appRoot -Parent) 'palturo-auth-web\public'
+if (-not (Test-Path (Join-Path $auth 'index.html'))) {
+  throw "Auth pages not found at $auth"
+}
+
+# Root assets referenced by the auth page with absolute URLs.
+foreach ($file in @('app.js', 'config.js', 'styles.css')) {
+  Copy-Item (Join-Path $auth $file) $merged -Force
+}
+New-Item -ItemType Directory -Path (Join-Path $merged 'vendor') -Force | Out-Null
+Copy-Item (Join-Path $auth 'vendor\*') (Join-Path $merged 'vendor') -Recurse -Force
+New-Item -ItemType Directory -Path (Join-Path $merged 'assets') -Force | Out-Null
+Copy-Item (Join-Path $auth 'assets\*') (Join-Path $merged 'assets') -Recurse -Force
+
+# Supabase email links point at /reset and /confirm.
+foreach ($route in @('reset', 'confirm')) {
+  $dir = Join-Path $merged $route
+  New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  Copy-Item (Join-Path $auth 'index.html') (Join-Path $dir 'index.html') -Force
+}
+
+# The app CSP wins over the auth project's copy.
+Copy-Item 'web\_headers' (Join-Path $merged '_headers') -Force
+
+foreach ($route in @('reset', 'confirm')) {
+  if (-not (Test-Path (Join-Path $merged "$route\index.html"))) {
+    throw "Missing $route/index.html after merge."
+  }
+}
+
+npx wrangler deploy --config cloudflare/wrangler.jsonc

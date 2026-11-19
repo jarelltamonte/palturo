@@ -686,6 +686,12 @@ class _HomePageState extends State<HomePage> {
     }
 
     if (!mounted) return;
+    if (_history.isEmpty ||
+        _historyRight.isEmpty ||
+        _historyConnectionIds.isEmpty) {
+      // A deck refresh cleared the history while the request was in flight.
+      return;
+    }
     Haptics.selection();
     setState(() {
       _history.removeLast();

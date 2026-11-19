@@ -791,6 +791,14 @@ class ProfileService {
           RejectedSkill(skillId: skillId, name: name, kind: kind),
         ]);
       }
+      if (status == 'queued') {
+        // The model accepted the name but could not place it in the taxonomy.
+        // Retrying the same name is deterministic, so fail with a clear
+        // "not added" result instead of a misleading transient error.
+        throw SkillModerationException.rejected([
+          RejectedSkill(skillId: skillId, name: name, kind: kind),
+        ]);
+      }
       return null;
     } catch (e) {
       if (e is SkillModerationException) rethrow;
@@ -1035,21 +1043,6 @@ class ProfileService {
       }
     }
 
-    if (mediaToDelete.isNotEmpty) {
-      try {
-        await _supabase.storage.from('profile-media').remove(mediaToDelete);
-      } catch (_) {}
-    }
-    if (showcaseToDelete.isNotEmpty) {
-      // New media lives in skill-showcases; legacy proofs live in skill-proofs.
-      // Removing from the wrong bucket is a no-op, so try both.
-      for (final bucket in const ['skill-showcases', 'skill-proofs']) {
-        try {
-          await _supabase.storage.from(bucket).remove(showcaseToDelete);
-        } catch (_) {}
-      }
-    }
-
     final availableDays = parseAvailableDays(
       updatedProfile.availableDays.isNotEmpty
           ? updatedProfile.availableDays
@@ -1127,6 +1120,24 @@ class ProfileService {
         });
       });
       await _supabase.rpc('set_skill_showcases', params: {'p_items': rows});
+    }
+
+    // Only remove replaced media after every DB write succeeded. Deleting
+    // first meant a failed save permanently removed the user's old photos
+    // while the profile still pointed at them.
+    if (mediaToDelete.isNotEmpty) {
+      try {
+        await _supabase.storage.from('profile-media').remove(mediaToDelete);
+      } catch (_) {}
+    }
+    if (showcaseToDelete.isNotEmpty) {
+      // New media lives in skill-showcases; legacy proofs live in skill-proofs.
+      // Removing from the wrong bucket is a no-op, so try both.
+      for (final bucket in const ['skill-showcases', 'skill-proofs']) {
+        try {
+          await _supabase.storage.from(bucket).remove(showcaseToDelete);
+        } catch (_) {}
+      }
     }
 
     final refreshed = await getCurrentUserProfile();

@@ -315,11 +315,27 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     return OnboardingCreateResult.added(displayName);
   }
 
-  void _goTo(OnboardingStep step) => setState(() => _history.add(step));
+  void _goTo(OnboardingStep step) {
+    setState(() {
+      if (_returnToReview &&
+          step == OnboardingStep.review &&
+          _history.length > 1) {
+        // Returning from an edit started on Review: drop the edit step so the
+        // existing Review becomes current instead of stacking a duplicate.
+        _returnToReview = false;
+        _history.removeLast();
+      } else {
+        _history.add(step);
+      }
+    });
+  }
 
   void _back() {
     if (_history.length > 1 && !_isSaving) {
-      setState(() => _history.removeLast());
+      setState(() {
+        _history.removeLast();
+        if (_returnToReview) _returnToReview = false;
+      });
     }
   }
 

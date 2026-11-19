@@ -21,6 +21,7 @@ import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/utils/media_url.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/app_empty_state.dart';
@@ -302,6 +303,8 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   late List<OutgoingRequestLite> _outgoing = const [];
   bool _loading = true;
   bool _loadingOutgoing = true;
+  int _requestsGeneration = 0;
+  int _outgoingGeneration = 0;
   String? _loadError;
   String? _outgoingError;
   bool _responding = false;
@@ -393,6 +396,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   }
 
   Future<void> _loadRequests({bool notifyFailure = false}) async {
+    final generation = ++_requestsGeneration;
     final hadData = _requests.isNotEmpty;
     setState(() {
       _loading = !hadData;
@@ -400,7 +404,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     });
     try {
       final incoming = await MatchApi.getIncomingRequests();
-      if (!mounted) return;
+      if (!mounted || generation != _requestsGeneration) return;
       setState(() {
         final fresh = incoming.map((r) => r.toConnectionRequest()).toList();
         final freshIds = fresh.map((request) => request.id).toSet();
@@ -421,7 +425,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
         _loadError = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _requestsGeneration) return;
       final message = friendlyError(
         e,
         fallback: "Couldn't load requests. Please try again.",
@@ -437,6 +441,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
   Future<void> _refreshRequests() => _loadRequests(notifyFailure: true);
 
   Future<void> _loadOutgoing({bool notifyFailure = false}) async {
+    final generation = ++_outgoingGeneration;
     final hadData = _outgoing.isNotEmpty;
     setState(() {
       _loadingOutgoing = !hadData;
@@ -444,14 +449,14 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     });
     try {
       final sent = await MatchApi.getOutgoingRequests();
-      if (!mounted) return;
+      if (!mounted || generation != _outgoingGeneration) return;
       setState(() {
         _outgoing = sent;
         _loadingOutgoing = false;
         _outgoingError = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _outgoingGeneration) return;
       final message = friendlyError(
         e,
         fallback: "Couldn't load sent requests. Please try again.",
@@ -631,7 +636,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
     if (request.photoUrls.isEmpty) return null;
     final url = request.photoUrls.first;
     if (url == null || url.trim().isEmpty) return null;
-    return NetworkImage(url);
+    return MediaUrl.image(url);
   }
 
   Future<bool> _respond(ConnectionRequest request, bool accept) async {
@@ -1425,7 +1430,7 @@ class _SentRequestCard extends StatelessWidget {
                 image:
                     request.avatarUrl == null
                         ? null
-                        : NetworkImage(request.avatarUrl!),
+                        : MediaUrl.image(request.avatarUrl!),
                 size: 48,
               ),
               const SizedBox(width: 12),

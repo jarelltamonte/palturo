@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/validators.dart';
 
@@ -395,7 +396,14 @@ class AuthService {
 
   // logout
   Future<void> logout() async {
-    await _supabase.auth.signOut();
+    try {
+      await _supabase.auth.signOut();
+    } catch (e) {
+      // The SDK clears the local session before calling the server. A network
+      // failure must not strand the user on a "Couldn't log out" screen; the
+      // local session is already gone and the refresh token will expire.
+      debugPrint('[AuthService] signOut server call failed: $e');
+    }
   }
 
   /// Permanently deletes the signed-in user's profile, media and auth account

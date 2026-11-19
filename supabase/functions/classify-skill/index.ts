@@ -436,6 +436,9 @@ Deno.serve(async (req) => {
               const created = await createAutoApprovedNode(
                 admin, parent, cleanedName, user.id,
               );
+              if (created.error === "too_many_new_skills") {
+                return json({ error: "too_many_new_skills", status: "error" }, 429);
+              }
               if (created.error || !created.node) {
                 return json({ error: created.error ?? "Could not create the skill", status: "error" }, 500);
               }
@@ -462,6 +465,9 @@ Deno.serve(async (req) => {
             const created = await createAutoApprovedNode(
               admin, parent, cleanedName, user.id,
             );
+            if (created.error === "too_many_new_skills") {
+              return json({ error: "too_many_new_skills", status: "error" }, 429);
+            }
             if (created.error || !created.node) {
               return json({ error: created.error ?? "Could not create the skill", status: "error" }, 500);
             }
@@ -541,7 +547,8 @@ Deno.serve(async (req) => {
       note_verdict: noteVerdict,
     });
   } catch (e) {
-    return json({ error: String(e?.message ?? e) }, 500);
+    console.error(`[classify-skill] ${String(e?.message ?? e)}`);
+    return json({ error: "classify_failed" }, 500);
   }
 });
 
@@ -577,6 +584,7 @@ async function jevCall(model: string, state: string, questions: unknown, admin: 
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model, state, questions }),
+    signal: AbortSignal.timeout(15000),
   });
 }
 
@@ -599,6 +607,20 @@ async function createAutoApprovedNode(
   name: string,
   userId: string,
 ): Promise<{ node: Record<string, unknown> | null; error: string | null }> {
+  // New nodes are globally visible, so cap how many one account can add per
+  // day. The hourly classifier limit alone allows too much taxonomy churn.
+  const { data: allowed, error: limitErr } = await admin.rpc(
+    "consume_rate_limit",
+    {
+      p_subject: userId,
+      p_action: "create_skill_node",
+      p_limit: 10,
+      p_window_seconds: 86400,
+    },
+  );
+  if (limitErr) return { node: null, error: "rate_limit_unavailable" };
+  if (allowed !== true) return { node: null, error: "too_many_new_skills" };
+
   const { data, error } = await admin
     .from("skill_nodes")
     .insert({

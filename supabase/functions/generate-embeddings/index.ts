@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
       config_version: cfg.configRevision,
     });
   } catch (e) {
-    return json({ error: String(e?.message ?? e) }, 500);
+    console.error(`[generate-embeddings] ${String(e?.message ?? e)}`);
+    return json({ error: "embedding_failed" }, 500);
   }
 });

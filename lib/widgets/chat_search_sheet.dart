@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -42,6 +44,16 @@ class _ChatSearchSheetState extends State<ChatSearchSheet> {
                 })
                 .toList(growable: false);
     final textColor = Theme.of(context).colorScheme.secondary;
+    final media = MediaQuery.of(context);
+    final available = math.max(
+      0.0,
+      media.size.height - media.viewInsets.bottom,
+    );
+    // Leave room for the keyboard inset added by the bottom padding below.
+    final sheetHeight = math.min(
+      media.size.height * 0.6,
+      math.max(180.0, available - 48),
+    );
 
     return SafeArea(
       child: Padding(
@@ -49,10 +61,10 @@ class _ChatSearchSheetState extends State<ChatSearchSheet> {
           left: 16,
           right: 16,
           top: 12,
-          bottom: 12 + MediaQuery.viewInsetsOf(context).bottom,
+          bottom: 12 + media.viewInsets.bottom,
         ),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.6,
+          height: sheetHeight,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

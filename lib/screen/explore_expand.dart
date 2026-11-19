@@ -98,7 +98,10 @@ class _ExploreExpandState extends State<ExploreExpand> {
           final random =
               widget.randomLoader != null
                   ? await widget.randomLoader!(limit: _deckTarget * 2)
-                  : await MatchApi.getRandomDeck(limit: _deckTarget * 2);
+                  : await MatchApi.getRandomDeck(
+                    limit: _deckTarget * 2,
+                    role: widget.kind == 'teach' ? 'mentor' : 'learner',
+                  );
           for (final person in random) {
             if (unique.length >= _deckTarget) break;
             if (seen.add(person.id)) unique.add(person);
@@ -211,6 +214,7 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
     _undoing = false;
     if (!mounted) return;
+    if (_history.isEmpty || _historyConnectionIds.isEmpty) return;
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     setState(() {
       _history.removeLast();

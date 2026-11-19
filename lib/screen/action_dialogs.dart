@@ -122,6 +122,7 @@ class _ConfirmDialog extends StatelessWidget {
     }
 
     return AlertDialog(
+      scrollable: true,
       backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: titleWidget,

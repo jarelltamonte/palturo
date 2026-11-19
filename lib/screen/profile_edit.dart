@@ -143,6 +143,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         ).hasMatch(picked.name) ||
         (picked.mimeType ?? '').startsWith('video/');
     final size = await picked.length();
+    if (!mounted || !_teachingSkillIds.contains(skillId)) return;
     final limit = looksVideo ? 50 * 1024 * 1024 : 20 * 1024 * 1024;
     if (size > limit) {
       if (!mounted) return;

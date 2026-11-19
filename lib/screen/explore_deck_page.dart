@@ -287,6 +287,7 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
 
     _undoing = false;
     if (!mounted) return;
+    if (_history.isEmpty || _historyConnectionIds.isEmpty) return;
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     setState(() {
       _history.removeLast();

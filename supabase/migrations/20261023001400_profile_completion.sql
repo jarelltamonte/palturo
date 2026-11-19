@@ -14,4 +14,5 @@ set is_profile_completed = (
     else coalesce(array_length(p.teaching_skills, 1), 0) > 0
       or coalesce(array_length(p.learning_skills, 1), 0) > 0
   end
-);
+)
+where p.id is not null;

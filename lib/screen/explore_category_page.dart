@@ -199,6 +199,10 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         final path = (child['path'] ?? '').toString();
         if (path.isEmpty) return const MapEntry('', -1);
         try {
+          if (widget.countsLoader != null || widget.usersLoader == null) {
+            final counts = await _counts(path, kind);
+            return MapEntry(path, counts.total);
+          }
           final users = await _users(path, kind);
           return MapEntry(path, users.length);
         } catch (e) {

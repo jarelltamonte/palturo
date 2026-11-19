@@ -2,7 +2,7 @@
 -- deck cache TTL, and removing media must take them out just as quickly.
 -- Clear cached decks once, then on showcase/media changes.
 
-delete from public.match_cache;
+delete from public.match_cache where true;
 
 create or replace function public.invalidate_all_match_cache()
 returns trigger

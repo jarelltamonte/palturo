@@ -327,7 +327,7 @@ class _SkillCheckDialogState extends State<_SkillCheckDialog> {
   Future<void> _run() async {
     OnboardingCreateResult result;
     try {
-      result = await widget.task();
+      result = await widget.task().timeout(const Duration(seconds: 40));
     } catch (_) {
       result = const OnboardingCreateResult.failed(
         'We could not check that skill right now. Please try again.',

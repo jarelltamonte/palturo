@@ -40,12 +40,12 @@ bool _isTrustedAuthCallback(Uri uri) {
   final query = uri.queryParameters;
   final fragment = uri.fragment;
   bool has(String key) => query.containsKey(key) || fragment.contains('$key=');
-  return has('code') ||
-      has('access_token') ||
-      has('refresh_token') ||
-      has('error') ||
-      has('error_description') ||
-      has('type');
+
+  // PKCE code or an auth error only. Implicit-flow fragments
+  // (`access_token`/`refresh_token`) are rejected: getSessionFromUrl accepts
+  // them without a PKCE verifier, which enables session fixation by link.
+  if (has('access_token') || has('refresh_token')) return false;
+  return has('code') || has('error_code') || has('error');
 }
 
 void main() async {

@@ -182,6 +182,7 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
         ((_incomingLoaded && incoming == null) ||
             (_conversationsLoaded && conversation == null))) {
       await _refreshEnrichment();
+      if (!mounted) return;
       conversation = _conversations[connectionId];
       incoming = _incoming[connectionId];
     }

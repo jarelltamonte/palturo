@@ -10,10 +10,10 @@ import 'package:palturo/screen/users_dump.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/screen/chats_room.dart';
-import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/chat_state_service.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/screen/utils/pals_count.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
@@ -163,10 +163,9 @@ class _MatchesState extends State<Matches> {
       callback();
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const HomePage()),
-    );
+    // The shell is already the first route; switch it to For You instead of
+    // pushing a second, chrome-less HomePage on top of it.
+    AppShellState.instance.setSelectedTab(0);
   }
 
   @override

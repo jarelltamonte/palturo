@@ -158,13 +158,9 @@ export async function ensureFreshEmbeddings(
   });
   if (toUpsert.length === 0) return { upserted: 0, costEmbeddings: 0 };
 
-  // delete stale rows for touched (user,role,group) pairs before insert
-  const touched = new Set(toUpsert.map((r) => `${r.user_id}|${r.role}|${r.field_group}`));
-  const toDelete: Array<{ user_id: string; role: string; field_group: string }> = [...touched].map((s) => {
-    const [user_id, role, field_group] = s.split("|");
-    return { user_id, role, field_group };
-  });
-
+  // Each input type is refreshed independently. Delete only the keys in this
+  // batch: deleting every touched pair would remove a still-valid query vector
+  // when only the passage changed (and vice versa).
   let cost = 0;
   for (const inputType of ["passage", "query"] as const) {
     const batch = toUpsert.filter((r) => {
@@ -180,6 +176,11 @@ export async function ensureFreshEmbeddings(
       inputType,
       timeoutMs,
     );
+    if (vectors.length !== batch.length) {
+      throw new Error(
+        `embedding count mismatch: expected ${batch.length}, got ${vectors.length}`,
+      );
+    }
     const payload = batch.map((r, i) => ({
       user_id: r.user_id,
       role: r.role,
@@ -191,15 +192,19 @@ export async function ensureFreshEmbeddings(
       embedding: vecLiteral(vectors[i]),
     }));
 
-    // delete old rows for these keys (per input_type!) then insert
-    for (const d of toDelete) {
-      await admin
+    const batchKeys = new Set(
+      batch.map((r) => `${r.user_id}|${r.role}|${r.field_group}`),
+    );
+    for (const key of batchKeys) {
+      const [user_id, role, field_group] = key.split("|");
+      const { error: delErr } = await admin
         .from("profile_embeddings")
         .delete()
-        .eq("user_id", d.user_id)
-        .eq("role", d.role)
-        .eq("field_group", d.field_group)
+        .eq("user_id", user_id)
+        .eq("role", role)
+        .eq("field_group", field_group)
         .eq("input_type", inputType);
+      if (delErr) throw new Error(`embedding delete: ${delErr.message}`);
     }
     const { error: insErr } = await admin.from("profile_embeddings").insert(payload);
     if (insErr) throw new Error(`embedding upsert: ${insErr.message}`);

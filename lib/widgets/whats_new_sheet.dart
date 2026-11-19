@@ -11,6 +11,9 @@ const List<String> whatsNewBullets = [
 ];
 
 /// Shows the one-time "what's new" sheet once per app version.
+///
+/// Not opened by the initial release navigation bar; kept so a future release
+/// can re-enable the sheet without rewriting it.
 bool _whatsNewShowing = false;
 
 Future<void> maybeShowWhatsNew(BuildContext context) async {

@@ -10,7 +10,6 @@ import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
-import 'package:palturo/widgets/whats_new_sheet.dart';
 
 import 'home_page.dart';
 import 'explore_page.dart';
@@ -75,9 +74,8 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) maybeShowWhatsNew(context);
-    });
+    // What's New is intentionally not shown in the initial release. Keep the
+    // sheet for a later release note; the navigation bar no longer opens it.
   }
 
   void _onItemTapped(int index) {

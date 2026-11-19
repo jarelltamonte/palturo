@@ -118,6 +118,17 @@ class NotificationPreferencesPage extends StatelessWidget {
               ),
               _categorySwitch(
                 context,
+                title: 'New match suggestions',
+                subtitle: 'When a new profile matches your interests.',
+                value: prefs.possibleMatchNotificationsEnabled,
+                enabled: master,
+                onChanged: (value) async {
+                  Haptics.selection();
+                  await prefs.setPossibleMatchNotificationsEnabled(value);
+                },
+              ),
+              _categorySwitch(
+                context,
                 title: 'Activity updates',
                 subtitle: 'Feedback reminders and skill moderation updates.',
                 value: prefs.activityNotificationsEnabled,

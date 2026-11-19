@@ -39,7 +39,7 @@ class LocalNotificationService extends ChangeNotifier
   static const _requestsChannel = AndroidNotificationChannel(
     'palturo_requests',
     'Requests & matches',
-    description: 'New requests, accepted requests, and declines',
+    description: 'New requests, match suggestions, and declines',
     importance: Importance.high,
     playSound: true,
     enableVibration: true,
@@ -277,7 +277,7 @@ class LocalNotificationService extends ChangeNotifier
       body: view.body,
       channel: _channelFor(item.kind, sound: sound, vibration: vibration),
       payload: _payloadForNotification(item, view),
-      threadId: item.connectionId,
+      threadId: item.connectionId ?? item.actorId,
       quiet: quiet,
       sound: sound,
       vibration: vibration,
@@ -423,7 +423,8 @@ class LocalNotificationService extends ChangeNotifier
             : switch (kind) {
               AppNotificationKind.connectionRequest ||
               AppNotificationKind.requestAccepted ||
-              AppNotificationKind.requestDeclined => _requestsChannel,
+              AppNotificationKind.requestDeclined ||
+              AppNotificationKind.possibleMatch => _requestsChannel,
               AppNotificationKind.feedbackReady ||
               AppNotificationKind.skillModeration ||
               AppNotificationKind.unknown => _activityChannel,
@@ -471,6 +472,16 @@ class LocalNotificationService extends ChangeNotifier
           'name': view.actorName,
           'skillName': view.skillName,
           'role': item.role,
+          'avatarUrl': item.actorAvatar,
+          'notificationId': item.id,
+        };
+      case ActivityDestination.profile:
+        return {
+          'route': 'user',
+          'userId': view.profileUserId,
+          'name': view.actorName,
+          'skillName': view.skillName,
+          'role': item.possibleMatchRole ?? item.role,
           'avatarUrl': item.actorAvatar,
           'notificationId': item.id,
         };
@@ -527,6 +538,22 @@ class LocalNotificationService extends ChangeNotifier
         );
       case 'profile':
         unawaited(AppRouter.openProfile());
+      case 'user':
+        {
+          final userId = payload['userId']?.toString();
+          if (userId == null || userId.isEmpty) {
+            unawaited(AppRouter.openActivity());
+            return;
+          }
+          unawaited(
+            AppRouter.openUserProfile(
+              userId: userId,
+              name: payload['name']?.toString(),
+              skillName: payload['skillName']?.toString(),
+              role: _roleFrom(payload['role']?.toString()),
+            ),
+          );
+        }
       case 'activity':
       default:
         unawaited(AppRouter.openActivity());

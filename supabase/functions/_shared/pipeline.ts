@@ -95,23 +95,41 @@ export async function nimEmbed(
   inputType: "query" | "passage",
   timeoutMs = 30000,
 ): Promise<number[][]> {
-  const res = await fetch(cfg.embeddingApi, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      input: texts,
-      model: cfg.embeddingModel,
-      input_type: inputType,
-      dimensions: cfg.embeddingDim,
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
+  const body = JSON.stringify({
+    input: texts,
+    model: cfg.embeddingModel,
+    input_type: inputType,
+    dimensions: cfg.embeddingDim,
   });
-  if (!res.ok) {
-    throw new Error(`NIM embed failed (${res.status}): ${await res.text()}`);
+  let lastError: unknown = null;
+  // The hosted embedding service occasionally returns a transient 503
+  // ("Service is overloaded"). A retry keeps onboarding/profile saves from
+  // silently losing their vectors for an entire session.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(cfg.embeddingApi, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // response: { data: [{ embedding: number[] }, ...] }
+        return (data.data ?? []).map((d: any) => d.embedding as number[]);
+      }
+      const detail = await res.text();
+      lastError = new Error(`NIM embed failed (${res.status}): ${detail}`);
+      if (attempt === 3 || ![429, 500, 502, 503, 504].includes(res.status)) {
+        throw lastError;
+      }
+    } catch (e) {
+      lastError = e;
+      if (attempt === 3) throw e;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000 * attempt * attempt));
   }
-  const data = await res.json();
-  // response: { data: [{ embedding: number[] }, ...] }
-  return (data.data ?? []).map((d: any) => d.embedding as number[]);
+  throw lastError ?? new Error("NIM embed failed");
 }
 
 /** Rerank passages against a query. Returns [{index, logit}]. */

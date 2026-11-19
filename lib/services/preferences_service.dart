@@ -19,6 +19,7 @@ class PreferencesService extends ChangeNotifier {
   bool messageNotificationsEnabled = true;
   bool requestNotificationsEnabled = true;
   bool activityNotificationsEnabled = true;
+  bool possibleMatchNotificationsEnabled = true;
   bool messagePreviewsEnabled = true;
 
   bool quietHoursEnabled = false;
@@ -39,6 +40,8 @@ class PreferencesService extends ChangeNotifier {
           await _prefs.getBool('request_notifications_enabled') ?? true;
       activityNotificationsEnabled =
           await _prefs.getBool('activity_notifications_enabled') ?? true;
+      possibleMatchNotificationsEnabled =
+          await _prefs.getBool('possible_match_notifications_enabled') ?? true;
       messagePreviewsEnabled =
           await _prefs.getBool('message_previews_enabled') ?? true;
       quietHoursEnabled = await _prefs.getBool('quiet_hours_enabled') ?? false;
@@ -92,6 +95,12 @@ class PreferencesService extends ChangeNotifier {
   Future<void> setActivityNotificationsEnabled(bool value) async {
     activityNotificationsEnabled = value;
     await setBool('activity_notifications_enabled', value);
+    notifyListeners();
+  }
+
+  Future<void> setPossibleMatchNotificationsEnabled(bool value) async {
+    possibleMatchNotificationsEnabled = value;
+    await setBool('possible_match_notifications_enabled', value);
     notifyListeners();
   }
 

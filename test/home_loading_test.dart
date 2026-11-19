@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/theme/theme.dart';
+import 'package:palturo/widgets/exhausted_deck_view.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 
 void main() {
@@ -81,10 +82,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(PersonCardSkeleton), findsNothing);
-    expect(
-      find.textContaining('You have seen all the top matches'),
-      findsOneWidget,
-    );
+    expect(find.text(ExhaustedDeckView.safeNote), findsOneWidget);
     expect(find.text(kDeckSlowMessage), findsNothing);
     expect(find.text('Retry'), findsNothing);
   });
@@ -169,10 +167,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining('You have seen all the top matches'),
-      findsOneWidget,
-    );
+    expect(find.text(ExhaustedDeckView.safeNote), findsOneWidget);
 
     await tester.tap(find.text('View Again'));
     await tester.pumpAndSettle();

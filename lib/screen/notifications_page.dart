@@ -218,6 +218,24 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
           role: _roleFrom(conversation?.otherRole),
           avatarUrl: conversation?.otherAvatar,
         );
+      case ActivityDestination.profile:
+        {
+          final userId = view.profileUserId;
+          if (userId == null || userId.trim().isEmpty) {
+            _showFallback('This profile is no longer available.');
+            return;
+          }
+          unawaited(_markItemRead(item));
+          final opened = await AppRouter.openUserProfile(
+            userId: userId,
+            name: view.actorName,
+            skillName: view.skillName,
+            role: _roleFrom(item.possibleMatchRole ?? item.role),
+          );
+          if (!opened) {
+            _showFallback('This profile is no longer available.');
+          }
+        }
       case ActivityDestination.none:
         _showFallback(
           item.kind == AppNotificationKind.skillModeration
@@ -252,6 +270,8 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
         return item.isUnread;
       case ActivityFilter.requests:
         return item.kind.isRequest || item.kind.isMatch || item.kind.isDecline;
+      case ActivityFilter.matches:
+        return item.kind.isPossibleMatch;
       case ActivityFilter.updates:
         return item.kind.isFeedback ||
             item.kind == AppNotificationKind.skillModeration ||
@@ -512,6 +532,8 @@ bool activityMatchesFilter(AppNotification item, ActivityFilter filter) {
       return item.isUnread;
     case ActivityFilter.requests:
       return item.kind.isRequest || item.kind.isMatch || item.kind.isDecline;
+    case ActivityFilter.matches:
+      return item.kind.isPossibleMatch;
     case ActivityFilter.updates:
       return item.kind.isFeedback ||
           item.kind == AppNotificationKind.skillModeration ||
@@ -547,6 +569,7 @@ enum ActivityFilter {
   all('All'),
   unread('Unread'),
   requests('Requests'),
+  matches('Matches'),
   updates('Updates');
 
   const ActivityFilter(this.label);

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/services/match_api.dart';
 
-enum ActivityDestination { incomingRequests, sentRequests, chat, none }
+enum ActivityDestination { incomingRequests, sentRequests, chat, profile, none }
 
 /// Pure presentation model for one notification row.
 ///
@@ -14,6 +14,7 @@ class ActivityItemView {
   final IconData icon;
   final ActivityDestination destination;
   final String? connectionId;
+  final String? profileUserId;
   final String? actorName;
   final String? skillName;
 
@@ -24,6 +25,7 @@ class ActivityItemView {
     required this.icon,
     required this.destination,
     this.connectionId,
+    this.profileUserId,
     this.actorName,
     this.skillName,
   });
@@ -47,6 +49,8 @@ ActivityItemView presentActivity(
 }) {
   final kind = _text(item['kind']) ?? 'unknown';
   final payload = _payloadOf(item);
+  final candidateId = _text(payload['candidate_id']) ?? _text(item['actor_id']);
+  final asRole = _text(payload['as_role']);
   final connectionId =
       _text(payload['connection_id']) ??
       incoming?.connectionId ??
@@ -118,6 +122,32 @@ ActivityItemView presentActivity(
         actorName: name,
         skillName: skill,
       );
+    case 'possible_match':
+      {
+        final String body;
+        if (name != null && skill != null) {
+          body =
+              asRole == 'learner'
+                  ? '$name wants to learn $skill, which matches what you teach.'
+                  : '$name teaches $skill and matches your interests.';
+        } else if (name != null) {
+          body = '$name matches your interests.';
+        } else if (asRole == 'learner') {
+          body = 'A new profile matches what you teach.';
+        } else {
+          body = 'A new profile matches what you want to learn.';
+        }
+        return ActivityItemView(
+          title: 'New possible match',
+          body: body,
+          actionLabel: 'View profile',
+          icon: Icons.person_search_outlined,
+          destination: ActivityDestination.profile,
+          profileUserId: candidateId,
+          actorName: name,
+          skillName: skill,
+        );
+      }
     case 'feedback_ready':
       return ActivityItemView(
         title: 'Feedback is ready',

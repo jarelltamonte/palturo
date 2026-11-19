@@ -86,6 +86,14 @@ void main() {
       ),
       'palturo_requests',
     );
+    expect(
+      service.channelIdFor(
+        AppNotificationKind.possibleMatch,
+        sound: true,
+        vibration: true,
+      ),
+      'palturo_requests',
+    );
   });
 
   test('chat payload carries the conversation context', () {
@@ -127,6 +135,34 @@ void main() {
 
     expect(payload['route'], 'requests');
     expect(payload['view'], 'incoming');
+  });
+
+  test('possible match payload routes to the candidate profile', () {
+    final item = AppNotification.fromRow({
+      'id': 'n4',
+      'kind': 'possible_match',
+      'payload': {
+        'candidate_id': 'cand-1',
+        'as_role': 'mentor',
+        'skill_name': 'Filipino Cooking',
+      },
+      'created_at': '2026-11-20T10:00:00Z',
+      'actor_id': 'cand-1',
+      'actor_name': 'Grace Lim',
+      'skill_name': 'Filipino Cooking',
+      'role': 'both',
+      'actor_avatar': 'https://example.test/grace.png',
+    });
+
+    final payload = LocalNotificationService.instance.payloadFor(item);
+
+    expect(payload['route'], 'user');
+    expect(payload['userId'], 'cand-1');
+    expect(payload['name'], 'Grace Lim');
+    expect(payload['skillName'], 'Filipino Cooking');
+    expect(payload['role'], 'mentor');
+    expect(payload['avatarUrl'], contains('grace.png'));
+    expect(payload['notificationId'], 'n4');
   });
 
   test('unknown routing falls back to Activity', () {

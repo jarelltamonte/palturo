@@ -227,6 +227,8 @@ class NotificationPresenter {
         unawaited(SoundService.instance.play(AppSound.success));
       } else if (item.kind == AppNotificationKind.skillModeration) {
         unawaited(Haptics.selection());
+      } else if (item.kind == AppNotificationKind.possibleMatch) {
+        unawaited(Haptics.selection());
       }
     }
     final rawTap = _tapFor(item, view);
@@ -291,6 +293,15 @@ class NotificationPresenter {
             avatarUrl: item.actorAvatar,
             role: _roleFrom(item.role),
           ),
+        );
+      case ActivityDestination.profile:
+        final userId = view.profileUserId;
+        if (userId == null || userId.trim().isEmpty) return null;
+        return () => AppRouter.openUserProfile(
+          userId: userId,
+          name: view.actorName,
+          skillName: view.skillName,
+          role: _roleFrom(item.possibleMatchRole ?? item.role),
         );
       case ActivityDestination.none:
         if (item.kind == AppNotificationKind.skillModeration) {
@@ -429,6 +440,8 @@ bool notificationKindEnabled(AppNotificationKind kind) {
     case AppNotificationKind.feedbackReady:
     case AppNotificationKind.skillModeration:
       return PreferencesService.instance.activityNotificationsEnabled;
+    case AppNotificationKind.possibleMatch:
+      return PreferencesService.instance.possibleMatchNotificationsEnabled;
     case AppNotificationKind.unknown:
       return false;
   }

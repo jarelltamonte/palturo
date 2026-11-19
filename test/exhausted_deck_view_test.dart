@@ -25,6 +25,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(ExhaustedDeckView.note), findsOneWidget);
+    expect(ExhaustedDeckView.note, contains('new possible match'));
+    expect(ExhaustedDeckView.safeNote, isNot(contains('notify')));
     expect(find.text('Explore'), findsOneWidget);
     expect(find.text('View Again'), findsOneWidget);
     expect(find.text('Browse'), findsOneWidget);

@@ -132,6 +132,7 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
   bool _profileNudgeShown = false;
+  bool _possibleMatchLive = false;
 
   RoleFilter _roleFilter = RoleFilter.all;
   String _skillFilter = 'all';
@@ -153,6 +154,13 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadDeck();
+    unawaited(
+      MatchApi.possibleMatchLive().then((live) {
+        if (mounted && live != _possibleMatchLive) {
+          setState(() => _possibleMatchLive = live);
+        }
+      }),
+    );
   }
 
   @override
@@ -1187,7 +1195,9 @@ class _HomePageState extends State<HomePage> {
           needsSetup
               ? 'Complete your profile setup so we can find Pals for you. '
                   'Add a role and at least one skill.'
-              : ExhaustedDeckView.note,
+              : _possibleMatchLive
+              ? ExhaustedDeckView.note
+              : ExhaustedDeckView.safeNote,
       showViewAgain: !needsSetup,
       showBrowse: !needsSetup,
     );

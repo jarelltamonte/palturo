@@ -26,6 +26,7 @@ void main() {
     expect(prefs.messageNotificationsEnabled, isTrue);
     expect(prefs.requestNotificationsEnabled, isTrue);
     expect(prefs.activityNotificationsEnabled, isTrue);
+    expect(prefs.possibleMatchNotificationsEnabled, isTrue);
     expect(prefs.messagePreviewsEnabled, isTrue);
     expect(prefs.quietHoursEnabled, isFalse);
   });
@@ -36,13 +37,19 @@ void main() {
     await prefs.setMessageNotificationsEnabled(false);
     await prefs.setRequestNotificationsEnabled(false);
     await prefs.setActivityNotificationsEnabled(false);
+    await prefs.setPossibleMatchNotificationsEnabled(false);
     await prefs.setMessagePreviewsEnabled(false);
 
     expect(prefs.messageNotificationsEnabled, isFalse);
     expect(prefs.requestNotificationsEnabled, isFalse);
     expect(prefs.activityNotificationsEnabled, isFalse);
+    expect(prefs.possibleMatchNotificationsEnabled, isFalse);
     expect(prefs.messagePreviewsEnabled, isFalse);
     expect(await prefs.getBool('message_notifications_enabled'), isFalse);
+    expect(
+      await prefs.getBool('possible_match_notifications_enabled'),
+      isFalse,
+    );
     expect(await prefs.getBool('message_previews_enabled'), isFalse);
   });
 
@@ -90,6 +97,12 @@ void main() {
         isFalse,
       );
       expect(notificationKindEnabled(AppNotificationKind.unknown), isFalse);
+
+      await prefs.setPossibleMatchNotificationsEnabled(false);
+      expect(
+        notificationKindEnabled(AppNotificationKind.possibleMatch),
+        isFalse,
+      );
     },
   );
 
@@ -130,6 +143,7 @@ void main() {
     );
     expect(find.text('Messages'), findsOneWidget);
     expect(find.text('Requests & matches'), findsOneWidget);
+    expect(find.text('New match suggestions'), findsOneWidget);
     expect(find.text('Activity updates'), findsOneWidget);
     expect(find.text('Show message text'), findsOneWidget);
     expect(find.widgetWithText(SwitchListTile, 'Quiet hours'), findsOneWidget);
@@ -140,7 +154,7 @@ void main() {
     await tester.tap(find.byType(SwitchListTile).first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Turn on notifications to use this.'), findsNWidgets(5));
+    expect(find.text('Turn on notifications to use this.'), findsNWidgets(6));
   });
 
   testWidgets('page survives 360px at 200% text', (tester) async {
@@ -189,10 +203,7 @@ void main() {
     );
 
     final list = tester.widget<ListView>(find.byType(ListView));
-    expect(
-      (list.padding! as EdgeInsets).bottom,
-      AppSpacing.pageBottom + 34,
-    );
+    expect((list.padding! as EdgeInsets).bottom, AppSpacing.pageBottom + 34);
   });
 
   testWidgets('message preview and quiet hours rows update', (tester) async {

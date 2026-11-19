@@ -84,6 +84,59 @@ void main() {
     expect(view.connectionId, 'c4');
   });
 
+  test('possible match names the candidate and opens the profile', () {
+    final view = presentActivity({
+      'kind': 'possible_match',
+      'payload': {
+        'candidate_id': 'cand-1',
+        'as_role': 'mentor',
+        'skill_name': 'Filipino Cooking',
+      },
+      'actor_id': 'cand-1',
+      'actor_name': 'Grace Lim',
+      'skill_name': 'Filipino Cooking',
+    });
+
+    expect(view.title, 'New possible match');
+    expect(view.body, contains('Grace Lim'));
+    expect(view.body, contains('Filipino Cooking'));
+    expect(view.body, contains('matches your interests'));
+    expect(view.body, isNot(contains('you matched')));
+    expect(view.actionLabel, 'View profile');
+    expect(view.destination, ActivityDestination.profile);
+    expect(view.profileUserId, 'cand-1');
+  });
+
+  test('possible match learner direction explains what the viewer teaches', () {
+    final view = presentActivity({
+      'kind': 'possible_match',
+      'payload': {
+        'candidate_id': 'cand-2',
+        'as_role': 'learner',
+        'skill_name': 'Philippine Handweaving',
+      },
+      'actor_name': 'Lolo Ben',
+    });
+
+    expect(view.title, 'New possible match');
+    expect(view.body, contains('wants to learn Philippine Handweaving'));
+    expect(view.body, contains('what you teach'));
+    expect(view.destination, ActivityDestination.profile);
+    expect(view.profileUserId, 'cand-2');
+  });
+
+  test('possible match without a skill still uses honest generic copy', () {
+    final view = presentActivity({
+      'kind': 'possible_match',
+      'payload': {'candidate_id': 'cand-3', 'as_role': 'mentor'},
+      'actor_name': 'RJ',
+    });
+
+    expect(view.body, 'RJ matches your interests.');
+    expect(view.actionLabel, 'View profile');
+    expect(view.destination, ActivityDestination.profile);
+  });
+
   test('unknown kinds stay on Activity with generic copy', () {
     final view = presentActivity({'kind': 'mystery', 'payload': {}});
     expect(view.title, 'Activity');

@@ -223,6 +223,23 @@ class OutgoingRequestLite {
 }
 
 class MatchApi {
+  /// Whether the server has possible-match fan-out in live mode.
+  ///
+  /// The exhausted deck only promises notifications when this is true;
+  /// otherwise it uses copy that is honest during shadow/off rollout. A failed
+  /// check is treated as not live.
+  static Future<bool> possibleMatchLive() async {
+    try {
+      final res = await _Client.c.rpc('possible_match_status');
+      if (res is Map) {
+        return res['enabled'] == true && res['mode']?.toString() == 'live';
+      }
+    } catch (_) {
+      // Rollout state is advisory; a failure must not break the deck.
+    }
+    return false;
+  }
+
   /// Backend rows may have a missing display name; never let an empty string
   /// reach list widgets that index `name[0]`.
   static String _displayName(dynamic value) {

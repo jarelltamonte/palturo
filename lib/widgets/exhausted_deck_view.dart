@@ -37,7 +37,11 @@ class ExhaustedDeckView extends StatefulWidget {
   final String updateLabel;
 
   static const String note =
-      'You have seen all the top matches, we will notify you if a new match is found.';
+      'You have seen all current matches. We will notify you when a new possible match appears.';
+
+  /// Honest copy for when live fan-out is disabled or still in shadow mode.
+  static const String safeNote =
+      'You have seen all current matches. New profiles and updates can create new matches when you return.';
 
   @override
   State<ExhaustedDeckView> createState() => _ExhaustedDeckViewState();

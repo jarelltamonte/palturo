@@ -7,6 +7,7 @@ import 'package:palturo/screen/notifications_page.dart';
 import 'package:palturo/screen/profile_page.dart';
 import 'package:palturo/screen/request_page.dart';
 import 'package:palturo/services/app_navigator.dart';
+import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/utils/media_url.dart';
 
@@ -61,4 +62,45 @@ class AppRouter {
   }
 
   static Future<void> openProfile() => _push((_) => const ProfilePage());
+
+  /// Opens the read-only profile card for another member. Returns false when
+  /// the profile is gone or the navigator is not ready, so Activity can show a
+  /// neutral fallback instead of a broken action.
+  static Future<bool> openUserProfile({
+    required String userId,
+    String? name,
+    String? skillName,
+    PersonRole? role,
+  }) async {
+    final id = userId.trim();
+    if (id.isEmpty) return false;
+
+    Person? person;
+    try {
+      person = await MatchApi.getPersonFromPublicProfile(
+        id,
+        preferRole: role?.name,
+      );
+    } catch (_) {
+      return false;
+    }
+    final resolved = person;
+    if (resolved == null) return false;
+
+    Future<bool> show() async {
+      final context = _navigator?.context;
+      if (context == null || !context.mounted) return false;
+      showPersonProfileDialog(context, resolved);
+      return true;
+    }
+
+    if (await show()) return true;
+
+    // A local-notification tap can arrive before the first route is mounted.
+    final completer = Completer<bool>();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      completer.complete(await show());
+    });
+    return completer.future;
+  }
 }

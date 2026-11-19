@@ -31,6 +31,34 @@ void main() {
     expect(item.createdAt, DateTime.utc(2026, 11, 4, 10));
   });
 
+  test('possible match rows keep the candidate and never become unknown', () {
+    final item = AppNotification.fromRow({
+      'id': 'pm1',
+      'kind': 'possible_match',
+      'payload': {
+        'candidate_id': 'cand-1',
+        'as_role': 'mentor',
+        'score': 0.42,
+        'skill_name': 'Filipino Cooking',
+        'skill_path': 'cooking_culinary.filipino_cooking',
+      },
+      'created_at': '2026-11-20T10:00:00Z',
+      'actor_id': 'cand-1',
+      'actor_name': 'Grace Lim',
+      'actor_avatar': 'https://example.test/grace.png',
+      'skill_name': 'Filipino Cooking',
+      'role': 'both',
+    });
+
+    expect(item.kind, AppNotificationKind.possibleMatch);
+    expect(item.kind.isPossibleMatch, isTrue);
+    expect(item.actorId, 'cand-1');
+    expect(item.actorName, 'Grace Lim');
+    expect(item.skillName, 'Filipino Cooking');
+    expect(item.connectionId, isNull);
+    expect(item.connectionStatus, isNull);
+  });
+
   test('falls back to payload and handles read state', () {
     final item = AppNotification.fromRow({
       'id': 'n2',

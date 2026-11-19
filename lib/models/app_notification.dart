@@ -9,6 +9,7 @@ enum AppNotificationKind {
   requestDeclined('request_declined'),
   feedbackReady('feedback_ready'),
   skillModeration('skill_moderation'),
+  possibleMatch('possible_match'),
   unknown('unknown');
 
   const AppNotificationKind(this.wireValue);
@@ -33,6 +34,9 @@ enum AppNotificationKind {
   bool get isDecline => this == AppNotificationKind.requestDeclined;
 
   bool get isFeedback => this == AppNotificationKind.feedbackReady;
+
+  /// A suggestion computed from a new profile, not a confirmed connection.
+  bool get isPossibleMatch => this == AppNotificationKind.possibleMatch;
 }
 
 class AppNotification {
@@ -71,6 +75,9 @@ class AppNotification {
   String? get skillLabel =>
       skillName ?? _text(payload['skill_name']) ?? _text(payload['skill']);
 
+  /// Direction of a possible match: the role the candidate was suggested as.
+  String? get possibleMatchRole => _text(payload['as_role']);
+
   /// Safe parser for a Supabase row from `list_notifications` or a realtime
   /// insert. Missing fields never throw.
   factory AppNotification.fromRow(Map<String, dynamic> row) {
@@ -82,6 +89,7 @@ class AppNotification {
         _text(row['actor_id']) ??
         _text(payload['requester_id']) ??
         _text(payload['responder_id']) ??
+        _text(payload['candidate_id']) ??
         _text(payload['actor_id']);
     final actorName =
         _text(row['actor_name']) ??

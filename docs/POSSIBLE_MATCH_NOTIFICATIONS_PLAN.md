@@ -17,7 +17,7 @@ and changelog as work lands.
 - `possible_match_jobs` + `possible_match_events` are service-only, RLS on.
 - `notifications.kind='possible_match'` is allowed.
 - `process_possible_match_jobs()` is scheduled every minute as
-  `possible-match-fanout` (pg_cron job 11). The worker reaps stale claims,
+  `possible-match-fanout`. The worker reaps stale claims,
   uses `SKIP LOCKED`, applies per-pair cooldown and per-recipient daily/weekly
   caps, and writes an audit event for every pair.
 - Rollout config is in `pipeline_config` under `possible_match_*`. The feature
@@ -34,7 +34,7 @@ and changelog as work lands.
   live mode; otherwise it uses the safe "new profiles and updates" copy.
 - Verification: 315 Flutter tests pass, analyzer clean. Live E2E with Grace Lim
   as candidate and `palturo-e2e@testmail.local` as recipient produced one
-  notification, `Activities` showed Matches 1 / Requests 4, tapping opened the
+  notification, Activity showed Matches 1 / Requests 4, tapping opened the
   candidate profile and marked the row read. Block, connection, and moderation
   cleanup each removed the row and suppressed the event. Re-running a job
   produced zero duplicates.

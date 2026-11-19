@@ -14,6 +14,7 @@ class ChangePasswordPage extends StatefulWidget {
 }
 
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
+  final TextEditingController _current = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirm = TextEditingController();
   bool _busy = false;
@@ -21,6 +22,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   void dispose() {
+    _current.dispose();
     _password.dispose();
     _confirm.dispose();
     super.dispose();
@@ -28,9 +30,17 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   Future<void> _save() async {
     if (_busy) return;
+    if (_current.text.isEmpty) {
+      showAppError(context, 'Enter your current password.');
+      return;
+    }
     setState(() => _busy = true);
     try {
-      await AuthService().updatePassword(_password.text, _confirm.text);
+      await AuthService().updatePassword(
+        _password.text,
+        _confirm.text,
+        currentPassword: _current.text,
+      );
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
     } catch (e) {
@@ -86,6 +96,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             ),
           ),
           const SizedBox(height: 24),
+          TopLabeledField(
+            label: 'Current password',
+            controller: _current,
+            obscureText: _obscure,
+            autofillHints: const [AutofillHints.password],
+          ),
+          const SizedBox(height: 14),
           TopLabeledField(
             label: 'New password',
             controller: _password,

@@ -408,14 +408,38 @@ class AuthService {
 
   /// Permanently deletes the signed-in user's profile, media and auth account
   /// via the `delete-account` Edge Function, then clears the local session.
-  Future<void> deleteAccount() async {
+  ///
+  /// The current password is verified both here and inside the function, so a
+  /// stolen unlocked session cannot erase the account on its own.
+  Future<void> deleteAccount({required String currentPassword}) async {
+    final email = _supabase.auth.currentUser?.email;
+    if (email == null || currentPassword.trim().isEmpty) {
+      throw Exception('Enter your current password.');
+    }
+
     try {
-      await _supabase.functions.invoke('delete-account', body: const {});
+      await _supabase.auth
+          .signInWithPassword(email: email, password: currentPassword)
+          .timeout(const Duration(seconds: 30));
+    } on AuthException {
+      throw Exception('Current password is incorrect.');
+    } on TimeoutException {
+      throw Exception('Could not verify your password. Please try again.');
+    }
+
+    try {
+      await _supabase.functions.invoke(
+        'delete-account',
+        body: {'password': currentPassword},
+      );
     } on FunctionException catch (e) {
       if (e.status == 0) {
         throw Exception(
           'Unable to delete your account. Please check your connection and try again.',
         );
+      }
+      if (e.status == 401) {
+        throw Exception('Current password is incorrect.');
       }
       if (e.status == 429) {
         throw Exception(
@@ -481,9 +505,16 @@ class AuthService {
   }
 
   // Update Password
-  Future<void> updatePassword(String password, String confirmPassword) async {
+  Future<void> updatePassword(
+    String password,
+    String confirmPassword, {
+    String? currentPassword,
+  }) async {
     if (password.isEmpty || confirmPassword.isEmpty) {
       throw Exception('All fields are required');
+    }
+    if (currentPassword != null && currentPassword.trim().isEmpty) {
+      throw Exception('Enter your current password.');
     }
 
     final passwordResult = Validators.checkPassword(password);
@@ -504,6 +535,23 @@ class AuthService {
     }
 
     try {
+      if (currentPassword != null) {
+        final email = _supabase.auth.currentUser?.email;
+        if (email == null) {
+          throw Exception(
+            'Could not verify your account. Please log in again.',
+          );
+        }
+        try {
+          await _supabase.auth
+              .signInWithPassword(email: email, password: currentPassword)
+              .timeout(const Duration(seconds: 30));
+        } on AuthException {
+          throw Exception('Current password is incorrect.');
+        } on TimeoutException {
+          throw Exception('Could not verify your password. Please try again.');
+        }
+      }
       await _supabase.auth.updateUser(UserAttributes(password: password));
       await _supabase.auth.signOut(scope: SignOutScope.local);
     } on AuthException catch (e) {

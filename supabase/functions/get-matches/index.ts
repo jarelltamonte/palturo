@@ -24,7 +24,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 const CACHE_COLUMNS =
-  "candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode";
+  "candidate_id, rank, bi_score, reciprocal_score, calibrated_score, pipeline_mode, display_name, role";
 
 /// Users the viewer must not see in discovery: existing connections (pending
 /// or accepted) and either direction of a report.
@@ -64,27 +64,20 @@ async function cacheResults(
   rows: Array<Record<string, unknown>>,
 ) {
   const excluded = await excludedUserIds(admin, userId);
-  const visible = rows.filter(
-    (r) => !excluded.has(r.candidate_id as string),
-  );
-  const ids = visible.map((r) => r.candidate_id as string).concat(userId);
-  const { data: pRows } = await admin.rpc("profile_match_view", { p_users: ids });
-  const profiles = (pRows ?? []) as Array<{ user_id: string; name: string; role: string }>;
-  const nameOf = new Map(profiles.map((p) => [p.user_id, p]));
-  return visible
-    .filter((r) => nameOf.has(r.candidate_id as string))
-    .map((r) => {
-      const p = nameOf.get(r.candidate_id as string)!;
-      return {
-        user_id: r.candidate_id,
-        rank: Number(r.rank),
-        display_name: p.name,
-        role: p.role,
-        compatibility: Number(r.calibrated_score ?? 0),
-        pipeline: String(r.pipeline_mode ?? "full"),
-        cached: true,
-      };
-    });
+  // Names and roles are stored with the ranking, so a cached deck no longer
+  // rebuilds every candidate's passages just to render the cards.
+  return rows
+    .filter((r) => !excluded.has(r.candidate_id as string))
+    .filter((r) => String(r.display_name ?? "").trim().length > 0)
+    .map((r) => ({
+      user_id: r.candidate_id,
+      rank: Number(r.rank),
+      display_name: String(r.display_name ?? ""),
+      role: String(r.role ?? "both"),
+      compatibility: Number(r.calibrated_score ?? 0),
+      pipeline: String(r.pipeline_mode ?? "full"),
+      cached: true,
+    }));
 }
 
 Deno.serve(async (req) => {
@@ -389,7 +382,7 @@ Deno.serve(async (req) => {
     const excluded = await excludedUserIds(admin, user.id);
     const visible = ranked.filter((s) => !excluded.has(s.candidate_id));
 
-    await refreshCache(admin, user.id, targetRole, visible, cfg, mode);
+    await refreshCache(admin, user.id, targetRole, visible, cfg, mode, byId);
 
     const results = visible.map((s) => {
       const p = byId.get(s.candidate_id)!;
@@ -429,9 +422,20 @@ async function refreshCache(
   }>,
   cfg: PipelineCfg,
   mode: string,
+  profiles?: Map<string, { name: string; role: string }>,
 ) {
   await admin.from("match_cache").delete().eq("user_id", userId).eq("as_role", asRole);
   if (ranked.length === 0) return;
+  let names = profiles;
+  if (!names) {
+    const { data } = await admin.rpc("profile_match_view", {
+      p_users: ranked.map((r) => r.candidate_id),
+    });
+    names = new Map(
+      ((data ?? []) as Array<{ user_id: string; name: string; role: string }>)
+        .map((p) => [p.user_id, p]),
+    );
+  }
   const payload = ranked.map((s) => ({
     user_id: userId,
     as_role: asRole,
@@ -443,6 +447,8 @@ async function refreshCache(
     reciprocal_score: s.reciprocal_score,
     calibrated_score: s.calibrated_score,
     pipeline_mode: mode,
+    display_name: names?.get(s.candidate_id)?.name ?? "",
+    role: names?.get(s.candidate_id)?.role ?? "both",
     model_name: mode === "full" ? cfg.rerankModel : cfg.embeddingModel,
     config_version: cfg.configRevision,
   }));

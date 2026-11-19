@@ -56,8 +56,11 @@ class OnboardingFinalScreen extends StatelessWidget {
         final selectedDays =
             kDayOptions.where(controller.availabilityDays.contains).toList();
 
+        final wantsLearning = controller.wantsLearning;
+        final wantsTeaching = controller.wantsTeaching;
         final isValid =
-            controller.learningStyles.isNotEmpty &&
+            (!wantsLearning || controller.learningStyles.isNotEmpty) &&
+            (!wantsTeaching || controller.teachingStyles.isNotEmpty) &&
             controller.languages.isNotEmpty &&
             selectedDays.isNotEmpty;
 

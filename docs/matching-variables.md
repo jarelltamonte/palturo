@@ -184,8 +184,8 @@ A/B: `config_revision` is the experiment key.
 - Role asymmetry → seeker learn ↔ candidate teach for mentor targets, and the
   reverse for learner targets.
 - Rejected/retired skills → excluded from discovery and passages; classifier-
-  accepted user submissions are auto-approved and marked `auto_approved` so the
-  admin panel can curate them later.
+  accepted submissions are auto-approved only at high confidence and marked
+  `auto_approved`; lower-confidence nodes wait as `pending` for the admin panel.
 - Rename/merge → IDs stable; taxonomy version invalidates caches; passages
   re-embed.
 - Missing embeddings → structured path still works.

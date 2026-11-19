@@ -79,14 +79,23 @@ bool isProfileComplete({
   required String bio,
   required List<String> languages,
   required List<String> learningStyles,
+  required List<String> teachingStyles,
+  required OnboardingRole? role,
   required bool hasRoleSkills,
   bool hasShowcase = true,
 }) {
+  final stylesOk = switch (role) {
+    OnboardingRole.learn => learningStyles.isNotEmpty,
+    OnboardingRole.teach => teachingStyles.isNotEmpty,
+    OnboardingRole.both =>
+      learningStyles.isNotEmpty && teachingStyles.isNotEmpty,
+    null => false,
+  };
   return avatarUrl != null &&
       avatarUrl.trim().isNotEmpty &&
       bio.trim().isNotEmpty &&
       languages.isNotEmpty &&
-      learningStyles.isNotEmpty &&
+      stylesOk &&
       hasRoleSkills &&
       hasShowcase;
 }
@@ -492,6 +501,8 @@ class ProfileService {
           bio: (existingProfile?['bio'] ?? '') as String,
           languages: controller.languages.toList(),
           learningStyles: controller.learningStyles.toList(),
+          teachingStyles: controller.teachingStyles.toList(),
+          role: controller.role,
           hasRoleSkills: hasRoleSkills,
           hasShowcase:
               !(controller.role == OnboardingRole.teach ||
@@ -1076,6 +1087,8 @@ class ProfileService {
       bio: updatedProfile.bio,
       languages: updatedProfile.languages,
       learningStyles: updatedProfile.interests,
+      teachingStyles: updatedProfile.teachingStyles,
+      role: updatedProfile.role,
       hasRoleSkills: hasSkillsForRole,
       hasShowcase:
           !(updatedProfile.role == OnboardingRole.teach ||

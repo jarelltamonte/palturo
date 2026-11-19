@@ -962,7 +962,7 @@ class ChatProfileItem extends StatelessWidget {
 
   const ChatProfileItem({
     super.key,
-    this.name = 'Random Name',
+    required this.name,
     this.avatarImage,
     this.onTap,
   });
@@ -1024,9 +1024,9 @@ class ChatListItem extends StatelessWidget {
 
   const ChatListItem({
     super.key,
-    this.name = 'Random Name',
-    this.message = 'Random chat message goes here',
-    this.time = 'Just now',
+    required this.name,
+    required this.message,
+    required this.time,
     this.presence,
     this.hasUnread = true,
     this.skillName,

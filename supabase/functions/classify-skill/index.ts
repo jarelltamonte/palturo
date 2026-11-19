@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
       : closestSpelling(normalized, [...semanticByKey.keys()]);
     const spellingMatch = spellingKey ? semanticByKey.get(spellingKey) ?? null : null;
     let skillDecision: {
-      status: "attached" | "created" | "queued" | "rejected" | "error";
+      status: "attached" | "created" | "pending" | "queued" | "rejected" | "error";
       node: Record<string, unknown> | null;
       action: string;
       confidence: number | null;
@@ -261,13 +261,18 @@ Deno.serve(async (req) => {
       dryRun
         ? Promise.resolve({ id: null as string | null, error: null as string | null })
         : placeSkill(admin, user.id, skillId, kind, null);
-    const draftNode = (parent: { path: string; kind?: string } | null, display: string) => ({
+    const draftNode = (
+      parent: { path: string; kind?: string } | null,
+      display: string,
+      autoApprove: boolean,
+    ) => ({
       id: null,
       name: display,
       path: parent ? `${parent.path}.${normalize(display)}` : normalize(display),
       kind: childKind(parent),
-      status: "approved",
-      auto_approved: true,
+      status: autoApprove ? "approved" : "pending",
+      is_visible: autoApprove,
+      auto_approved: autoApprove,
     });
 
     if (exact) {
@@ -428,13 +433,14 @@ Deno.serve(async (req) => {
             // not name an equivalent skill: register it as a pending skill
             // instead of silently dropping it as unresolved.
             const parent = createParent;
+            const autoApprove = (actionConf ?? 0) >= confThreshold;
             if (!parent) {
               skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
             } else if (dryRun) {
-              skillDecision = { status: "created", node: draftNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
+              skillDecision = { status: autoApprove ? "created" : "pending", node: draftNode(parent, cleanedName, autoApprove), action: "create_new", confidence: actionConf, placementId: null };
             } else {
               const created = await createAutoApprovedNode(
-                admin, parent, cleanedName, user.id,
+                admin, parent, cleanedName, user.id, autoApprove,
               );
               if (created.error === "too_many_new_skills") {
                 return json({ error: "too_many_new_skills", status: "error" }, 429);
@@ -444,7 +450,7 @@ Deno.serve(async (req) => {
               }
               const placed = await place((created.node as any).id);
               if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-              skillDecision = { status: "created", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
+              skillDecision = { status: autoApprove ? "created" : "pending", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
             }
           }
         }
@@ -457,13 +463,14 @@ Deno.serve(async (req) => {
           skillDecision = { status: "attached", node: pick(semanticMatch), action: "attach_existing", confidence: semanticConf, placementId: placed.id };
         } else {
           const parent = createParent;
+          const autoApprove = (actionConf ?? 0) >= confThreshold;
           if (!parent) {
             skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
           } else if (dryRun) {
-            skillDecision = { status: "created", node: draftNode(parent, cleanedName), action: "create_new", confidence: actionConf, placementId: null };
+            skillDecision = { status: autoApprove ? "created" : "pending", node: draftNode(parent, cleanedName, autoApprove), action: "create_new", confidence: actionConf, placementId: null };
           } else {
             const created = await createAutoApprovedNode(
-              admin, parent, cleanedName, user.id,
+              admin, parent, cleanedName, user.id, autoApprove,
             );
             if (created.error === "too_many_new_skills") {
               return json({ error: "too_many_new_skills", status: "error" }, 429);
@@ -473,7 +480,7 @@ Deno.serve(async (req) => {
             }
             const placed = await place((created.node as any).id);
             if (placed.error) return json({ error: placed.error, status: "error" }, 409);
-            skillDecision = { status: "created", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
+            skillDecision = { status: autoApprove ? "created" : "pending", node: created.node, action: "create_new", confidence: actionConf, placementId: placed.id };
           }
         }
       } else {
@@ -606,6 +613,7 @@ async function createAutoApprovedNode(
   parent: { id: string; kind?: string },
   name: string,
   userId: string,
+  autoApprove: boolean,
 ): Promise<{ node: Record<string, unknown> | null; error: string | null }> {
   // New nodes are globally visible, so cap how many one account can add per
   // day. The hourly classifier limit alone allows too much taxonomy churn.
@@ -628,10 +636,10 @@ async function createAutoApprovedNode(
       parent_id: parent.id,
       kind: childKind(parent),
       is_leaf: true,
-      is_visible: true,
+      is_visible: autoApprove,
       origin: "user_submitted",
-      status: "approved",
-      auto_approved: true,
+      status: autoApprove ? "approved" : "pending",
+      auto_approved: autoApprove,
       submitted_by: userId,
     })
     .select("id,name,path,status,kind,auto_approved")
@@ -652,8 +660,8 @@ async function createAutoApprovedNode(
     );
     if (existing) {
       // An instance running the previous version may have left the sibling
-      // pending. Promote it so the accepted skill is immediately usable.
-      if ((existing as any).status === "pending") {
+      // pending. Promote it only when this verdict is trusted.
+      if (autoApprove && (existing as any).status === "pending") {
         await admin
           .from("skill_nodes")
           .update({

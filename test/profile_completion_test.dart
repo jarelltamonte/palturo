@@ -49,6 +49,8 @@ void main() {
         bio: 'Hello',
         languages: const ['English'],
         learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: true,
       ),
       isTrue,
@@ -59,6 +61,8 @@ void main() {
         bio: 'Hello',
         languages: const ['English'],
         learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: true,
       ),
       isFalse,
@@ -69,6 +73,8 @@ void main() {
         bio: '   ',
         languages: const ['English'],
         learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: true,
       ),
       isFalse,
@@ -79,6 +85,8 @@ void main() {
         bio: 'Hello',
         languages: const [],
         learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: true,
       ),
       isFalse,
@@ -89,6 +97,8 @@ void main() {
         bio: 'Hello',
         languages: const ['English'],
         learningStyles: const [],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: true,
       ),
       isFalse,
@@ -99,6 +109,8 @@ void main() {
         bio: 'Hello',
         languages: const ['English'],
         learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: false,
       ),
       isFalse,
@@ -109,10 +121,74 @@ void main() {
         bio: 'Hello',
         languages: const ['English'],
         learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.learn,
         hasRoleSkills: true,
         hasShowcase: false,
       ),
       isFalse,
+    );
+  });
+  test('role-specific styles are required', () {
+    expect(
+      isProfileComplete(
+        avatarUrl: 'https://example.test/avatar.jpg',
+        bio: 'Hello',
+        languages: const ['English'],
+        learningStyles: const [],
+        teachingStyles: const ['Visual'],
+        role: OnboardingRole.teach,
+        hasRoleSkills: true,
+      ),
+      isTrue,
+    );
+    expect(
+      isProfileComplete(
+        avatarUrl: 'https://example.test/avatar.jpg',
+        bio: 'Hello',
+        languages: const ['English'],
+        learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.teach,
+        hasRoleSkills: true,
+      ),
+      isFalse,
+    );
+    expect(
+      isProfileComplete(
+        avatarUrl: 'https://example.test/avatar.jpg',
+        bio: 'Hello',
+        languages: const ['English'],
+        learningStyles: const [],
+        teachingStyles: const ['Visual'],
+        role: OnboardingRole.learn,
+        hasRoleSkills: true,
+      ),
+      isFalse,
+    );
+    expect(
+      isProfileComplete(
+        avatarUrl: 'https://example.test/avatar.jpg',
+        bio: 'Hello',
+        languages: const ['English'],
+        learningStyles: const ['Visual'],
+        teachingStyles: const [],
+        role: OnboardingRole.both,
+        hasRoleSkills: true,
+      ),
+      isFalse,
+    );
+    expect(
+      isProfileComplete(
+        avatarUrl: 'https://example.test/avatar.jpg',
+        bio: 'Hello',
+        languages: const ['English'],
+        learningStyles: const ['Visual'],
+        teachingStyles: const ['Visual'],
+        role: OnboardingRole.both,
+        hasRoleSkills: true,
+      ),
+      isTrue,
     );
   });
 }

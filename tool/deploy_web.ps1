@@ -16,6 +16,15 @@ if (Test-Path $merged) { Remove-Item $merged -Recurse -Force }
 New-Item -ItemType Directory -Path $merged | Out-Null
 Copy-Item 'build\web\*' $merged -Recurse -Force
 
+# Stamp the build so the app can detect a new deploy and offer a reload.
+$versionPath = Join-Path $merged 'version.json'
+if (Test-Path $versionPath) {
+  $version = Get-Content $versionPath -Raw | ConvertFrom-Json
+  $version | Add-Member -NotePropertyName build `
+    -NotePropertyValue ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -Force
+  $version | ConvertTo-Json -Compress | Set-Content $versionPath -Encoding utf8
+}
+
 $auth = Join-Path (Split-Path $appRoot -Parent) 'palturo-auth-web\public'
 if (-not (Test-Path (Join-Path $auth 'index.html'))) {
   throw "Auth pages not found at $auth"

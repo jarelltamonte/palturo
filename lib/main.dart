@@ -16,6 +16,8 @@ import 'package:palturo/services/notification_presenter.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/app_navigator.dart';
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/services/update_service.dart';
+import 'package:palturo/services/error_reporter.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/offline_banner.dart';
 import 'package:palturo/services/chat_state_service.dart';
@@ -67,8 +69,11 @@ void main() async {
     ),
   );
 
+  await ErrorReporter.instance.install();
+
   await PreferencesService.instance.init();
   await DraftService.instance.init();
+  UpdateService.instance.start();
   unawaited(ConnectivityService.instance.init());
   AppBadgeService.instance.init();
   // Only load privacy once a session exists; on a signed-out launch the RPC

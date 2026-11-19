@@ -75,10 +75,11 @@ supabase functions deploy moderate-notes --no-verify-jwt
 `classify-skill` moderates custom skill names, attaches or creates a node, and
 places the selectable skill in `user_skills` with the leaf as focus. It cleans
 casing and spacing, and a near-spelling of an existing node attaches to that
-node instead of creating a duplicate. A newly created node is accepted
-immediately (`status = 'approved'`, visible) and marked `auto_approved` so the
-admin panel can find and curate classifier-approved skills later. Verdicts are
-written to `skill_moderation_log`, linked to the node through `skill_node_id`.
+node instead of creating a duplicate. A high-confidence new node is accepted
+immediately (`status = 'approved'`, visible) and marked `auto_approved`; a
+lower-confidence creation is queued as `pending` for the admin panel. Verdicts
+are written to `skill_moderation_log`, linked to the node through
+`skill_node_id`.
 
 Pass `dry_run: true` to run the full decision without writing `user_skills` or
 new `skill_nodes`. Onboarding uses a dry run when a chip is created and repeats

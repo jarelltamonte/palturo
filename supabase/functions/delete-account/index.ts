@@ -121,6 +121,25 @@ Deno.serve(async (req) => {
       return json({ error: "rate_limited", retry_after_seconds: 3600 }, 429);
     }
 
+    // Re-authenticate before deleting. A stolen unlocked session must know the
+    // current password; the client verifies too, but this is the enforcement.
+    let payload: { password?: string } = {};
+    try {
+      payload = await req.json();
+    } catch {
+      payload = {};
+    }
+    const password = (payload.password ?? "").toString();
+    if (!password) return json({ error: "password_required" }, 400);
+    if (!user.email) return json({ error: "password_unavailable" }, 400);
+
+    const verifier = createClient(url, anonKey);
+    const { error: verifyErr } = await verifier.auth.signInWithPassword({
+      email: user.email,
+      password,
+    });
+    if (verifyErr) return json({ error: "invalid_password" }, 401);
+
     // 1. Storage first. If this fails we abort before touching the database,
     //    so a failure never leaves a half-deleted account.
     await deleteUserMedia(admin, user.id);

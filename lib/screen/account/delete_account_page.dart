@@ -4,6 +4,7 @@ import 'package:palturo/services/auth_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/top_labeled_field.dart';
 import 'support_page.dart';
 
 /// A dedicated destructive destination. Kept out of the routine account list
@@ -18,20 +19,26 @@ class DeleteAccountPage extends StatefulWidget {
 class _DeleteAccountPageState extends State<DeleteAccountPage> {
   static const String _keyword = 'DELETE';
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _password = TextEditingController();
   bool _deleting = false;
+  bool _obscure = true;
 
   bool get _canDelete =>
-      _controller.text.trim().toUpperCase() == _keyword && !_deleting;
+      _controller.text.trim().toUpperCase() == _keyword &&
+      _password.text.isNotEmpty &&
+      !_deleting;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
+    _password.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -39,7 +46,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     if (!_canDelete) return;
     setState(() => _deleting = true);
     try {
-      await AuthService().deleteAccount();
+      await AuthService().deleteAccount(currentPassword: _password.text);
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
     } catch (e) {
@@ -158,6 +165,22 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                         color: AppColors.dangerText(context),
                         width: 1.5,
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TopLabeledField(
+                  label: 'Current password',
+                  controller: _password,
+                  obscureText: _obscure,
+                  autofillHints: const [AutofillHints.password],
+                  suffixIcon: IconButton(
+                    tooltip: _obscure ? 'Show password' : 'Hide password',
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(
+                      _obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                     ),
                   ),
                 ),

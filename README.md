@@ -254,7 +254,7 @@ redirect URLs, and verification checklist.
 ## Testing
 
 - `flutter analyze --no-pub`: clean.
-- `flutter test`: 217 tests.
+- `flutter test`: 310 tests.
 - Coverage includes the desktop shell, exhausted deck, Explore deck, seen-card
   persistence, Browse filters, onboarding search and depth-2 options, login
   keyboard behavior, banner without an Overlay, notification badge and realtime

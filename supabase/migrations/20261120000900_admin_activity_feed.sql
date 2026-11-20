@@ -51,16 +51,50 @@ events as (
   select
     p.updated_at,
     'users',
-    'onboarding',
-    'Onboarding completed',
+    'profile_updated',
+    'Profile updated',
     p.role::text,
     n.name,
     p.id::text
   from public.profiles p
   join names n on n.id = p.id
   cross join win w
-  where p.has_completed_onboarding
-    and p.updated_at >= w.since
+  where p.updated_at >= w.since
+    and p.updated_at > p.created_at + interval '5 minutes'
+    and (p.name_changed_at is null or p.name_changed_at <> p.updated_at)
+    and (p.suspended_at is null or p.suspended_at <> p.updated_at)
+    and (p.last_warned_at is null or p.last_warned_at <> p.updated_at)
+
+  union all
+
+  select
+    p.name_changed_at,
+    'users',
+    'name_changed',
+    'Name changed',
+    nullif(trim(concat_ws(' ', p.first_name, p.last_name)), ''),
+    n.name,
+    p.id::text
+  from public.profiles p
+  join names n on n.id = p.id
+  cross join win w
+  where p.name_changed_at is not null
+    and p.name_changed_at >= w.since
+
+  union all
+
+  select
+    f.created_at,
+    'users',
+    'app_feedback',
+    'App feedback submitted',
+    f.kind,
+    coalesce(n.name, 'Unknown'),
+    f.user_id::text
+  from public.app_feedback f
+  left join names n on n.id = f.user_id
+  cross join win w
+  where f.created_at >= w.since
 
   union all
 
@@ -82,7 +116,7 @@ events as (
   select
     s.created_at,
     'skills',
-    'skill_added',
+    case when s.status = 'pending' then 'skill_submitted' else 'skill_added' end,
     case when s.status = 'pending' then 'Skill submitted' else 'Skill added' end,
     concat_ws(' · ', s.path::text, nullif(s.origin::text, '')),
     s.name,
@@ -97,8 +131,8 @@ events as (
   select
     sc.created_at,
     'skills',
-    'showcase_added',
-    'Showcase added',
+    'showcase_saved',
+    'Showcase saved',
     sk.name,
     n.name,
     sc.user_id::text
@@ -107,6 +141,26 @@ events as (
   join names n on n.id = sc.user_id
   cross join win w
   where sc.created_at >= w.since
+
+  union all
+
+  select
+    us.created_at,
+    'skills',
+    'profile_skill_added',
+    'Skill added to profile',
+    concat_ws(
+      ' · ',
+      sn.name,
+      case when us.kind = 'teach' then 'teaching' else 'learning' end
+    ),
+    coalesce(n.name, 'Unknown'),
+    us.user_id::text
+  from public.user_skills us
+  join public.skill_nodes sn on sn.id = us.skill_id
+  left join names n on n.id = us.user_id
+  cross join win w
+  where us.created_at >= w.since
 
   union all
 
@@ -179,6 +233,40 @@ events as (
   union all
 
   select
+    c.requester_cleared_at,
+    'requests',
+    'conversation_cleared',
+    'Conversation cleared',
+    concat_ws(' · ', nullif(c.skill_name, ''), 'with ' || recip.name),
+    req.name,
+    c.id::text
+  from public.connections c
+  join names req on req.id = c.requester_id
+  join names recip on recip.id = c.recipient_id
+  cross join win w
+  where c.requester_cleared_at is not null
+    and c.requester_cleared_at >= w.since
+
+  union all
+
+  select
+    c.recipient_cleared_at,
+    'requests',
+    'conversation_cleared',
+    'Conversation cleared',
+    concat_ws(' · ', nullif(c.skill_name, ''), 'with ' || req.name),
+    recip.name,
+    c.id::text
+  from public.connections c
+  join names req on req.id = c.requester_id
+  join names recip on recip.id = c.recipient_id
+  cross join win w
+  where c.recipient_cleared_at is not null
+    and c.recipient_cleared_at >= w.since
+
+  union all
+
+  select
     m.created_at,
     'chats',
     'chat_started',
@@ -197,6 +285,75 @@ events as (
       where pm.connection_id = m.connection_id
         and pm.created_at < m.created_at
     )
+
+  union all
+
+  select
+    m.created_at,
+    'chats',
+    'message_sent',
+    'Message sent',
+    nullif(c.skill_name, ''),
+    coalesce(n.name, 'Unknown'),
+    c.id::text
+  from public.messages m
+  join public.connections c on c.id = m.connection_id
+  left join names n on n.id = m.sender_id
+  cross join win w
+  where m.created_at >= w.since
+
+  union all
+
+  select
+    m.edited_at,
+    'chats',
+    'message_edited',
+    'Message edited',
+    nullif(c.skill_name, ''),
+    coalesce(n.name, 'Unknown'),
+    c.id::text
+  from public.messages m
+  join public.connections c on c.id = m.connection_id
+  left join names n on n.id = m.sender_id
+  cross join win w
+  where m.edited_at is not null
+    and m.edited_at >= w.since
+
+  union all
+
+  select
+    m.deleted_at,
+    'chats',
+    'message_deleted',
+    'Message deleted',
+    nullif(c.skill_name, ''),
+    coalesce(n.name, 'Unknown'),
+    c.id::text
+  from public.messages m
+  join public.connections c on c.id = m.connection_id
+  left join names n on n.id = m.sender_id
+  cross join win w
+  where m.deleted_at is not null
+    and m.deleted_at >= w.since
+
+  union all
+
+  select
+    f.created_at,
+    'chats',
+    'feedback_submitted',
+    'Feedback submitted',
+    concat_ws(
+      ' · ',
+      'Clarity ' || f.clarity_of_instruction,
+      'Reliability ' || f.reliability
+    ),
+    coalesce(n.name, 'Unknown'),
+    f.connection_id::text
+  from public.feedback f
+  left join names n on n.id = f.rater_id
+  cross join win w
+  where f.created_at >= w.since
 
   union all
 
@@ -249,6 +406,22 @@ events as (
   join names bl on bl.id = b.blocked_id
   cross join win w
   where b.created_at >= w.since
+
+  union all
+
+  select
+    ma.created_at,
+    'safety',
+    'moderation_' || ma.action,
+    'Moderation: ' || ma.action,
+    nullif(ma.reason, ''),
+    coalesce(n.name, 'Unnamed'),
+    ma.user_id::text
+  from public.moderation_actions ma
+  left join names n on n.id = ma.user_id
+  cross join win w
+  where ma.created_at >= w.since
+    and ma.action <> 'pass'
 )
 select jsonb_build_object(
   'days', (select n from win),
@@ -262,13 +435,24 @@ select jsonb_build_object(
       group by category
     ) q
   ), '[]'::jsonb),
+  'kinds', coalesce((
+    select jsonb_agg(
+      jsonb_build_object('category', category, 'kind', kind, 'count', n)
+      order by category, kind
+    )
+    from (
+      select category, kind, count(*)::int as n
+      from events
+      group by category, kind
+    ) q
+  ), '[]'::jsonb),
   'events', coalesce((
     select jsonb_agg(to_jsonb(e) order by e.occurred_at desc)
     from (
       select *
       from events
       order by occurred_at desc
-      limit 200
+      limit 500
     ) e
   ), '[]'::jsonb)
 );

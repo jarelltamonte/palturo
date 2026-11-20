@@ -24,6 +24,7 @@ class UpdateService with WidgetsBindingObserver {
 
   bool _started = false;
   bool _checking = false;
+  Timer? _timer;
 
   void start() {
     if (!kIsWeb || _started) return;
@@ -31,6 +32,16 @@ class UpdateService with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // First run only records the current build; it must not prompt.
     unawaited(check(prompt: false));
+    // A tab can stay open across a deploy without ever resuming. Poll while the
+    // app is alive so the update prompt is not tied to a lifecycle event.
+    _timer = Timer.periodic(const Duration(minutes: 5), (_) {
+      unawaited(check());
+    });
+  }
+
+  void stop() {
+    _timer?.cancel();
+    _timer = null;
   }
 
   @override
@@ -76,7 +87,7 @@ class UpdateService with WidgetsBindingObserver {
       'A new version of PalTuro is available.',
       actionLabel: 'Update',
       onAction: reloadApp,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 30),
     );
   }
 }

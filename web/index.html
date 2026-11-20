@@ -114,6 +114,29 @@
       document.body.style.background = "transparent";
     }
   </script>
+  <script id="fresh-build-script">
+    // Flutter web can keep an old bundle alive through an installed service
+    // worker or CacheStorage. Drop both before the engine boots so a deployed
+    // build is never masked by a previous one.
+    (function () {
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) {
+              reg.unregister();
+            });
+          });
+        }
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (keys) {
+            keys.forEach(function (key) {
+              caches.delete(key);
+            });
+          });
+        }
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body>
   <picture id="splash-branding">

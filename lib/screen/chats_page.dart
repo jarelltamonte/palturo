@@ -783,19 +783,13 @@ class _ChatsPageState extends State<ChatsPage> {
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
               if (showMatchesSection) ...[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 16.0),
-                    child: Text(
-                      'Quick access to Pals',
-                      style: AppTextStyles.boldText.copyWith(color: textTheme),
-                    ),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                const SliverToBoxAdapter(child: SizedBox(height: 4)),
                 SliverToBoxAdapter(
                   child: SizedBox(
-                    height: 160,
+                    height:
+                        MediaQuery.textScalerOf(context).scale(12) > 16
+                            ? 132
+                            : 108,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -916,36 +910,33 @@ class MatchesShortcutItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+      child: SizedBox(
+        width: 84,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 100,
-              height: 120,
-              decoration: BoxDecoration(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
+                shape: BoxShape.circle,
               ),
               child: const Icon(
                 CupertinoIcons.person_3_fill,
                 color: AppColors.black,
-                size: 36,
+                size: 30,
               ),
             ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 100,
-              child: Text(
-                'View all',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                  fontSize: 16,
-                ),
+            const SizedBox(height: 6),
+            Text(
+              'View all',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 12,
               ),
             ),
           ],
@@ -974,31 +965,21 @@ class ChatProfileItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+      child: SizedBox(
+        width: 84,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            UserAvatar(
-              name: name,
-              image: avatarImage,
-              size: 100,
-              height: 120,
-              circular: false,
-              borderRadius: 12,
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 100,
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.regularText.copyWith(
-                  color: textTheme,
-                  fontSize: 16,
-                ),
+            UserAvatar(name: name, image: avatarImage, size: 72),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme,
+                fontSize: 12,
               ),
             ),
           ],

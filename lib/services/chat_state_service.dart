@@ -14,17 +14,27 @@ bool isMuteActive(DateTime? mutedUntil, {DateTime? now}) {
   return mutedUntil.isAfter(now ?? DateTime.now());
 }
 
-/// Orders the Chats list by the newest message. New Pals (no messages) sit
-/// below every started conversation and keep their incoming order.
+/// Orders the Chats list by the newest activity: the last message for a
+/// started chat, or the match time for a new Pal with no messages yet.
+///
+/// A fresh match is a new conversation, so it starts at the top and then
+/// slides down as other chats receive messages. Rows with no known timestamp
+/// stay at the bottom in their incoming order.
 @visibleForTesting
 void sortConversationsByRecency(List<ConversationLite> list) {
-  final withMessages = list.where((c) => c.lastAt != null).toList();
-  final newPals = list.where((c) => c.lastAt == null).toList();
-  withMessages.sort((a, b) => b.lastAt!.compareTo(a.lastAt!));
+  final indexed = list.indexed.toList();
+  indexed.sort((a, b) {
+    final aAt = a.$2.lastAt;
+    final bAt = b.$2.lastAt;
+    if (aAt == null && bAt == null) return a.$1.compareTo(b.$1);
+    if (aAt == null) return 1;
+    if (bAt == null) return -1;
+    final byTime = bAt.compareTo(aAt);
+    return byTime != 0 ? byTime : a.$1.compareTo(b.$1);
+  });
   list
     ..clear()
-    ..addAll(withMessages)
-    ..addAll(newPals);
+    ..addAll(indexed.map((entry) => entry.$2));
 }
 
 class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
@@ -46,6 +56,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
   StreamSubscription<AuthState>? _authSubscription;
   Timer? _midnightTimer;
   Timer? _resubscribeTimer;
+  Timer? _connectionRefreshTimer;
   int _resubscribeAttempts = 0;
   DateTime? _lastHeartbeat;
   Timer? _refreshTimer;
@@ -265,6 +276,12 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
           table: 'profile_presence',
           callback: _handleRealtimePresence,
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'connections',
+          callback: _handleRealtimeConnection,
+        )
         .subscribe((status, error) {
           if (status == RealtimeSubscribeStatus.subscribed) {
             _realtimeSubscribed = true;
@@ -301,6 +318,31 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
       changed = true;
     }
     if (changed) notifyListeners();
+  }
+
+  /// A new accepted connection is a new conversation. Reload so it enters the
+  /// Chats list at its match time instead of waiting for the next poll.
+  void _handleRealtimeConnection(PostgresChangePayload payload) {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+    final record =
+        payload.eventType == PostgresChangeEvent.delete
+            ? payload.oldRecord
+            : payload.newRecord;
+    final requester = record['requester_id']?.toString();
+    final recipient = record['recipient_id']?.toString();
+    // Realtime only delivers rows this user may read, but an update payload
+    // may omit unchanged participant columns.
+    if (requester != null &&
+        recipient != null &&
+        requester != uid &&
+        recipient != uid) {
+      return;
+    }
+    _connectionRefreshTimer?.cancel();
+    _connectionRefreshTimer = Timer(const Duration(milliseconds: 250), () {
+      unawaited(loadConversations(showSpinner: false));
+    });
   }
 
   void _handleRealtimeMessage(PostgresChangePayload payload) {
@@ -341,7 +383,10 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
           unread: newUnread,
         );
         _conversations.removeAt(index);
-        _conversations.insert(0, updated);
+        _conversations.add(updated);
+        // A message always outranks the match time, but sorting keeps the
+        // list honest when timestamps arrive out of order.
+        _sortConversations(_conversations);
         notifyListeners();
         if (!isMine && !isRoomActiveAndResumed) {
           _emitIncoming(updated, body, createdAt);
@@ -533,6 +578,8 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _refreshTimer = null;
     _resubscribeTimer?.cancel();
     _resubscribeTimer = null;
+    _connectionRefreshTimer?.cancel();
+    _connectionRefreshTimer = null;
     _resubscribeAttempts = 0;
     _realtimeSubscribed = false;
     if (_realtimeChannel != null) {
@@ -566,6 +613,7 @@ class ChatStateService extends ChangeNotifier with WidgetsBindingObserver {
     _midnightTimer?.cancel();
     _resubscribeTimer?.cancel();
     _refreshTimer?.cancel();
+    _connectionRefreshTimer?.cancel();
     ChatPrivacyService.instance.removeListener(_onPrivacyChanged);
     _realtimeSubscribed = false;
     _messageEvents.close();

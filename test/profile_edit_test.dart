@@ -190,7 +190,7 @@ void main() {
           final border = decoration.border;
           return border is Border && border.top.width == 3;
         }).toList();
-    expect(slots, hasLength(3));
+    expect(slots, hasLength(1));
     for (final slot in slots) {
       final color = (slot.decoration as BoxDecoration).color;
       expect(color, AppColors.mutedSurface(context));
@@ -201,7 +201,7 @@ void main() {
             .widgetList<Icon>(find.byIcon(Icons.add))
             .where((icon) => icon.size == 32)
             .toList();
-    expect(addIcons, hasLength(3));
+    expect(addIcons, hasLength(1));
     for (final icon in addIcons) {
       expect(icon.color, AppColors.mutedText(context));
     }
@@ -212,7 +212,10 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await pumpEdit(tester);
     expect(find.text('PROFILE PHOTOS'), findsOneWidget);
-    expect(find.textContaining('Changing role hides skills'), findsOneWidget);
+    expect(
+      find.textContaining('Your role updates with your skills'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -462,22 +465,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('role change preview keeps hidden skill counts', (tester) async {
+  testWidgets('saving derives the mentor role from a teaching skill', (
+    tester,
+  ) async {
+    final service = _CapturingProfileService();
+    await pumpEdit(
+      tester,
+      service: service,
+      data: profile().copyWith(
+        role: OnboardingRole.learn,
+        learningSkillIds: const [],
+        learningNotes: const {},
+      ),
+    );
+
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, 'Updated bio');
+    await tester.pump();
+    await tester.tap(find.text('Save').first);
+    await tester.pumpAndSettle();
+
+    expect(service.captured?.role, OnboardingRole.teach);
+    expect(service.captured?.teachingSkillIds, isNotEmpty);
+    expect(service.captured?.learningSkillIds, isEmpty);
+  });
+
+  testWidgets('preview shows the role derived from the selected skills', (
+    tester,
+  ) async {
     await pumpEdit(tester);
 
-    final teachRole = find.byWidgetPredicate(
-      (widget) =>
-          widget is RichText &&
-          widget.text.toPlainText().contains('I want to\nteach'),
-    );
-    await tester.ensureVisible(teachRole);
-    await tester.tap(teachRole);
-    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Preview profile'));
     await tester.pumpAndSettle();
 
     expect(find.text('Profile preview'), findsOneWidget);
     expect(find.text('1 selected'), findsNWidgets(2));
-    expect(find.text('Mentor'), findsOneWidget);
+    expect(find.text('Learner & Mentor'), findsOneWidget);
   });
 }

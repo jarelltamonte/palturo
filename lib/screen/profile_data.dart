@@ -47,7 +47,7 @@ class ProfileData {
     required this.schedule,
     this.availableDays = const [],
     this.avatarUrl,
-    this.photos = const [null, null, null],
+    this.photos = const [null],
     this.bio = '',
     this.languages = const [],
     this.interests = const [],
@@ -79,6 +79,16 @@ class ProfileData {
 
   bool get hasAnySkill =>
       learningSkillIds.isNotEmpty || teachingSkillIds.isNotEmpty;
+
+  /// The role implied by the current skills, or null when there are none.
+  OnboardingRole? get derivedRole => roleForSkills(
+    hasLearning: learningSkillIds.isNotEmpty,
+    hasTeaching: teachingSkillIds.isNotEmpty,
+  );
+
+  /// Role used across the app: skills win once they exist, and the stored
+  /// role only matters for a profile that has not picked a skill yet.
+  OnboardingRole? get effectiveRole => hasAnySkill ? derivedRole : role;
 
   /// True when For You should show the setup checklist instead of looking for
   /// matches: no role chosen, or no skill picked on either side.
@@ -190,16 +200,26 @@ class ProfileData {
     final formattedSchedule = formatScheduleDays(parsedDays);
 
     final rawPhotos = map['photos'] as List<dynamic>?;
-    List<String?> parsedPhotos = [null, null, null];
+    // One profile photo. Older rows may still hold three; keep the main one.
+    final parsedPhotos = <String?>[null];
     if (rawPhotos != null && rawPhotos.isNotEmpty) {
-      for (int i = 0; i < 3; i++) {
-        if (i < rawPhotos.length && rawPhotos[i] != null) {
-          parsedPhotos[i] = rawPhotos[i].toString();
-        }
-      }
-    } else if (map['avatar_url'] != null) {
+      final main = rawPhotos.first;
+      if (main != null) parsedPhotos[0] = main.toString();
+    }
+    if (parsedPhotos[0] == null && map['avatar_url'] != null) {
       parsedPhotos[0] = map['avatar_url'] as String;
     }
+
+    final learningSkills = _stringList(map['learning_skills']);
+    final teachingSkills = _stringList(map['teaching_skills']);
+    final storedRole = parsedRole;
+    final resolvedRole =
+        learningSkills.isNotEmpty || teachingSkills.isNotEmpty
+            ? roleForSkills(
+              hasLearning: learningSkills.isNotEmpty,
+              hasTeaching: teachingSkills.isNotEmpty,
+            )
+            : storedRole;
 
     final rawSkillImages = map['teaching_skill_images'];
     Map<String, String> parsedSkillImages = {};
@@ -232,9 +252,9 @@ class ProfileData {
       languages: _stringList(map['languages']),
       interests: _stringList(map['learning_styles']),
       teachingStyles: _stringList(map['teaching_styles']),
-      role: parsedRole,
-      learningSkillIds: _stringList(map['learning_skills']),
-      teachingSkillIds: _stringList(map['teaching_skills']),
+      role: resolvedRole,
+      learningSkillIds: learningSkills,
+      teachingSkillIds: teachingSkills,
       teachingSkillImages: parsedSkillImages,
       hasCompletedOnboarding: map['has_completed_onboarding'] as bool? ?? false,
       isProfileCompleted: map['is_profile_completed'] as bool? ?? false,

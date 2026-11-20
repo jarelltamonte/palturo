@@ -219,7 +219,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _openEdit() async {
+  Future<void> _openEdit({bool startAtSkills = false}) async {
     final profile = _profile;
     if (profile == null || _openingEditor) return;
 
@@ -227,7 +227,13 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final updated = await Navigator.push<ProfileData>(
         context,
-        MaterialPageRoute(builder: (_) => ProfileEditPage(profile: profile)),
+        MaterialPageRoute(
+          builder:
+              (_) => ProfileEditPage(
+                profile: profile,
+                startAtSkills: startAtSkills,
+              ),
+        ),
       );
 
       if (!mounted) return;
@@ -253,10 +259,11 @@ class _ProfilePageState extends State<ProfilePage> {
     PersonRole role;
     String skillName;
 
-    if (profile.role == OnboardingRole.teach) {
+    final effectiveRole = profile.effectiveRole;
+    if (effectiveRole == OnboardingRole.teach) {
       role = PersonRole.mentor;
       skillName = teachId == null ? '' : _skillLabel(teachId, kTeachingOptions);
-    } else if (profile.role == OnboardingRole.learn) {
+    } else if (effectiveRole == OnboardingRole.learn) {
       role = PersonRole.learner;
       skillName = learnId == null ? '' : _skillLabel(learnId, kLearningOptions);
     } else if (learnId != null) {
@@ -337,10 +344,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
     final profile = _profile;
+    final effectiveRole = profile?.effectiveRole;
     final wantsTeaching =
-        profile != null &&
-        (profile.role == OnboardingRole.teach ||
-            profile.role == OnboardingRole.both);
+        effectiveRole == OnboardingRole.teach ||
+        effectiveRole == OnboardingRole.both;
     final missingShowcaseLabels =
         profile == null
             ? const <String>[]
@@ -515,35 +522,49 @@ class _ProfilePageState extends State<ProfilePage> {
                               thickness: 1,
                             ),
                             const SizedBox(height: 16),
-                            Text(
-                              'Role',
-                              style: AppTextStyles.regularText.copyWith(
-                                color: AppColors.mutedText(context),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Skills',
+                                    style: AppTextStyles.regularText.copyWith(
+                                      color: AppColors.mutedText(context),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Semantics(
+                                  container: true,
+                                  button: true,
+                                  label: 'Edit skills',
+                                  child: IconButton(
+                                    tooltip: 'Edit skills',
+                                    onPressed:
+                                        () => _openEdit(startAtSkills: true),
+                                    icon: Icon(
+                                      Icons.edit_outlined,
+                                      size: 20,
+                                      color: AppColors.accentText(context),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 6),
-                            _RoleSummary(role: _profile!.role),
+                            SkillsCard.toLearn(
+                              isEditing: false,
+                              initialSkillIds: _profile!.learningSkillIds,
+                              notes: _profile!.learningNotes,
+                              onAddSkills: () => _openEdit(startAtSkills: true),
+                            ),
                             const SizedBox(height: 24),
-                            if (_profile!.role == OnboardingRole.learn ||
-                                _profile!.role == OnboardingRole.both) ...[
-                              SkillsCard.toLearn(
-                                isEditing: false,
-                                initialSkillIds: _profile!.learningSkillIds,
-                                notes: _profile!.learningNotes,
-                                onAddSkills: _openEdit,
-                              ),
-                              const SizedBox(height: 24),
-                            ],
-                            if (_profile!.role == OnboardingRole.teach ||
-                                _profile!.role == OnboardingRole.both)
-                              SkillsCard.toTeach(
-                                isEditing: false,
-                                initialSkillIds: _profile!.teachingSkillIds,
-                                notes: _profile!.teachingNotes,
-                                onAddSkills: _openEdit,
-                              ),
+                            SkillsCard.toTeach(
+                              isEditing: false,
+                              initialSkillIds: _profile!.teachingSkillIds,
+                              notes: _profile!.teachingNotes,
+                              onAddSkills: () => _openEdit(startAtSkills: true),
+                            ),
                           ],
                         ),
                       ),
@@ -668,6 +689,21 @@ class ProfileSummaryCard extends StatelessWidget {
             const SizedBox(height: 16),
             Divider(color: textColor.withValues(alpha: 0.2)),
             const SizedBox(height: 12),
+            if (profile.bio.trim().isNotEmpty) ...[
+              Text(
+                profile.bio.trim(),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor.withValues(alpha: 0.85),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            _RoleSummary(role: profile.effectiveRole),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Icon(Icons.translate, size: 18, color: textColor),
@@ -691,8 +727,8 @@ class ProfileSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
-            if ((profile.role == OnboardingRole.teach ||
-                    profile.role == OnboardingRole.both) &&
+            if ((profile.effectiveRole == OnboardingRole.teach ||
+                    profile.effectiveRole == OnboardingRole.both) &&
                 profile.teachingStyles.isNotEmpty) ...[
               const SizedBox(height: 10),
               Row(
@@ -727,18 +763,12 @@ class _RoleSummary extends StatelessWidget {
     final chips = <Widget>[];
     if (role == OnboardingRole.learn || role == OnboardingRole.both) {
       chips.add(
-        _RoleChip(
-          svgAsset: 'assets/icons/rlearner.svg',
-          label: role == OnboardingRole.both ? 'Learner' : 'I want to learn',
-        ),
+        _RoleChip(svgAsset: 'assets/icons/rlearner.svg', label: 'Learner'),
       );
     }
     if (role == OnboardingRole.teach || role == OnboardingRole.both) {
       chips.add(
-        _RoleChip(
-          svgAsset: 'assets/icons/rmentor.svg',
-          label: role == OnboardingRole.both ? 'Mentor' : 'I want to teach',
-        ),
+        _RoleChip(svgAsset: 'assets/icons/rmentor.svg', label: 'Mentor'),
       );
     }
     if (chips.isEmpty) {
@@ -779,11 +809,15 @@ class _RoleChip extends StatelessWidget {
           else
             Icon(icon, size: 16, color: iconColor),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppTextStyles.boldText.copyWith(
-              color: AppColors.black,
-              fontSize: 13,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.boldText.copyWith(
+                color: AppColors.black,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

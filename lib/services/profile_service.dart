@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_models.dart'
-    show OnboardingRole, OnboardingRoleDb;
+    show OnboardingRole, OnboardingRoleDb, roleForSkills;
 import 'package:palturo/screen/profile_data.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/skill_options.dart'
@@ -480,11 +480,19 @@ class ProfileService {
       // Completion is best-effort; a read failure must not block onboarding.
     }
 
-    final hasRoleSkills = switch (controller.role) {
+    final resolvedRole =
+        roleForSkills(
+          hasLearning: resolvedLearning.isNotEmpty,
+          hasTeaching: resolvedTeaching.isNotEmpty,
+        ) ??
+        controller.role;
+
+    final hasRoleSkills = switch (resolvedRole) {
       OnboardingRole.teach => resolvedTeaching.isNotEmpty,
       OnboardingRole.both =>
         resolvedLearning.isNotEmpty || resolvedTeaching.isNotEmpty,
-      _ => resolvedLearning.isNotEmpty,
+      OnboardingRole.learn => resolvedLearning.isNotEmpty,
+      null => false,
     };
 
     final existingShowcase = existingProfile?['teaching_skill_images'];
@@ -502,11 +510,11 @@ class ProfileService {
           languages: controller.languages.toList(),
           learningStyles: controller.learningStyles.toList(),
           teachingStyles: controller.teachingStyles.toList(),
-          role: controller.role,
+          role: resolvedRole,
           hasRoleSkills: hasRoleSkills,
           hasShowcase:
-              !(controller.role == OnboardingRole.teach ||
-                  (controller.role == OnboardingRole.both &&
+              !(resolvedRole == OnboardingRole.teach ||
+                  (resolvedRole == OnboardingRole.both &&
                       resolvedTeaching.isNotEmpty)) ||
               hasExistingShowcase,
         );
@@ -522,7 +530,7 @@ class ProfileService {
           await _supabase
               .from('profiles')
               .update({
-                'role': controller.role?.dbValue ?? 'learner',
+                'role': resolvedRole?.dbValue ?? 'learner',
                 'learning_styles': controller.learningStyles.toList(),
                 'teaching_styles': controller.teachingStyles.toList(),
                 'languages': controller.languages.toList(),

@@ -1,5 +1,28 @@
 enum OnboardingRole { learn, teach, both }
 
+/// Role follows the skills a profile actually has.
+///
+/// The role picker only seeds setup. Afterwards a teaching skill means mentor,
+/// a learning skill means learner, both means both, and removing the last skill
+/// of a kind removes that role. A profile with no skills has no derived role.
+OnboardingRole? roleForSkills({
+  required bool hasLearning,
+  required bool hasTeaching,
+}) {
+  if (hasLearning && hasTeaching) return OnboardingRole.both;
+  if (hasTeaching) return OnboardingRole.teach;
+  if (hasLearning) return OnboardingRole.learn;
+  return null;
+}
+
+extension OnboardingRoleLabel on OnboardingRole {
+  String get displayLabel => switch (this) {
+    OnboardingRole.learn => 'Learner',
+    OnboardingRole.teach => 'Mentor',
+    OnboardingRole.both => 'Learner and Mentor',
+  };
+}
+
 /// DB <-> UI mapping: the profiles.role column enum is (learner, mentor, both)
 /// while the UI enum historically uses learn/teach. Keep one conversion point.
 extension OnboardingRoleDb on OnboardingRole {

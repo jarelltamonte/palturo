@@ -39,9 +39,10 @@ class ProfileCompletion {
 }
 
 ProfileCompletion computeProfileCompletion(ProfileData profile) {
+  final effectiveRole = profile.effectiveRole;
   final wantsTeaching =
-      profile.role == OnboardingRole.teach ||
-      profile.role == OnboardingRole.both;
+      effectiveRole == OnboardingRole.teach ||
+      effectiveRole == OnboardingRole.both;
 
   final hasPhoto =
       profile.avatarUrl?.trim().isNotEmpty == true ||
@@ -71,8 +72,9 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
     ),
     ProfileCompletionItem(
       label: 'Role and skills',
-      detail: 'Choose whether you learn, teach, or both, then add a skill.',
-      complete: profile.role != null && profile.hasAnySkill,
+      detail:
+          'Add a learning or teaching skill. Your role follows automatically.',
+      complete: profile.hasAnySkill,
       weight: 3,
     ),
     ProfileCompletionItem(

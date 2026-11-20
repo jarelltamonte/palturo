@@ -10,7 +10,6 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/models/profile_completion.dart';
-import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
     show
@@ -37,12 +36,16 @@ const kBioMaxLength = 100;
 class ProfileEditPage extends StatefulWidget {
   final ProfileData profile;
 
+  /// Open with the Skills section at the top (Profile page shortcut).
+  final bool startAtSkills;
+
   /// Injectable for tests; production builds use the Supabase-backed service.
   final ProfileService? profileService;
 
   const ProfileEditPage({
     super.key,
     required this.profile,
+    this.startAtSkills = false,
     this.profileService,
   });
 
@@ -74,9 +77,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late List<String> _languages;
   late List<String> _learningStyles;
   late List<String> _teachingStyles;
-  List<String?> _photos = [null, null, null];
+  List<String?> _photos = [null];
 
-  OnboardingRole? _role;
   late List<String> _learningSkillIds;
   late List<String> _teachingSkillIds;
   late Map<String, String> _learningNotes;
@@ -87,20 +89,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   final Set<String> _changedTeachingNotes = {};
   final GlobalKey _teachingSkillsKey = GlobalKey();
   final GlobalKey _learningSkillsKey = GlobalKey();
-
-  static const _roleOptions = [
-    RoleOption(
-      OnboardingRole.learn,
-      'assets/icons/rlearner.svg',
-      'I want to\nlearn',
-    ),
-    RoleOption(
-      OnboardingRole.teach,
-      'assets/icons/rmentor.svg',
-      'I want to\nteach',
-    ),
-    RoleOption(OnboardingRole.both, 'assets/icons/rboth.svg', 'I can do\nboth'),
-  ];
+  final GlobalKey _skillsSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -119,7 +108,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _languages = List.from(widget.profile.languages);
     _learningStyles = List.from(widget.profile.interests);
     _teachingStyles = List.from(widget.profile.teachingStyles);
-    _role = widget.profile.role;
     _learningSkillIds = List.from(widget.profile.learningSkillIds);
     _teachingSkillIds = List.from(widget.profile.teachingSkillIds);
     _learningNotes = Map<String, String>.from(widget.profile.learningNotes);
@@ -130,10 +118,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _initialTeachingNotes = Map<String, String>.from(
       widget.profile.teachingNotes,
     );
-    _photos = List.from(widget.profile.photos);
+    _photos = [
+      widget.profile.photos.isNotEmpty ? widget.profile.photos.first : null,
+    ];
     _teachingSkillImages = Map<String, String>.from(
       widget.profile.teachingSkillImages,
     );
+    if (widget.startAtSkills) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSkills());
+    }
   }
 
   @override
@@ -259,7 +252,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       return true;
     }
     if (_gender != widget.profile.gender) return true;
-    if (_role != widget.profile.role) return true;
     if (!setEquals(_availability.keys.toSet(), initialAvail.keys.toSet())) {
       return true;
     }
@@ -381,12 +373,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   bool get _needsShowcaseReminder =>
-      _isTeachingRole &&
-      _teachingSkillIds.isNotEmpty &&
-      !_hasAnyShowcase(_teachingSkillImages);
+      _teachingSkillIds.isNotEmpty && !_hasAnyShowcase(_teachingSkillImages);
 
-  bool get _isTeachingRole =>
-      _role == OnboardingRole.teach || _role == OnboardingRole.both;
+  OnboardingRole? get _derivedRole => roleForSkills(
+    hasLearning: _learningSkillIds.isNotEmpty,
+    hasTeaching: _teachingSkillIds.isNotEmpty,
+  );
 
   bool _hasAnyShowcase(Map<String, String> images) =>
       images.values.any((value) => value.trim().isNotEmpty);
@@ -400,7 +392,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }) async {
     final teaching = skills ?? _teachingSkillIds;
     final media = images ?? _teachingSkillImages;
-    if (!_isTeachingRole || teaching.isEmpty || _hasAnyShowcase(media)) {
+    if (teaching.isEmpty || _hasAnyShowcase(media)) {
       return true;
     }
 
@@ -435,6 +427,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (target == null) return;
     await Scrollable.ensureVisible(
       target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  Future<void> _scrollToSkills() async {
+    final target = _skillsSectionKey.currentContext;
+    if (target == null) return;
+    await Scrollable.ensureVisible(
+      target,
+      alignment: 0,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeInOut,
     );
@@ -802,8 +805,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       languages: _languages,
       interests: _learningStyles,
       teachingStyles: _teachingStyles,
-      role: _role,
-      photos: _photos,
+      role: _derivedRole,
+      photos: [_photos.isNotEmpty ? _photos.first : null],
       learningSkillIds: _learningSkillIds,
       teachingSkillIds: _teachingSkillIds,
       learningNotes: _learningNotes,
@@ -1010,8 +1013,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       languages: _languages,
       interests: _learningStyles,
       teachingStyles: _teachingStyles,
-      role: _role,
-      photos: _photos,
+      role: roleForSkills(
+        hasLearning: learningSkills.isNotEmpty,
+        hasTeaching: teachingSkills.isNotEmpty,
+      ),
+      photos: [_photos.isNotEmpty ? _photos.first : null],
       learningSkillIds: learningSkills,
       teachingSkillIds: teachingSkills,
       learningNotes: _learningNotes,
@@ -1088,8 +1094,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final hasChanges = _hasUnsavedChanges();
     final canSave = hasChanges && !_isSaving;
     final needsShowcaseReminder = _needsShowcaseReminder;
-    final wantsTeaching =
-        _role == OnboardingRole.teach || _role == OnboardingRole.both;
+    final wantsTeaching = _teachingSkillIds.isNotEmpty;
     final hasAnyShowcase = _teachingSkillImages.values.any(
       (value) => value.trim().isNotEmpty,
     );
@@ -1109,7 +1114,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         (wantsTeaching && _teachingStyles.isEmpty);
     final privateNeedsCompletion =
         _ageController.text.trim().isEmpty || _gender == null;
-    final roleNeedsCompletion = _role == null;
     final skillsNeedCompletion =
         (_learningSkillIds.isEmpty && _teachingSkillIds.isEmpty) ||
         completion.missing.any((item) => item.label == 'Skill notes');
@@ -1236,18 +1240,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'The main photo appears on your profile and cards.',
-                      style: AppTextStyles.regularText.copyWith(
-                        color: AppColors.mutedText(context),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _ProfileSectionHeader(
@@ -1349,27 +1342,25 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                     ),
                               ),
                         ),
-                        if (_role == OnboardingRole.teach ||
-                            _role == OnboardingRole.both) ...[
-                          const SizedBox(height: 12),
-                          _DropdownInfoField(
-                            icon: Icons.school_outlined,
-                            label: 'Teaching Style',
-                            value: _teachingStyles.join(', '),
-                            hint: 'Tap to set teaching styles',
-                            needsAttention: _teachingStyles.isEmpty,
-                            onTap:
-                                () => _pickMultiSelect(
-                                  title: 'Teaching Style',
-                                  options: kTeachingStyleOptions,
-                                  selected: _teachingStyles,
-                                  onSaved:
-                                      (result) => setState(
-                                        () => _teachingStyles = result,
-                                      ),
-                                ),
-                          ),
-                        ],
+                        const SizedBox(height: 12),
+                        _DropdownInfoField(
+                          icon: Icons.school_outlined,
+                          label: 'Teaching Style',
+                          value: _teachingStyles.join(', '),
+                          hint: 'Tap to set teaching styles',
+                          needsAttention:
+                              wantsTeaching && _teachingStyles.isEmpty,
+                          onTap:
+                              () => _pickMultiSelect(
+                                title: 'Teaching Style',
+                                options: kTeachingStyleOptions,
+                                selected: _teachingStyles,
+                                onSaved:
+                                    (result) => setState(
+                                      () => _teachingStyles = result,
+                                    ),
+                              ),
+                        ),
                       ],
                     ),
                   ),
@@ -1463,135 +1454,133 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _ProfileSectionHeader(
-                          title: 'Role',
-                          needsAttention: roleNeedsCompletion,
-                        ),
-                        const SizedBox(height: 10),
-                        RoleCardGroup(
-                          options: _roleOptions,
-                          selected: _role,
-                          isEditing: true,
-                          onSelect: (role) => setState(() => _role = role),
+                        KeyedSubtree(
+                          key: _skillsSectionKey,
+                          child: _ProfileSectionHeader(
+                            title: 'Skills',
+                            needsAttention: skillsNeedCompletion,
+                          ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Changing role hides skills; it does not delete them.',
-                          style: AppTextStyles.regularText.copyWith(
-                            color: AppColors.mutedText(context),
-                            fontSize: 12,
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.badge_outlined,
+                              size: 16,
+                              color: AppColors.accentText(context),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _derivedRole == null
+                                    ? 'Add a skill to set your role.'
+                                    : 'You appear as '
+                                        '${_derivedRole!.displayLabel}. '
+                                        'Your role updates with your skills.',
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: AppColors.mutedText(context),
+                                  fontSize: 12,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        KeyedSubtree(
+                          key: _learningSkillsKey,
+                          child: SkillsCard.toLearn(
+                            isEditing: true,
+                            initialSkillIds: _learningSkillIds,
+                            notes: _learningNotes,
+                            onChanged:
+                                (updatedIds) => setState(
+                                  () => _learningSkillIds = updatedIds,
+                                ),
+                            onNoteChanged: (id, note) {
+                              setState(() {
+                                if (note.trim().isEmpty) {
+                                  _learningNotes.remove(id);
+                                } else {
+                                  _learningNotes[id] = note;
+                                }
+                                final initial = _initialLearningNotes[id] ?? '';
+                                final current = _learningNotes[id] ?? '';
+                                if (current.trim() == initial.trim()) {
+                                  _changedLearningNotes.remove(id);
+                                } else {
+                                  _changedLearningNotes.add(id);
+                                }
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(height: 24),
-                        _ProfileSectionHeader(
-                          title: 'Skills',
-                          needsAttention: skillsNeedCompletion,
-                        ),
-                        const SizedBox(height: 12),
-                        if (_role == OnboardingRole.learn ||
-                            _role == OnboardingRole.both) ...[
-                          KeyedSubtree(
-                            key: _learningSkillsKey,
-                            child: SkillsCard.toLearn(
-                              isEditing: true,
-                              initialSkillIds: _learningSkillIds,
-                              notes: _learningNotes,
-                              onChanged:
-                                  (updatedIds) => setState(
-                                    () => _learningSkillIds = updatedIds,
-                                  ),
-                              onNoteChanged: (id, note) {
-                                setState(() {
-                                  if (note.trim().isEmpty) {
-                                    _learningNotes.remove(id);
-                                  } else {
-                                    _learningNotes[id] = note;
-                                  }
-                                  final initial =
-                                      _initialLearningNotes[id] ?? '';
-                                  final current = _learningNotes[id] ?? '';
-                                  if (current.trim() == initial.trim()) {
-                                    _changedLearningNotes.remove(id);
-                                  } else {
-                                    _changedLearningNotes.add(id);
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                        if (_role == OnboardingRole.teach ||
-                            _role == OnboardingRole.both)
-                          KeyedSubtree(
-                            key: _teachingSkillsKey,
-                            child: SkillsCard.toTeach(
-                              isEditing: true,
-                              initialSkillIds: _teachingSkillIds,
-                              attachments: _teachingSkillImages,
-                              videoAttachments: _showcaseVideos,
-                              notes: _teachingNotes,
-                              onNoteChanged: (id, note) {
-                                setState(() {
-                                  if (note.trim().isEmpty) {
-                                    _teachingNotes.remove(id);
-                                  } else {
-                                    _teachingNotes[id] = note;
-                                  }
-                                  final initial =
-                                      _initialTeachingNotes[id] ?? '';
-                                  final current = _teachingNotes[id] ?? '';
-                                  if (current.trim() == initial.trim()) {
-                                    _changedTeachingNotes.remove(id);
-                                  } else {
-                                    _changedTeachingNotes.add(id);
-                                  }
-                                });
-                              },
-                              onChanged: (updatedIds) {
-                                setState(() {
-                                  // A proof can be waiting while a row has no
-                                  // selection; restore it if that skill is
-                                  // re-added through another row.
-                                  for (final entry
-                                      in _pendingTeachingImages.entries
-                                          .toList()) {
-                                    if (updatedIds.contains(entry.key)) {
-                                      if (!_teachingSkillImages.containsKey(
-                                        entry.key,
-                                      )) {
-                                        _teachingSkillImages[entry.key] =
-                                            entry.value;
-                                      }
-                                      _pendingTeachingImages.remove(entry.key);
-                                    }
-                                  }
-                                  final removed =
-                                      _teachingSkillIds
-                                          .where(
-                                            (id) => !updatedIds.contains(id),
-                                          )
-                                          .toList();
-                                  for (final oldId in removed) {
-                                    if (_pendingTeachingImages.containsKey(
-                                      oldId,
+                        KeyedSubtree(
+                          key: _teachingSkillsKey,
+                          child: SkillsCard.toTeach(
+                            isEditing: true,
+                            initialSkillIds: _teachingSkillIds,
+                            attachments: _teachingSkillImages,
+                            videoAttachments: _showcaseVideos,
+                            notes: _teachingNotes,
+                            onNoteChanged: (id, note) {
+                              setState(() {
+                                if (note.trim().isEmpty) {
+                                  _teachingNotes.remove(id);
+                                } else {
+                                  _teachingNotes[id] = note;
+                                }
+                                final initial = _initialTeachingNotes[id] ?? '';
+                                final current = _teachingNotes[id] ?? '';
+                                if (current.trim() == initial.trim()) {
+                                  _changedTeachingNotes.remove(id);
+                                } else {
+                                  _changedTeachingNotes.add(id);
+                                }
+                              });
+                            },
+                            onChanged: (updatedIds) {
+                              setState(() {
+                                // A proof can be waiting while a row has no
+                                // selection; restore it if that skill is
+                                // re-added through another row.
+                                for (final entry
+                                    in _pendingTeachingImages.entries
+                                        .toList()) {
+                                  if (updatedIds.contains(entry.key)) {
+                                    if (!_teachingSkillImages.containsKey(
+                                      entry.key,
                                     )) {
-                                      continue;
+                                      _teachingSkillImages[entry.key] =
+                                          entry.value;
                                     }
-                                    _teachingSkillImages.remove(oldId);
+                                    _pendingTeachingImages.remove(entry.key);
                                   }
-                                  _teachingSkillIds = updatedIds;
-                                });
-                              },
-                              onSkillReplaced: _replaceTeachingImage,
-                              onSkillRemoved: _removeTeachingImage,
-                              onAttachFile:
-                                  (skillId) => _pickAttachmentForSkill(skillId),
-                              onRemoveAttachment:
-                                  (skillId) =>
-                                      _removeAttachmentForSkill(skillId),
-                            ),
+                                }
+                                final removed =
+                                    _teachingSkillIds
+                                        .where((id) => !updatedIds.contains(id))
+                                        .toList();
+                                for (final oldId in removed) {
+                                  if (_pendingTeachingImages.containsKey(
+                                    oldId,
+                                  )) {
+                                    continue;
+                                  }
+                                  _teachingSkillImages.remove(oldId);
+                                }
+                                _teachingSkillIds = updatedIds;
+                              });
+                            },
+                            onSkillReplaced: _replaceTeachingImage,
+                            onSkillRemoved: _removeTeachingImage,
+                            onAttachFile:
+                                (skillId) => _pickAttachmentForSkill(skillId),
+                            onRemoveAttachment:
+                                (skillId) => _removeAttachmentForSkill(skillId),
                           ),
+                        ),
                         if (wantsTeaching) ...[
                           const SizedBox(height: 16),
                           Text(
@@ -1687,7 +1676,7 @@ class _ProfilePreviewPage extends StatelessWidget {
   const _ProfilePreviewPage({required this.profile});
 
   String get _roleLabel {
-    switch (profile.role) {
+    switch (profile.effectiveRole) {
       case OnboardingRole.learn:
         return 'Learner';
       case OnboardingRole.teach:
@@ -2076,7 +2065,7 @@ class _PhotoPickerRow extends StatelessWidget {
 
   const _PhotoPickerRow({required this.photoPaths, required this.onChanged});
 
-  Future<void> _pickPhoto(int index) async {
+  Future<void> _pickPhoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
@@ -2085,49 +2074,87 @@ class _PhotoPickerRow extends StatelessWidget {
       imageQuality: 85,
     );
     if (picked == null) return;
-    final updated = List<String?>.from(photoPaths);
-    while (updated.length <= index) {
-      updated.add(null);
-    }
-    updated[index] = picked.path;
-    onChanged(updated);
+    onChanged([picked.path]);
   }
 
-  void _removePhoto(int index) {
-    if (index < 0 || index >= photoPaths.length) return;
-    final updated = List<String?>.from(photoPaths);
-    updated[index] = null;
-    onChanged(updated);
+  void _removePhoto() {
+    onChanged([null]);
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasPhoto =
+        photoPaths.isNotEmpty && (photoPaths.first?.trim().isNotEmpty ?? false);
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (int i = 0; i < 3; i++) ...[
-          Expanded(
-            child: _PhotoSlot(
-              index: i,
-              path: photoPaths.length > i ? photoPaths[i] : null,
-              onTap: () => _pickPhoto(i),
-              onRemove: () => _removePhoto(i),
-            ),
+        SizedBox(
+          width: 120,
+          child: _PhotoSlot(
+            path: photoPaths.isNotEmpty ? photoPaths.first : null,
+            onTap: _pickPhoto,
+            onRemove: _removePhoto,
           ),
-          if (i != 2) const SizedBox(width: 12),
-        ],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Main photo',
+                style: AppTextStyles.boldText.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Shown on your profile and discovery cards. Use a clear photo '
+                'so Pals know who they are meeting.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              if (hasPhoto)
+                TextButton.icon(
+                  onPressed: _pickPhoto,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 44),
+                    alignment: Alignment.centerLeft,
+                  ),
+                  icon: Icon(
+                    Icons.photo_camera_outlined,
+                    size: 16,
+                    color: AppColors.accentText(context),
+                  ),
+                  label: Text(
+                    'Change photo',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.accentText(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
 class _PhotoSlot extends StatelessWidget {
-  final int index;
   final String? path;
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
   const _PhotoSlot({
-    required this.index,
     required this.path,
     required this.onTap,
     required this.onRemove,
@@ -2149,19 +2176,10 @@ class _PhotoSlot extends StatelessWidget {
               : FileImage(File(path!));
     }
 
-    final slotLabel =
-        hasImage
-            ? (index == 0 ? 'Main photo' : 'Photo ${index + 1}')
-            : (index == 0
-                ? 'Add main photo'
-                : index == 1
-                ? 'Add second photo'
-                : 'Add third photo');
-
     return Semantics(
       container: true,
       button: true,
-      label: slotLabel,
+      label: hasImage ? 'Profile photo' : 'Add profile photo',
       hint: hasImage ? 'Change photo' : 'Add photo',
       child: GestureDetector(
         onTap: onTap,
@@ -2193,29 +2211,20 @@ class _PhotoSlot extends StatelessWidget {
                           ),
                         ),
               ),
-              if (index == 0)
+              if (hasImage)
                 Positioned(
-                  top: 6,
-                  left: 6,
+                  bottom: 6,
+                  right: 6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.62),
-                      borderRadius: BorderRadius.circular(999),
+                      shape: BoxShape.circle,
                     ),
-                    child: const ExcludeSemantics(
-                      child: Text(
-                        'MAIN',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
+                    child: const Icon(
+                      Icons.photo_camera_outlined,
+                      size: 14,
+                      color: Colors.white,
                     ),
                   ),
                 ),

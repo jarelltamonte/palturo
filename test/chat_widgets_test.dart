@@ -380,4 +380,24 @@ void main() {
       isNull,
     );
   });
+
+  testWidgets('quick-access circles tag online pals only', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Scaffold(
+          body: Row(
+            children: const [
+              ChatProfileItem(name: 'Online Pal', isOnline: true),
+              ChatProfileItem(name: 'Offline Pal'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Online'), findsOneWidget);
+    expect(find.bySemanticsLabel('Online Pal is online'), findsOneWidget);
+  });
 }

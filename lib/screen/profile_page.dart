@@ -702,6 +702,8 @@ class ProfileSummaryCard extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            _RoleSummary(role: profile.effectiveRole),
             const SizedBox(height: 16),
             Divider(color: textColor.withValues(alpha: 0.2)),
             const SizedBox(height: 12),
@@ -718,8 +720,6 @@ class ProfileSummaryCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-            _RoleSummary(role: profile.effectiveRole),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Icon(Icons.translate, size: 18, color: textColor),
@@ -753,7 +753,7 @@ class ProfileSummaryCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      'Teaching style: ${profile.teachingStyles.join(', ')}',
+                      profile.teachingStyles.join(', '),
                       maxLines: 2,
                       style: TextStyle(color: textColor, fontSize: 14),
                       overflow: TextOverflow.ellipsis,

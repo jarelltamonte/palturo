@@ -73,14 +73,13 @@ void main() {
   testWidgets('mentor summary shows the teaching style', (tester) async {
     await _pumpSummary(tester, _profile(role: OnboardingRole.teach));
 
-    expect(find.textContaining('Teaching style:'), findsOneWidget);
-    expect(find.textContaining('Hands-on Practice'), findsOneWidget);
+    expect(find.text('Hands-on Practice'), findsOneWidget);
   });
 
   testWidgets('learner summary hides the teaching style', (tester) async {
     await _pumpSummary(tester, _profile(role: OnboardingRole.learn));
 
-    expect(find.textContaining('Teaching style:'), findsNothing);
+    expect(find.text('Hands-on Practice'), findsNothing);
   });
 
   testWidgets('mentor without a teaching style shows no empty row', (
@@ -91,6 +90,6 @@ void main() {
       _profile(role: OnboardingRole.both, teachingStyles: const []),
     );
 
-    expect(find.textContaining('Teaching style:'), findsNothing);
+    expect(find.text('Hands-on Practice'), findsNothing);
   });
 }

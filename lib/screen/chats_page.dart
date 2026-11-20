@@ -788,8 +788,8 @@ class _ChatsPageState extends State<ChatsPage> {
                   child: SizedBox(
                     height:
                         MediaQuery.textScalerOf(context).scale(12) > 16
-                            ? 132
-                            : 108,
+                            ? 158
+                            : 126,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -807,6 +807,7 @@ class _ChatsPageState extends State<ChatsPage> {
                         return ChatProfileItem(
                           name: chat.name,
                           avatarImage: avatarImage,
+                          isOnline: chat.isOnline,
                           onTap:
                               () => _openChatRoom(
                                 context,
@@ -949,12 +950,14 @@ class MatchesShortcutItem extends StatelessWidget {
 class ChatProfileItem extends StatelessWidget {
   final String name;
   final ImageProvider? avatarImage;
+  final bool isOnline;
   final VoidCallback? onTap;
 
   const ChatProfileItem({
     super.key,
     required this.name,
     this.avatarImage,
+    this.isOnline = false,
     this.onTap,
   });
 
@@ -982,6 +985,34 @@ class ChatProfileItem extends StatelessWidget {
                 fontSize: 12,
               ),
             ),
+            if (isOnline) ...[
+              const SizedBox(height: 2),
+              Semantics(
+                label: '$name is online',
+                excludeSemantics: true,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Online',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: AppColors.accentText(context),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -432,6 +432,63 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('row chevrons stay right-aligned when a count is present', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: (path, {required kind}) async => const [],
+      nodePath: 'modern_practical_skills',
+      nodeLabel: 'Modern Practical Skills',
+      nodeDepth: 1,
+      nodeKind: 'category',
+      taxonomy:
+          (path) => const [
+            {
+              'path': 'modern_practical_skills',
+              'name': 'Modern Practical Skills',
+              'kind': 'category',
+              'depth': 1,
+              'usage_count': 3,
+            },
+            {
+              'path': 'modern_practical_skills.programming',
+              'name': 'Programming',
+              'kind': 'category',
+              'depth': 2,
+              'usage_count': 2,
+            },
+            {
+              'path': 'modern_practical_skills.motorcycle',
+              'name': 'Motorcycle Maintenance',
+              'kind': 'skill',
+              'depth': 2,
+              'usage_count': 1,
+            },
+          ],
+      countsLoader:
+          (path, {required kind}) async =>
+              path.endsWith('programming')
+                  ? (total: 1, fresh: 0, newcomers: 0)
+                  : (total: 0, fresh: 0, newcomers: 0),
+    );
+
+    final chevrons = find.byWidgetPredicate(
+      (widget) =>
+          widget is Icon &&
+          widget.icon == Icons.chevron_right &&
+          widget.size == 18,
+    );
+    expect(chevrons, findsNWidgets(2));
+    // A row with a count used to leave the leftover flex space after the
+    // chevron, pulling it left of its neighbours.
+    expect(
+      tester.getRect(chevrons.at(0)).right,
+      tester.getRect(chevrons.at(1)).right,
+    );
+  });
+
   testWidgets(
     'category, subcategory, and skill pages read as different levels',
     (tester) async {

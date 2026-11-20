@@ -1037,8 +1037,9 @@ class _SkillRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              if (countText != null)
-                Flexible(
+              if (countText != null) ...[
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 110),
                   child: Text(
                     countText,
                     maxLines: 1,
@@ -1050,6 +1051,8 @@ class _SkillRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(width: 4),
+              ],
               const SizedBox(width: 2),
               Icon(
                 Icons.chevron_right,

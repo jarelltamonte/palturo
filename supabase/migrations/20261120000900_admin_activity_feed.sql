@@ -233,40 +233,6 @@ events as (
   union all
 
   select
-    c.requester_cleared_at,
-    'requests',
-    'conversation_cleared',
-    'Conversation cleared',
-    concat_ws(' · ', nullif(c.skill_name, ''), 'with ' || recip.name),
-    req.name,
-    c.id::text
-  from public.connections c
-  join names req on req.id = c.requester_id
-  join names recip on recip.id = c.recipient_id
-  cross join win w
-  where c.requester_cleared_at is not null
-    and c.requester_cleared_at >= w.since
-
-  union all
-
-  select
-    c.recipient_cleared_at,
-    'requests',
-    'conversation_cleared',
-    'Conversation cleared',
-    concat_ws(' · ', nullif(c.skill_name, ''), 'with ' || req.name),
-    recip.name,
-    c.id::text
-  from public.connections c
-  join names req on req.id = c.requester_id
-  join names recip on recip.id = c.recipient_id
-  cross join win w
-  where c.recipient_cleared_at is not null
-    and c.recipient_cleared_at >= w.since
-
-  union all
-
-  select
     m.created_at,
     'chats',
     'chat_started',
@@ -285,56 +251,6 @@ events as (
       where pm.connection_id = m.connection_id
         and pm.created_at < m.created_at
     )
-
-  union all
-
-  select
-    m.created_at,
-    'chats',
-    'message_sent',
-    'Message sent',
-    nullif(c.skill_name, ''),
-    coalesce(n.name, 'Unknown'),
-    c.id::text
-  from public.messages m
-  join public.connections c on c.id = m.connection_id
-  left join names n on n.id = m.sender_id
-  cross join win w
-  where m.created_at >= w.since
-
-  union all
-
-  select
-    m.edited_at,
-    'chats',
-    'message_edited',
-    'Message edited',
-    nullif(c.skill_name, ''),
-    coalesce(n.name, 'Unknown'),
-    c.id::text
-  from public.messages m
-  join public.connections c on c.id = m.connection_id
-  left join names n on n.id = m.sender_id
-  cross join win w
-  where m.edited_at is not null
-    and m.edited_at >= w.since
-
-  union all
-
-  select
-    m.deleted_at,
-    'chats',
-    'message_deleted',
-    'Message deleted',
-    nullif(c.skill_name, ''),
-    coalesce(n.name, 'Unknown'),
-    c.id::text
-  from public.messages m
-  join public.connections c on c.id = m.connection_id
-  left join names n on n.id = m.sender_id
-  cross join win w
-  where m.deleted_at is not null
-    and m.deleted_at >= w.since
 
   union all
 

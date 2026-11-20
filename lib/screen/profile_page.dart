@@ -12,6 +12,7 @@ import 'package:palturo/onboarding/onboarding_flow.dart'
         onboardingDraftKey,
         onboardingResumeDismissedKey;
 import 'package:palturo/services/preferences_service.dart';
+import 'package:palturo/models/profile_completion.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/services/profile_service.dart';
@@ -28,6 +29,7 @@ import 'package:palturo/widgets/resume_setup_card.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/discoverability_status.dart';
+import 'package:palturo/widgets/profile_completion_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
@@ -295,12 +297,6 @@ class _ProfilePageState extends State<ProfilePage> {
     setupComplete: _profile?.isProfileCompleted ?? true,
   );
 
-  bool _needsProfileTip(ProfileData profile) {
-    return profile.bio.trim().isEmpty ||
-        profile.languages.isEmpty ||
-        profile.availableDays.isEmpty;
-  }
-
   Widget _buildErrorState(Color textTheme) {
     return Center(
       child: Padding(
@@ -351,6 +347,8 @@ class _ProfilePageState extends State<ProfilePage> {
             : profile.missingShowcaseSkillIds
                 .map((id) => _skillLabel(id, kTeachingOptions))
                 .toList(growable: false);
+    final completion =
+        profile == null ? null : computeProfileCompletion(profile);
 
     return Scaffold(
       backgroundColor: bgTheme,
@@ -393,6 +391,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           onAvatarTap: _showMyProfile,
                         ),
                       ),
+                      if (completion != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: ProfileCompletionCard(
+                            completion: completion,
+                            onEdit: _openEdit,
+                          ),
+                        ),
                       if (profile != null && wantsTeaching)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -402,14 +408,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             missingSkillLabels: missingShowcaseLabels,
                             onAction: _openEdit,
                             compact: true,
-                          ),
-                        ),
-                      if (_needsProfileTip(_profile!) && !_showResume)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                          child: _ProfileTip(
-                            onEdit: _openEdit,
-                            profile: _profile!,
                           ),
                         ),
                       if (_showResume)
@@ -714,49 +712,6 @@ class ProfileSummaryCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ProfileTip extends StatelessWidget {
-  final VoidCallback onEdit;
-  final ProfileData profile;
-
-  const _ProfileTip({required this.onEdit, required this.profile});
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.secondary;
-    const message =
-        'Finish your profile details to improve your recommendations.';
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.auto_awesome_outlined,
-            color: AppColors.accentText(context),
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.regularText.copyWith(
-                color: textColor,
-                fontSize: 13,
-                height: 1.35,
-              ),
-            ),
-          ),
-          TextButton(onPressed: onEdit, child: const Text('Improve')),
-        ],
       ),
     );
   }

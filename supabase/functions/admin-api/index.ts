@@ -442,6 +442,7 @@ Deno.serve(async (req) => {
           : surface === "users" ? "admin_user_analytics"
           : surface === "supply" ? "admin_supply"
           : surface === "matching" ? "admin_matching"
+          : surface === "demographics" ? "admin_demographics"
           : surface === "conversations" ? "admin_conversations"
           : surface === "safety" ? "admin_safety"
           : surface === "system" ? "admin_system"

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -53,6 +54,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
+  late final TextEditingController _ageController;
+  String? _gender;
 
   late Map<String, String> _availability;
   late List<String> _languages;
@@ -94,6 +97,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
     _profileService = widget.profileService ?? ProfileService();
     _bioController = TextEditingController(text: widget.profile.bio);
+    _ageController = TextEditingController(
+      text: widget.profile.age?.toString() ?? '',
+    );
+    _gender = widget.profile.gender;
     _availability = _parseAvailability(widget.profile);
     _languages = List.from(widget.profile.languages);
     _learningStyles = List.from(widget.profile.interests);
@@ -118,6 +125,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void dispose() {
     _bioController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -232,6 +240,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final initialAvail = _parseAvailability(widget.profile);
 
     if (_bioController.text.trim() != widget.profile.bio.trim()) return true;
+    if (_ageController.text.trim() != (widget.profile.age?.toString() ?? '')) {
+      return true;
+    }
+    if (_gender != widget.profile.gender) return true;
     if (_role != widget.profile.role) return true;
     if (!setEquals(_availability.keys.toSet(), initialAvail.keys.toSet())) {
       return true;
@@ -257,6 +269,88 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     if (!mapEquals(_teachingSkillImages, initialProofImages)) return true;
 
     return false;
+  }
+
+  String? get _ageError {
+    final text = _ageController.text.trim();
+    if (text.isEmpty) return null;
+    final age = int.tryParse(text);
+    if (age == null || age < 13 || age > 120) {
+      return 'Enter an age between 13 and 120.';
+    }
+    return null;
+  }
+
+  String get _genderLabel => switch (_gender) {
+    'woman' => 'Woman',
+    'man' => 'Man',
+    'nonbinary' => 'Non-binary',
+    'prefer_not_to_say' => 'Prefer not to say',
+    _ => '',
+  };
+
+  Future<void> _pickGender() async {
+    const options = <({String value, String label})>[
+      (value: 'woman', label: 'Woman'),
+      (value: 'man', label: 'Man'),
+      (value: 'nonbinary', label: 'Non-binary'),
+      (value: 'prefer_not_to_say', label: 'Prefer not to say'),
+      (value: '', label: 'Not specified'),
+    ];
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.elevatedSurface(context),
+      builder:
+          (sheetContext) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                  child: Text(
+                    'Gender',
+                    style: AppTextStyles.headingText.copyWith(
+                      color: Theme.of(sheetContext).colorScheme.secondary,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    'Private. Used only for aggregate analytics.',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(sheetContext),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                for (final option in options)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    title: Text(
+                      option.label,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: Theme.of(sheetContext).colorScheme.secondary,
+                      ),
+                    ),
+                    trailing:
+                        _gender == (option.value.isEmpty ? null : option.value)
+                            ? Icon(
+                              Icons.check_circle_outline,
+                              color: AppColors.accentText(sheetContext),
+                            )
+                            : null,
+                    onTap: () => Navigator.pop(sheetContext, option.value),
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _gender = result.isEmpty ? null : result);
   }
 
   Future<bool> _confirmDiscardChanges() async {
@@ -760,11 +854,22 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       return;
     }
 
+    if (!mounted) return;
+    if (_ageError != null) {
+      showAppError(context, _ageError!);
+      return;
+    }
+
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
+    final parsedAge = int.tryParse(_ageController.text.trim());
 
     final updated = widget.profile.copyWith(
       bio: _bioController.text.trim(),
+      age: parsedAge,
+      clearAge: parsedAge == null,
+      gender: _gender,
+      clearGender: _gender == null,
       schedule: scheduleFormatted,
       availableDays: selectedDays,
       languages: _languages,
@@ -1070,6 +1175,56 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                 ),
                           ),
                         ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _ProfileSectionHeader(title: 'Private details'),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Only used for aggregate analytics. Never shown on '
+                          'your profile, cards, or public matches.',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: AppColors.mutedText(context),
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TopLabeledField(
+                          label: 'Age',
+                          controller: _ageController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 3,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          onChanged: (_) => setState(() {}),
+                        ),
+                        if (_ageError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 4),
+                            child: Text(
+                              _ageError!,
+                              style: AppTextStyles.regularText.copyWith(
+                                color: AppColors.dangerText(context),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        _DropdownInfoField(
+                          icon: Icons.person_outline,
+                          label: 'Gender',
+                          value: _genderLabel,
+                          hint: 'Select gender',
+                          onTap: _pickGender,
+                        ),
                       ],
                     ),
                   ),

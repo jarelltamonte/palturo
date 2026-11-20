@@ -34,6 +34,11 @@ class ProfileData {
   final bool hasCompletedOnboarding;
   final bool isProfileCompleted;
 
+  /// Private demographics. Used for aggregate analytics only; never shown on
+  /// cards or in a public profile.
+  final int? age;
+  final String? gender;
+
   ProfileData({
     this.id = '',
     String? name,
@@ -58,6 +63,8 @@ class ProfileData {
     this.changedTeachingNotes = const {},
     this.hasCompletedOnboarding = false,
     this.isProfileCompleted = false,
+    this.age,
+    this.gender,
   }) : firstName = firstName ?? (name != null ? name.split(' ').first : 'User'),
        lastName =
            lastName ??
@@ -96,6 +103,14 @@ class ProfileData {
   /// True when at least one teaching skill still lacks its own showcase.
   bool get hasIncompleteShowcases => missingShowcaseSkillIds.isNotEmpty;
 
+  String? get genderLabel => switch (gender) {
+    'woman' => 'Woman',
+    'man' => 'Man',
+    'nonbinary' => 'Non-binary',
+    'prefer_not_to_say' => 'Prefer not to say',
+    _ => null,
+  };
+
   ProfileData copyWith({
     String? id,
     String? firstName,
@@ -119,6 +134,10 @@ class ProfileData {
     Set<String>? changedTeachingNotes,
     bool? hasCompletedOnboarding,
     bool? isProfileCompleted,
+    int? age,
+    String? gender,
+    bool clearAge = false,
+    bool clearGender = false,
   }) {
     return ProfileData(
       id: id ?? this.id,
@@ -144,6 +163,8 @@ class ProfileData {
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,
+      age: clearAge ? null : (age ?? this.age),
+      gender: clearGender ? null : (gender ?? this.gender),
     );
   }
 
@@ -188,6 +209,14 @@ class ProfileData {
       );
     }
 
+    int? parsedAge;
+    final rawAge = map['age'];
+    if (rawAge is num) {
+      parsedAge = rawAge.toInt();
+    } else if (rawAge is String) {
+      parsedAge = int.tryParse(rawAge.trim());
+    }
+
     return ProfileData(
       id: map['id'] as String? ?? '',
       firstName:
@@ -209,6 +238,11 @@ class ProfileData {
       teachingSkillImages: parsedSkillImages,
       hasCompletedOnboarding: map['has_completed_onboarding'] as bool? ?? false,
       isProfileCompleted: map['is_profile_completed'] as bool? ?? false,
+      age: parsedAge,
+      gender:
+          (map['gender'] as String?)?.trim().isEmpty == true
+              ? null
+              : map['gender'] as String?,
     );
   }
 }

@@ -51,6 +51,24 @@ class _SlowProfileService implements ProfileService {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _CapturingProfileService implements ProfileService {
+  ProfileData? captured;
+
+  @override
+  Future<ProfileData> updateProfile(
+    ProfileData updatedProfile, {
+    List<String?>? newPhotoLocalPaths,
+    Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
+  }) async {
+    captured = updatedProfile;
+    return updatedProfile;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
@@ -227,6 +245,57 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
+  });
+
+  testWidgets('private age and gender save with the profile', (tester) async {
+    final service = _CapturingProfileService();
+    await pumpEdit(tester, service: service);
+
+    final ageField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is TopLabeledField && widget.label == 'Age',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(ageField, '29');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Gender'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gender'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Woman'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save'));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(service.captured?.age, 29);
+    expect(service.captured?.gender, 'woman');
+  });
+
+  testWidgets('an invalid age blocks saving and shows guidance', (
+    tester,
+  ) async {
+    final service = _CapturingProfileService();
+    await pumpEdit(tester, service: service);
+
+    final ageField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is TopLabeledField && widget.label == 'Age',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(ageField, '9');
+    await tester.pump();
+
+    expect(find.text('Enter an age between 13 and 120.'), findsOneWidget);
+    await tester.ensureVisible(find.text('Save'));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(service.captured, isNull);
   });
 
   testWidgets('discoverability status is visible at the top of the editor', (

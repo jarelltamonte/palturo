@@ -1,194 +1,112 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:palturo/models/profile_completion.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/screen/profile_data.dart';
-import 'package:palturo/services/profile_service.dart';
+
+ProfileData _profile({
+  OnboardingRole? role,
+  String bio = '',
+  List<String?> photos = const [null, null, null],
+  List<String> languages = const [],
+  List<String> days = const [],
+  List<String> interests = const [],
+  List<String> teachingStyles = const [],
+  List<String> learningSkills = const [],
+  List<String> teachingSkills = const [],
+  Map<String, String> showcases = const {},
+  int? age,
+  String? gender,
+}) {
+  return ProfileData(
+    schedule: '',
+    role: role,
+    bio: bio,
+    photos: photos,
+    languages: languages,
+    availableDays: days,
+    interests: interests,
+    teachingStyles: teachingStyles,
+    learningSkillIds: learningSkills,
+    teachingSkillIds: teachingSkills,
+    teachingSkillImages: showcases,
+    age: age,
+    gender: gender,
+  );
+}
 
 void main() {
-  test('fromMap drops null and blank skill entries', () {
-    final profile = ProfileData.fromMap({
-      'id': 'profile-1',
-      'teaching_skills': ['Programming', null, '   '],
-      'learning_skills': null,
-      'languages': ['English', null],
-      'learning_styles': ['Visual Demonstration', ''],
-    });
-    expect(profile.teachingSkillIds, ['Programming']);
-    expect(profile.learningSkillIds, isEmpty);
-    expect(profile.languages, ['English']);
-    expect(profile.interests, ['Visual Demonstration']);
+  test('an empty profile has zero completion and lists the missing parts', () {
+    final completion = computeProfileCompletion(_profile());
+    expect(completion.percent, 0);
+    expect(completion.isComplete, isFalse);
+    expect(
+      completion.missing.map((item) => item.label),
+      contains('Profile photo'),
+    );
+    expect(
+      completion.missing.map((item) => item.label),
+      contains('Role and skills'),
+    );
+    expect(completion.missing.map((item) => item.label), contains('Age'));
+    expect(completion.missing.map((item) => item.label), contains('Gender'));
   });
 
-  test('setup and showcase needs follow role, skills, and media', () {
-    final empty = ProfileData(schedule: '', role: OnboardingRole.learn);
-    expect(empty.needsSetup, isTrue);
-    expect(empty.needsShowcase, isFalse);
-
-    final learner = empty.copyWith(learningSkillIds: const ['programming']);
-    expect(learner.needsSetup, isFalse);
-
-    final mentor = ProfileData(
-      schedule: '',
-      role: OnboardingRole.teach,
-      teachingSkillIds: const ['filipino_cooking'],
+  test('a complete learner profile reaches 100 percent', () {
+    final completion = computeProfileCompletion(
+      _profile(
+        role: OnboardingRole.learn,
+        bio: 'Hello',
+        photos: const ['https://example.test/me.jpg'],
+        languages: const ['English'],
+        days: const ['Friday'],
+        interests: const ['Hands-on Practice'],
+        learningSkills: const ['cooking'],
+        age: 29,
+        gender: 'woman',
+      ),
     );
-    expect(mentor.needsSetup, isFalse);
-    expect(mentor.needsShowcase, isTrue);
-
-    final withShowcase = mentor.copyWith(
-      teachingSkillImages: const {
-        'Filipino Cooking': 'https://x.test/showcase.mp4',
-      },
-    );
-    expect(withShowcase.needsShowcase, isFalse);
+    expect(completion.percent, 100);
+    expect(completion.isComplete, isTrue);
+    expect(completion.missing, isEmpty);
   });
 
-  test('requires every profile field and a role skill', () {
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
-      ),
-      isTrue,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: null,
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: '   ',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const [],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const [],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: false,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
-        hasShowcase: false,
-      ),
-      isFalse,
-    );
-  });
-  test('role-specific styles are required', () {
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const [],
-        teachingStyles: const ['Visual'],
+  test('a mentor needs a teaching style and a showcase', () {
+    final missingShowcase = computeProfileCompletion(
+      _profile(
         role: OnboardingRole.teach,
-        hasRoleSkills: true,
-      ),
-      isTrue,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
         bio: 'Hello',
+        photos: const ['https://example.test/me.jpg'],
         languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
+        days: const ['Friday'],
+        interests: const ['Hands-on Practice'],
+        teachingStyles: const ['Discussion'],
+        teachingSkills: const ['weaving'],
+        age: 40,
+        gender: 'man',
+      ),
+    );
+    expect(missingShowcase.percent, lessThan(100));
+    expect(
+      missingShowcase.missing.map((item) => item.label),
+      contains('Showcase'),
+    );
+
+    final complete = computeProfileCompletion(
+      _profile(
         role: OnboardingRole.teach,
-        hasRoleSkills: true,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
         bio: 'Hello',
+        photos: const ['https://example.test/me.jpg'],
         languages: const ['English'],
-        learningStyles: const [],
-        teachingStyles: const ['Visual'],
-        role: OnboardingRole.learn,
-        hasRoleSkills: true,
+        days: const ['Friday'],
+        interests: const ['Hands-on Practice'],
+        teachingStyles: const ['Discussion'],
+        teachingSkills: const ['weaving'],
+        showcases: const {'weaving': 'https://example.test/weave.jpg'},
+        age: 40,
+        gender: 'man',
       ),
-      isFalse,
     );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const [],
-        role: OnboardingRole.both,
-        hasRoleSkills: true,
-      ),
-      isFalse,
-    );
-    expect(
-      isProfileComplete(
-        avatarUrl: 'https://example.test/avatar.jpg',
-        bio: 'Hello',
-        languages: const ['English'],
-        learningStyles: const ['Visual'],
-        teachingStyles: const ['Visual'],
-        role: OnboardingRole.both,
-        hasRoleSkills: true,
-      ),
-      isTrue,
-    );
+    expect(complete.percent, 100);
+    expect(complete.isComplete, isTrue);
   });
 }

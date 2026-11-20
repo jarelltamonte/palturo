@@ -663,8 +663,31 @@ class ProfileService {
           proofImages[entry.key] = value;
         }
       }
+      // Private demographics live in an owner-only table. They are merged here
+      // for the editor and completion meter, but never returned by public
+      // profile or matching RPCs.
+      int? age;
+      String? gender;
+      try {
+        final demographics =
+            await _supabase
+                .from('profile_demographics')
+                .select('age, gender')
+                .eq('user_id', user.id)
+                .maybeSingle();
+        if (demographics != null) {
+          age = (demographics['age'] as num?)?.toInt();
+          gender = (demographics['gender'] as String?)?.trim();
+          if (gender != null && gender.isEmpty) gender = null;
+        }
+      } catch (_) {
+        // A demographics read failure must not block the profile screen.
+      }
+
       final profileWithProofs = profile.copyWith(
         teachingSkillImages: proofImages,
+        age: age,
+        gender: gender,
       );
 
       final learningNotes = <String, String>{};
@@ -1122,6 +1145,19 @@ class ProfileService {
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', user.id);
+
+    // Demographics are optional and private. A failure here must not block a
+    // profile save; the completion meter will simply keep prompting.
+    try {
+      await _supabase.from('profile_demographics').upsert({
+        'user_id': user.id,
+        'age': updatedProfile.age,
+        'gender': updatedProfile.gender,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('[ProfileService] demographics save failed: $e');
+    }
 
     // Discovery cards read public.skill_showcases, not
     // profiles.teaching_skill_images. Keep the rows in step with the editor so

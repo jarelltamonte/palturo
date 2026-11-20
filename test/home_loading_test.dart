@@ -29,7 +29,9 @@ void main() {
     await tester.pump(kDeckSlowThreshold);
     expect(find.text(kDeckSlowMessage), findsOneWidget);
     expect(find.text(kDeckSlowHint), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
+    // No in-flight Retry: a second request would restart matching for the
+    // same cold load. The retry appears only after the timeout.
+    expect(find.text('Retry'), findsNothing);
 
     await tester.pump(kDeckTimeout);
     await tester.pump();
@@ -87,11 +89,13 @@ void main() {
     expect(find.text('Retry'), findsNothing);
   });
 
-  testWidgets('retry re-arms the slow state and ignores the stale load', (
+  testWidgets('timeout retry reuses the cache instead of forcing a rebuild', (
     tester,
   ) async {
     final calls = <Completer<List<Person>>>[];
+    final forces = <bool>[];
     Future<List<Person>> load({bool force = false}) {
+      forces.add(force);
       final call = Completer<List<Person>>();
       calls.add(call);
       return call.future;
@@ -101,17 +105,20 @@ void main() {
       MaterialApp(theme: lightMode, home: HomePage(deckLoader: load)),
     );
     await tester.pump();
-    await tester.pump(kDeckSlowThreshold);
-    expect(find.text(kDeckSlowMessage), findsOneWidget);
+    await tester.pump(kDeckTimeout);
+    await tester.pump();
+
+    expect(find.textContaining('taking longer'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
 
     await tester.tap(find.text('Retry'));
     await tester.pump();
     expect(calls, hasLength(2));
+    // A retry must reuse the cached ranking instead of forcing a paid
+    // embedding/rerank pass.
+    expect(forces, [false, false]);
     expect(find.text(kDeckSlowMessage), findsOneWidget);
     expect(find.text('Retry'), findsNothing);
-
-    await tester.pump(kDeckSlowThreshold);
-    expect(find.text(kDeckSlowMessage), findsOneWidget);
 
     // The superseded first load must not cancel the retry's timers.
     calls.first.complete(const []);

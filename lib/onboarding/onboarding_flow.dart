@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,6 +15,7 @@ import 'screens/onboarding_final_screen.dart';
 import 'screens/onboarding_review_screen.dart';
 import 'screens/onboarding_interests_screen.dart';
 import 'screens/onboarding_role_screen.dart';
+import 'widgets/onboarding_save_overlay.dart';
 import '../services/profile_service.dart';
 import '../services/preferences_service.dart';
 import '../screen/action_dialogs.dart';
@@ -87,6 +89,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   List<OnboardingOption> _dynamicOptions = List.from(kBaseOptions);
   bool _isSaving = false;
+  bool _saveSlow = false;
+  Timer? _saveSlowTimer;
+
+  /// First-time saves warm matching, so the overlay explains the wait after
+  /// this long instead of leaving a bare spinner.
+  static const Duration saveSlowThreshold = Duration(seconds: 6);
 
   bool _returnToReview = false;
 
@@ -102,6 +110,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   @override
   void dispose() {
+    _saveSlowTimer?.cancel();
     _controller.removeListener(_persistDraft);
     super.dispose();
   }
@@ -371,7 +380,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   Future<void> _saveAndProceed() async {
-    setState(() => _isSaving = true);
+    setState(() {
+      _isSaving = true;
+      _saveSlow = false;
+    });
+    _saveSlowTimer?.cancel();
+    _saveSlowTimer = Timer(saveSlowThreshold, () {
+      if (mounted && _isSaving) setState(() => _saveSlow = true);
+    });
     try {
       await _profileService.saveOnboardingPreferences(_controller);
       try {
@@ -405,7 +421,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             ),
       );
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      _saveSlowTimer?.cancel();
+      _saveSlowTimer = null;
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveSlow = false;
+        });
+      }
     }
   }
 
@@ -428,11 +451,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 child: _buildStep(_current),
               ),
             ),
-            if (_isSaving)
-              Container(
-                color: Colors.black45,
-                child: const Center(child: CircularProgressIndicator()),
-              ),
+            if (_isSaving) OnboardingSaveOverlay(slow: _saveSlow),
           ],
         ),
       ),

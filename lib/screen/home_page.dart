@@ -1230,10 +1230,6 @@ class _HomePageState extends State<HomePage> {
                         height: 1.4,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => _loadDeck(force: true),
-                      child: const Text('Retry'),
-                    ),
                   ],
                 ],
               ),
@@ -1264,6 +1260,9 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
+                // Cache-first retry: the server returns its stored ranking
+                // when it is still valid, so a retry never re-runs embeddings
+                // or reranking just because the first response was slow.
                 onPressed: _loadDeck,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

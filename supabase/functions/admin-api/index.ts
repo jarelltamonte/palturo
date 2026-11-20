@@ -444,10 +444,13 @@ Deno.serve(async (req) => {
           : surface === "conversations" ? "admin_conversations"
           : surface === "safety" ? "admin_safety"
           : surface === "system" ? "admin_system"
+          : surface === "activity" ? "admin_activity"
           : "";
         if (!rpc) return json({ error: "Unknown analytics surface" }, 400);
         const args =
-          surface === "growth" || surface === "conversations" ? { p_days: days } : {};
+          surface === "growth" || surface === "conversations" || surface === "activity"
+            ? { p_days: days }
+            : {};
         const { data, error } = await admin.rpc(rpc, args);
         if (error) throw error;
         return json({ ok: true, data, surface, days });

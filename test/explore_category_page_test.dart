@@ -220,7 +220,7 @@ void main() {
     final users = _FakeUsers();
     await _pump(tester, theme: lightMode, users: users.call);
 
-    expect(find.text('Cooking & Culinary'), findsOneWidget);
+    expect(find.text('Cooking & Culinary'), findsNWidgets(2));
     expect(
       find.text('Recipes, flavors, and kitchen traditions'),
       findsOneWidget,
@@ -382,7 +382,7 @@ void main() {
     await tester.tap(find.text('Filipino cooking'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Filipino cooking'), findsOneWidget);
+    expect(find.text('Filipino cooking'), findsNWidgets(2));
     expect(
       find.text('Explore Filipino cooking in the PalTuro community.'),
       findsOneWidget,
@@ -394,7 +394,7 @@ void main() {
     final users = _FakeUsers();
     await _pump(tester, theme: darkMode, users: users.call);
 
-    expect(find.text('Cooking & Culinary'), findsOneWidget);
+    expect(find.text('Cooking & Culinary'), findsNWidgets(2));
     expect(find.text('Start browsing mentors'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -409,7 +409,7 @@ void main() {
       textScale: 2,
     );
 
-    expect(find.text('Cooking & Culinary'), findsOneWidget);
+    expect(find.text('Cooking & Culinary'), findsNWidgets(2));
     expect(find.text('Filipino cooking'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

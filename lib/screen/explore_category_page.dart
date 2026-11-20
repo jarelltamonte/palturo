@@ -594,6 +594,16 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
+                      widget.nodeLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.boldText.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontSize: isSkill ? 13 : 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
                       _levelLabel.toUpperCase(),
                       style: AppTextStyles.boldText.copyWith(
                         color: accent,

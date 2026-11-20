@@ -135,4 +135,65 @@ void main() {
     expect(find.text('Mentor'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('a complete profile shows a tappable check next to the name', (
+    tester,
+  ) async {
+    var opened = 0;
+    final profile = ProfileData(
+      name: 'Pal Tester',
+      schedule: 'Weekends',
+      languages: const ['English'],
+      interests: const ['Hands-on Practice'],
+      role: OnboardingRole.learn,
+      learningSkillIds: const ['weaving'],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ProfileSummaryCard(
+              profile: profile,
+              onTap: () => opened++,
+              onAvatarTap: () {},
+              isComplete: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.check_circle));
+    await tester.pump();
+
+    expect(find.text('Profile Complete'), findsOneWidget);
+    expect(opened, 0);
+  });
+
+  testWidgets('incomplete profiles have no completion check', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ProfileSummaryCard(
+              profile: ProfileData(
+                name: 'Pal Tester',
+                schedule: 'Weekends',
+                languages: const ['English'],
+              ),
+              onTap: () {},
+              onAvatarTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.check_circle), findsNothing);
+  });
 }

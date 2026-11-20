@@ -26,7 +26,6 @@ import 'package:palturo/onboarding/skill_options.dart'
     show onboardingInterestLabel;
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_feedback.dart';
-import 'package:palturo/widgets/discoverability_status.dart';
 import 'package:palturo/widgets/profile_completion_card.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
@@ -384,15 +383,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       images.values.any((value) => value.trim().isNotEmpty);
 
   /// Reminds a mentor that no showcase keeps the profile out of discovery.
-  /// Returns true when it is safe to leave/save.
-  Future<bool> _confirmShowcaseReminder({
-    bool saving = false,
-    List<String>? skills,
-    Map<String, String>? images,
-  }) async {
-    final teaching = skills ?? _teachingSkillIds;
-    final media = images ?? _teachingSkillImages;
-    if (teaching.isEmpty || _hasAnyShowcase(media)) {
+  /// Used when leaving the editor; saving has its own combined reminder.
+  Future<bool> _confirmShowcaseReminder() async {
+    if (_teachingSkillIds.isEmpty || _hasAnyShowcase(_teachingSkillImages)) {
       return true;
     }
 
@@ -404,7 +397,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           'profile will not appear in For You, Browse, or Explore until you '
           'add at least one.',
       confirmLabel: 'Add showcase',
-      cancelLabel: saving ? 'Save anyway' : 'Leave anyway',
+      cancelLabel: 'Leave anyway',
       destructive: false,
     );
     if (!add) return true;
@@ -443,14 +436,30 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
-  Future<void> _showMissingNotesDialog(
-    List<String> labels, {
+  /// Saving is never blocked by incomplete notes or a missing showcase. Show
+  /// one reminder, let the user review, or continue and let completion track
+  /// the gap.
+  Future<bool> _confirmSaveReminder({
+    required List<String> missingNoteLabels,
     required bool learningFirst,
   }) async {
+    final needsShowcase = _needsShowcaseReminder;
+    if (missingNoteLabels.isEmpty && !needsShowcase) return true;
+
     final textTheme = Theme.of(context).colorScheme.secondary;
-    final shown = labels.take(4).toList(growable: false);
-    final extra = labels.length - shown.length;
-    await showDialog<void>(
+    final shown = missingNoteLabels.take(4).toList(growable: false);
+    final extra = missingNoteLabels.length - shown.length;
+    final lines = <String>[
+      if (missingNoteLabels.isNotEmpty)
+        'Add a note for ${shown.join(', ')}'
+            '${extra > 0 ? ' and $extra more' : ''}. '
+            'It appears on your card.',
+      if (needsShowcase)
+        'Add a showcase to a teaching skill so learners can find you in '
+            'Browse and For You.',
+    ];
+
+    final saveAnyway = await showDialog<bool>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
@@ -461,14 +470,14 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             title: Row(
               children: [
                 const Icon(
-                  Icons.sticky_note_2_outlined,
+                  Icons.playlist_add_check_circle_outlined,
                   color: AppColors.primary,
                   size: 24,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Add a skill note',
+                    'A few details are missing',
                     style: AppTextStyles.boldText.copyWith(
                       color: textTheme,
                       fontSize: 18,
@@ -478,8 +487,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
               ],
             ),
             content: Text(
-              'Your card shows a short note for each skill. Add one for '
-              '${shown.join(', ')}${extra > 0 ? ' and $extra more' : ''}.',
+              '${lines.join('\n\n')}\n\n'
+              'You can save now and finish these later. Your profile stays '
+              'marked incomplete until they are filled in.',
               style: AppTextStyles.regularText.copyWith(
                 color: textTheme.withValues(alpha: 0.8),
                 fontSize: 14,
@@ -488,23 +498,35 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: Text(
-                  'Add notes',
+                  'Review',
                   style: AppTextStyles.boldText.copyWith(
                     color: AppColors.accentText(dialogContext),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(
+                  'Save anyway',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(dialogContext),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
     );
-    if (!mounted) return;
+    if (saveAnyway == true) return true;
+    if (!mounted) return false;
     if (learningFirst) {
       await _scrollToLearningSkills();
     } else {
       await _scrollToTeachingSkills();
     }
+    return false;
   }
 
   Future<void> _handleBack() async {
@@ -806,6 +828,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       interests: _learningStyles,
       teachingStyles: _teachingStyles,
       role: _derivedRole,
+      avatarUrl: _photos.isNotEmpty ? _photos.first : null,
+      clearAvatar: _photos.isEmpty || (_photos.first?.trim().isEmpty ?? true),
       photos: [_photos.isNotEmpty ? _photos.first : null],
       learningSkillIds: _learningSkillIds,
       teachingSkillIds: _teachingSkillIds,
@@ -964,15 +988,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
-    if (!await _confirmShowcaseReminder(
-      saving: true,
-      skills: teachingSkills,
-      images: teachingSkillImages,
-    )) {
-      return;
-    }
-
-    if (!mounted) return;
     if (_ageError != null) {
       showAppError(context, _ageError!);
       return;
@@ -990,13 +1005,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       ...missingLearningNotes,
       ...missingTeachingNotes,
     ];
-    if (missingNoteLabels.isNotEmpty) {
-      await _showMissingNotesDialog(
-        missingNoteLabels,
-        learningFirst: missingLearningNotes.isNotEmpty,
-      );
+    if (!await _confirmSaveReminder(
+      missingNoteLabels: missingNoteLabels,
+      learningFirst: missingLearningNotes.isNotEmpty,
+    )) {
       return;
     }
+    if (!mounted) return;
 
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
@@ -1017,6 +1032,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         hasLearning: learningSkills.isNotEmpty,
         hasTeaching: teachingSkills.isNotEmpty,
       ),
+      avatarUrl: _photos.isNotEmpty ? _photos.first : null,
+      clearAvatar: _photos.isEmpty || (_photos.first?.trim().isEmpty ?? true),
       photos: [_photos.isNotEmpty ? _photos.first : null],
       learningSkillIds: learningSkills,
       teachingSkillIds: teachingSkills,
@@ -1095,13 +1112,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final canSave = hasChanges && !_isSaving;
     final needsShowcaseReminder = _needsShowcaseReminder;
     final wantsTeaching = _teachingSkillIds.isNotEmpty;
-    final hasAnyShowcase = _teachingSkillImages.values.any(
-      (value) => value.trim().isNotEmpty,
-    );
-    final missingShowcaseLabels = _teachingSkillIds
-        .where((id) => (_teachingSkillImages[id]?.trim() ?? '').isEmpty)
-        .map(onboardingInterestLabel)
-        .toList(growable: false);
     final completion = computeProfileCompletion(_draftProfile());
     final hasPhoto =
         _photos.any((photo) => photo?.trim().isNotEmpty == true) ||
@@ -1210,16 +1220,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         onEdit: () {},
                         showAction: false,
                         compact: true,
-                      ),
-                    ),
-                  if (wantsTeaching)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: DiscoverabilityStatusCard(
-                        wantsTeaching: wantsTeaching,
-                        hasAnyShowcase: hasAnyShowcase,
-                        missingSkillLabels: missingShowcaseLabels,
-                        onAction: _scrollToTeachingSkills,
                       ),
                     ),
                   Padding(

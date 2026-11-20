@@ -8,6 +8,7 @@ import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/theme.dart';
+import 'package:palturo/widgets/profile_completion_card.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -297,7 +298,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('saving without a skill note is blocked with guidance', (
+  testWidgets('saving without a skill note prompts but does not block', (
     tester,
   ) async {
     final service = _CapturingProfileService();
@@ -321,8 +322,14 @@ void main() {
     await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Add a skill note'), findsOneWidget);
-    expect(service.captured, isNull);
+    expect(find.text('A few details are missing'), findsOneWidget);
+    expect(find.textContaining('Add a note for'), findsOneWidget);
+
+    await tester.tap(find.text('Save anyway'));
+    await tester.pumpAndSettle();
+
+    expect(service.captured, isNotNull);
+    expect(service.captured?.teachingNotes, isEmpty);
   });
 
   testWidgets('private age and gender save with the profile', (tester) async {
@@ -376,22 +383,22 @@ void main() {
     expect(service.captured, isNull);
   });
 
-  testWidgets('discoverability status is visible at the top of the editor', (
+  testWidgets('the completion card carries the showcase requirement', (
     tester,
   ) async {
     await pumpEdit(
       tester,
       data: profile().copyWith(teachingSkillImages: const {}),
     );
-    expect(find.text('You are hidden from discovery'), findsOneWidget);
-    expect(find.text('Add a showcase'), findsOneWidget);
+    expect(find.text('Showcase'), findsOneWidget);
+    expect(find.textContaining('learners can find you'), findsOneWidget);
   });
 
-  testWidgets('discoverability status shows the complete state', (
+  testWidgets('the completion card drops showcase once media exists', (
     tester,
   ) async {
     await pumpEdit(tester);
-    expect(find.text('You are visible in discovery'), findsOneWidget);
+    expect(find.text('Showcase'), findsNothing);
   });
 
   testWidgets('teaching profile prompts but can save without a showcase', (
@@ -417,18 +424,17 @@ void main() {
     await tester.pumpAndSettle();
 
     // The reminder names the discovery cost, but it is not a hard block.
-    expect(find.text('Add a showcase?'), findsOneWidget);
+    expect(find.text('A few details are missing'), findsOneWidget);
     expect(
-      find.textContaining('will not appear in For You, Browse, or Explore'),
-      findsOneWidget,
+      find.textContaining('learners can find you in Browse and For You'),
+      findsWidgets,
     );
 
     await tester.tap(find.text('Save anyway'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Add a showcase?'), findsNothing);
-    expect(find.text('Showcase Required'), findsNothing);
+    expect(find.text('A few details are missing'), findsNothing);
     expect(find.textContaining('to PalTuro'), findsOneWidget);
     expect(service.completer.isCompleted, isFalse);
   });
@@ -455,10 +461,10 @@ void main() {
     await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Add showcase'));
+    await tester.tap(find.text('Review'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Add a showcase?'), findsNothing);
+    expect(find.text('A few details are missing'), findsNothing);
     expect(find.text('Edit Profile'), findsOneWidget);
     // The save never started.
     expect(service.completer.isCompleted, isFalse);
@@ -494,6 +500,35 @@ void main() {
     expect(service.captured?.role, OnboardingRole.teach);
     expect(service.captured?.teachingSkillIds, isNotEmpty);
     expect(service.captured?.learningSkillIds, isEmpty);
+  });
+
+  testWidgets('completion card tracks draft edits live', (tester) async {
+    await pumpEdit(tester);
+
+    String percent() {
+      final text = tester.widget<Text>(
+        find
+            .descendant(
+              of: find.byType(ProfileCompletionCard),
+              matching: find.textContaining('%'),
+            )
+            .first,
+      );
+      return text.data ?? '';
+    }
+
+    final before = percent();
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, '');
+    await tester.pump();
+
+    expect(percent(), isNot(before));
   });
 
   testWidgets('preview shows the role derived from the selected skills', (

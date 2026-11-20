@@ -83,6 +83,15 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
       complete: profile.hasAnySkill && missingNotes.isEmpty,
       weight: 2,
     ),
+    if (wantsTeaching)
+      ProfileCompletionItem(
+        label: 'Showcase',
+        detail:
+            'Add media to a teaching skill so learners can find you in '
+            'Browse and For You.',
+        complete: profile.hasAnyShowcase,
+        weight: 2,
+      ),
     ProfileCompletionItem(
       label: 'Languages',
       detail: 'Add the languages you can use with a Pal.',
@@ -107,13 +116,6 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
         detail: 'Pick how you like to teach.',
         complete: profile.teachingStyles.isNotEmpty,
         weight: 1,
-      ),
-    if (wantsTeaching)
-      ProfileCompletionItem(
-        label: 'Showcase',
-        detail: 'Add a photo or short video to a teaching skill.',
-        complete: profile.hasAnyShowcase,
-        weight: 2,
       ),
     ProfileCompletionItem(
       label: 'Age',

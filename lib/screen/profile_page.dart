@@ -27,8 +27,8 @@ import 'settings.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/resume_setup_card.dart';
 import 'package:palturo/widgets/app_chrome.dart';
+import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/user_avatar.dart';
-import 'package:palturo/widgets/discoverability_status.dart';
 import 'package:palturo/widgets/profile_completion_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -344,16 +344,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
     final profile = _profile;
-    final effectiveRole = profile?.effectiveRole;
-    final wantsTeaching =
-        effectiveRole == OnboardingRole.teach ||
-        effectiveRole == OnboardingRole.both;
-    final missingShowcaseLabels =
-        profile == null
-            ? const <String>[]
-            : profile.missingShowcaseSkillIds
-                .map((id) => _skillLabel(id, kTeachingOptions))
-                .toList(growable: false);
     final completion =
         profile == null ? null : computeProfileCompletion(profile);
 
@@ -396,25 +386,15 @@ class _ProfilePageState extends State<ProfilePage> {
                           profile: _profile!,
                           onTap: _openEdit,
                           onAvatarTap: _showMyProfile,
+                          isComplete: completion?.isComplete ?? false,
                         ),
                       ),
-                      if (completion != null)
+                      if (completion != null && !completion.isComplete)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                           child: ProfileCompletionCard(
                             completion: completion,
                             onEdit: _openEdit,
-                          ),
-                        ),
-                      if (profile != null && wantsTeaching)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                          child: DiscoverabilityStatusCard(
-                            wantsTeaching: wantsTeaching,
-                            hasAnyShowcase: profile.hasAnyShowcase,
-                            missingSkillLabels: missingShowcaseLabels,
-                            onAction: _openEdit,
-                            compact: true,
                           ),
                         ),
                       if (_showResume)
@@ -582,11 +562,15 @@ class ProfileSummaryCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onAvatarTap;
 
+  /// Owner-only completion badge. Never rendered on public cards.
+  final bool isComplete;
+
   const ProfileSummaryCard({
     super.key,
     required this.profile,
     required this.onTap,
     required this.onAvatarTap,
+    this.isComplete = false,
   });
 
   @override
@@ -643,14 +627,46 @@ class ProfileSummaryCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        profile.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.headingText.copyWith(
-                          color: textColor,
-                          fontSize: 18,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              profile.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.headingText.copyWith(
+                                color: textColor,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                          if (isComplete) ...[
+                            const SizedBox(width: 6),
+                            Semantics(
+                              container: true,
+                              button: true,
+                              label: 'Profile Complete',
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  showAppSnackBar(
+                                    context,
+                                    'Profile Complete',
+                                    tone: AppFeedbackTone.success,
+                                  );
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.check_circle,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 6),
                       Row(

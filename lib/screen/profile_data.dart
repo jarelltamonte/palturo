@@ -148,6 +148,7 @@ class ProfileData {
     String? gender,
     bool clearAge = false,
     bool clearGender = false,
+    bool clearAvatar = false,
   }) {
     return ProfileData(
       id: id ?? this.id,
@@ -155,7 +156,7 @@ class ProfileData {
       lastName: lastName ?? this.lastName,
       schedule: schedule ?? this.schedule,
       availableDays: availableDays ?? this.availableDays,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: clearAvatar ? null : (avatarUrl ?? this.avatarUrl),
       photos: photos ?? this.photos,
       bio: bio ?? this.bio,
       languages: languages ?? this.languages,

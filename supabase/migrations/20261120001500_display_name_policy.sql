@@ -159,6 +159,13 @@ begin
       using errcode = '22023';
   end if;
 
+  -- Fullwidth Latin letters can be used to slip blocklisted words past a
+  -- client-side fold. Reject them at the database boundary.
+  if v_clean ~ U&'[\FF21-\FF3A\FF41-\FF5A]' then
+    raise exception 'Names can only use letters, spaces, hyphens, and apostrophes.'
+      using errcode = '22023';
+  end if;
+
   if position('.' in v_clean) > 0 and v_clean !~ '^[^.]*\.$' then
     raise exception 'Names can only use letters, spaces, hyphens, and apostrophes.'
       using errcode = '22023';

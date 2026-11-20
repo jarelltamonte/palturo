@@ -23,7 +23,6 @@ Person _person(
 Widget _app({
   required Future<List<Person>> Function(String path, {required String kind})
   users,
-  Future<List<Person>> Function({int limit})? random,
   Future<String?> Function(
     String userId, {
     String? skillName,
@@ -34,6 +33,7 @@ Widget _app({
   Size surface = const Size(390, 844),
   double textScale = 1,
   ThemeData? theme,
+  String kind = 'teach',
 }) {
   return MaterialApp(
     theme: theme ?? lightMode,
@@ -45,9 +45,8 @@ Widget _app({
       child: ExploreExpand(
         nodePath: 'cooking_culinary',
         nodeLabel: 'Cooking & Culinary',
-        kind: 'teach',
+        kind: kind,
         usersLoader: users,
-        randomLoader: random,
         sendRequest: sendRequest,
       ),
     ),
@@ -66,72 +65,55 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('category matches come first, then random Pals fill the deck', (
+  testWidgets('the deck asks for this category and side, then ends', (
     tester,
   ) async {
+    String? seenPath;
+    String? seenKind;
     await _pump(
       tester,
       _app(
-        users:
-            (path, {required kind}) async => [
-              _person('a', 'Alpha'),
-              _person('b', 'Beta'),
-            ],
-        random: ({int limit = 20}) async => [_person('c', 'Gamma')],
+        users: (path, {required kind}) async {
+          seenPath = path;
+          seenKind = kind;
+          return [_person('a', 'Alpha'), _person('b', 'Beta')];
+        },
       ),
     );
 
-    expect(find.text('Cooking & Culinary'), findsOneWidget);
+    expect(seenPath, 'cooking_culinary');
+    expect(seenKind, 'teach');
     expect(find.text('Alpha'), findsOneWidget);
 
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
     expect(find.text('Beta'), findsOneWidget);
 
-    // The deck keeps going past the category with people from the wider pool.
+    // No unrelated top-up: past the matches the deck ends.
     await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
-    expect(find.text('Gamma'), findsOneWidget);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('You’ve seen everyone in this category.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('random fill never duplicates a category match', (tester) async {
+  testWidgets('mentor browsing asks for learners of the category', (
+    tester,
+  ) async {
+    String? seenKind;
     await _pump(
       tester,
       _app(
-        users: (path, {required kind}) async => [_person('a', 'Alpha')],
-        random:
-            ({int limit = 20}) async => [
-              _person('a', 'Alpha'),
-              _person('b', 'Beta'),
-            ],
-      ),
-    );
-
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Beta'), findsOneWidget);
-    expect(find.text('Alpha'), findsNothing);
-  });
-
-  testWidgets('a full category skips the random pool', (tester) async {
-    var randomCalls = 0;
-    final people = [for (var i = 0; i < 12; i++) _person('p$i', 'Person $i')];
-
-    await _pump(
-      tester,
-      _app(
-        users: (path, {required kind}) async => people,
-        random: ({int limit = 20}) async {
-          randomCalls++;
-          return const [];
+        kind: 'learn',
+        users: (path, {required kind}) async {
+          seenKind = kind;
+          return [_person('a', 'Alpha')];
         },
       ),
     );
 
-    expect(find.text('Person 0'), findsOneWidget);
-    expect(randomCalls, 0);
+    expect(seenKind, 'learn');
+    expect(find.text('Alpha'), findsOneWidget);
   });
 
   testWidgets('send request carries the card context and advances', (
@@ -150,7 +132,6 @@ void main() {
               _person('a', 'Alpha'),
               _person('b', 'Beta'),
             ],
-        random: ({int limit = 20}) async => const [],
         sendRequest: (id, {skillName, skillPath, source}) async {
           sentId = id;
           sentSkill = skillName;
@@ -181,7 +162,6 @@ void main() {
       tester,
       _app(
         users: (path, {required kind}) async => [_person('a', 'Alpha')],
-        random: ({int limit = 20}) async => const [],
         sendRequest: (id, {skillName, skillPath, source}) async => null,
       ),
     );
@@ -200,10 +180,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      _app(
-        users: (path, {required kind}) async => const [],
-        random: ({int limit = 20}) async => const [],
-      ),
+      _app(users: (path, {required kind}) async => const []),
     );
     // The empty state hosts a looping Lottie, so settle would never finish.
     await tester.pump();
@@ -224,7 +201,6 @@ void main() {
           if (attempts == 1) throw Exception('offline');
           return [_person('a', 'Alpha')];
         },
-        random: ({int limit = 20}) async => const [],
       ),
     );
 
@@ -242,7 +218,6 @@ void main() {
       tester,
       _app(
         users: (path, {required kind}) async => [_person('a', 'Alpha')],
-        random: ({int limit = 20}) async => const [],
         surface: const Size(360, 640),
         textScale: 2,
       ),
@@ -258,7 +233,6 @@ void main() {
       tester,
       _app(
         users: (path, {required kind}) async => [_person('a', 'Alpha')],
-        random: ({int limit = 20}) async => const [],
         theme: darkMode,
       ),
     );

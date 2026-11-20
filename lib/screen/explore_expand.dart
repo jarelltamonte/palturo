@@ -25,7 +25,6 @@ class ExploreExpand extends StatefulWidget {
   /// Test hooks. Production leaves these null.
   final Future<List<Person>> Function(String path, {required String kind})?
   usersLoader;
-  final Future<List<Person>> Function({int limit})? randomLoader;
   final Future<String?> Function(
     String userId, {
     String? skillName,
@@ -40,7 +39,6 @@ class ExploreExpand extends StatefulWidget {
     required this.nodeLabel,
     required this.kind,
     this.usersLoader,
-    this.randomLoader,
     this.sendRequest,
   });
 
@@ -49,8 +47,6 @@ class ExploreExpand extends StatefulWidget {
 }
 
 class _ExploreExpandState extends State<ExploreExpand> {
-  static const int _deckTarget = 12;
-
   List<Person> _people = const [];
   bool _loading = true;
   String? _error;
@@ -89,27 +85,6 @@ class _ExploreExpandState extends State<ExploreExpand> {
 
       final seen = <String>{};
       final unique = users.where((u) => seen.add(u.id)).toList();
-
-      // A thin category should still feel like discovery. Keep the category
-      // matches first, then top up with random Pals from the whole pool so the
-      // deck does not stop after one card.
-      if (unique.length < _deckTarget) {
-        try {
-          final random =
-              widget.randomLoader != null
-                  ? await widget.randomLoader!(limit: _deckTarget * 2)
-                  : await MatchApi.getRandomDeck(
-                    limit: _deckTarget * 2,
-                    role: widget.kind == 'teach' ? 'mentor' : 'learner',
-                  );
-          for (final person in random) {
-            if (unique.length >= _deckTarget) break;
-            if (seen.add(person.id)) unique.add(person);
-          }
-        } catch (e) {
-          debugPrint('[Browse] random fill failed: $e');
-        }
-      }
 
       if (!mounted) return;
 

@@ -30,6 +30,13 @@ import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/utils/presence_label.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 
+/// Mirrors `messages_body_check` (length(body) <= 4000) so a long paste is
+/// capped at input instead of failing as a raw Postgres error.
+const int kMessageMaxLength = 4000;
+
+/// Bound for a background thread reload.
+const Duration kChatReloadTimeout = Duration(seconds: 10);
+
 @visibleForTesting
 DateTime? peerReadTimestamp(
   Map<String, dynamic> payload, {
@@ -203,9 +210,16 @@ class _ChatRoomState extends State<ChatRoom> {
       ChatStateService.instance.enterRoom(connectionId);
       final draft = DraftService.instance.draftFor(connectionId);
       if (draft != null) {
-        _messageController.text = draft;
+        // Restored text bypasses the composer's input formatter; clamp by
+        // grapheme so a family emoji or combining mark is never split. The
+        // send guard below still enforces Postgres' code-point limit.
+        final restored =
+            draft.length > kMessageMaxLength
+                ? draft.characters.take(kMessageMaxLength).toString()
+                : draft;
+        _messageController.text = restored;
         _messageController.selection = TextSelection.collapsed(
-          offset: draft.length,
+          offset: restored.length,
         );
       }
     }
@@ -634,27 +648,37 @@ class _ChatRoomState extends State<ChatRoom> {
         .from('messages')
         .stream(primaryKey: ['id'], private: true)
         .eq('connection_id', widget.connectionId!)
-        .listen((rows) {
-          if (!mounted) return;
-          final wasAtBottom = _isNearBottom;
-          final previousCount = _messages.length;
-          setState(() {
-            _messages = _sortMessages(rows);
-            _placeUnreadDivider(_messages.length);
-            if (rows.isNotEmpty) _loadError = null;
-          });
-          if (wasAtBottom) {
-            _scrollToBottom();
-          }
-          if (rows.length > previousCount) {
-            if (!wasAtBottom) {
-              setState(() {
-                _newWhileScrolled += rows.length - previousCount;
-              });
+        .listen(
+          (rows) {
+            if (!mounted) return;
+            final wasAtBottom = _isNearBottom;
+            final previousCount = _messages.length;
+            setState(() {
+              _messages = _sortMessages(rows);
+              _placeUnreadDivider(_messages.length);
+              if (rows.isNotEmpty) _loadError = null;
+            });
+            if (wasAtBottom) {
+              _scrollToBottom();
             }
-            _broadcastRead();
-          }
-        });
+            if (rows.length > previousCount) {
+              if (!wasAtBottom) {
+                setState(() {
+                  _newWhileScrolled += rows.length - previousCount;
+                });
+              }
+              _broadcastRead();
+            }
+          },
+          // A dropped realtime channel used to stall silently: the room kept
+          // the REST snapshot and stopped receiving messages. Reload so the
+          // thread is current even if the subscription is gone.
+          onError: (Object error, StackTrace stack) {
+            debugPrint('[ChatRoom] realtime error: $error');
+            if (!mounted) return;
+            unawaited(_reloadMessagesSilently());
+          },
+        );
   }
 
   List<Map<String, dynamic>> _sortMessages(List<Map<String, dynamic>> rows) {
@@ -732,6 +756,15 @@ class _ChatRoomState extends State<ChatRoom> {
 
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
+    // The composer caps by grapheme, Postgres counts code points. Guard here
+    // so emoji-heavy text cannot reach the server's 4000-character check.
+    if (message.runes.length > kMessageMaxLength) {
+      showAppSnackBar(
+        context,
+        'That message is too long. Shorten it and try again.',
+      );
+      return;
+    }
     if (widget.connectionId == null) {
       showAppSnackBar(context, 'This chat is not ready yet.');
       return;
@@ -794,6 +827,9 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Future<void> _retryPending(PendingChatMessage pending) async {
     if (_sendingMessage) return;
+    // `_deliverPending` returns before its finally when there is no
+    // connection; guarding here keeps the send flag from sticking on.
+    if (widget.connectionId == null) return;
     setState(() {
       final index = _pending.indexWhere(
         (item) => item.localId == pending.localId,
@@ -812,7 +848,9 @@ class _ChatRoomState extends State<ChatRoom> {
     final connectionId = widget.connectionId;
     if (connectionId == null) return;
     try {
-      final msgs = await MatchApi.getMessages(connectionId);
+      final msgs = await MatchApi.getMessages(
+        connectionId,
+      ).timeout(kChatReloadTimeout);
       if (!mounted) return;
       setState(() {
         _messages = _sortMessages(msgs);
@@ -1675,6 +1713,11 @@ class _ChatRoomState extends State<ChatRoom> {
                       onTap: _scrollToBottom,
                       minLines: 1,
                       maxLines: 3,
+                      // The server rejects bodies over 4000 characters, so cap
+                      // the composer instead of failing the send afterwards.
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(kMessageMaxLength),
+                      ],
                       textInputAction: TextInputAction.newline,
                       style: AppTextStyles.regularText.copyWith(fontSize: 16),
                       decoration: InputDecoration(
@@ -2236,7 +2279,7 @@ class _EditMessageDialogState extends State<_EditMessageDialog> {
         autofocus: true,
         minLines: 1,
         maxLines: 5,
-        maxLength: 4000,
+        maxLength: kMessageMaxLength,
         textCapitalization: TextCapitalization.sentences,
         decoration: const InputDecoration(hintText: 'Message'),
       ),

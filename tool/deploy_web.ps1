@@ -5,6 +5,14 @@ $ErrorActionPreference = 'Stop'
 $appRoot = Split-Path $PSScriptRoot -Parent
 Set-Location $appRoot
 
+# Production is main-only. The post-test-survey branch is for study runs and
+# must never reach the live Worker. Set PALTURO_ALLOW_BRANCH_DEPLOY=1 only for
+# an intentional non-main deployment.
+$branch = (git rev-parse --abbrev-ref HEAD 2>$null)
+if ($branch -and $branch -ne 'main' -and $env:PALTURO_ALLOW_BRANCH_DEPLOY -ne '1') {
+  throw "Refusing to deploy '$branch'. Production deploys must run from main."
+}
+
 if (-not (Test-Path '.env.production')) {
   throw 'Missing .env.production (SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY).'
 }

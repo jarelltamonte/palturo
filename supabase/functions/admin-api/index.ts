@@ -439,6 +439,7 @@ Deno.serve(async (req) => {
         const days = clampInt(payload.days, 30, 1, 365);
         const rpc =
           surface === "growth" ? "admin_growth"
+          : surface === "users" ? "admin_user_analytics"
           : surface === "supply" ? "admin_supply"
           : surface === "matching" ? "admin_matching"
           : surface === "conversations" ? "admin_conversations"
@@ -448,7 +449,10 @@ Deno.serve(async (req) => {
           : "";
         if (!rpc) return json({ error: "Unknown analytics surface" }, 400);
         const args =
-          surface === "growth" || surface === "conversations" || surface === "activity"
+          surface === "growth" ||
+          surface === "conversations" ||
+          surface === "activity" ||
+          surface === "users"
             ? { p_days: days }
             : {};
         const { data, error } = await admin.rpc(rpc, args);

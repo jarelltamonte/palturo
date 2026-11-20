@@ -947,7 +947,7 @@ class _SkillRowState extends State<_SkillRow> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.accentText(context),
+                  color: AppColors.primary,
                 ),
               ),
             ),
@@ -1002,7 +1002,7 @@ class _SkillRowState extends State<_SkillRow> {
           border: _border(dim, 1.5, 28),
           enabledBorder: _border(dim, 1.5, 28),
           disabledBorder: _border(dim, 1.5, 28),
-          focusedBorder: _border(widget.accentColor, 1.5, 28),
+          focusedBorder: _border(AppColors.primary, 1.5, 28),
         ),
       ),
     );
@@ -1080,7 +1080,7 @@ class _SkillRowState extends State<_SkillRow> {
                                 : (categoryById(s.categoryId)?.icon ??
                                     Icons.label_outline),
                             size: 20,
-                            color: s.isCustom ? widget.accentColor : textColor,
+                            color: s.isCustom ? AppColors.primary : textColor,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1298,7 +1298,7 @@ class _SkillRowState extends State<_SkillRow> {
                   color: AppColors.mutedSurface(context),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: widget.accentColor.withValues(alpha: 0.65),
+                    color: AppColors.primary.withValues(alpha: 0.65),
                   ),
                 ),
                 child: Row(
@@ -1344,7 +1344,7 @@ class _SkillRowState extends State<_SkillRow> {
                           child: Icon(
                             Icons.swap_horiz_rounded,
                             size: 20,
-                            color: widget.accentColor,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -1389,10 +1389,10 @@ class _SkillRowState extends State<_SkillRow> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: widget.accentColor.withValues(alpha: 0.07),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: widget.accentColor.withValues(alpha: 0.45),
+                        color: AppColors.primary.withValues(alpha: 0.45),
                       ),
                     ),
                     child: Row(
@@ -1401,13 +1401,13 @@ class _SkillRowState extends State<_SkillRow> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: widget.accentColor.withValues(alpha: 0.14),
+                            color: AppColors.primary.withValues(alpha: 0.16),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             Icons.video_library_outlined,
                             size: 22,
-                            color: widget.accentColor,
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1434,8 +1434,8 @@ class _SkillRowState extends State<_SkillRow> {
                                       vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: widget.accentColor.withValues(
-                                        alpha: 0.16,
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.18,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -1470,7 +1470,7 @@ class _SkillRowState extends State<_SkillRow> {
                         Icon(
                           Icons.add_circle,
                           size: 26,
-                          color: widget.accentColor,
+                          color: AppColors.primary,
                         ),
                       ],
                     ),
@@ -1501,13 +1501,13 @@ class _SkillRowState extends State<_SkillRow> {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: widget.accentColor.withValues(alpha: 0.14),
+                color: AppColors.primary.withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 category?.icon ?? Icons.check,
                 size: 16,
-                color: widget.accentColor,
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(width: 10),

@@ -110,7 +110,7 @@ class OnboardingFinalScreen extends StatelessWidget {
                       Icon(
                         Icons.video_library_outlined,
                         size: 16,
-                        color: AppColors.accentText(context),
+                        color: AppColors.primary,
                       ),
                       const SizedBox(width: 8),
                       Expanded(

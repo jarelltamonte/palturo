@@ -233,7 +233,7 @@ class _LoginPageState extends State<LoginPage> {
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             textStyle: AppTextStyles.boldText,
                             side: BorderSide(
-                              color: AppColors.accentText(context),
+                              color: AppColors.primary,
                               width: 1,
                             ),
                             shape: const RoundedRectangleBorder(

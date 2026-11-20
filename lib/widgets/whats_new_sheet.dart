@@ -85,7 +85,7 @@ class WhatsNewSheet extends StatelessWidget {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: AppColors.accentText(context),
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                         ),

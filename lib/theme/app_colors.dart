@@ -14,6 +14,10 @@ class AppColors {
 
   /// Derived tokens. These keep the lime brand fill intact while giving text
   /// and muted controls enough contrast on light surfaces.
+  ///
+  /// Convention: fills, borders, icons, progress bars, dots, and selected
+  /// tracks use [primary] in both themes so the lime stays vivid on white.
+  /// [accentText] is for foreground text only (darker olive in light mode).
   static const Color accentTextLight = Color(0xFF5F7300);
   static const Color mutedTextLight = Color(0xFF5C6B73);
   static const Color mutedTextDark = secondary;

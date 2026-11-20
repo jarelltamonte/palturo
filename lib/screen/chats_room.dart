@@ -1743,11 +1743,7 @@ class _ChatRoomState extends State<ChatRoom> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
         child: Row(
           children: [
-            Icon(
-              Icons.verified_outlined,
-              size: 15,
-              color: AppColors.accentText(context),
-            ),
+            Icon(Icons.verified_outlined, size: 15, color: AppColors.primary),
             const SizedBox(width: 6),
             Text(
               'Feedback submitted. Thank you!',
@@ -1780,9 +1776,7 @@ class _ChatRoomState extends State<ChatRoom> {
                     open ? Icons.star_outline : Icons.lock_clock,
                     size: 16,
                     color:
-                        open
-                            ? AppColors.accentText(context)
-                            : AppColors.mutedText(context),
+                        open ? AppColors.primary : AppColors.mutedText(context),
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -1831,11 +1825,7 @@ class _ChatRoomState extends State<ChatRoom> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.star_outline,
-                  size: 17,
-                  color: AppColors.accentText(context),
-                ),
+                Icon(Icons.star_outline, size: 17, color: AppColors.primary),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
@@ -1948,7 +1938,7 @@ class _ChatRoomState extends State<ChatRoom> {
         children: [
           Expanded(
             child: Divider(
-              color: AppColors.accentText(context).withValues(alpha: 0.5),
+              color: AppColors.primary.withValues(alpha: 0.55),
               thickness: 1,
             ),
           ),
@@ -1965,7 +1955,7 @@ class _ChatRoomState extends State<ChatRoom> {
           ),
           Expanded(
             child: Divider(
-              color: AppColors.accentText(context).withValues(alpha: 0.5),
+              color: AppColors.primary.withValues(alpha: 0.55),
               thickness: 1,
             ),
           ),
@@ -2148,10 +2138,7 @@ class _ChatRoomState extends State<ChatRoom> {
                         isDeleted
                             ? Border.all(color: AppColors.border(context))
                             : _highlightedMessageKey == messageKey
-                            ? Border.all(
-                              color: AppColors.accentText(context),
-                              width: 2,
-                            )
+                            ? Border.all(color: AppColors.primary, width: 2)
                             : null,
                   ),
                   child: Text(

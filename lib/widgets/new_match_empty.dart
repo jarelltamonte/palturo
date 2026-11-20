@@ -543,7 +543,6 @@ class _StarterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = AppColors.mutedText(context);
-    final accent = AppColors.accentText(context);
     return Container(
       width: width,
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -603,12 +602,12 @@ class _StarterCard extends StatelessWidget {
                             height: 30,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: accent.withValues(alpha: 0.14),
+                              color: AppColors.primary.withValues(alpha: 0.16),
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.add_rounded,
                               size: 14,
-                              color: accent,
+                              color: AppColors.primary,
                             ),
                           ),
                         ),
@@ -634,7 +633,7 @@ class _Dots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (count <= 0) return const SizedBox.shrink();
-    final on = AppColors.accentText(context);
+    final on = AppColors.primary;
     final off = AppColors.border(context);
     return Semantics(
       liveRegion: true,

@@ -197,7 +197,7 @@ class _ShowcaseNotice extends StatelessWidget {
               child: Icon(
                 Icons.visibility_off_outlined,
                 size: 18,
-                color: AppColors.accentText(context),
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(width: 12),

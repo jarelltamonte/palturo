@@ -1160,7 +1160,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: AppColors.accentText(context),
+                      color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1467,7 +1467,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             Icon(
                               Icons.badge_outlined,
                               size: 16,
-                              color: AppColors.accentText(context),
+                              color: AppColors.primary,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -2130,7 +2130,7 @@ class _PhotoPickerRow extends StatelessWidget {
                   icon: Icon(
                     Icons.photo_camera_outlined,
                     size: 16,
-                    color: AppColors.accentText(context),
+                    color: AppColors.primary,
                   ),
                   label: Text(
                     'Change photo',

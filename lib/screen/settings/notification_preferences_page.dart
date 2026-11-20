@@ -282,7 +282,7 @@ class NotificationPreferencesPage extends StatelessWidget {
         trailing = Icon(
           Icons.check_circle_outline,
           size: 18,
-          color: AppColors.accentText(context),
+          color: AppColors.success,
         );
       case NotificationPermissionStatus.denied:
         subtitle =
@@ -406,7 +406,7 @@ class NotificationPreferencesPage extends StatelessWidget {
               color:
                   onPreview == null
                       ? AppColors.mutedText(context)
-                      : AppColors.accentText(context),
+                      : AppColors.primary,
             ),
           ),
           Switch.adaptive(
@@ -531,7 +531,7 @@ class NotificationPreferencesPage extends StatelessWidget {
             child: Icon(
               Icons.person_outline,
               size: 16,
-              color: AppColors.accentText(context),
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(width: 10),

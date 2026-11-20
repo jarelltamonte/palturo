@@ -157,7 +157,7 @@ class _ChatPrivacyPageState extends State<ChatPrivacyPage> {
                     Icon(
                       Icons.lock_outline,
                       size: 18,
-                      color: AppColors.accentText(context),
+                      color: AppColors.primary,
                     ),
                     const SizedBox(width: 10),
                     Expanded(

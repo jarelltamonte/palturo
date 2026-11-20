@@ -800,7 +800,7 @@ class _MatchesState extends State<Matches> {
                             style: AppTextStyles.regularText.copyWith(
                               color: textTheme,
                             ),
-                            cursorColor: AppColors.accentText(context),
+                            cursorColor: AppColors.primary,
                             decoration: InputDecoration(
                               hintText: 'Search pals',
                               hintStyle: AppTextStyles.regularText.copyWith(

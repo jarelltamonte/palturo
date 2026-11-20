@@ -486,11 +486,7 @@ class _RequestCardState extends State<RequestCard>
                 spacing: 5,
                 runSpacing: 2,
                 children: [
-                  Icon(
-                    _sourceIcon,
-                    size: 13,
-                    color: AppColors.accentText(context),
-                  ),
+                  Icon(_sourceIcon, size: 13, color: AppColors.primary),
                   Text(
                     _sourceLabel!,
                     style: AppTextStyles.regularText.copyWith(

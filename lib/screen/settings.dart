@@ -193,10 +193,10 @@ class _SettingsState extends State<Settings> {
                             ),
                           ),
                           if (selected)
-                            Icon(
+                            const Icon(
                               Icons.check_circle,
                               size: 18,
-                              color: AppColors.accentText(context),
+                              color: AppColors.primary,
                             ),
                         ],
                       ),

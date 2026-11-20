@@ -543,6 +543,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   Widget _buildHero() {
     final muted = AppColors.mutedText(context);
     final accent = AppColors.accentText(context);
+    final fill = AppColors.primary;
     final count = _total;
     final teachBlocked = _mentor && !_canBrowse;
     final isDomain = widget.nodeDepth <= 1;
@@ -565,7 +566,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
           color:
               isDomain
                   ? AppColors.border(context)
-                  : accent.withValues(alpha: 0.28),
+                  : fill.withValues(alpha: 0.35),
         ),
       ),
       child: Column(
@@ -584,7 +585,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                 child: Icon(
                   exploreRootIcon(widget.nodePath),
                   size: iconSize * 0.5,
-                  color: accent,
+                  color: fill,
                 ),
               ),
               const SizedBox(width: 12),
@@ -770,7 +771,6 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   }
 
   Widget _buildTeachPanel(Color muted) {
-    final accent = AppColors.accentText(context);
     final teachesUnder = _teachingPaths.any(
       (path) => path.startsWith('${widget.nodePath}.'),
     );
@@ -791,7 +791,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.school_outlined, size: 20, color: accent),
+              Icon(Icons.school_outlined, size: 20, color: AppColors.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1012,7 +1012,7 @@ class _SkillRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.accentText(context).withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(

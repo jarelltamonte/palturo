@@ -166,7 +166,7 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
             onSubmitted: (_) => _submit(),
             textInputAction: TextInputAction.search,
             textCapitalization: TextCapitalization.words,
-            cursorColor: AppColors.accentText(context),
+            cursorColor: AppColors.primary,
             style: AppTextStyles.regularText.copyWith(
               color: textTheme,
               fontSize: 15,
@@ -210,10 +210,7 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(24),
-                borderSide: BorderSide(
-                  color: AppColors.accentText(context),
-                  width: 1.5,
-                ),
+                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
               ),
             ),
           ),
@@ -362,7 +359,7 @@ class _SkillCheckDialogState extends State<_SkillCheckDialog> {
                 height: 34,
                 child: CircularProgressIndicator(
                   strokeWidth: 3,
-                  color: AppColors.accentText(context),
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(height: 18),

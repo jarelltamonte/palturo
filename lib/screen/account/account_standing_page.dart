@@ -68,16 +68,17 @@ class _AccountStandingPageState extends State<AccountStandingPage> {
       setState(() {
         _warnings = _warnings
             .map(
-              (item) => item.id == warning.id
-                  ? AccountWarning(
-                    id: item.id,
-                    category: item.category,
-                    message: item.message,
-                    createdAt: item.createdAt,
-                    visibleUntil: item.visibleUntil,
-                    acknowledgedAt: DateTime.now().toUtc(),
-                  )
-                  : item,
+              (item) =>
+                  item.id == warning.id
+                      ? AccountWarning(
+                        id: item.id,
+                        category: item.category,
+                        message: item.message,
+                        createdAt: item.createdAt,
+                        visibleUntil: item.visibleUntil,
+                        acknowledgedAt: DateTime.now().toUtc(),
+                      )
+                      : item,
             )
             .toList(growable: false);
       });
@@ -171,11 +172,7 @@ class _AccountStandingPageState extends State<AccountStandingPage> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.shield_outlined,
-                size: 18,
-                color: AppColors.accentText(context),
-              ),
+              Icon(Icons.shield_outlined, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

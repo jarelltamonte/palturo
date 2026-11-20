@@ -34,7 +34,7 @@ class ResumeSetupCard extends StatelessWidget {
             children: [
               Icon(
                 Icons.play_circle_outline,
-                color: AppColors.accentText(context),
+                color: AppColors.primary,
                 size: 22,
               ),
               const SizedBox(width: 10),

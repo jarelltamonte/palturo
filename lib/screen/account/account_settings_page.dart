@@ -226,7 +226,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                       Icon(
                         Icons.verified_outlined,
                         size: 14,
-                        color: AppColors.accentText(context),
+                        color: AppColors.primary,
                       ),
                       const SizedBox(width: 4),
                       Text(

@@ -615,13 +615,13 @@ class _ActivityRow extends StatelessWidget {
             decoration: BoxDecoration(
               color:
                   unread
-                      ? AppColors.accentText(context).withValues(alpha: 0.08)
+                      ? AppColors.primary.withValues(alpha: 0.12)
                       : AppColors.elevatedSurface(context),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color:
                     unread
-                        ? AppColors.accentText(context).withValues(alpha: 0.45)
+                        ? AppColors.primary.withValues(alpha: 0.5)
                         : AppColors.border(context),
               ),
             ),
@@ -635,11 +635,7 @@ class _ActivityRow extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.16),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    view.icon,
-                    size: 19,
-                    color: AppColors.accentText(context),
-                  ),
+                  child: Icon(view.icon, size: 19, color: AppColors.primary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -661,8 +657,8 @@ class _ActivityRow extends StatelessWidget {
                             Container(
                               width: 8,
                               height: 8,
-                              decoration: BoxDecoration(
-                                color: AppColors.accentText(context),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
                                 shape: BoxShape.circle,
                               ),
                             ),

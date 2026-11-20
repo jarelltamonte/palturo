@@ -682,7 +682,7 @@ class _ChatsPageState extends State<ChatsPage> {
         titleSpacing: AppSpacing.titleSpacing,
         title:
             _isSearching
-                ? _buildSearchField(textTheme, AppColors.accentText(context))
+                ? _buildSearchField(textTheme, AppColors.primary)
                 : Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1113,7 +1113,7 @@ class ChatListItem extends StatelessWidget {
                         Icon(
                           Icons.arrow_forward_rounded,
                           size: 16,
-                          color: AppColors.accentText(context),
+                          color: AppColors.primary,
                         ),
                       ],
                       if (muted) ...[

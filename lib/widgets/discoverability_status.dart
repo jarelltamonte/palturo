@@ -93,7 +93,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
                         ? Icons.visibility_off_outlined
                         : Icons.auto_awesome_outlined,
                     size: compact ? 18 : 20,
-                    color: accent,
+                    color: complete ? AppColors.success : fill,
                   ),
                 ),
                 const SizedBox(width: 12),

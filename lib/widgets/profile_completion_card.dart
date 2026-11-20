@@ -62,7 +62,7 @@ class ProfileCompletionCard extends StatelessWidget {
                   child: Icon(
                     complete ? Icons.check_circle_outline : Icons.donut_large,
                     size: 18,
-                    color: complete ? AppColors.success : accent,
+                    color: complete ? AppColors.success : fill,
                   ),
                 ),
                 const SizedBox(width: 10),

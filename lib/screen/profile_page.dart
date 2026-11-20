@@ -545,7 +545,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     icon: Icon(
                                       Icons.edit_outlined,
                                       size: 20,
-                                      color: AppColors.accentText(context),
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ),
@@ -788,7 +788,7 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = AppColors.accentText(context);
+    final iconColor = AppColors.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),

@@ -223,7 +223,7 @@ class _BannerCard extends StatelessWidget {
     final accent = AppColors.accentText(context);
     final border =
         data.isMatch
-            ? accent.withValues(alpha: 0.65)
+            ? AppColors.primary.withValues(alpha: 0.65)
             : AppColors.border(context);
     final semanticLabel =
         '${data.title}. ${data.body}'
@@ -389,7 +389,7 @@ class _BannerLeading extends StatelessWidget {
       child: Icon(
         data.isMatch ? Icons.celebration_outlined : data.icon,
         size: 19,
-        color: AppColors.accentText(context),
+        color: AppColors.primary,
       ),
     );
   }

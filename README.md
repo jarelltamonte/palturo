@@ -289,9 +289,10 @@ current README.
 - Profile and showcase URLs are constrained to the project storage origin.
 - The CSP allows only self, Supabase, and the font/script hosts the app needs.
 - Anonymous execution is limited to the rate-limited `report_client_error`
-  helper plus four pure, side-effect-free URL/slug helpers. Every
-  security-definer function is either revoked from client roles or returns
-  `trigger` (which PostgREST does not expose).
+  helper plus four pure, side-effect-free URL/slug helpers. Internal
+  security-definer helpers are either revoked from client roles or return
+  `trigger` (which PostgREST does not expose); the app RPCs stay callable by
+  authenticated users.
 - Never commit `.env`, `.env.cli`, or `.env.cloudflare`.
 
 ## Known limitations

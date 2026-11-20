@@ -687,7 +687,9 @@ class ProfileService {
       final profileWithProofs = profile.copyWith(
         teachingSkillImages: proofImages,
         age: age,
+        clearAge: age == null,
         gender: gender,
+        clearGender: gender == null,
       );
 
       final learningNotes = <String, String>{};

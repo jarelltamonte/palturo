@@ -15,10 +15,14 @@ class CardGuideOverlay extends StatefulWidget {
     super.key,
     required this.keys,
     required this.onFinished,
+    this.showShowcaseStep = false,
+    this.onOpenProfile,
   });
 
   final CardGuideKeys keys;
   final Future<void> Function() onFinished;
+  final bool showShowcaseStep;
+  final VoidCallback? onOpenProfile;
 
   @override
   State<CardGuideOverlay> createState() => _CardGuideOverlayState();
@@ -71,6 +75,20 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
     ),
   ];
 
+  static const CardGuideStep _showcaseStep = CardGuideStep(
+    target: null,
+    showcaseStep: true,
+    title: 'One more step for mentors',
+    body:
+        'Learners can only find you when your teaching skills have a '
+        'showcase. Add a photo or short video in Profile when you are ready.',
+  );
+
+  List<CardGuideStep> get _all => [
+    ..._allSteps,
+    if (widget.showShowcaseStep) _showcaseStep,
+  ];
+
   int _index = 0;
   bool _finishing = false;
 
@@ -84,7 +102,8 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
     });
   }
 
-  Rect? _rectFor(CardGuideTarget target) {
+  Rect? _rectFor(CardGuideTarget? target) {
+    if (target == null) return null;
     final context = widget.keys.forTarget(target)?.currentContext;
     if (context == null) return null;
     final box = context.findRenderObject();
@@ -94,10 +113,11 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
   }
 
   List<CardGuideStep> get _steps {
-    final available = _allSteps
-        .where((step) => _rectFor(step.target) != null)
+    final all = _all;
+    final available = all
+        .where((step) => step.target == null || _rectFor(step.target) != null)
         .toList(growable: false);
-    if (available.isEmpty) return _allSteps.take(1).toList(growable: false);
+    if (available.isEmpty) return all.take(1).toList(growable: false);
     return available;
   }
 
@@ -123,7 +143,7 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final motion = reduceMotion ? Duration.zero : AppMotion.base;
     final maxWidth = math.min(380.0, size.width - 32);
-    final maxHeight = math.min(260.0, size.height * 0.42);
+    final maxHeight = math.min(320.0, size.height * 0.5);
 
     final double top;
     if (targetRect == null) {
@@ -144,46 +164,49 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
             )
             .toDouble();
 
-    return PopScope(
-      canPop: false,
-      child: Material(
-        type: MaterialType.transparency,
-        child: Semantics(
-          scopesRoute: true,
-          namesRoute: true,
-          explicitChildNodes: true,
-          label: 'Card guide',
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {},
-                  child: CustomPaint(
-                    painter: _SpotlightPainter(
-                      hole: targetRect,
-                      borderColor: AppColors.primary,
-                      scrimColor: Colors.black.withValues(alpha: 0.74),
-                    ),
+    return Material(
+      type: MaterialType.transparency,
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        label: 'Card guide',
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {},
+                child: CustomPaint(
+                  painter: _SpotlightPainter(
+                    hole: targetRect,
+                    borderColor: AppColors.primary,
+                    scrimColor: Colors.black.withValues(alpha: 0.74),
                   ),
                 ),
               ),
-              AnimatedPositioned(
-                duration: motion,
-                curve: Curves.easeOutCubic,
-                top: clampedTop,
-                left: (size.width - maxWidth) / 2,
-                width: maxWidth,
-                child: _GuideTooltip(
-                  index: index,
-                  total: steps.length,
-                  step: step,
-                  maxHeight: maxHeight,
-                  onNext: _next,
-                ),
+            ),
+            AnimatedPositioned(
+              duration: motion,
+              curve: Curves.easeOutCubic,
+              top: clampedTop,
+              left: (size.width - maxWidth) / 2,
+              width: maxWidth,
+              child: _GuideTooltip(
+                index: index,
+                total: steps.length,
+                step: step,
+                maxHeight: maxHeight,
+                onNext: _next,
+                onShowcasePrimary:
+                    step.showcaseStep
+                        ? () async {
+                          await _next();
+                          widget.onOpenProfile?.call();
+                        }
+                        : null,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -197,6 +220,7 @@ class _GuideTooltip extends StatelessWidget {
     required this.step,
     required this.maxHeight,
     required this.onNext,
+    this.onShowcasePrimary,
   });
 
   final int index;
@@ -204,6 +228,7 @@ class _GuideTooltip extends StatelessWidget {
   final CardGuideStep step;
   final double maxHeight;
   final VoidCallback onNext;
+  final Future<void> Function()? onShowcasePrimary;
 
   @override
   Widget build(BuildContext context) {
@@ -267,7 +292,7 @@ class _GuideTooltip extends StatelessWidget {
                   value: (index + 1) / total,
                   minHeight: 3,
                   backgroundColor: AppColors.mutedSurface(context),
-                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
               ),
               const SizedBox(height: 12),
@@ -288,27 +313,66 @@ class _GuideTooltip extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: onNext,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.black,
-                    minimumSize: const Size(0, 44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
+              if (step.showcaseStep) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed:
+                        onShowcasePrimary == null
+                            ? null
+                            : () {
+                              onShowcasePrimary!();
+                            },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.black,
+                      minimumSize: const Size(0, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    last ? 'Start exploring' : 'Next',
-                    style: AppTextStyles.boldText.copyWith(
-                      color: AppColors.black,
-                      fontSize: 13,
+                    child: Text(
+                      'Go to Profile',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: AppColors.black,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
-              ),
+                TextButton(
+                  onPressed: onNext,
+                  child: Text(
+                    'Do Later',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ] else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onNext,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.black,
+                      minimumSize: const Size(0, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                    ),
+                    child: Text(
+                      last ? 'Start exploring' : 'Next',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: AppColors.black,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -332,27 +396,41 @@ class _SpotlightPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final screen = Offset.zero & size;
     final holeRect = hole?.inflate(6).intersect(screen);
-    final path = Path()..addRect(screen);
-    if (holeRect != null && !holeRect.isEmpty) {
-      final rounded = RRect.fromRectAndRadius(
-        holeRect,
-        const Radius.circular(22),
-      );
-      final cutout = Path()..addRRect(rounded);
-      canvas.drawPath(
-        Path.combine(PathOperation.difference, path, cutout),
-        Paint()..color = scrimColor,
-      );
-      canvas.drawRRect(
-        rounded,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = borderColor,
-      );
-    } else {
-      canvas.drawPath(path, Paint()..color = scrimColor);
+    final paint = Paint()..color = scrimColor;
+
+    if (holeRect == null || holeRect.isEmpty) {
+      canvas.drawRect(screen, paint);
+      return;
     }
+
+    // Draw four opaque regions around the cutout instead of subtracting paths.
+    // Path.combine differs between renderers; this leaves the card genuinely
+    // un-dimmed on web and mobile.
+    canvas.drawRect(Rect.fromLTRB(0, 0, size.width, holeRect.top), paint);
+    canvas.drawRect(
+      Rect.fromLTRB(0, holeRect.bottom, size.width, size.height),
+      paint,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(0, holeRect.top, holeRect.left, holeRect.bottom),
+      paint,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(holeRect.right, holeRect.top, size.width, holeRect.bottom),
+      paint,
+    );
+
+    final rounded = RRect.fromRectAndRadius(
+      holeRect,
+      const Radius.circular(22),
+    );
+    canvas.drawRRect(
+      rounded,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = borderColor,
+    );
   }
 
   @override

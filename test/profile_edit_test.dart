@@ -69,6 +69,21 @@ class _CapturingProfileService implements ProfileService {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _HoldProfileService implements ProfileService {
+  final Completer<ProfileData> completer = Completer<ProfileData>();
+
+  @override
+  Future<ProfileData> updateProfile(
+    ProfileData updatedProfile, {
+    List<String?>? newPhotoLocalPaths,
+    Map<String, String>? teachingSkillImages,
+    void Function(String skillName)? onClassifyingSkill,
+  }) => completer.future;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
@@ -89,6 +104,13 @@ void main() {
     role: OnboardingRole.both,
     learningSkillIds: const ['other:Learning skill:arts_design'],
     teachingSkillIds: const ['other:Teaching skill:everyday_skills'],
+    learningNotes: const {
+      'other:Learning skill:arts_design': 'I want to learn design.',
+    },
+    teachingNotes: const {
+      'other:Teaching skill:everyday_skills':
+          'I can teach practical everyday skills.',
+    },
     teachingSkillImages: const {
       'other:Teaching skill:everyday_skills':
           'https://example.test/showcase.png',
@@ -210,7 +232,7 @@ void main() {
     // Make the draft dirty so Save is enabled.
     await tester.enterText(find.byType(TextField).first, 'Updated bio');
     await tester.pump();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Skill not added'), findsOneWidget);
@@ -232,7 +254,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, 'Updated bio');
     await tester.pump();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save').first);
     await tester.pump();
 
     expect(find.textContaining('Weaving Sleeping Mat'), findsOneWidget);
@@ -245,6 +267,59 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
+  });
+
+  testWidgets('save overlay rotates reassuring progress copy', (tester) async {
+    final service = _HoldProfileService();
+    await pumpEdit(tester, service: service);
+
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, 'Updated bio');
+    await tester.pump();
+
+    await tester.tap(find.text('Save').first);
+    await tester.pump();
+    expect(find.text('Saving your profile...'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.text('Preparing your card and notes...'), findsOneWidget);
+
+    service.completer.complete(profile().copyWith(bio: 'Updated bio'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('saving without a skill note is blocked with guidance', (
+    tester,
+  ) async {
+    final service = _CapturingProfileService();
+    await pumpEdit(
+      tester,
+      service: service,
+      data: profile().copyWith(teachingNotes: const {}),
+    );
+
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, 'Updated bio');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Save').first);
+    await tester.tap(find.text('Save').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add a skill note'), findsOneWidget);
+    expect(service.captured, isNull);
   });
 
   testWidgets('private age and gender save with the profile', (tester) async {
@@ -260,15 +335,15 @@ void main() {
     await tester.enterText(ageField, '29');
     await tester.pump();
 
-    await tester.ensureVisible(find.text('Gender'));
+    await tester.ensureVisible(find.text('Gender').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Gender'));
+    await tester.tap(find.text('Gender').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Woman'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Save'));
-    await tester.tap(find.text('Save'));
+    await tester.ensureVisible(find.text('Save').first);
+    await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
     expect(service.captured?.age, 29);
@@ -291,8 +366,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Enter an age between 13 and 120.'), findsOneWidget);
-    await tester.ensureVisible(find.text('Save'));
-    await tester.tap(find.text('Save'));
+    await tester.ensureVisible(find.text('Save').first);
+    await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
     expect(service.captured, isNull);
@@ -335,7 +410,7 @@ void main() {
     );
     await tester.enterText(bioField, 'Updated bio');
     await tester.pump();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
     // The reminder names the discovery cost, but it is not a hard block.
@@ -374,7 +449,7 @@ void main() {
     );
     await tester.enterText(bioField, 'Updated bio');
     await tester.pump();
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Add showcase'));

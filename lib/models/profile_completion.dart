@@ -47,6 +47,15 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
       profile.avatarUrl?.trim().isNotEmpty == true ||
       profile.photos.any((photo) => photo?.trim().isNotEmpty == true);
 
+  final missingNotes = <String>[
+    ...profile.learningSkillIds.where(
+      (id) => (profile.learningNotes[id]?.trim() ?? '').isEmpty,
+    ),
+    ...profile.teachingSkillIds.where(
+      (id) => (profile.teachingNotes[id]?.trim() ?? '').isEmpty,
+    ),
+  ];
+
   final items = <ProfileCompletionItem>[
     ProfileCompletionItem(
       label: 'Profile photo',
@@ -65,6 +74,12 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
       detail: 'Choose whether you learn, teach, or both, then add a skill.',
       complete: profile.role != null && profile.hasAnySkill,
       weight: 3,
+    ),
+    ProfileCompletionItem(
+      label: 'Skill notes',
+      detail: 'Add a note to each skill. It appears on your card.',
+      complete: profile.hasAnySkill && missingNotes.isEmpty,
+      weight: 2,
     ),
     ProfileCompletionItem(
       label: 'Languages',

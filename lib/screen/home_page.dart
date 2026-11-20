@@ -12,6 +12,7 @@ import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/explore_deck_page.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
+import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
@@ -164,6 +165,7 @@ class _HomePageState extends State<HomePage> {
   );
   bool _guideActive = false;
   bool _guideChecked = false;
+  OverlayEntry? _guideEntry;
 
   @override
   void initState() {
@@ -180,6 +182,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _guideEntry?.remove();
+    _guideEntry = null;
     _slowTimer?.cancel();
     _timeoutTimer?.cancel();
     super.dispose();
@@ -355,31 +359,32 @@ class _HomePageState extends State<HomePage> {
   Future<void> _openCardGuide() async {
     if (!mounted || _guideActive) return;
     if (_people.isEmpty || _currentIndex >= _people.length) return;
+    final overlay = Overlay.of(context, rootOverlay: true);
     setState(() => _guideActive = true);
-    await showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.transparent,
-      transitionDuration:
-          MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 220),
-      pageBuilder:
-          (dialogContext, _, __) => CardGuideOverlay(
+
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder:
+          (_) => CardGuideOverlay(
             keys: _guideKeys,
+            showShowcaseStep:
+                _myProfile?.role == OnboardingRole.teach ||
+                _myProfile?.role == OnboardingRole.both,
+            onOpenProfile: () => AppRouter.openProfile(),
             onFinished: () async {
               await CardGuideService.instance.markSeen();
-              if (dialogContext.mounted) {
-                Navigator.of(dialogContext).pop();
-              }
+              entry.remove();
+              if (identical(_guideEntry, entry)) _guideEntry = null;
+              if (!mounted) return;
+              setState(() {
+                _guideActive = false;
+                _guideChecked = true;
+              });
             },
           ),
     );
-    if (!mounted) return;
-    setState(() {
-      _guideActive = false;
-      _guideChecked = true;
-    });
+    _guideEntry = entry;
+    overlay.insert(entry);
   }
 
   String get _roleKey => switch (_roleFilter) {
@@ -979,194 +984,204 @@ class _HomePageState extends State<HomePage> {
             ? _buildDeck(people)
             : _buildExhaustedState();
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        toolbarHeight: AppSpacing.topBarHeight(),
-        backgroundColor: Colors.transparent,
-        titleSpacing: 0,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Padding(
-          padding: EdgeInsets.only(
-            left: desktop ? AppSpacing.titleSpacing : AppSpacing.pageHorizontal,
-            right: (16.0 - (AppSpacing.iconTarget - 24) / 2).clamp(0.0, 16.0),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (desktop)
-                Text(
-                  'For You',
-                  style: AppTextStyles.headingText.copyWith(color: textTheme),
-                )
-              else
-                Transform.translate(
-                  offset: const Offset(-10, 0),
-                  child: Image.asset(
-                    isDarkMode
-                        ? 'assets/images/hlogo_white.png'
-                        : 'assets/images/hlogo_black.png',
-                    height: 40,
+    return PopScope(
+      canPop: !_guideActive,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        appBar: AppBar(
+          toolbarHeight: AppSpacing.topBarHeight(),
+          backgroundColor: Colors.transparent,
+          titleSpacing: 0,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          title: Padding(
+            padding: EdgeInsets.only(
+              left:
+                  desktop ? AppSpacing.titleSpacing : AppSpacing.pageHorizontal,
+              right: (16.0 - (AppSpacing.iconTarget - 24) / 2).clamp(0.0, 16.0),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (desktop)
+                  Text(
+                    'For You',
+                    style: AppTextStyles.headingText.copyWith(color: textTheme),
+                  )
+                else
+                  Transform.translate(
+                    offset: const Offset(-10, 0),
+                    child: Image.asset(
+                      isDarkMode
+                          ? 'assets/images/hlogo_white.png'
+                          : 'assets/images/hlogo_black.png',
+                      height: 40,
+                    ),
                   ),
-                ),
-              Row(
-                children: [
-                  ListenableBuilder(
-                    listenable: NotificationService.instance,
-                    builder: (context, _) {
-                      final unread =
-                          PreferencesService.instance.notificationsEnabled
-                              ? NotificationService.instance.unread
-                              : 0;
-                      final label =
-                          unread > 0 ? 'Activity, $unread unread' : 'Activity';
-                      return Semantics(
-                        button: true,
-                        label: label,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => AppRouter.openActivity(),
-                          child: SizedBox(
-                            width: AppSpacing.iconTarget,
-                            height: AppSpacing.iconTarget,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Align(
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    Icons.notifications_none_rounded,
-                                    color: textTheme,
-                                    size: 24,
+                Row(
+                  children: [
+                    ListenableBuilder(
+                      listenable: NotificationService.instance,
+                      builder: (context, _) {
+                        final unread =
+                            PreferencesService.instance.notificationsEnabled
+                                ? NotificationService.instance.unread
+                                : 0;
+                        final label =
+                            unread > 0
+                                ? 'Activity, $unread unread'
+                                : 'Activity';
+                        return Semantics(
+                          button: true,
+                          label: label,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => AppRouter.openActivity(),
+                            child: SizedBox(
+                              width: AppSpacing.iconTarget,
+                              height: AppSpacing.iconTarget,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      Icons.notifications_none_rounded,
+                                      color: textTheme,
+                                      size: 24,
+                                    ),
                                   ),
-                                ),
-                                if (unread > 0)
-                                  Positioned(
-                                    right: -2,
-                                    top: 8,
-                                    child: Container(
-                                      constraints: const BoxConstraints(
-                                        minWidth: 16,
-                                      ),
-                                      height: 16,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        unread > 99 ? '99+' : '$unread',
-                                        style: const TextStyle(
-                                          color: Colors.black,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1,
+                                  if (unread > 0)
+                                    Positioned(
+                                      right: -2,
+                                      top: 8,
+                                      child: Container(
+                                        constraints: const BoxConstraints(
+                                          minWidth: 16,
+                                        ),
+                                        height: 16,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Text(
+                                          unread > 99 ? '99+' : '$unread',
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            height: 1,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                  Semantics(
-                    button: true,
-                    enabled: _history.isNotEmpty,
-                    label: 'Undo last person',
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap:
-                          _history.isEmpty || _sendingRequest || _undoing
-                              ? null
-                              : _undo,
-                      child: SizedBox(
-                        width: AppSpacing.iconTarget,
-                        height: AppSpacing.iconTarget,
-                        child: Align(
-                          alignment: Alignment.center,
-                          child: Icon(
-                            CupertinoIcons.arrow_uturn_left,
-                            color:
-                                _history.isEmpty || _sendingRequest || _undoing
-                                    ? textTheme.withValues(alpha: 0.3)
-                                    : textTheme,
-                            size: 24,
+                        );
+                      },
+                    ),
+                    Semantics(
+                      button: true,
+                      enabled: _history.isNotEmpty,
+                      label: 'Undo last person',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap:
+                            _history.isEmpty || _sendingRequest || _undoing
+                                ? null
+                                : _undo,
+                        child: SizedBox(
+                          width: AppSpacing.iconTarget,
+                          height: AppSpacing.iconTarget,
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: Icon(
+                              CupertinoIcons.arrow_uturn_left,
+                              color:
+                                  _history.isEmpty ||
+                                          _sendingRequest ||
+                                          _undoing
+                                      ? textTheme.withValues(alpha: 0.3)
+                                      : textTheme,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  Semantics(
-                    button: true,
-                    label: 'Filter recommendations',
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _openFilterSheet,
-                      child: SizedBox(
-                        width: AppSpacing.iconTarget,
-                        height: AppSpacing.iconTarget,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Align(
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.tune,
-                                color: textTheme,
-                                size: 24,
-                              ),
-                            ),
-                            if (_hasActiveFilter)
-                              Positioned(
-                                right: 10,
-                                top: 10,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFB0CE13),
-                                    shape: BoxShape.circle,
-                                  ),
+                    Semantics(
+                      button: true,
+                      label: 'Filter recommendations',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _openFilterSheet,
+                        child: SizedBox(
+                          width: AppSpacing.iconTarget,
+                          height: AppSpacing.iconTarget,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Align(
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.tune,
+                                  color: textTheme,
+                                  size: 24,
                                 ),
                               ),
-                          ],
+                              if (_hasActiveFilter)
+                                Positioned(
+                                  right: 10,
+                                  top: 10,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFB0CE13),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          desktop
-              ? 24
-              : MediaQuery.textScalerOf(context).scale(12) > 16
-              ? 112
-              : 90,
-        ),
-        child:
+        body: Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
             desktop
-                ? Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 460),
-                    child: content,
-                  ),
-                )
-                : content,
+                ? 24
+                : MediaQuery.textScalerOf(context).scale(12) > 16
+                ? 112
+                : 90,
+          ),
+          child:
+              desktop
+                  ? Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: content,
+                    ),
+                  )
+                  : content,
+        ),
       ),
     );
   }

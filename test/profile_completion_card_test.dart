@@ -17,6 +17,8 @@ ProfileCompletion _completion({required bool complete}) {
       availableDays: complete ? const ['Friday'] : const [],
       interests: complete ? const ['Hands-on Practice'] : const [],
       learningSkillIds: complete ? const ['cooking'] : const [],
+      learningNotes:
+          complete ? const {'cooking': 'I want to learn adobo.'} : const {},
       age: complete ? 29 : null,
       gender: complete ? 'woman' : null,
     ),

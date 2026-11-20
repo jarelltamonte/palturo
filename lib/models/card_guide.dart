@@ -52,9 +52,11 @@ class CardGuideStep {
     required this.target,
     required this.title,
     required this.body,
+    this.showcaseStep = false,
   });
 
-  final CardGuideTarget target;
+  final CardGuideTarget? target;
   final String title;
   final String body;
+  final bool showcaseStep;
 }

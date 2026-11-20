@@ -30,6 +30,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
     final complete = hasAnyShowcase && missingSkillLabels.isEmpty;
     final hidden = !hasAnyShowcase;
     final accent = complete ? AppColors.success : AppColors.accentText(context);
+    final fill = AppColors.primary;
     final textColor = Theme.of(context).colorScheme.secondary;
     final muted = AppColors.mutedText(context);
 
@@ -65,14 +66,11 @@ class DiscoverabilityStatusCard extends StatelessWidget {
         decoration: BoxDecoration(
           color:
               complete
-                  ? AppColors.success.withValues(alpha: 0.08)
-                  : accent.withValues(alpha: 0.09),
+                  ? fill.withValues(alpha: 0.1)
+                  : fill.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color:
-                complete
-                    ? AppColors.success.withValues(alpha: 0.35)
-                    : accent.withValues(alpha: 0.45),
+            color: fill.withValues(alpha: complete ? 0.45 : 0.35),
           ),
         ),
         child: Column(
@@ -85,7 +83,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
                   width: compact ? 34 : 38,
                   height: compact ? 34 : 38,
                   decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.14),
+                    color: fill.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -137,7 +135,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
+                        color: fill.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -156,7 +154,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
+                        color: fill.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -180,11 +178,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
                   minimumSize: const Size(44, 44),
                   alignment: Alignment.centerLeft,
                 ),
-                icon: Icon(
-                  Icons.video_library_outlined,
-                  size: 17,
-                  color: accent,
-                ),
+                icon: Icon(Icons.video_library_outlined, size: 17, color: fill),
                 label: Text(
                   hidden ? 'Add a showcase' : 'Review teaching skills',
                   style: AppTextStyles.regularText.copyWith(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
+import 'package:palturo/models/profile_completion.dart';
 import 'package:palturo/onboarding/widgets/role_card_group.dart';
 import 'package:palturo/screen/card/skills_card.dart';
 import 'package:palturo/onboarding/screens/onboarding_final_screen.dart'
@@ -26,6 +28,7 @@ import 'package:palturo/onboarding/skill_options.dart'
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/discoverability_status.dart';
+import 'package:palturo/widgets/profile_completion_card.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
 
@@ -51,6 +54,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   late final ProfileService _profileService;
   bool _isSaving = false;
   String? _saveStatus;
+  String? _savePhaseMessage;
+  Timer? _saveProgressTimer;
+  int _savePhaseIndex = 0;
+  static const List<String> _saveMessages = [
+    'Saving your profile...',
+    'Preparing your card and notes...',
+    'Teaching the matcher about your skills...',
+    'Looking for people who fit what you offer...',
+    'Still working. Good matches take a moment.',
+  ];
   bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
@@ -73,6 +86,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   final Set<String> _changedLearningNotes = {};
   final Set<String> _changedTeachingNotes = {};
   final GlobalKey _teachingSkillsKey = GlobalKey();
+  final GlobalKey _learningSkillsKey = GlobalKey();
 
   static const _roleOptions = [
     RoleOption(
@@ -124,6 +138,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   @override
   void dispose() {
+    _stopSaveProgress();
     _bioController.dispose();
     _ageController.dispose();
     super.dispose();
@@ -415,6 +430,80 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  Future<void> _scrollToLearningSkills() async {
+    final target = _learningSkillsKey.currentContext;
+    if (target == null) return;
+    await Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  Future<void> _showMissingNotesDialog(
+    List<String> labels, {
+    required bool learningFirst,
+  }) async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final shown = labels.take(4).toList(growable: false);
+    final extra = labels.length - shown.length;
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(dialogContext),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.sticky_note_2_outlined,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Add a skill note',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'Your card shows a short note for each skill. Add one for '
+              '${shown.join(', ')}${extra > 0 ? ' and $extra more' : ''}.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'Add notes',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.accentText(dialogContext),
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+    if (!mounted) return;
+    if (learningFirst) {
+      await _scrollToLearningSkills();
+    } else {
+      await _scrollToTeachingSkills();
+    }
+  }
+
   Future<void> _handleBack() async {
     if (_isSaving) return;
     if (_hasUnsavedChanges()) {
@@ -701,8 +790,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   ProfileData _draftProfile() {
     final selectedDays = parseAvailableDays(_availability.keys);
+    final parsedAge = int.tryParse(_ageController.text.trim());
     return widget.profile.copyWith(
       bio: _bioController.text.trim(),
+      age: parsedAge,
+      clearAge: parsedAge == null,
+      gender: _gender,
+      clearGender: _gender == null,
       schedule: formatScheduleDays(selectedDays),
       availableDays: selectedDays,
       languages: _languages,
@@ -810,6 +904,27 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  void _startSaveProgress() {
+    _saveProgressTimer?.cancel();
+    _savePhaseIndex = 0;
+    _savePhaseMessage = _saveMessages.first;
+    _saveProgressTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      setState(() {
+        _savePhaseIndex = (_savePhaseIndex + 1).clamp(
+          0,
+          _saveMessages.length - 1,
+        );
+        _savePhaseMessage = _saveMessages[_savePhaseIndex];
+      });
+    });
+  }
+
+  void _stopSaveProgress() {
+    _saveProgressTimer?.cancel();
+    _saveProgressTimer = null;
+  }
+
   Future<void> _save() async {
     if (widget.profile.id.isEmpty) {
       if (_showingProfileError) return;
@@ -860,6 +975,26 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       return;
     }
 
+    final missingLearningNotes = learningSkills
+        .where((id) => (_learningNotes[id]?.trim() ?? '').isEmpty)
+        .map(onboardingInterestLabel)
+        .toList(growable: false);
+    final missingTeachingNotes = teachingSkills
+        .where((id) => (_teachingNotes[id]?.trim() ?? '').isEmpty)
+        .map(onboardingInterestLabel)
+        .toList(growable: false);
+    final missingNoteLabels = [
+      ...missingLearningNotes,
+      ...missingTeachingNotes,
+    ];
+    if (missingNoteLabels.isNotEmpty) {
+      await _showMissingNotesDialog(
+        missingNoteLabels,
+        learningFirst: missingLearningNotes.isNotEmpty,
+      );
+      return;
+    }
+
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
     final parsedAge = int.tryParse(_ageController.text.trim());
@@ -888,7 +1023,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     setState(() {
       _isSaving = true;
       _saveStatus = null;
+      _savePhaseMessage = _saveMessages.first;
     });
+    _startSaveProgress();
 
     try {
       final savedProfile = await _profileService.updateProfile(
@@ -905,6 +1042,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         },
       );
       if (mounted) {
+        _stopSaveProgress();
         Haptics.success();
         SoundService.instance.play(AppSound.success);
         Navigator.pop(context, savedProfile);
@@ -930,6 +1068,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         );
       }
     } finally {
+      _stopSaveProgress();
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -958,6 +1097,22 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         .where((id) => (_teachingSkillImages[id]?.trim() ?? '').isEmpty)
         .map(onboardingInterestLabel)
         .toList(growable: false);
+    final completion = computeProfileCompletion(_draftProfile());
+    final hasPhoto =
+        _photos.any((photo) => photo?.trim().isNotEmpty == true) ||
+        widget.profile.avatarUrl?.trim().isNotEmpty == true;
+    final aboutNeedsCompletion =
+        _bioController.text.trim().isEmpty ||
+        _languages.isEmpty ||
+        _availability.isEmpty ||
+        _learningStyles.isEmpty ||
+        (wantsTeaching && _teachingStyles.isEmpty);
+    final privateNeedsCompletion =
+        _ageController.text.trim().isEmpty || _gender == null;
+    final roleNeedsCompletion = _role == null;
+    final skillsNeedCompletion =
+        (_learningSkillIds.isEmpty && _teachingSkillIds.isEmpty) ||
+        completion.missing.any((item) => item.label == 'Skill notes');
     final largeText = MediaQuery.textScalerOf(context).scale(20) > 28;
 
     return PopScope(
@@ -1043,6 +1198,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
+                  if (!completion.isComplete)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: ProfileCompletionCard(
+                        completion: completion,
+                        onEdit: () {},
+                        showAction: false,
+                        compact: true,
+                      ),
+                    ),
                   if (wantsTeaching)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1053,9 +1218,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         onAction: _scrollToTeachingSkills,
                       ),
                     ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: _ProfileSectionHeader(title: 'Profile photos'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _ProfileSectionHeader(
+                      title: 'Profile photos',
+                      needsAttention: !hasPhoto,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Padding(
@@ -1080,9 +1248,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: _ProfileSectionHeader(title: 'About you'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _ProfileSectionHeader(
+                      title: 'About you',
+                      needsAttention: aboutNeedsCompletion,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Padding(
@@ -1098,15 +1269,35 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TopLabeledField(
-                      label: 'Introduce yourself',
-                      controller: _bioController,
-                      onChanged: (_) => setState(() {}),
-                      maxLines: null,
-                      maxLength: kBioMaxLength,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.done,
-                      textCapitalization: TextCapitalization.sentences,
+                    child: Container(
+                      padding:
+                          _bioController.text.trim().isEmpty
+                              ? const EdgeInsets.symmetric(horizontal: 8)
+                              : EdgeInsets.zero,
+                      decoration:
+                          _bioController.text.trim().isEmpty
+                              ? BoxDecoration(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.08,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                ),
+                              )
+                              : null,
+                      child: TopLabeledField(
+                        label: 'Introduce yourself',
+                        controller: _bioController,
+                        onChanged: (_) => setState(() {}),
+                        maxLines: null,
+                        maxLength: kBioMaxLength,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.done,
+                        textCapitalization: TextCapitalization.sentences,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1121,6 +1312,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           value: scheduleDisplay,
                           hint: 'Tap to set availability',
                           onTap: _pickSchedule,
+                          needsAttention: _availability.isEmpty,
                         ),
                         const SizedBox(height: 12),
                         _DropdownInfoField(
@@ -1128,6 +1320,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           label: 'Language',
                           value: _languages.join(', '),
                           hint: 'Tap to set languages',
+                          needsAttention: _languages.isEmpty,
                           onTap:
                               () => _pickMultiSelect(
                                 title: 'Language Preference',
@@ -1144,6 +1337,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           label: 'Learning Style',
                           value: _learningStyles.join(', '),
                           hint: 'Tap to set learning styles',
+                          needsAttention: _learningStyles.isEmpty,
                           onTap:
                               () => _pickMultiSelect(
                                 title: 'Learning Style',
@@ -1163,6 +1357,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             label: 'Teaching Style',
                             value: _teachingStyles.join(', '),
                             hint: 'Tap to set teaching styles',
+                            needsAttention: _teachingStyles.isEmpty,
                             onTap:
                                 () => _pickMultiSelect(
                                   title: 'Teaching Style',
@@ -1184,7 +1379,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _ProfileSectionHeader(title: 'Private details'),
+                        _ProfileSectionHeader(
+                          title: 'Private details',
+                          needsAttention: privateNeedsCompletion,
+                        ),
                         const SizedBox(height: 6),
                         Text(
                           'Only used for aggregate analytics. Never shown on '
@@ -1196,15 +1394,35 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        TopLabeledField(
-                          label: 'Age',
-                          controller: _ageController,
-                          keyboardType: TextInputType.number,
-                          maxLength: 3,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          onChanged: (_) => setState(() {}),
+                        Container(
+                          padding:
+                              _ageController.text.trim().isEmpty
+                                  ? const EdgeInsets.symmetric(horizontal: 8)
+                                  : EdgeInsets.zero,
+                          decoration:
+                              _ageController.text.trim().isEmpty
+                                  ? BoxDecoration(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                    ),
+                                  )
+                                  : null,
+                          child: TopLabeledField(
+                            label: 'Age',
+                            controller: _ageController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 3,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            onChanged: (_) => setState(() {}),
+                          ),
                         ),
                         if (_ageError != null)
                           Padding(
@@ -1224,6 +1442,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           value: _genderLabel,
                           hint: 'Select gender',
                           onTap: _pickGender,
+                          needsAttention: _gender == null,
                         ),
                       ],
                     ),
@@ -1244,7 +1463,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const _ProfileSectionHeader(title: 'Role'),
+                        _ProfileSectionHeader(
+                          title: 'Role',
+                          needsAttention: roleNeedsCompletion,
+                        ),
                         const SizedBox(height: 10),
                         RoleCardGroup(
                           options: _roleOptions,
@@ -1261,34 +1483,41 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const _ProfileSectionHeader(title: 'Skills'),
+                        _ProfileSectionHeader(
+                          title: 'Skills',
+                          needsAttention: skillsNeedCompletion,
+                        ),
                         const SizedBox(height: 12),
                         if (_role == OnboardingRole.learn ||
                             _role == OnboardingRole.both) ...[
-                          SkillsCard.toLearn(
-                            isEditing: true,
-                            initialSkillIds: _learningSkillIds,
-                            notes: _learningNotes,
-                            onChanged:
-                                (updatedIds) => setState(
-                                  () => _learningSkillIds = updatedIds,
-                                ),
-                            onNoteChanged: (id, note) {
-                              setState(() {
-                                if (note.trim().isEmpty) {
-                                  _learningNotes.remove(id);
-                                } else {
-                                  _learningNotes[id] = note;
-                                }
-                                final initial = _initialLearningNotes[id] ?? '';
-                                final current = _learningNotes[id] ?? '';
-                                if (current.trim() == initial.trim()) {
-                                  _changedLearningNotes.remove(id);
-                                } else {
-                                  _changedLearningNotes.add(id);
-                                }
-                              });
-                            },
+                          KeyedSubtree(
+                            key: _learningSkillsKey,
+                            child: SkillsCard.toLearn(
+                              isEditing: true,
+                              initialSkillIds: _learningSkillIds,
+                              notes: _learningNotes,
+                              onChanged:
+                                  (updatedIds) => setState(
+                                    () => _learningSkillIds = updatedIds,
+                                  ),
+                              onNoteChanged: (id, note) {
+                                setState(() {
+                                  if (note.trim().isEmpty) {
+                                    _learningNotes.remove(id);
+                                  } else {
+                                    _learningNotes[id] = note;
+                                  }
+                                  final initial =
+                                      _initialLearningNotes[id] ?? '';
+                                  final current = _learningNotes[id] ?? '';
+                                  if (current.trim() == initial.trim()) {
+                                    _changedLearningNotes.remove(id);
+                                  } else {
+                                    _changedLearningNotes.add(id);
+                                  }
+                                });
+                              },
+                            ),
                           ),
                           const SizedBox(height: 24),
                         ],
@@ -1416,7 +1645,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         Semantics(
                           liveRegion: true,
                           child: Text(
-                            _saveStatus ?? 'Saving profile…',
+                            _saveStatus ??
+                                _savePhaseMessage ??
+                                'Saving your profile...',
                             textAlign: TextAlign.center,
                             style: AppTextStyles.boldText.copyWith(
                               color: textTheme,
@@ -1425,6 +1656,19 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             ),
                           ),
                         ),
+                        if (_saveStatus == null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'This can take a moment while we prepare your '
+                            'matches.',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.regularText.copyWith(
+                              color: AppColors.mutedText(context),
+                              fontSize: 12,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1656,21 +1900,51 @@ class _PreviewPhotoFallback extends StatelessWidget {
 
 class _ProfileSectionHeader extends StatelessWidget {
   final String title;
+  final bool needsAttention;
 
-  const _ProfileSectionHeader({required this.title});
+  const _ProfileSectionHeader({
+    required this.title,
+    this.needsAttention = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       header: true,
-      child: Text(
-        title.toUpperCase(),
-        style: AppTextStyles.regularText.copyWith(
-          color: AppColors.mutedText(context),
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.4,
-        ),
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(
+              title.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.regularText.copyWith(
+                color: AppColors.mutedText(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+          if (needsAttention) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'NEEDS COMPLETION',
+                style: AppTextStyles.boldText.copyWith(
+                  color: AppColors.accentText(context),
+                  fontSize: 8,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1682,6 +1956,7 @@ class _DropdownInfoField extends StatefulWidget {
   final String value;
   final String hint;
   final Future<void> Function() onTap;
+  final bool needsAttention;
 
   const _DropdownInfoField({
     required this.icon,
@@ -1689,6 +1964,7 @@ class _DropdownInfoField extends StatefulWidget {
     required this.value,
     required this.hint,
     required this.onTap,
+    this.needsAttention = false,
   });
 
   @override
@@ -1720,56 +1996,72 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _handleTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 9),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(widget.icon, size: 18, color: textColor),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 120,
-                  child: Text(
-                    widget.label,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+        child: Container(
+          padding:
+              widget.needsAttention
+                  ? const EdgeInsets.symmetric(horizontal: 8)
+                  : EdgeInsets.zero,
+          decoration:
+              widget.needsAttention
+                  ? BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                    ),
+                  )
+                  : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(widget.icon, size: 18, color: textColor),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 120,
+                    child: Text(
+                      widget.label,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          showHint ? widget.hint : widget.value,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color:
-                                showHint
-                                    ? textColor.withValues(alpha: 0.4)
-                                    : textColor,
-                            fontSize: 16,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            showHint ? widget.hint : widget.value,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color:
+                                  showHint
+                                      ? textColor.withValues(alpha: 0.4)
+                                      : textColor,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      ),
-                      AnimatedRotation(
-                        turns: _isOpen ? 0.5 : 0,
-                        duration: AppMotion.base,
-                        curve: Curves.easeInOut,
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 20,
-                          color: textColor.withValues(alpha: 0.6),
+                        AnimatedRotation(
+                          turns: _isOpen ? 0.5 : 0,
+                          duration: AppMotion.base,
+                          curve: Curves.easeInOut,
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 20,
+                            color: textColor.withValues(alpha: 0.6),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

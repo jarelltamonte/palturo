@@ -11,17 +11,20 @@ class ProfileCompletionCard extends StatelessWidget {
     required this.completion,
     required this.onEdit,
     this.compact = false,
+    this.showAction = true,
   });
 
   final ProfileCompletion completion;
   final VoidCallback onEdit;
   final bool compact;
+  final bool showAction;
 
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
     final muted = AppColors.mutedText(context);
     final accent = AppColors.accentText(context);
+    final fill = AppColors.primary;
     final complete = completion.isComplete;
     final missing = completion.missing.take(4).toList(growable: false);
     final extra = completion.remainingCount - missing.length;
@@ -40,7 +43,7 @@ class ProfileCompletionCard extends StatelessWidget {
           border: Border.all(
             color:
                 complete
-                    ? AppColors.success.withValues(alpha: 0.35)
+                    ? AppColors.primary.withValues(alpha: 0.45)
                     : AppColors.border(context),
           ),
         ),
@@ -53,10 +56,7 @@ class ProfileCompletionCard extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color:
-                        complete
-                            ? AppColors.success.withValues(alpha: 0.1)
-                            : accent.withValues(alpha: 0.1),
+                    color: fill.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Icon(
@@ -92,9 +92,7 @@ class ProfileCompletionCard extends StatelessWidget {
                 value: completion.fraction,
                 minHeight: 7,
                 backgroundColor: AppColors.mutedSurface(context),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  complete ? AppColors.success : accent,
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(fill),
               ),
             ),
             const SizedBox(height: 9),
@@ -123,7 +121,7 @@ class ProfileCompletionCard extends StatelessWidget {
                         child: Icon(
                           Icons.radio_button_unchecked,
                           size: 13,
-                          color: accent,
+                          color: fill,
                         ),
                       ),
                       const SizedBox(width: 7),
@@ -161,24 +159,26 @@ class ProfileCompletionCard extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
-              const SizedBox(height: 4),
-              TextButton.icon(
-                onPressed: onEdit,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(44, 44),
-                  alignment: Alignment.centerLeft,
-                ),
-                icon: Icon(Icons.edit_outlined, size: 16, color: accent),
-                label: Text(
-                  'Finish profile',
-                  style: AppTextStyles.regularText.copyWith(
-                    color: accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              if (showAction) ...[
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: onEdit,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(44, 44),
+                    alignment: Alignment.centerLeft,
+                  ),
+                  icon: Icon(Icons.edit_outlined, size: 16, color: fill),
+                  label: Text(
+                    'Finish profile',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ],
         ),

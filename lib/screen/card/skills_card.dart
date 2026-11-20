@@ -1155,6 +1155,8 @@ class _SkillRowState extends State<_SkillRow> {
         _isLearn
             ? 'Tell us more about what you want to learn'
             : 'Tell us more about what you can teach';
+    final needsAttention =
+        widget.isEditing && _noteController.text.trim().isEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -1163,26 +1165,79 @@ class _SkillRowState extends State<_SkillRow> {
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(
-              prompt,
-              style: TextStyle(
-                color: textColor.withValues(alpha: 0.7),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.6,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  prompt,
+                  style: TextStyle(
+                    color: textColor.withValues(alpha: 0.7),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                if (needsAttention)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'REQUIRED FOR YOUR CARD',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: AppColors.accentText(context),
+                        fontSize: 8,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding:
+                needsAttention
+                    ? const EdgeInsets.symmetric(horizontal: 8)
+                    : EdgeInsets.zero,
+            decoration:
+                needsAttention
+                    ? BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                      ),
+                    )
+                    : null,
+            child: IgnorePointer(
+              ignoring: !widget.isEditing,
+              child: TopLabeledField(
+                label: 'Add note',
+                controller: _noteController,
+                maxLines: 3,
+                maxLength: kSkillNoteMaxLength,
+                textCapitalization: TextCapitalization.sentences,
               ),
             ),
           ),
-          IgnorePointer(
-            ignoring: !widget.isEditing,
-            child: TopLabeledField(
-              label: 'Add note',
-              controller: _noteController,
-              maxLines: 3,
-              maxLength: kSkillNoteMaxLength,
-              textCapitalization: TextCapitalization.sentences,
+          if (needsAttention)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 4),
+              child: Text(
+                'A short note appears on your discovery card.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 11,
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

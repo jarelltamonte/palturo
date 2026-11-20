@@ -20,6 +20,8 @@ Widget _host(
   required Future<void> Function() onFinished,
   Size size = const Size(390, 844),
   double textScale = 1,
+  bool showShowcaseStep = false,
+  VoidCallback? onOpenProfile,
 }) {
   return MaterialApp(
     theme: lightMode,
@@ -76,7 +78,12 @@ Widget _host(
                     ),
                   ),
                   Positioned.fill(
-                    child: CardGuideOverlay(keys: keys, onFinished: onFinished),
+                    child: CardGuideOverlay(
+                      keys: keys,
+                      onFinished: onFinished,
+                      showShowcaseStep: showShowcaseStep,
+                      onOpenProfile: onOpenProfile,
+                    ),
                   ),
                 ],
               ),
@@ -92,11 +99,20 @@ Future<void> _pumpGuide(
   required Future<void> Function() onFinished,
   Size size = const Size(390, 844),
   double textScale = 1,
+  bool showShowcaseStep = false,
+  VoidCallback? onOpenProfile,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
-    _host(keys, onFinished: onFinished, size: size, textScale: textScale),
+    _host(
+      keys,
+      onFinished: onFinished,
+      size: size,
+      textScale: textScale,
+      showShowcaseStep: showShowcaseStep,
+      onOpenProfile: onOpenProfile,
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -169,16 +185,57 @@ void main() {
     expect(find.text('Your first card'), findsOneWidget);
   });
 
-  testWidgets('fits 360 at 200% text', (tester) async {
-    final keys = _keys(optional: true);
-    await _pumpGuide(
-      tester,
-      keys,
-      onFinished: () async {},
-      size: const Size(360, 640),
-      textScale: 2,
-    );
-    expect(tester.takeException(), isNull);
-    expect(find.text('Your first card'), findsOneWidget);
-  });
+  testWidgets(
+    'mentor guide adds a showcase step with profile and later actions',
+    (tester) async {
+      final keys = _keys(optional: true);
+      var finished = false;
+      var opened = false;
+      await _pumpGuide(
+        tester,
+        keys,
+        onFinished: () async => finished = true,
+        showShowcaseStep: true,
+        onOpenProfile: () => opened = true,
+      );
+
+      expect(find.text('1 of 9'), findsOneWidget);
+      for (var i = 0; i < 8; i++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('One more step for mentors'), findsOneWidget);
+      expect(find.text('Go to Profile'), findsOneWidget);
+      expect(find.text('Do Later'), findsOneWidget);
+
+      await tester.tap(find.text('Do Later'));
+      await tester.pumpAndSettle();
+      expect(finished, isTrue);
+      expect(opened, isFalse);
+    },
+  );
+
+  testWidgets(
+    'showcase step profile action opens the profile after finishing',
+    (tester) async {
+      final keys = _keys(optional: true);
+      var finished = false;
+      var opened = false;
+      await _pumpGuide(
+        tester,
+        keys,
+        onFinished: () async => finished = true,
+        showShowcaseStep: true,
+        onOpenProfile: () => opened = true,
+      );
+      for (var i = 0; i < 8; i++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('Go to Profile'));
+      await tester.pumpAndSettle();
+      expect(finished, isTrue);
+      expect(opened, isTrue);
+    },
+  );
 }

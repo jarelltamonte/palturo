@@ -33,13 +33,52 @@ insert into public.name_blocklist (term, kind) values
   ('retarded','profanity'), ('rape','profanity'), ('rapist','profanity'),
   ('porn','profanity'), ('pussy','profanity'), ('wanker','profanity'),
   ('twat','profanity'), ('douche','profanity'),
+  ('ass','profanity'), ('arse','profanity'), ('piss','profanity'),
+  ('pissed','profanity'), ('prick','profanity'), ('cum','profanity'),
+  ('jizz','profanity'), ('blowjob','profanity'), ('handjob','profanity'),
+  ('jerkoff','profanity'), ('dildo','profanity'), ('orgy','profanity'),
+  ('nazi','profanity'), ('hitler','profanity'), ('chink','profanity'),
+  ('spic','profanity'), ('kike','profanity'), ('wetback','profanity'),
+  ('tranny','profanity'), ('dyke','profanity'), ('coon','profanity'),
+  ('gook','profanity'), ('raghead','profanity'), ('towelhead','profanity'),
+  ('beaner','profanity'), ('redskin','profanity'), ('fuk','profanity'),
+  ('fukk','profanity'), ('phuck','profanity'), ('biatch','profanity'),
+  ('shiit','profanity'), ('shyt','profanity'), ('assclown','profanity'),
+  ('assface','profanity'), ('smartass','profanity'), ('hardon','profanity'),
+  ('motherfucking','profanity'), ('fuckin','profanity'),
+  ('fuckoff','profanity'), ('fuckup','profanity'),
+  ('motherfucker','profanity'), ('motherfuckers','profanity'),
+  ('fuckface','profanity'), ('fuckboy','profanity'),
+  ('fucktard','profanity'), ('clusterfuck','profanity'),
+  ('shithead','profanity'), ('shitface','profanity'),
+  ('dumbass','profanity'), ('jackass','profanity'),
+  ('asshat','profanity'), ('asswipe','profanity'),
+  ('dickhead','profanity'), ('dickface','profanity'),
+  ('cocksucker','profanity'), ('cuntface','profanity'),
+  ('bitchface','profanity'), ('whoreface','profanity'),
+  ('tosser','profanity'), ('bellend','profanity'),
+  ('bollocks','profanity'),
   ('puta','profanity'), ('putangina','profanity'),
-  ('putanginamo','profanity'), ('tangina','profanity'),
+  ('putanginamo','profanity'), ('putanginang','profanity'),
+  ('tangina','profanity'),
   ('tanginamo','profanity'), ('gago','profanity'), ('gaga','profanity'),
-  ('bobo','profanity'), ('ulol','profanity'), ('punyeta','profanity'),
-  ('kupal','profanity'), ('tarantado','profanity'), ('pakshet','profanity'),
+  ('bobo','profanity'), ('tanga','profanity'), ('ulol','profanity'),
+  ('ulul','profanity'),
+  ('punyeta','profanity'), ('kupal','profanity'),
+  ('tarantado','profanity'), ('pakshet','profanity'),
   ('kingina','profanity'), ('iyot','profanity'), ('kantot','profanity'),
+  ('kantutin','profanity'),
   ('hinayupak','profanity'), ('hayop','profanity'),
+  ('lintik','profanity'), ('buwisit','profanity'),
+  ('hinampak','profanity'), ('yawa','profanity'),
+  ('gunggong','profanity'), ('engot','profanity'),
+  ('inutil','profanity'), ('peste','profanity'),
+  ('tite','profanity'), ('titi','profanity'), ('puke','profanity'),
+  ('puki','profanity'), ('pekpek','profanity'), ('suso','profanity'),
+  ('bayag','profanity'), ('tamod','profanity'), ('burat','profanity'),
+  ('etits','profanity'), ('chupa','profanity'), ('jakol','profanity'),
+  ('salsal','profanity'), ('hangal','profanity'), ('siraulo','profanity'),
+  ('abnoy','profanity'), ('bading','profanity'), ('walanghiya','profanity'),
   ('putangina','phrase'), ('putanginamo','phrase'), ('tanginamo','phrase'),
   ('anakngputa','phrase'), ('sonofabitch','phrase'),
   ('pieceofshit','phrase'), ('fuckyou','phrase')
@@ -207,6 +246,55 @@ begin
 end;
 $$;
 
+create or replace function public.validate_display_name_pair(
+  p_first text,
+  p_last text
+)
+returns void
+language plpgsql
+stable
+security definer
+set search_path to 'public'
+as $$
+declare
+  v_compact text;
+begin
+  if lower(p_first) = lower(p_last) then
+    raise exception 'First and last name cannot be the same.'
+      using errcode = '22023';
+  end if;
+
+  v_compact := replace(
+    replace(
+      replace(public.fold_display_name(p_first || ' ' || p_last), ' ', ''),
+      '-',
+      ''
+    ),
+    '''',
+    ''
+  );
+
+  if exists (
+    select 1 from public.name_blocklist b
+    where b.kind = 'profanity' and b.term = v_compact
+  ) or exists (
+    select 1 from public.name_blocklist b
+    where b.kind = 'phrase' and b.term = v_compact
+  ) then
+    raise exception 'This name contains language that is not allowed. Please enter your real name.'
+      using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1 from public.name_blocklist b
+    where b.kind = 'placeholder' and b.term = v_compact
+  ) then
+    raise exception 'Please enter your real name, not a placeholder.'
+      using errcode = '22023';
+  end if;
+end;
+$$;
+
 create or replace function public.enforce_display_name()
 returns trigger
 language plpgsql
@@ -216,10 +304,7 @@ as $$
 begin
   new.first_name := public.validate_display_name_part(new.first_name, 'First name');
   new.last_name := public.validate_display_name_part(new.last_name, 'Last name');
-  if lower(new.first_name) = lower(new.last_name) then
-    raise exception 'First and last name cannot be the same.'
-      using errcode = '22023';
-  end if;
+  perform public.validate_display_name_pair(new.first_name, new.last_name);
   return new;
 end;
 $$;
@@ -233,6 +318,7 @@ create trigger trg_profiles_display_name
 revoke all on function public.normalize_display_name(text) from public, anon, authenticated;
 revoke all on function public.fold_display_name(text) from public, anon, authenticated;
 revoke all on function public.validate_display_name_part(text, text) from public, anon, authenticated;
+revoke all on function public.validate_display_name_pair(text, text) from public, anon, authenticated;
 revoke all on function public.enforce_display_name() from public, anon, authenticated;
 
 -- Keep the RPC's own checks in step with the trigger and drop stale deck rows so
@@ -263,10 +349,7 @@ begin
 
   clean_first := public.validate_display_name_part(p_first_name, 'First name');
   clean_last := public.validate_display_name_part(p_last_name, 'Last name');
-  if lower(clean_first) = lower(clean_last) then
-    raise exception 'First and last name cannot be the same.'
-      using errcode = '22023';
-  end if;
+  perform public.validate_display_name_pair(clean_first, clean_last);
 
   select * into current_profile
   from public.profiles

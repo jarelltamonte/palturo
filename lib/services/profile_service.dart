@@ -9,6 +9,7 @@ import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_models.dart'
     show OnboardingRole, OnboardingRoleDb, roleForSkills;
 import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/utils/name_policy.dart';
 import 'package:palturo/utils/validators.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/skill_options.dart'
@@ -779,6 +780,11 @@ class ProfileService {
     if (first.sanitized.toLowerCase() == last.sanitized.toLowerCase()) {
       throw Exception('First and last name cannot be the same.');
     }
+    final combined = NamePolicy.combinedNameError(
+      first.sanitized,
+      last.sanitized,
+    );
+    if (combined != null) throw Exception(combined);
 
     final res =
         await _supabase.rpc(

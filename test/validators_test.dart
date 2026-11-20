@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:palturo/utils/name_policy.dart';
 import 'package:palturo/utils/validators.dart';
 
 void main() {
@@ -49,6 +50,27 @@ void main() {
             'That doesn’t look like a real name. Please enter your actual name.',
         'asdkjhasd':
             'That doesn’t look like a real name. Please enter your actual name.',
+        'Fu Ck':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+        "Fu'ck":
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+        'Ｆｕｃｋ':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+        'Motherfucker':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+        'Shithead':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+        'Assclown':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+        'Tite':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
         'Test': 'Please enter your real name, not a placeholder.',
         'Fuck':
             'This name contains language that isn’t allowed. '
@@ -93,6 +115,24 @@ void main() {
 
       final mixed = Validators.validateNameDetailed('McDonald', 'Last name');
       expect(mixed.sanitized, 'McDonald');
+    });
+
+    test('split names are checked together', () {
+      expect(
+        NamePolicy.combinedNameError('Fu', 'Ck'),
+        'This name contains language that isn’t allowed. '
+        'Please enter your real name.',
+      );
+      expect(
+        NamePolicy.combinedNameError('Pu', 'Ta'),
+        'This name contains language that isn’t allowed. '
+        'Please enter your real name.',
+      );
+      expect(
+        NamePolicy.combinedNameError('Te', 'st'),
+        'Please enter your real name, not a placeholder.',
+      );
+      expect(NamePolicy.combinedNameError('Maria', 'Santos'), isNull);
     });
 
     test('confirmation only errors on a non-empty mismatch', () {

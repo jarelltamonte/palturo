@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../utils/name_policy.dart';
 import '../utils/validators.dart';
 
 enum LoginFailureKind {
@@ -291,6 +292,13 @@ class AuthService {
       return AuthRegisterResult.failure(
         'First and last name cannot be the same.',
       );
+    }
+    final combinedError = NamePolicy.combinedNameError(
+      cleanFirstName,
+      cleanLastName,
+    );
+    if (combinedError != null) {
+      return AuthRegisterResult.failure(combinedError);
     }
 
     final emailError = Validators.validateEmail(cleanEmail);

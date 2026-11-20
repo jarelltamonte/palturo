@@ -15,6 +15,7 @@ import 'package:palturo/theme/app_text_styles.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'package:palturo/utils/friendly_error.dart';
+import 'package:palturo/utils/name_policy.dart';
 import 'package:palturo/utils/validators.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 
@@ -475,12 +476,20 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
         first.isValid &&
         last.isValid &&
         first.sanitized.toLowerCase() == last.sanitized.toLowerCase();
+    final combined =
+        first.isValid && last.isValid
+            ? NamePolicy.combinedNameError(first.sanitized, last.sanitized)
+            : null;
     setState(() {
       _firstError = first.error;
       _lastError = last.error;
-      _error = same ? 'First and last name cannot be the same.' : null;
+      _error = same
+          ? 'First and last name cannot be the same.'
+          : combined;
     });
-    if (first.error != null || last.error != null || same) return;
+    if (first.error != null || last.error != null || same || combined != null) {
+      return;
+    }
 
     setState(() {
       _saving = true;

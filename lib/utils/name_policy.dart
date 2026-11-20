@@ -133,16 +133,80 @@ class NamePolicy {
     'wanker',
     'twat',
     'douche',
+    'ass',
+    'arse',
+    'piss',
+    'pissed',
+    'prick',
+    'cum',
+    'jizz',
+    'blowjob',
+    'handjob',
+    'jerkoff',
+    'dildo',
+    'orgy',
+    'nazi',
+    'hitler',
+    'chink',
+    'spic',
+    'kike',
+    'wetback',
+    'tranny',
+    'dyke',
+    'coon',
+    'gook',
+    'raghead',
+    'towelhead',
+    'beaner',
+    'redskin',
+    'fuk',
+    'fukk',
+    'phuck',
+    'biatch',
+    'shiit',
+    'shyt',
+    'assclown',
+    'assface',
+    'smartass',
+    'hardon',
+    'motherfucking',
+    'fuckin',
+    'fuckoff',
+    'fuckup',
+    'motherfucker',
+    'motherfuckers',
+    'fuckface',
+    'fuckboy',
+    'fucktard',
+    'clusterfuck',
+    'shithead',
+    'shitface',
+    'dumbass',
+    'jackass',
+    'asshat',
+    'asswipe',
+    'dickhead',
+    'dickface',
+    'cocksucker',
+    'cuntface',
+    'bitchface',
+    'whoreface',
+    'tosser',
+    'bellend',
+    'bollocks',
     // Filipino / Tagalog
     'puta',
     'putangina',
     'putanginamo',
+    'putanginang',
     'tangina',
     'tanginamo',
     'gago',
     'gaga',
     'bobo',
+    'tanga',
     'ulol',
+    'ulul',
     'punyeta',
     'kupal',
     'tarantado',
@@ -150,8 +214,35 @@ class NamePolicy {
     'kingina',
     'iyot',
     'kantot',
+    'kantutin',
     'hinayupak',
     'hayop',
+    'lintik',
+    'buwisit',
+    'hinampak',
+    'yawa',
+    'gunggong',
+    'engot',
+    'inutil',
+    'peste',
+    'tite',
+    'titi',
+    'puke',
+    'puki',
+    'pekpek',
+    'suso',
+    'bayag',
+    'tamod',
+    'burat',
+    'etits',
+    'chupa',
+    'jakol',
+    'salsal',
+    'hangal',
+    'siraulo',
+    'abnoy',
+    'bading',
+    'walanghiya',
   };
 
   static const Set<String> profanityPhrases = {
@@ -228,6 +319,15 @@ class NamePolicy {
         text,
         NameErrorCode.emojiOrSymbols,
         'Names cannot contain emoji or symbols.',
+      );
+    }
+    // Mathematical Alphanumeric Symbols render like Latin letters but are not
+    // covered by the accent fold; reject them outright.
+    if (text.runes.any((rune) => rune >= 0x1D400 && rune <= 0x1D7FF)) {
+      return _fail(
+        text,
+        NameErrorCode.invalidPunctuation,
+        'Names can only use letters, spaces, hyphens, and apostrophes.',
       );
     }
 
@@ -308,16 +408,38 @@ class NamePolicy {
     }
 
     final compact = _compact(text);
-    if (profanityPhrases.contains(compact) || placeholders.contains(compact)) {
+    if (profanity.contains(compact) ||
+        profanityPhrases.contains(compact) ||
+        _isProfane(compact) ||
+        placeholders.contains(compact)) {
       return _fail(
         text,
-        NameErrorCode.profanity,
-        'This name contains language that isn’t allowed. '
-        'Please enter your real name.',
+        profanity.contains(compact) || _isProfane(compact)
+            ? NameErrorCode.profanity
+            : NameErrorCode.placeholder,
+        profanity.contains(compact) || _isProfane(compact)
+            ? 'This name contains language that isn’t allowed. '
+                'Please enter your real name.'
+            : 'Please enter your real name, not a placeholder.',
       );
     }
 
     return NameValidation(sanitized: text);
+  }
+
+  /// Catches terms split across first/last, e.g. "Fu" + "Ck".
+  static String? combinedNameError(String first, String last) {
+    final compact = _compact('$first $last');
+    if (profanity.contains(compact) ||
+        profanityPhrases.contains(compact) ||
+        _isProfane(compact)) {
+      return 'This name contains language that isn’t allowed. '
+          'Please enter your real name.';
+    }
+    if (placeholders.contains(compact)) {
+      return 'Please enter your real name, not a placeholder.';
+    }
+    return null;
   }
 
   static NameValidation _fail(
@@ -366,7 +488,15 @@ class NamePolicy {
     final lower = value.toLowerCase();
     final buffer = StringBuffer();
     for (final char in lower.split('')) {
-      buffer.write(_accentFold[char] ?? char);
+      final code = char.codeUnitAt(0);
+      // Fullwidth Latin letters are a common blocklist bypass.
+      if (code >= 0xFF21 && code <= 0xFF3A) {
+        buffer.writeCharCode(code - 0xFF21 + 0x61);
+      } else if (code >= 0xFF41 && code <= 0xFF5A) {
+        buffer.writeCharCode(code - 0xFF41 + 0x61);
+      } else {
+        buffer.write(_accentFold[char] ?? char);
+      }
     }
     return buffer
         .toString()

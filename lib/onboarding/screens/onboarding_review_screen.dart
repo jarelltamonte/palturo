@@ -89,6 +89,10 @@ class OnboardingReviewScreen extends StatelessWidget {
               ),
             ),
           ],
+          if (controller.wantsTeaching) ...[
+            const _ShowcaseNotice(),
+            const SizedBox(height: 10),
+          ],
           _ReviewSection(
             title: 'Role',
             value: _roleLabel(controller.role),
@@ -156,6 +160,75 @@ class OnboardingReviewScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ShowcaseNotice extends StatelessWidget {
+  const _ShowcaseNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.secondary;
+    return Semantics(
+      container: true,
+      label:
+          'Showcase required for visibility. Learners cannot find you until '
+          'you add at least one photo or short video to a teaching skill.',
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.09),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(
+                Icons.visibility_off_outlined,
+                size: 18,
+                color: AppColors.accentText(context),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Showcase required for visibility',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textColor,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Learners cannot find you in For You, Browse, or Explore '
+                    'until you add at least one photo or short video to a '
+                    'teaching skill. You can add it right after saving; one '
+                    'for each teaching skill makes every card stronger.',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: AppColors.mutedText(context),
+                      fontSize: 11.5,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

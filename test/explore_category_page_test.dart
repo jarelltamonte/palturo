@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_category_page.dart';
+import 'package:palturo/screen/explore_taxonomy.dart';
 import 'package:palturo/theme/theme.dart';
 
 List<Map<String, dynamic>> _taxonomy(String path) => const [
@@ -91,6 +92,10 @@ Widget _app({
   String nodePath = 'cooking_culinary',
   String nodeLabel = 'Cooking & Culinary',
   Set<String> teachingPaths = const <String>{},
+  List<BrowseCrumb> ancestors = const <BrowseCrumb>[],
+  String nodeKind = 'category',
+  int nodeDepth = 1,
+  List<Map<String, dynamic>> Function(String path)? taxonomy,
   Future<({int total, int fresh, int newcomers})> Function(
     String path, {
     required String kind,
@@ -106,12 +111,16 @@ Widget _app({
         textScaler: TextScaler.linear(textScale),
       ),
       child: ExploreCategoryPage(
+        key: ValueKey('$nodePath|$nodeDepth|${ancestors.length}'),
         nodePath: nodePath,
         nodeLabel: nodeLabel,
         description: 'Recipes, flavors, and kitchen traditions',
         mentor: mentor,
         teachingPaths: teachingPaths,
-        taxonomyLoader: (path) async => _taxonomy(path),
+        ancestors: ancestors,
+        nodeKind: nodeKind,
+        nodeDepth: nodeDepth,
+        taxonomyLoader: (path) async => (taxonomy ?? _taxonomy)(path),
         usersLoader: users,
         countsLoader: countsLoader,
       ),
@@ -130,6 +139,10 @@ Future<void> _pump(
   String nodePath = 'cooking_culinary',
   String nodeLabel = 'Cooking & Culinary',
   Set<String> teachingPaths = const <String>{},
+  List<BrowseCrumb> ancestors = const <BrowseCrumb>[],
+  String nodeKind = 'category',
+  int nodeDepth = 1,
+  List<Map<String, dynamic>> Function(String path)? taxonomy,
   Future<({int total, int fresh, int newcomers})> Function(
     String path, {
     required String kind,
@@ -148,10 +161,56 @@ Future<void> _pump(
       nodePath: nodePath,
       nodeLabel: nodeLabel,
       teachingPaths: teachingPaths,
+      ancestors: ancestors,
+      nodeKind: nodeKind,
+      nodeDepth: nodeDepth,
+      taxonomy: taxonomy,
       countsLoader: countsLoader,
     ),
   );
   await tester.pumpAndSettle();
+}
+
+List<Map<String, dynamic>> _programmingTaxonomy(String path) => const [
+  {
+    'path': 'modern_practical_skills',
+    'name': 'Modern Practical Skills',
+    'kind': 'category',
+    'depth': 1,
+    'usage_count': 2,
+  },
+  {
+    'path': 'modern_practical_skills.programming',
+    'name': 'Programming',
+    'kind': 'category',
+    'depth': 2,
+    'usage_count': 2,
+  },
+  {
+    'path': 'modern_practical_skills.programming.general_programming',
+    'name': 'General Programming',
+    'kind': 'skill',
+    'depth': 3,
+    'usage_count': 1,
+  },
+  {
+    'path': 'modern_practical_skills.programming.python_programming',
+    'name': 'Python Programming',
+    'kind': 'skill',
+    'depth': 3,
+    'usage_count': 1,
+  },
+];
+
+Future<List<Person>> _programmingUsers(
+  String path, {
+  required String kind,
+}) async {
+  if (path.endsWith('general_programming') ||
+      path.endsWith('python_programming')) {
+    return [_person(0)];
+  }
+  return const [];
 }
 
 void main() {
@@ -370,6 +429,73 @@ void main() {
     final skillsX = tester.getTopLeft(find.text('Filipino cooking')).dx;
     expect(skillsX, greaterThan(heroX + 200));
     expect(find.text('Start browsing mentors'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('domain, category, and skill pages read as different levels', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: _programmingUsers,
+      nodePath: 'modern_practical_skills',
+      nodeLabel: 'Modern Practical Skills',
+      nodeDepth: 1,
+      nodeKind: 'category',
+      taxonomy: _programmingTaxonomy,
+    );
+    expect(find.text('DOMAIN'), findsOneWidget);
+    expect(find.text('SUBCATEGORIES'), findsOneWidget);
+    expect(find.text('Part of '), findsNothing);
+    expect(find.text('Programming'), findsOneWidget);
+
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: _programmingUsers,
+      nodePath: 'modern_practical_skills.programming',
+      nodeLabel: 'Programming',
+      ancestors: const [
+        BrowseCrumb(
+          label: 'Modern Practical Skills',
+          path: 'modern_practical_skills',
+        ),
+      ],
+      nodeDepth: 2,
+      nodeKind: 'category',
+      taxonomy: _programmingTaxonomy,
+    );
+    expect(find.text('CATEGORY'), findsOneWidget);
+    expect(find.text('Part of Modern Practical Skills'), findsOneWidget);
+    expect(find.text('SKILLS'), findsOneWidget);
+    expect(find.text('General Programming'), findsOneWidget);
+
+    await _pump(
+      tester,
+      theme: lightMode,
+      users: _programmingUsers,
+      nodePath: 'modern_practical_skills.programming.general_programming',
+      nodeLabel: 'General Programming',
+      ancestors: const [
+        BrowseCrumb(
+          label: 'Modern Practical Skills',
+          path: 'modern_practical_skills',
+        ),
+        BrowseCrumb(
+          label: 'Programming',
+          path: 'modern_practical_skills.programming',
+        ),
+      ],
+      nodeDepth: 3,
+      nodeKind: 'skill',
+      taxonomy: _programmingTaxonomy,
+    );
+    expect(find.text('SKILL'), findsOneWidget);
+    expect(find.text('Part of Programming'), findsOneWidget);
+    expect(find.text('SKILLS'), findsNothing);
+    expect(find.text('Start browsing mentors'), findsOneWidget);
+    expect(find.text('Modern Practical Skills'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

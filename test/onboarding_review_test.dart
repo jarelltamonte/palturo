@@ -37,7 +37,20 @@ void main() {
     expect(find.text('Review your profile'), findsOneWidget);
     expect(find.text('Step 5 of 5 - Review'), findsOneWidget);
     expect(find.text('Learner and mentor'), findsOneWidget);
+    expect(find.text('Showcase required for visibility'), findsOneWidget);
+    for (var i = 0;
+        i < 8 && find.text('Cooking Pinakbet').evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -100));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Cooking Pinakbet'), findsOneWidget);
+    for (var i = 0;
+        i < 8 && find.text('Barong Embroidery').evaluate().isEmpty;
+        i++) {
+      await tester.drag(find.byType(ListView), const Offset(0, -100));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Barong Embroidery'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Hands-on Practice'), 300);
     expect(find.text('Hands-on Practice'), findsOneWidget);

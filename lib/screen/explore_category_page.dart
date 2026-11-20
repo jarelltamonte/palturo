@@ -28,6 +28,9 @@ class ExploreCategoryPage extends StatefulWidget {
     required this.description,
     required this.mentor,
     this.teachingPaths = const <String>{},
+    this.ancestors = const <BrowseCrumb>[],
+    this.nodeKind = 'category',
+    this.nodeDepth = 1,
     this.taxonomyLoader,
     this.usersLoader,
     this.countsLoader,
@@ -41,6 +44,15 @@ class ExploreCategoryPage extends StatefulWidget {
   /// The exact skill paths the mentor teaches. Learner browsing is limited to
   /// these nodes; the rest of the domain stays readable.
   final Set<String> teachingPaths;
+
+  /// Parent trail above this node. Empty for a root domain.
+  final List<BrowseCrumb> ancestors;
+
+  /// `category` or `skill`; used for the level badge and row labels.
+  final String nodeKind;
+
+  /// Taxonomy depth (1 = domain).
+  final int nodeDepth;
 
   /// Test hooks. Production leaves these null.
   final Future<List<Map<String, dynamic>>> Function(String path)?
@@ -79,6 +91,25 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
   String get _otherNoun => _mentor ? 'mentor' : 'learner';
 
   String get _nounHere => '$_noun${_total == 1 ? '' : 's'} here';
+
+  String get _levelLabel =>
+      browseLevelLabel(kind: widget.nodeKind, depth: widget.nodeDepth);
+
+  String? get _parentLabel =>
+      widget.ancestors.isEmpty ? null : widget.ancestors.last.label;
+
+  String get _childrenSectionLabel {
+    final hasCategory = _children.any(
+      (child) => (child['kind'] ?? '') == 'category',
+    );
+    final hasSkill = _children.any(
+      (child) => (child['kind'] ?? '') != 'category',
+    );
+    if (hasCategory && hasSkill) return 'Inside ${widget.nodeLabel}';
+    if (hasCategory) return 'Subcategories';
+    if (hasSkill) return 'Skills';
+    return 'People here';
+  }
 
   /// Mentors can read every domain and skill, but the learner deck is limited
   /// to the exact skills they teach.
@@ -296,6 +327,13 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
               description: 'Explore $label in the PalTuro community.',
               mentor: _mentor,
               teachingPaths: _teachingPaths,
+              ancestors: [
+                ...widget.ancestors,
+                BrowseCrumb(label: widget.nodeLabel, path: widget.nodePath),
+              ],
+              nodeKind: (node['kind'] ?? 'skill').toString(),
+              nodeDepth:
+                  (node['depth'] as num?)?.toInt() ?? widget.nodeDepth + 1,
               taxonomyLoader: widget.taxonomyLoader,
               usersLoader: widget.usersLoader,
               countsLoader: widget.countsLoader,
@@ -396,10 +434,12 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 
   List<Widget> _buildNarrowBody() {
     return [
+      _buildBreadcrumb(),
+      const SizedBox(height: 12),
       _buildHero(),
       if (_children.isNotEmpty) ...[
         const SizedBox(height: 24),
-        _buildSectionLabel('Skills'),
+        _buildSectionLabel(_childrenSectionLabel),
         const SizedBox(height: 10),
         _buildSkills(),
       ],
@@ -416,6 +456,8 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _buildBreadcrumb(),
+              const SizedBox(height: 10),
               _buildHero(),
               if (_showDeckCta) ...[
                 const SizedBox(height: 18),
@@ -430,7 +472,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (_children.isNotEmpty) ...[
-                _buildSectionLabel('Skills'),
+                _buildSectionLabel(_childrenSectionLabel),
                 const SizedBox(height: 10),
                 _buildSkills(),
               ],
@@ -441,45 +483,147 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     );
   }
 
+  Widget _buildBreadcrumb() {
+    final muted = AppColors.mutedText(context);
+    final ink = Theme.of(context).colorScheme.secondary;
+    final crumbs = widget.ancestors;
+    final pathLabel = [
+      'Browse',
+      ...crumbs.map((c) => c.label),
+      widget.nodeLabel,
+    ].join(' / ');
+
+    return Semantics(
+      container: true,
+      label: 'Browse path: $pathLabel',
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text(
+                    'Browse',
+                    style: AppTextStyles.regularText.copyWith(
+                      color: muted,
+                      fontSize: 11,
+                    ),
+                  ),
+                  for (var i = 0; i < crumbs.length; i++) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        Icons.chevron_right,
+                        size: 14,
+                        color: muted.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    Text(
+                      crumbs[i].label,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: i == crumbs.length - 1 ? ink : muted,
+                        fontSize: 11,
+                        fontWeight:
+                            i == crumbs.length - 1
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHero() {
     final muted = AppColors.mutedText(context);
     final accent = AppColors.accentText(context);
     final count = _total;
     final teachBlocked = _mentor && !_canBrowse;
+    final isDomain = widget.nodeDepth <= 1;
+    final isSkill = widget.nodeKind == 'skill';
+    final iconSize = isDomain ? 52.0 : (isSkill ? 38.0 : 44.0);
+    final iconRadius = isDomain ? 16.0 : (isSkill ? 12.0 : 14.0);
+    final heroRadius = isDomain ? 24.0 : (isSkill ? 16.0 : 20.0);
+    final heroPadding = isDomain ? 16.0 : 14.0;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(heroPadding),
       decoration: BoxDecoration(
-        color: AppColors.elevatedSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border(context)),
+        color:
+            isDomain
+                ? AppColors.elevatedSurface(context)
+                : AppColors.mutedSurface(context),
+        borderRadius: BorderRadius.circular(heroRadius),
+        border: Border.all(
+          color:
+              isDomain
+                  ? AppColors.border(context)
+                  : accent.withValues(alpha: 0.28),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: exploreTileTint(context),
-                borderRadius: BorderRadius.circular(16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: iconSize,
+                height: iconSize,
+                decoration: BoxDecoration(
+                  color: exploreTileTint(context),
+                  borderRadius: BorderRadius.circular(iconRadius),
+                ),
+                child: Icon(
+                  exploreRootIcon(widget.nodePath),
+                  size: iconSize * 0.5,
+                  color: accent,
+                ),
               ),
-              child: Icon(
-                exploreRootIcon(widget.nodePath),
-                size: 26,
-                color: AppColors.accentText(context),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _levelLabel.toUpperCase(),
+                      style: AppTextStyles.boldText.copyWith(
+                        color: accent,
+                        fontSize: 9,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    if (_parentLabel != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Part of $_parentLabel',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.regularText.copyWith(
+                          color: muted,
+                          fontSize: 11,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             widget.description,
             style: AppTextStyles.regularText.copyWith(
               color: muted,
-              fontSize: 14,
+              fontSize: isSkill ? 13 : 14,
               height: 1.45,
             ),
           ),
@@ -733,6 +877,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
       rows.add(
         _SkillRow(
           label: (child['name'] ?? '').toString(),
+          kind: (child['kind'] ?? 'skill').toString(),
           count: _childCounts[(child['path'] ?? '').toString()],
           countLabel: _noun,
           onTap: () => _openChild(child),
@@ -826,12 +971,14 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
 class _SkillRow extends StatelessWidget {
   const _SkillRow({
     required this.label,
+    required this.kind,
     required this.count,
     required this.countLabel,
     required this.onTap,
   });
 
   final String label;
+  final String kind;
   final int? count;
   final String countLabel;
   final VoidCallback onTap;
@@ -846,10 +993,14 @@ class _SkillRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final countText = _countText;
+    final isCategory = kind == 'category';
     return Semantics(
       container: true,
       button: true,
-      label: countText == null ? '$label.' : '$label. $countText.',
+      label:
+          countText == null
+              ? '$label. ${isCategory ? 'Category' : 'Skill'}.'
+              : '$label. ${isCategory ? 'Category' : 'Skill'}. $countText.',
       onTap: onTap,
       excludeSemantics: true,
       child: InkWell(
@@ -858,6 +1009,22 @@ class _SkillRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
           child: Row(
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.accentText(context).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isCategory ? 'CATEGORY' : 'SKILL',
+                  style: AppTextStyles.boldText.copyWith(
+                    fontSize: 8,
+                    letterSpacing: 0.6,
+                    color: AppColors.accentText(context),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   label,
@@ -871,11 +1038,16 @@ class _SkillRow extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               if (countText != null)
-                Text(
-                  countText,
-                  style: AppTextStyles.boldText.copyWith(
-                    fontSize: 11,
-                    color: AppColors.accentText(context),
+                Flexible(
+                  child: Text(
+                    countText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: AppTextStyles.boldText.copyWith(
+                      fontSize: 11,
+                      color: AppColors.accentText(context),
+                    ),
                   ),
                 ),
               const SizedBox(width: 2),

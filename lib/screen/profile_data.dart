@@ -77,8 +77,24 @@ class ProfileData {
   /// matches: no role chosen, or no skill picked on either side.
   bool get needsSetup => role == null || !hasAnySkill;
 
-  bool get needsShowcase =>
-      teachingSkillIds.isNotEmpty && teachingSkillImages.isEmpty;
+  /// Teaching skills that do not have showcase media yet.
+  List<String> get missingShowcaseSkillIds => teachingSkillIds
+      .where((id) => (teachingSkillImages[id]?.trim() ?? '').isEmpty)
+      .toList(growable: false);
+
+  /// True when at least one teaching skill has showcase media. This is the
+  /// actual discoverability gate used by the backend.
+  bool get hasAnyShowcase =>
+      teachingSkillIds.any(
+        (id) => (teachingSkillImages[id]?.trim() ?? '').isNotEmpty,
+      ) ||
+      teachingSkillImages.values.any((value) => value.trim().isNotEmpty);
+
+  /// True when the mentor is not discoverable because no showcase exists yet.
+  bool get needsShowcase => teachingSkillIds.isNotEmpty && !hasAnyShowcase;
+
+  /// True when at least one teaching skill still lacks its own showcase.
+  bool get hasIncompleteShowcases => missingShowcaseSkillIds.isNotEmpty;
 
   ProfileData copyWith({
     String? id,

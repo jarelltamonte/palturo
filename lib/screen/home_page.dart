@@ -6,6 +6,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:palturo/models/card_guide.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
@@ -17,6 +18,7 @@ import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/app_navigation.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
+import 'package:palturo/services/card_guide_service.dart';
 import 'package:palturo/services/chat_state_service.dart';
 import 'package:palturo/services/notification_service.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -25,6 +27,7 @@ import 'package:palturo/services/seen_deck_service.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/exhausted_deck_view.dart';
+import 'package:palturo/widgets/card_guide_overlay.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/swipe_deck.dart';
 import 'package:palturo/utils/friendly_error.dart';
@@ -149,6 +152,18 @@ class _HomePageState extends State<HomePage> {
   bool _sendingRequest = false;
   int _deckGeneration = 0;
   final GlobalKey<SwipeDeckState> _swipeKey = GlobalKey();
+  final CardGuideKeys _guideKeys = CardGuideKeys(
+    card: GlobalKey(),
+    skill: GlobalKey(),
+    name: GlobalKey(),
+    note: GlobalKey(),
+    language: GlobalKey(),
+    learningStyle: GlobalKey(),
+    schedule: GlobalKey(),
+    actions: GlobalKey(),
+  );
+  bool _guideActive = false;
+  bool _guideChecked = false;
 
   @override
   void initState() {
@@ -195,6 +210,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadDeck({bool force = false}) async {
+    if (_guideActive) return;
     final generation = ++_deckGeneration;
 
     _slowTimer?.cancel();
@@ -303,6 +319,67 @@ class _HomePageState extends State<HomePage> {
         _slowLoad = false;
       });
     }
+
+    unawaited(_scheduleGuideCheck(seen));
+  }
+
+  Future<void> _scheduleGuideCheck(Set<String> seen) async {
+    if (!mounted || _guideChecked || _guideActive) return;
+    if (_people.isEmpty || _currentIndex >= _people.length) return;
+    final shouldShow = await CardGuideService.instance.shouldShow(seen);
+    if (!mounted) return;
+    if (!shouldShow) {
+      _guideChecked = true;
+      return;
+    }
+    _guideChecked = true;
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || _guideActive) return;
+    if (_guideKeys.card?.currentContext == null) {
+      // The card may not have laid out yet. Try once more on the next frame;
+      // if it still is not ready, leave the flag unset for a later visit.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted || _guideActive) return;
+        if (_guideKeys.card?.currentContext == null) {
+          _guideChecked = false;
+          return;
+        }
+        await _openCardGuide();
+      });
+      return;
+    }
+    await _openCardGuide();
+  }
+
+  Future<void> _openCardGuide() async {
+    if (!mounted || _guideActive) return;
+    if (_people.isEmpty || _currentIndex >= _people.length) return;
+    setState(() => _guideActive = true);
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.transparent,
+      transitionDuration:
+          MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+      pageBuilder:
+          (dialogContext, _, __) => CardGuideOverlay(
+            keys: _guideKeys,
+            onFinished: () async {
+              await CardGuideService.instance.markSeen();
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext).pop();
+              }
+            },
+          ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _guideActive = false;
+      _guideChecked = true;
+    });
   }
 
   String get _roleKey => switch (_roleFilter) {
@@ -565,6 +642,10 @@ class _HomePageState extends State<HomePage> {
   /// A right swipe and the Connect button both land here. The request is the
   /// commit action: failure restores the card instead of pretending success.
   Future<void> _handleSwiped(Person person, bool right) async {
+    if (_guideActive) {
+      _resetCard();
+      return;
+    }
     if (!right) {
       _advanceFrom(person);
       return;
@@ -752,13 +833,14 @@ class _HomePageState extends State<HomePage> {
       SwipeDeck(
         key: _swipeKey,
         cardKey: current.id,
-        enabled: !_sendingRequest,
+        enabled: !_sendingRequest && !_guideActive,
         busy: _sendingRequest,
         rightLabel: 'Send request',
         leftLabel: 'Skip',
         onSwiped: (right) => _handleSwiped(current, right),
         child: PersonCardOverlay(
           person: current,
+          guideKeys: _guideKeys,
           addLabel: 'Send request',
           onAdd: () => _confirmAdd(current),
           onSkip: () => _dismissCard(current),

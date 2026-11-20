@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/theme/app_colors.dart';
+import 'package:palturo/theme/app_text_styles.dart';
 import '../onboarding_controller.dart';
 import '../widgets/onboarding_scaffold.dart';
 import '../widgets/onboarding_select_field.dart';
@@ -100,6 +102,29 @@ class OnboardingFinalScreen extends StatelessWidget {
                     selected: controller.teachingStyles,
                     multiSelect: true,
                     onChanged: controller.setTeachingStyles,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.video_library_outlined,
+                        size: 16,
+                        color: AppColors.accentText(context),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You will add your showcase after saving. It is what '
+                          'makes you visible to learners.',
+                          style: AppTextStyles.regularText.copyWith(
+                            color: AppColors.mutedText(context),
+                            fontSize: 11.5,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 24),

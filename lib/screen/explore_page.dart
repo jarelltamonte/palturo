@@ -465,6 +465,9 @@ class _ExplorePageState extends State<ExplorePage> {
                     _role == ExploreRole.mentor
                         ? _teachingSkillPaths
                         : const <String>{},
+                ancestors: const <BrowseCrumb>[],
+                nodeKind: 'category',
+                nodeDepth: 1,
               ),
         ),
       );

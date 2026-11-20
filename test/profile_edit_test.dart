@@ -229,6 +229,24 @@ void main() {
     expect(find.textContaining('Weaving Sleeping Mat'), findsNothing);
   });
 
+  testWidgets('discoverability status is visible at the top of the editor', (
+    tester,
+  ) async {
+    await pumpEdit(
+      tester,
+      data: profile().copyWith(teachingSkillImages: const {}),
+    );
+    expect(find.text('You are hidden from discovery'), findsOneWidget);
+    expect(find.text('Add a showcase'), findsOneWidget);
+  });
+
+  testWidgets('discoverability status shows the complete state', (
+    tester,
+  ) async {
+    await pumpEdit(tester);
+    expect(find.text('You are visible in discovery'), findsOneWidget);
+  });
+
   testWidgets('teaching profile prompts but can save without a showcase', (
     tester,
   ) async {

@@ -20,8 +20,11 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/onboarding/skill_options.dart'
+    show onboardingInterestLabel;
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_feedback.dart';
+import 'package:palturo/widgets/discoverability_status.dart';
 import 'package:palturo/widgets/top_labeled_field.dart';
 import 'profile_data.dart';
 
@@ -269,21 +272,18 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   bool get _needsShowcaseReminder =>
-      _hasMissingShowcase(_teachingSkillIds, _teachingSkillImages);
+      _isTeachingRole &&
+      _teachingSkillIds.isNotEmpty &&
+      !_hasAnyShowcase(_teachingSkillImages);
 
-  bool _hasMissingShowcase(
-    List<String> teachingSkills,
-    Map<String, String> images,
-  ) {
-    if (_role != OnboardingRole.teach && _role != OnboardingRole.both) {
-      return false;
-    }
-    if (teachingSkills.isEmpty) return false;
-    return teachingSkills.any((id) => (images[id]?.trim() ?? '').isEmpty);
-  }
+  bool get _isTeachingRole =>
+      _role == OnboardingRole.teach || _role == OnboardingRole.both;
 
-  /// Reminds a mentor that a teaching skill without a showcase keeps the
-  /// profile out of discovery. Returns true when it is safe to leave/save.
+  bool _hasAnyShowcase(Map<String, String> images) =>
+      images.values.any((value) => value.trim().isNotEmpty);
+
+  /// Reminds a mentor that no showcase keeps the profile out of discovery.
+  /// Returns true when it is safe to leave/save.
   Future<bool> _confirmShowcaseReminder({
     bool saving = false,
     List<String>? skills,
@@ -291,17 +291,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }) async {
     final teaching = skills ?? _teachingSkillIds;
     final media = images ?? _teachingSkillImages;
-    if (!_hasMissingShowcase(teaching, media)) return true;
+    if (!_isTeachingRole || teaching.isEmpty || _hasAnyShowcase(media)) {
+      return true;
+    }
 
-    final missing =
-        teaching.where((id) => (media[id]?.trim() ?? '').isEmpty).length;
     final add = await showConfirmDialog(
       context,
       title: 'Add a showcase?',
       message:
-          '${missing == 1 ? 'One of your teaching skills has' : '$missing of your teaching skills have'} '
-          'no showcase yet. Your mentor profile will not appear in For You, '
-          'Browse, or Explore until every teaching skill has one.',
+          'None of your teaching skills has a showcase yet. Your mentor '
+          'profile will not appear in For You, Browse, or Explore until you '
+          'add at least one.',
       confirmLabel: 'Add showcase',
       cancelLabel: saving ? 'Save anyway' : 'Leave anyway',
       destructive: false,
@@ -844,6 +844,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final hasChanges = _hasUnsavedChanges();
     final canSave = hasChanges && !_isSaving;
     final needsShowcaseReminder = _needsShowcaseReminder;
+    final wantsTeaching =
+        _role == OnboardingRole.teach || _role == OnboardingRole.both;
+    final hasAnyShowcase = _teachingSkillImages.values.any(
+      (value) => value.trim().isNotEmpty,
+    );
+    final missingShowcaseLabels = _teachingSkillIds
+        .where((id) => (_teachingSkillImages[id]?.trim() ?? '').isEmpty)
+        .map(onboardingInterestLabel)
+        .toList(growable: false);
     final largeText = MediaQuery.textScalerOf(context).scale(20) > 28;
 
     return PopScope(
@@ -929,6 +938,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 24),
+                  if (wantsTeaching)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: DiscoverabilityStatusCard(
+                        wantsTeaching: wantsTeaching,
+                        hasAnyShowcase: hasAnyShowcase,
+                        missingSkillLabels: missingShowcaseLabels,
+                        onAction: _scrollToTeachingSkills,
+                      ),
+                    ),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: _ProfileSectionHeader(title: 'Profile photos'),
@@ -1189,34 +1208,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                       _removeAttachmentForSkill(skillId),
                             ),
                           ),
-                        const SizedBox(height: 24),
-                        const _ProfileSectionHeader(title: 'Showcase'),
-                        const SizedBox(height: 8),
-                        Text(
-                          _role == OnboardingRole.teach ||
-                                  _role == OnboardingRole.both
-                              ? 'Add a showcase so you appear in For You, '
-                                  'Explore, and Browse. You can save now and '
-                                  'add it later; you will stay out of '
-                                  'discovery until you do.'
-                              : 'Switch to Teach or Both to add showcase media to '
-                                  'a teaching skill.',
-                          style: AppTextStyles.regularText.copyWith(
-                            color: AppColors.mutedText(context),
-                            fontSize: 12,
-                            height: 1.4,
-                          ),
-                        ),
-                        if (_role == OnboardingRole.teach ||
-                            _role == OnboardingRole.both) ...[
-                          const SizedBox(height: 4),
-                          TextButton.icon(
-                            onPressed: _scrollToTeachingSkills,
-                            icon: const Icon(
-                              Icons.video_library_outlined,
-                              size: 18,
+                        if (wantsTeaching) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Showcase media is managed on each teaching skill above.',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: AppColors.mutedText(context),
+                              fontSize: 12,
+                              height: 1.4,
                             ),
-                            label: const Text('Go to teaching skills'),
                           ),
                         ],
                       ],

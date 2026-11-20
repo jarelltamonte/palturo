@@ -6,6 +6,7 @@ import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/app_motion.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
+import 'package:palturo/models/card_guide.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
 import 'package:palturo/widgets/showcase_media.dart';
 import 'package:palturo/widgets/user_avatar.dart';
@@ -115,6 +116,9 @@ class PersonCardOverlay extends StatefulWidget {
   final bool showShadow;
   final bool showSkillNote;
 
+  /// Optional keys used by the first-card guide. Null in normal use.
+  final CardGuideKeys? guideKeys;
+
   const PersonCardOverlay({
     super.key,
     required this.person,
@@ -132,6 +136,7 @@ class PersonCardOverlay extends StatefulWidget {
     this.showProfilePill = true,
     this.showShadow = true,
     this.showSkillNote = false,
+    this.guideKeys,
   });
 
   @override
@@ -319,6 +324,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
     final scheduleText = formatSchedule(widget.person.schedule);
 
     final card = Container(
+      key: widget.guideKeys?.card,
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
@@ -663,6 +669,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        key: widget.guideKeys?.skill,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Flexible(
@@ -714,6 +721,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                         children: [
                           Expanded(
                             child: Text(
+                              key: widget.guideKeys?.name,
                               widget.person.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -738,6 +746,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                             ),
                             const SizedBox(width: 6),
                             ConstrainedBox(
+                              key: widget.guideKeys?.schedule,
                               constraints: const BoxConstraints(maxWidth: 150),
                               child: Text(
                                 scheduleText,
@@ -767,6 +776,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           children: [
                             if (language.isNotEmpty)
                               Row(
+                                key: widget.guideKeys?.language,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(
@@ -798,6 +808,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                               ),
                             if (learningStyle.isNotEmpty)
                               Row(
+                                key: widget.guideKeys?.learningStyle,
                                 children: [
                                   const Icon(
                                     Icons.psychology,
@@ -831,7 +842,10 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                       ],
                       if (bodyText.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _buildBio(context, bodyText),
+                        KeyedSubtree(
+                          key: widget.guideKeys?.note,
+                          child: _buildBio(context, bodyText),
+                        ),
                       ],
                     ],
                   ),
@@ -924,6 +938,7 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
               right: 20,
               bottom: 20,
               child: Row(
+                key: widget.guideKeys?.actions,
                 children: [
                   Expanded(
                     child: SizedBox(

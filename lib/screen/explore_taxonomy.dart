@@ -15,6 +15,21 @@ const Map<String, IconData> exploreRootIcons = {
   'visual_arts_design': Icons.brush_outlined,
 };
 
+/// A parent trail entry for Browse pages.
+class BrowseCrumb {
+  const BrowseCrumb({required this.label, required this.path});
+
+  final String label;
+  final String path;
+}
+
+/// Human-readable level for a taxonomy node.
+String browseLevelLabel({required String kind, required int depth}) {
+  if (depth <= 1) return 'Domain';
+  if (kind == 'skill') return 'Skill';
+  return 'Category';
+}
+
 IconData exploreRootIcon(String path) {
   final root = path.split('.').first;
   return exploreRootIcons[root] ?? Icons.category_outlined;

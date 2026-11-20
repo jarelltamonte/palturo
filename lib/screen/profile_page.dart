@@ -27,6 +27,7 @@ import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/resume_setup_card.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/discoverability_status.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
@@ -295,13 +296,9 @@ class _ProfilePageState extends State<ProfilePage> {
   );
 
   bool _needsProfileTip(ProfileData profile) {
-    final wantsTeaching =
-        profile.role == OnboardingRole.teach ||
-        profile.role == OnboardingRole.both;
     return profile.bio.trim().isEmpty ||
         profile.languages.isEmpty ||
-        profile.availableDays.isEmpty ||
-        (wantsTeaching && profile.teachingSkillImages.isEmpty);
+        profile.availableDays.isEmpty;
   }
 
   Widget _buildErrorState(Color textTheme) {
@@ -343,6 +340,17 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final bgTheme = Theme.of(context).colorScheme.surface;
     final textTheme = Theme.of(context).colorScheme.secondary;
+    final profile = _profile;
+    final wantsTeaching =
+        profile != null &&
+        (profile.role == OnboardingRole.teach ||
+            profile.role == OnboardingRole.both);
+    final missingShowcaseLabels =
+        profile == null
+            ? const <String>[]
+            : profile.missingShowcaseSkillIds
+                .map((id) => _skillLabel(id, kTeachingOptions))
+                .toList(growable: false);
 
     return Scaffold(
       backgroundColor: bgTheme,
@@ -385,6 +393,17 @@ class _ProfilePageState extends State<ProfilePage> {
                           onAvatarTap: _showMyProfile,
                         ),
                       ),
+                      if (profile != null && wantsTeaching)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: DiscoverabilityStatusCard(
+                            wantsTeaching: wantsTeaching,
+                            hasAnyShowcase: profile.hasAnyShowcase,
+                            missingSkillLabels: missingShowcaseLabels,
+                            onAction: _openEdit,
+                            compact: true,
+                          ),
+                        ),
                       if (_needsProfileTip(_profile!) && !_showResume)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -709,12 +728,8 @@ class _ProfileTip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.secondary;
-    final needsShowcase = profile.needsShowcase;
-    final message =
-        needsShowcase
-            ? 'Add a showcase so you appear in For You and Browse. You can '
-                'add it now or later.'
-            : 'Finish your profile details to improve your recommendations.';
+    const message =
+        'Finish your profile details to improve your recommendations.';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
@@ -740,10 +755,7 @@ class _ProfileTip extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(
-            onPressed: onEdit,
-            child: Text(needsShowcase ? 'Add' : 'Improve'),
-          ),
+          TextButton(onPressed: onEdit, child: const Text('Improve')),
         ],
       ),
     );

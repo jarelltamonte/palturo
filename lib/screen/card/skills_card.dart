@@ -1231,7 +1231,8 @@ class _SkillRowState extends State<_SkillRow> {
             Padding(
               padding: const EdgeInsets.only(left: 8, top: 4),
               child: Text(
-                'A short note appears on your discovery card.',
+                'Notes are checked automatically before they appear on '
+                'your card.',
                 style: AppTextStyles.regularText.copyWith(
                   color: AppColors.mutedText(context),
                   fontSize: 11,

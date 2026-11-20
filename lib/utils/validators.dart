@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:palturo/utils/name_policy.dart';
 
 /// Password validation breakdown describing unmet requirements.
 class PasswordValidationResult {
@@ -47,8 +48,6 @@ class Validators {
   static final RegExp _controlAndZeroWidthRegExp = RegExp(
     r'[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]',
   );
-  static final RegExp _consecutiveWhitespaceRegExp = RegExp(r'\s+');
-  static final RegExp _unicodeLetterRegExp = RegExp(r'[\p{L}]', unicode: true);
 
   /// Deny whitespace inside email addresses.
   static final TextInputFormatter emailDenyWhitespaceFormatter =
@@ -73,16 +72,9 @@ class Validators {
     return email.trim().toLowerCase();
   }
 
-  /// Sanitizes name inputs by stripping control/zero-width chars,
-  /// collapsing internal spaces, trimming, and capitalizing the first letter of each word.
-  static String sanitizeName(String name) {
-    final cleaned =
-        name
-            .replaceAll(_controlAndZeroWidthRegExp, '')
-            .replaceAll(_consecutiveWhitespaceRegExp, ' ')
-            .trim();
-    return capitalizeWords(cleaned);
-  }
+  /// Sanitizes name inputs by stripping invisible/format characters,
+  /// normalizing typography and spaces, and applying display casing.
+  static String sanitizeName(String name) => NamePolicy.sanitize(name);
 
   /// Validates email address according to RFC standards and security rules.
   static String? validateEmail(String? rawEmail) {
@@ -183,33 +175,16 @@ class Validators {
     return null;
   }
 
-  /// Validates first or last name field.
+  /// Validates first or last name field with deterministic rules.
   static String? validateName(String? rawName, String fieldLabel) {
-    if (rawName == null) {
-      return '$fieldLabel is required';
-    }
+    return NamePolicy.validate(rawName, fieldLabel).error;
+  }
 
-    final trimmed =
-        rawName
-            .replaceAll(_controlAndZeroWidthRegExp, '')
-            .replaceAll(_consecutiveWhitespaceRegExp, ' ')
-            .trim();
-
-    if (trimmed.isEmpty) {
-      return '$fieldLabel is required';
-    }
-
-    if (trimmed.length > maxNameLength) {
-      return '$fieldLabel cannot exceed $maxNameLength characters';
-    }
-
-    // Must contain at least one valid unicode letter (reject purely numbers, symbols, spaces)
-    if (!_unicodeLetterRegExp.hasMatch(trimmed)) {
-      return 'Please enter a valid $fieldLabel';
-    }
-
-    // Casing is normalized by sanitizeName(); do not reject lowercase
-    // particles ("van der Berg") or non-cased scripts here.
-    return null;
+  /// Same rules, but also returns the sanitized value for saving.
+  static NameValidation validateNameDetailed(
+    String? rawName,
+    String fieldLabel,
+  ) {
+    return NamePolicy.validate(rawName, fieldLabel);
   }
 }

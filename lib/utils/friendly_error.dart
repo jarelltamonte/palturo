@@ -50,6 +50,7 @@ String friendlyError(
       lower.contains('digit') ||
       lower.contains('same as') ||
       lower.contains('does not meet') ||
+      lower.contains('name') ||
       lower.contains('delete your account') ||
       lower.contains('account deletion') ||
       lower.contains('unable to delete')) {

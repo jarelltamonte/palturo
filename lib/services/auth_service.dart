@@ -271,22 +271,26 @@ class AuthService {
     }
 
     // Input sanitization (password is NEVER trimmed or altered)
-    final cleanFirstName = Validators.sanitizeName(firstName);
-    final cleanLastName = Validators.sanitizeName(lastName);
+    final firstResult = Validators.validateNameDetailed(
+      firstName,
+      'First name',
+    );
+    final lastResult = Validators.validateNameDetailed(lastName, 'Last name');
     final cleanEmail = Validators.normalizeEmail(email);
 
     // Validation
-    final firstNameError = Validators.validateName(
-      cleanFirstName,
-      'First name',
-    );
-    if (firstNameError != null) {
-      return AuthRegisterResult.failure(firstNameError);
+    if (!firstResult.isValid) {
+      return AuthRegisterResult.failure(firstResult.error!);
     }
-
-    final lastNameError = Validators.validateName(cleanLastName, 'Last name');
-    if (lastNameError != null) {
-      return AuthRegisterResult.failure(lastNameError);
+    if (!lastResult.isValid) {
+      return AuthRegisterResult.failure(lastResult.error!);
+    }
+    final cleanFirstName = firstResult.sanitized;
+    final cleanLastName = lastResult.sanitized;
+    if (cleanFirstName.toLowerCase() == cleanLastName.toLowerCase()) {
+      return AuthRegisterResult.failure(
+        'First and last name cannot be the same.',
+      );
     }
 
     final emailError = Validators.validateEmail(cleanEmail);

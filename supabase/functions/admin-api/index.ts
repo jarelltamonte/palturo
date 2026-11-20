@@ -3,6 +3,11 @@
 // every action verifies the caller's admin row, role, and MFA level here.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  ensureFreshEmbeddings,
+  getConfig,
+  nimKey,
+} from "../_shared/pipeline.ts";
 
 const CORS_BASE = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -906,7 +911,7 @@ Deno.serve(async (req) => {
         let query = admin
           .from("note_moderation_queue")
           .select(
-            "id,user_id,kind,name,skill_id,note,status,attempts,last_error,created_at,updated_at,user:user_id(id,display_name,email),skill:skill_id(id,name,path)",
+            "id,user_id,kind,name,skill_id,note,status,decision_source,attempts,last_error,created_at,updated_at,user:user_id(id,display_name,email),skill:skill_id(id,name,path)",
           )
           .order("created_at", { ascending: true })
           .limit(200);
@@ -943,9 +948,48 @@ Deno.serve(async (req) => {
         if (!before) return json({ error: "Note not found" }, 404);
         const { error } = await admin
           .from("note_moderation_queue")
-          .update({ status, updated_at: new Date().toISOString() })
+          .update({
+            status,
+            decision_source: "manual",
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", id);
         if (error) throw error;
+
+        // Publish or withdraw the note itself. The queue row is only audit
+        // state; public output reads user_skills.note_approved.
+        if (before.skill_id) {
+          const { error: noteErr } = await admin
+            .from("user_skills")
+            .update({
+              note_approved: decision === "approve",
+              note_approval_source:
+                decision === "approve" ? "manual" : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", before.user_id)
+            .eq("kind", before.kind)
+            .eq("skill_id", before.skill_id)
+            .eq("note", before.note);
+          if (noteErr) throw noteErr;
+        }
+
+        if (before.user_id) {
+          try {
+            const cfg = await getConfig(admin as any);
+            const key = await nimKey(admin as any);
+            if (key) {
+              await ensureFreshEmbeddings(admin as any, [before.user_id], cfg, key);
+            }
+          } catch (refreshError) {
+            console.error(
+              `[admin-api] note embedding refresh: ${
+                (refreshError as Error)?.message ?? refreshError
+              }`,
+            );
+          }
+        }
+
         await audit(`note.${decision}`, "note", id, { status, user_id: before.user_id }, reason);
         return json({ ok: true, data: { id, status } });
       }

@@ -33,6 +33,68 @@ void main() {
       expect(Validators.validateName('   ', 'First name'), isNotNull);
     });
 
+    test('name rules give a specific message per failure', () {
+      final cases = <String, String>{
+        '': 'First name is required.',
+        'A': 'First name must be at least 2 letters.',
+        'John3': 'Names cannot contain numbers.',
+        'John 😀': 'Names cannot contain emoji or symbols.',
+        'John@':
+            'Names can only use letters, spaces, hyphens, and apostrophes.',
+        'John Jacob Jingleheimer Schmidt':
+            'Please use at most 3 words per name.',
+        'Aaaa':
+            'That doesn’t look like a real name. Please enter your actual name.',
+        'qwerty':
+            'That doesn’t look like a real name. Please enter your actual name.',
+        'asdkjhasd':
+            'That doesn’t look like a real name. Please enter your actual name.',
+        'Test': 'Please enter your real name, not a placeholder.',
+        'Fuck':
+            'This name contains language that isn’t allowed. '
+            'Please enter your real name.',
+      };
+      cases.forEach((input, message) {
+        expect(
+          Validators.validateName(input, 'First name'),
+          message,
+          reason: input,
+        );
+      });
+    });
+
+    test('valid names cover international, hyphen, apostrophe, suffix', () {
+      for (final name in [
+        'Li',
+        'Ñúñez',
+        'O’Brien',
+        'Jean-Luc',
+        'Mary Jane',
+        'van der Berg',
+        'Dela Cruz Jr.',
+        'Juan',
+        'D’Angelo',
+      ]) {
+        expect(
+          Validators.validateName(name, 'Last name'),
+          isNull,
+          reason: name,
+        );
+      }
+    });
+
+    test('detailed name validation returns the sanitized value', () {
+      final result = Validators.validateNameDetailed(
+        '  juan   de la ',
+        'First name',
+      );
+      expect(result.isValid, isTrue);
+      expect(result.sanitized, 'Juan De La');
+
+      final mixed = Validators.validateNameDetailed('McDonald', 'Last name');
+      expect(mixed.sanitized, 'McDonald');
+    });
+
     test('confirmation only errors on a non-empty mismatch', () {
       expect(Validators.validateConfirmPassword('Abcdef1!', ''), isNull);
       expect(

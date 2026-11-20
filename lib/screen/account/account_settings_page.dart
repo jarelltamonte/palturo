@@ -450,6 +450,8 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
   late final TextEditingController _last;
   bool _saving = false;
   String? _error;
+  String? _firstError;
+  String? _lastError;
 
   @override
   void initState() {
@@ -467,11 +469,18 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
 
   Future<void> _save() async {
     if (_saving || !_dirty) return;
-    final firstError = Validators.validateName(_first.text, 'First name');
-    if (firstError != null) {
-      setState(() => _error = firstError);
-      return;
-    }
+    final first = Validators.validateNameDetailed(_first.text, 'First name');
+    final last = Validators.validateNameDetailed(_last.text, 'Last name');
+    final same =
+        first.isValid &&
+        last.isValid &&
+        first.sanitized.toLowerCase() == last.sanitized.toLowerCase();
+    setState(() {
+      _firstError = first.error;
+      _lastError = last.error;
+      _error = same ? 'First and last name cannot be the same.' : null;
+    });
+    if (first.error != null || last.error != null || same) return;
 
     setState(() {
       _saving = true;
@@ -479,14 +488,11 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
     });
 
     try {
-      await ProfileService().changeName(_first.text, _last.text);
+      await ProfileService().changeName(first.sanitized, last.sanitized);
       try {
         await Supabase.instance.client.auth.updateUser(
           UserAttributes(
-            data: {
-              'first_name': _first.text.trim(),
-              'last_name': _last.text.trim(),
-            },
+            data: {'first_name': first.sanitized, 'last_name': last.sanitized},
           ),
         );
       } catch (_) {
@@ -558,8 +564,19 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
               textInputAction: TextInputAction.next,
               textCapitalization: TextCapitalization.words,
               maxLength: 50,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => setState(() => _firstError = null),
             ),
+            if (_firstError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  _firstError!,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.dangerText(context),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             TopLabeledField(
               label: 'Last name',
@@ -567,9 +584,20 @@ class _ChangeNameSheetState extends State<_ChangeNameSheet> {
               textInputAction: TextInputAction.done,
               textCapitalization: TextCapitalization.words,
               maxLength: 50,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => setState(() => _lastError = null),
               onSubmitted: (_) => _save(),
             ),
+            if (_lastError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  _lastError!,
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.dangerText(context),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             if (_error != null) ...[
               const SizedBox(height: 4),
               Text(

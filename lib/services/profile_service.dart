@@ -9,6 +9,7 @@ import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_models.dart'
     show OnboardingRole, OnboardingRoleDb, roleForSkills;
 import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/utils/validators.dart';
 import '../screen/card/skills_card.dart' show CustomSkill, kOtherPrefix;
 import '../onboarding/skill_options.dart'
     show onboardingInterestLabel, selectableSkillLabelForId;
@@ -771,18 +772,27 @@ class ProfileService {
   }
 
   Future<NameChangeStatus> changeName(String firstName, String lastName) async {
+    final first = Validators.validateNameDetailed(firstName, 'First name');
+    final last = Validators.validateNameDetailed(lastName, 'Last name');
+    if (!first.isValid) throw Exception(first.error);
+    if (!last.isValid) throw Exception(last.error);
+    if (first.sanitized.toLowerCase() == last.sanitized.toLowerCase()) {
+      throw Exception('First and last name cannot be the same.');
+    }
+
     final res =
         await _supabase.rpc(
               'change_profile_name',
               params: {
-                'p_first_name': firstName.trim(),
-                'p_last_name': lastName.trim(),
+                'p_first_name': first.sanitized,
+                'p_last_name': last.sanitized,
               },
             )
             as List;
     if (res.isEmpty) {
       throw Exception('The name change did not complete.');
     }
+    MatchApi.clearCaches();
     return NameChangeStatus.fromMap(
       Map<String, dynamic>.from(res.first as Map),
     );

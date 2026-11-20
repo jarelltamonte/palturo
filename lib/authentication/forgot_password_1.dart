@@ -5,6 +5,7 @@ import '../widgets/top_labeled_field.dart';
 import '../theme/app_text_styles.dart';
 import 'package:palturo/authentication/forgot_password_2.dart';
 import '../services/auth_service.dart';
+import '../utils/friendly_error.dart';
 
 class ForgotPassword extends StatefulWidget {
   const ForgotPassword({super.key});
@@ -50,7 +51,12 @@ class _ForgotPasswordState extends State<ForgotPassword> {
     } catch (e) {
       if (!mounted) return;
 
-      _showErrorDialog(e.toString().replaceFirst('Exception: ', ''));
+      _showErrorDialog(
+        friendlyError(
+          e,
+          fallback: "We couldn't send the reset email. Please try again.",
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {

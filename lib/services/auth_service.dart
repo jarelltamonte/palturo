@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/name_policy.dart';
+import '../utils/session_retry.dart';
 import '../utils/validators.dart';
 
 enum LoginFailureKind {
@@ -451,7 +452,16 @@ class AuthService {
         );
       }
       if (e.status == 401) {
-        throw Exception('Current password is incorrect.');
+        final detail = '${e.details ?? ''}'.toLowerCase();
+        if (detail.contains('invalid_password')) {
+          throw Exception('Current password is incorrect.');
+        }
+        try {
+          await _supabase.auth.signOut(scope: SignOutScope.local);
+        } catch (_) {
+          // Clearing the local session is best-effort.
+        }
+        throw const SessionExpiredException();
       }
       if (e.status == 429) {
         throw Exception(

@@ -22,6 +22,7 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/services/sound_service.dart';
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/utils/friendly_error.dart';
 import 'package:palturo/onboarding/skill_options.dart'
     show onboardingInterestLabel;
 import 'package:palturo/widgets/app_chrome.dart';
@@ -1085,8 +1086,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         await _showSkillRejectedDialog(e.message);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Couldn’t save your profile. Please try again.'),
+          SnackBar(
+            content: Text(
+              friendlyError(
+                e,
+                fallback: 'Couldn’t save your profile. Please try again.',
+              ),
+            ),
           ),
         );
       }

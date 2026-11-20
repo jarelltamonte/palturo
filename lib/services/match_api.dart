@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/request_page.dart' show ConnectionRequest;
 import 'package:palturo/screen/utils/schedule_format.dart';
+import 'package:palturo/utils/session_retry.dart';
 
 class _Client {
   static SupabaseClient get c => Supabase.instance.client;
@@ -247,6 +248,34 @@ class MatchApi {
     return name.isEmpty ? 'Community member' : name;
   }
 
+  /// Invokes an Edge Function, repairing a revoked or expired session once.
+  ///
+  /// A 401 here means the JWT is no longer accepted (expired, revoked, or the
+  /// session row was removed). Retrying with the same token can never succeed,
+  /// so refresh first; if that fails, clear the session so the auth gate sends
+  /// the user to sign in instead of leaving them on an endless Retry.
+  static Future<FunctionResponse> _invoke(
+    String name,
+    Map<String, dynamic> body,
+  ) {
+    return retryOnUnauthorized(
+      call: () => _Client.c.functions.invoke(name, body: body),
+      refresh: () async {
+        final result = await _Client.c.auth.refreshSession();
+        return result.session != null;
+      },
+      expire: () async {
+        try {
+          await _Client.c.auth.signOut();
+        } catch (_) {
+          // Best-effort: the gate still sees a dead session.
+        }
+      },
+      isUnauthorized:
+          (error) => error is FunctionException && error.status == 401,
+    );
+  }
+
   /// Edge Function: full recommendation pipeline.
   /// [asRole] = the role we want to find ('mentor' from a learner, etc).
   /// [useCache] lets the function return its cached ranking when it is still
@@ -259,10 +288,10 @@ class MatchApi {
   }) async {
     late final FunctionResponse res;
     try {
-      res = await _Client.c.functions.invoke(
-        'get-matches',
-        body: {'as_role': asRole, 'refresh': useCache},
-      );
+      res = await _invoke('get-matches', {
+        'as_role': asRole,
+        'refresh': useCache,
+      });
     } on FunctionException catch (e) {
       if (e.status == 429) {
         throw Exception('Too many deck requests. Please try again later.');
@@ -476,7 +505,10 @@ class MatchApi {
             compatibility: m.compatibility,
             pipeline: m.pipeline,
           );
-        } catch (_) {
+        } catch (error) {
+          // Surface a dead session instead of caching an empty deck that looks
+          // like "you've seen everyone".
+          if (error is SessionExpiredException) rethrow;
           return null;
         }
       }),
@@ -1045,16 +1077,13 @@ class MatchApi {
     bool dryRun = false,
     String? category,
   }) async {
-    final res = await _Client.c.functions.invoke(
-      'classify-skill',
-      body: {
-        'name': name,
-        if (note != null && note.isNotEmpty) 'note': note,
-        'kind': kind,
-        if (category != null && category.isNotEmpty) 'category': category,
-        if (dryRun) 'dry_run': true,
-      },
-    );
+    final res = await _invoke('classify-skill', {
+      'name': name,
+      if (note != null && note.isNotEmpty) 'note': note,
+      'kind': kind,
+      if (category != null && category.isNotEmpty) 'category': category,
+      if (dryRun) 'dry_run': true,
+    });
     final dynamic raw = res.data;
     if (raw is Map) return Map<String, dynamic>.from(raw);
     if (raw is String && raw.isNotEmpty) {

@@ -8,6 +8,7 @@ import '../widgets/top_labeled_field.dart';
 import 'package:palturo/authentication/forgot_password_4.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
+import '../utils/friendly_error.dart';
 
 class ForgotPasswordType extends StatefulWidget {
   const ForgotPasswordType({super.key, this.tokenHash});
@@ -193,7 +194,12 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
 
       if (!mounted) return;
 
-      await _showErrorDialog(e.toString().replaceFirst('Exception: ', ''));
+      await _showErrorDialog(
+        friendlyError(
+          e,
+          fallback: "We couldn't reset your password. Please try again.",
+        ),
+      );
     }
   }
 
@@ -217,7 +223,9 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                   width: 28,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -246,11 +254,7 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: errorColor,
-                    ),
+                    Icon(Icons.error_outline, size: 48, color: errorColor),
                     const SizedBox(height: 16),
                     Text(
                       'This reset link has expired',
@@ -271,8 +275,11 @@ class _ForgotPasswordTypeState extends State<ForgotPasswordType> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () =>
-                            Navigator.popUntil(context, (route) => route.isFirst),
+                        onPressed:
+                            () => Navigator.popUntil(
+                              context,
+                              (route) => route.isFirst,
+                            ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.textSecondary,

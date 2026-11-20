@@ -16,6 +16,7 @@ import '../onboarding/skill_options.dart'
     show onboardingInterestLabel, selectableSkillLabelForId;
 import '../screen/utils/schedule_format.dart';
 import '../utils/media_url.dart';
+import '../utils/session_retry.dart';
 import 'match_api.dart';
 
 /// A custom skill the Jev classifier refused to attach to the taxonomy.
@@ -875,6 +876,8 @@ class ProfileService {
       return null;
     } catch (e) {
       if (e is SkillModerationException) rethrow;
+      // A dead session is not a classifier outage; let the caller sign out.
+      if (e is SessionExpiredException) rethrow;
       // The classifier may be unavailable; the caller fails closed rather
       // than storing an unmoderated name.
       return null;

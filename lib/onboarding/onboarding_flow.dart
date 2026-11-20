@@ -17,6 +17,7 @@ import 'screens/onboarding_role_screen.dart';
 import '../services/profile_service.dart';
 import '../services/preferences_service.dart';
 import '../screen/action_dialogs.dart';
+import '../utils/friendly_error.dart';
 
 enum OnboardingStep {
   intro,
@@ -274,9 +275,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         'That name does not look like a skill we can add. Try a clearer name, '
         'like "Sourdough Baking".',
       );
-    } catch (_) {
-      return const OnboardingCreateResult.failed(
-        'We could not check that skill right now. Please try again.',
+    } catch (e) {
+      return OnboardingCreateResult.failed(
+        friendlyError(
+          e,
+          fallback:
+              'We could not check that skill right now. Please try again.',
+        ),
       );
     }
 
@@ -385,7 +390,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         builder:
             (context) => AlertDialog(
               title: const Text('Save Failed'),
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              content: Text(
+                friendlyError(
+                  e,
+                  fallback: "We couldn't save your profile. Please try again.",
+                ),
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),

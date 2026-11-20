@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, ValueNotifier;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -130,6 +130,14 @@ class NameChangeStatus {
 
 class ProfileService {
   final SupabaseClient _supabase = Supabase.instance.client;
+
+  /// Bumped after any profile write so screens that stay mounted (the Profile
+  /// tab in the shell) can reload instead of showing stale data.
+  static final ValueNotifier<int> profileRevision = ValueNotifier<int>(0);
+
+  static void notifyProfileChanged() {
+    profileRevision.value++;
+  }
 
   /// Reads picked-image bytes without `File(path)`, which throws
   /// "Unsupported operation: _Namespace" on web.
@@ -799,6 +807,7 @@ class ProfileService {
       throw Exception('The name change did not complete.');
     }
     MatchApi.clearCaches();
+    ProfileService.notifyProfileChanged();
     return NameChangeStatus.fromMap(
       Map<String, dynamic>.from(res.first as Map),
     );
@@ -1226,6 +1235,7 @@ class ProfileService {
     // stuck for tens of seconds after the profile had already been written.
     unawaited(refreshEmbeddings());
 
+    ProfileService.notifyProfileChanged();
     return refreshed ?? updatedProfile;
   }
 

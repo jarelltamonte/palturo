@@ -74,6 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     ChatStateService.instance.addListener(_onPalsChanged);
+    ProfileService.profileRevision.addListener(_onProfileChanged);
     _onPalsChanged();
     ChatStateService.instance.loadConversations(showSpinner: false);
     _loadResumeState();
@@ -179,7 +180,13 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void dispose() {
     ChatStateService.instance.removeListener(_onPalsChanged);
+    ProfileService.profileRevision.removeListener(_onProfileChanged);
     super.dispose();
+  }
+
+  void _onProfileChanged() {
+    if (!mounted) return;
+    _loadProfile(showSpinner: false);
   }
 
   Future<void> _refreshProfileAndPals() async {

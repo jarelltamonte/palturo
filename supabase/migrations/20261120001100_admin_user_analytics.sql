@@ -186,10 +186,14 @@ skill_buckets as (
   from skill_counts
   group by 1
 ),
-location_countries as (
+country_breakdown as (
   select country_code as code, count(*)::int as n
   from public.profile_locations
   group by country_code
+  union all
+  select 'Unknown', greatest(0,
+    (select count(*) from public.profiles) - (select count(*) from public.profile_locations))
+  where (select count(*) from public.profiles) > (select count(*) from public.profile_locations)
 ),
 ph_groups as (
   select public.ph_island_group(region_code, region) as name, count(*)::int as n
@@ -198,12 +202,13 @@ ph_groups as (
   group by 1
 ),
 ph_cities as (
-  select city as name, max(region) as region, count(*)::int as n
+  select
+    coalesce(nullif(btrim(city), ''), 'Unknown city') as name,
+    max(region) as region,
+    count(*)::int as n
   from public.profile_locations
   where country_code = 'PH'
-    and city is not null
-    and btrim(city) <> ''
-  group by city
+  group by 1
 )
 select jsonb_build_object(
   'days', (select n from win),
@@ -314,9 +319,10 @@ select jsonb_build_object(
     'countries', coalesce((
       select jsonb_agg(jsonb_build_object('code', code, 'count', n) order by n desc)
       from (
-        select * from location_countries order by n desc limit 10
+        select * from country_breakdown order by n desc limit 10
       ) q
     ), '[]'::jsonb),
+    'ph_total', (select count(*)::int from public.profile_locations where country_code = 'PH'),
     'island_groups', coalesce((
       select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by n desc)
       from ph_groups

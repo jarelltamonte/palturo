@@ -10,6 +10,7 @@ import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/chat_privacy_service.dart';
 import 'package:palturo/services/connectivity_service.dart';
 import 'package:palturo/services/draft_service.dart';
+import 'package:palturo/services/device_service.dart';
 import 'package:palturo/services/local_notification_service.dart';
 import 'package:palturo/services/location_service.dart';
 import 'package:palturo/services/sound_service.dart';
@@ -91,6 +92,7 @@ void main() async {
   NotificationPresenter.instance.init();
   unawaited(LocalNotificationService.instance.init());
   LocationService.instance.start();
+  DeviceService.instance.start();
   final bool? isOnboardingDone = await PreferencesService.instance.getBool(
     'onboarding_done',
   );

@@ -209,6 +209,43 @@ ph_cities as (
   from public.profile_locations
   where country_code = 'PH'
   group by 1
+),
+device_users as (
+  select user_id, count(*)::int as devices
+  from public.profile_devices
+  group by user_id
+),
+device_platforms as (
+  select platform as name, count(distinct user_id)::int as users, count(*)::int as devices
+  from public.profile_devices
+  group by platform
+),
+device_oses as (
+  select coalesce(nullif(os, ''), platform) as name,
+         count(distinct user_id)::int as users,
+         count(*)::int as devices
+  from public.profile_devices
+  group by 1
+),
+device_browsers as (
+  select browser as name, count(distinct user_id)::int as users, count(*)::int as devices
+  from public.profile_devices
+  where browser is not null
+  group by browser
+),
+device_versions as (
+  select app_version as name, count(distinct user_id)::int as users, count(*)::int as devices
+  from public.profile_devices
+  where app_version is not null
+  group by app_version
+),
+device_buckets as (
+  select
+    case when devices = 1 then '1' when devices = 2 then '2' else '3+' end as bucket,
+    count(*)::int as count,
+    min(case when devices = 1 then 1 when devices = 2 then 2 else 3 end) as ord
+  from device_users
+  group by 1
 )
 select jsonb_build_object(
   'days', (select n from win),
@@ -333,6 +370,50 @@ select jsonb_build_object(
       from (
         select * from ph_cities order by n desc limit 10
       ) q
+    ), '[]'::jsonb)
+  ),
+  'devices', jsonb_build_object(
+    'total', (select count(*)::int from public.profile_devices),
+    'users', (select count(distinct user_id)::int from public.profile_devices),
+    'multi_users', (select count(*)::int from device_users where devices > 1),
+    'avg_per_user', case
+      when (select count(distinct user_id) from public.profile_devices) > 0
+      then round(
+        (select count(*) from public.profile_devices)::numeric
+        / (select count(distinct user_id) from public.profile_devices), 2)
+      else null
+    end,
+    'platforms', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('name', name, 'users', users, 'devices', devices)
+        order by devices desc
+      )
+      from device_platforms
+    ), '[]'::jsonb),
+    'oses', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('name', name, 'users', users, 'devices', devices)
+        order by devices desc
+      )
+      from device_oses
+    ), '[]'::jsonb),
+    'browsers', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('name', name, 'users', users, 'devices', devices)
+        order by devices desc
+      )
+      from device_browsers
+    ), '[]'::jsonb),
+    'app_versions', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('name', name, 'users', users, 'devices', devices)
+        order by devices desc
+      )
+      from device_versions
+    ), '[]'::jsonb),
+    'per_user', coalesce((
+      select jsonb_agg(jsonb_build_object('bucket', bucket, 'count', count) order by ord)
+      from device_buckets
     ), '[]'::jsonb)
   ),
   'languages', coalesce((

@@ -99,11 +99,23 @@ void main() {
         );
         expect(starters.first, startsWith('Hi Lolo!'), reason: '$role/$skill');
         expect(starters.toSet().length, starters.length);
+        if (skill != null) {
+          expect(
+            starters.every((starter) => starter.contains(skill)),
+            isTrue,
+            reason: '$role/$skill',
+          );
+        }
         for (final starter in starters) {
           expect(starter, endsWith('?'), reason: starter);
           expect(starter, isNot(contains('Ask ')), reason: starter);
           expect(starter, isNot(contains('Share ')), reason: starter);
           expect(starter, isNot(contains('what they')), reason: starter);
+          expect(
+            starter,
+            isNot(matches(RegExp(r'^(Tell|Say|Write|Send)\b'))),
+            reason: starter,
+          );
           expect(starter.length, greaterThan(20), reason: starter);
         }
         if (role == PersonRole.mentor) {

@@ -94,6 +94,9 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
 
     final field = GestureDetector(
       behavior: HitTestBehavior.opaque,
+      // Let the TextField own the semantics. Without this the whole field is
+      // exposed as a tappable label with no editable role.
+      excludeFromSemantics: true,
       onTap: () => FocusScope.of(context).requestFocus(_focusNode),
       child: Container(
         constraints: const BoxConstraints(minHeight: _height),
@@ -116,8 +119,16 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                 duration: _duration,
                 curve: _curve,
                 opacity: floating ? 1 : 0,
-                child: IgnorePointer(
-                  ignoring: !floating,
+                // The text layer is painted at zero opacity until the field
+                // floats, so its semantics are usually dropped. Keep them so
+                // the field is announced before the first tap.
+                alwaysIncludeSemantics: true,
+                // No IgnorePointer here: blocking pointer actions also blocks
+                // the semantics tap/focus actions, which left mobile screen
+                // readers unable to enter the field. The empty, invisible
+                // TextField simply forwards taps to its focus node.
+                child: Semantics(
+                  label: widget.label,
                   child: TextField(
                     controller: _controller,
                     focusNode: _focusNode,
@@ -176,7 +187,7 @@ class _TopLabeledFieldState extends State<TopLabeledField> {
                       fontWeight:
                           floating ? FontWeight.w500 : FontWeight.normal,
                     ),
-                    child: Text(widget.label),
+                    child: ExcludeSemantics(child: Text(widget.label)),
                   ),
                 ),
               ),

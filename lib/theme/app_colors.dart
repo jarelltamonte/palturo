@@ -62,4 +62,16 @@ class AppColors {
   /// Danger used as foreground text, not as a fill.
   static Color dangerText(BuildContext context) =>
       _isDark(context) ? dangerLight : danger;
+
+  /// Success used as foreground text or an icon. The dark green reads on white
+  /// but disappears on charcoal, so dark mode uses the brand lime instead.
+  static Color successText(BuildContext context) =>
+      _isDark(context) ? primary : success;
+
+  /// Track behind progress meters. The muted surface is too close to the dark
+  /// card color, so dark mode lifts it with a translucent white instead.
+  static Color progressTrack(BuildContext context) =>
+      _isDark(context)
+          ? Colors.white.withValues(alpha: 0.18)
+          : mutedSurfaceLight;
 }

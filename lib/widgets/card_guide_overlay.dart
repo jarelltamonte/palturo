@@ -291,7 +291,7 @@ class _GuideTooltip extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: (index + 1) / total,
                   minHeight: 3,
-                  backgroundColor: AppColors.mutedSurface(context),
+                  backgroundColor: AppColors.progressTrack(context),
                   valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
               ),

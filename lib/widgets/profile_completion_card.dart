@@ -62,7 +62,7 @@ class ProfileCompletionCard extends StatelessWidget {
                   child: Icon(
                     complete ? Icons.check_circle_outline : Icons.donut_large,
                     size: 18,
-                    color: complete ? AppColors.success : fill,
+                    color: complete ? AppColors.successText(context) : fill,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -78,7 +78,7 @@ class ProfileCompletionCard extends StatelessWidget {
                 Text(
                   '${completion.percent}%',
                   style: AppTextStyles.headingText.copyWith(
-                    color: complete ? AppColors.success : accent,
+                    color: complete ? AppColors.successText(context) : accent,
                     fontSize: 18,
                     letterSpacing: -0.4,
                   ),
@@ -90,8 +90,8 @@ class ProfileCompletionCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: completion.fraction,
-                minHeight: 7,
-                backgroundColor: AppColors.mutedSurface(context),
+                minHeight: 8,
+                backgroundColor: AppColors.progressTrack(context),
                 valueColor: AlwaysStoppedAnimation<Color>(fill),
               ),
             ),

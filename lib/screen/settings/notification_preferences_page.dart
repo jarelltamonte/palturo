@@ -282,7 +282,7 @@ class NotificationPreferencesPage extends StatelessWidget {
         trailing = Icon(
           Icons.check_circle_outline,
           size: 18,
-          color: AppColors.success,
+          color: AppColors.successText(context),
         );
       case NotificationPermissionStatus.denied:
         subtitle =

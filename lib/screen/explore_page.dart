@@ -1093,7 +1093,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
               return LinearProgressIndicator(
                 value: value,
                 minHeight: 4,
-                backgroundColor: textTheme.withValues(alpha: 0.1),
+                backgroundColor: AppColors.progressTrack(context),
                 valueColor: const AlwaysStoppedAnimation<Color>(
                   AppColors.primary,
                 ),
@@ -1530,26 +1530,13 @@ class _TeachingDomainCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Divider(height: 1, thickness: 1, color: border),
                 const SizedBox(height: 9),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'YOU TEACH HERE',
-                      style: AppTextStyles.boldText.copyWith(
-                        fontSize: 9,
-                        letterSpacing: 1.2,
-                        color: accent,
-                      ),
-                    ),
-                  ],
+                Text(
+                  'YOU TEACH HERE',
+                  style: AppTextStyles.boldText.copyWith(
+                    fontSize: 9,
+                    letterSpacing: 1.2,
+                    color: accent,
+                  ),
                 ),
               ],
             ),

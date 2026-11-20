@@ -1851,7 +1851,7 @@ class _ChatRoomState extends State<ChatRoom> {
               child: LinearProgressIndicator(
                 value: count / 15,
                 minHeight: 5,
-                backgroundColor: AppColors.mutedSurface(context),
+                backgroundColor: AppColors.progressTrack(context),
                 color: AppColors.primary,
               ),
             ),

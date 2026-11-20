@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/models/profile_completion.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
 import 'package:palturo/screen/profile_data.dart';
+import 'package:palturo/theme/app_colors.dart';
 import 'package:palturo/theme/theme.dart';
 import 'package:palturo/widgets/profile_completion_card.dart';
 
@@ -29,9 +30,10 @@ Widget _host(
   Widget child, {
   double scale = 1,
   Size size = const Size(390, 844),
+  ThemeData? theme,
 }) {
   return MaterialApp(
-    theme: lightMode,
+    theme: theme ?? lightMode,
     home: MediaQuery(
       data: MediaQueryData(size: size, textScaler: TextScaler.linear(scale)),
       child: Scaffold(body: SingleChildScrollView(child: child)),
@@ -74,6 +76,30 @@ void main() {
     expect(find.text('100%'), findsOneWidget);
     expect(find.text('Everything is filled in. Nice work.'), findsOneWidget);
     expect(find.text('Finish profile'), findsNothing);
+  });
+
+  testWidgets('dark mode keeps the completed meter readable', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        ProfileCompletionCard(
+          completion: _completion(complete: true),
+          onEdit: () {},
+        ),
+        theme: darkMode,
+      ),
+    );
+    final context = tester.element(find.byType(ProfileCompletionCard));
+    final percent = tester.widget<Text>(find.text('100%'));
+    expect(percent.style?.color, AppColors.primary);
+
+    final bar = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
+    expect(bar.backgroundColor, AppColors.progressTrack(context));
+    expect(bar.backgroundColor, isNot(AppColors.mutedSurfaceDark));
+
+    final icon = tester.widget<Icon>(find.byIcon(Icons.check_circle_outline));
+    expect(icon.color, AppColors.primary);
   });
 
   testWidgets('fits a small phone at 200% text', (tester) async {

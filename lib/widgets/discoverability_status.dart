@@ -29,7 +29,10 @@ class DiscoverabilityStatusCard extends StatelessWidget {
 
     final complete = hasAnyShowcase && missingSkillLabels.isEmpty;
     final hidden = !hasAnyShowcase;
-    final accent = complete ? AppColors.success : AppColors.accentText(context);
+    final accent =
+        complete
+            ? AppColors.successText(context)
+            : AppColors.accentText(context);
     final fill = AppColors.primary;
     final textColor = Theme.of(context).colorScheme.secondary;
     final muted = AppColors.mutedText(context);
@@ -93,7 +96,7 @@ class DiscoverabilityStatusCard extends StatelessWidget {
                         ? Icons.visibility_off_outlined
                         : Icons.auto_awesome_outlined,
                     size: compact ? 18 : 20,
-                    color: complete ? AppColors.success : fill,
+                    color: complete ? AppColors.successText(context) : fill,
                   ),
                 ),
                 const SizedBox(width: 12),

@@ -273,7 +273,7 @@ class _SettingsState extends State<Settings> {
                   child: LinearProgressIndicator(
                     value: (currentStep + 1) / (_feedbackStatements.length + 1),
                     minHeight: 4,
-                    backgroundColor: textTheme.withValues(alpha: 0.1),
+                    backgroundColor: AppColors.progressTrack(context),
                     valueColor: const AlwaysStoppedAnimation<Color>(
                       AppColors.primary,
                     ),

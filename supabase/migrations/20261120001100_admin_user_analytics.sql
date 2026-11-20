@@ -316,6 +316,7 @@ select jsonb_build_object(
         / (select count(*) from public.profiles), 3)
       else null
     end,
+    'last_captured_at', (select max(updated_at) from public.profile_locations),
     'countries', coalesce((
       select jsonb_agg(jsonb_build_object('code', code, 'count', n) order by n desc)
       from (

@@ -427,6 +427,7 @@ class LocalNotificationService extends ChangeNotifier
               AppNotificationKind.possibleMatch => _requestsChannel,
               AppNotificationKind.feedbackReady ||
               AppNotificationKind.skillModeration ||
+              AppNotificationKind.accountWarning ||
               AppNotificationKind.unknown => _activityChannel,
             };
     if (sound && vibration) return base;
@@ -485,6 +486,8 @@ class LocalNotificationService extends ChangeNotifier
           'avatarUrl': item.actorAvatar,
           'notificationId': item.id,
         };
+      case ActivityDestination.accountStanding:
+        return {'route': 'account_standing', 'notificationId': item.id};
       case ActivityDestination.none:
         return item.kind == AppNotificationKind.skillModeration
             ? {'route': 'profile', 'notificationId': item.id}
@@ -538,6 +541,8 @@ class LocalNotificationService extends ChangeNotifier
         );
       case 'profile':
         unawaited(AppRouter.openProfile());
+      case 'account_standing':
+        unawaited(AppRouter.openAccountStanding());
       case 'user':
         {
           final userId = payload['userId']?.toString();

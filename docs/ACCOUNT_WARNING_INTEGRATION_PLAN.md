@@ -1,18 +1,44 @@
 # Account Warning Integration — Implementation Plan
 
-> **Status:** Proposed, not started.
+> **Status:** Implemented (2026-11-20). Backend, admin console, and Flutter code
+> are in place; the consumer app needs its normal release to reach users.
 > **Owner:** Consumer app + Supabase + admin console.
 > **Last updated:** 2026-11-20.
-> **Scope:** Make an account warning visible, attributable, and acknowledgeable in
-> the consumer app without changing authentication, matching, or the existing
-> audit/revert path in a breaking way.
+> **Scope:** Make an account warning visible, attributable, acknowledgeable, and
+> time-limited in the consumer app without changing authentication, matching, or
+> the existing audit/revert path in a breaking way.
 > **Repo:** `C:\Users\Xander\Desktop\PalTuro\palturo`
 > **Admin repo:** `C:\Users\Xander\Desktop\PalTuro\palturo-admin`
 > **Supabase project:** `yjcrfgvenilptrnudvcb`
-> **Production:** live. Every step below is additive and flag-gated.
+> **Production:** live.
 
 This file is the source of truth for a fresh session. Update the status and
 changelog as work lands.
+
+## Implementation record (2026-11-20)
+
+- Migration `20261120001000_account_warnings.sql` applied: table, counter
+  trigger, issue/get/acknowledge/revoke RPCs, `notifications` kind constraint,
+  and visibility filtering in `list_notifications` +
+  `count_unread_notifications`.
+- `admin_issue_warning` records the warning and inserts the
+  `account_warning` notification atomically. The trigger maintains
+  `profiles.warning_count` and `last_warned_at` from retained warnings.
+- `admin-api` warn resolution accepts `warning_category`, `warning_days`
+  (1–365), and `warning_message`; audit revert now revokes the warning instead
+  of restoring a stale counter. `users.detail` returns warning history.
+- Admin console: warn dialog has category, visibility duration, and required
+  user message; user detail lists retained warnings with visible/hidden/revoked
+  state and acknowledgment.
+- Flutter: `account_warning` notification kind, Activity “Updates” entry,
+  Account standing page, acknowledgment, account-settings link, notification
+  bypass for account notices, and local-notification routing.
+- Verification: SQL issue/expiry/revoke/client-read checks passed; a live admin
+  warn on a test report produced the warning, notification, counter, and audit;
+  client RPCs read and acknowledged it; cleanup restored zero. `flutter analyze`
+  clean, 320 tests pass, admin typecheck/build and 23/23 production smoke pass.
+- Caveat: notifications are sent immediately, so consumers on builds older than
+  this change see a generic “Activity” row until they update.
 
 ---
 
@@ -79,9 +105,9 @@ Suspension and ban are different: they call the GoTrue admin API with a
 | Push notification | Yes, but not disableable by category; master notification toggle and OS permission still apply |
 | Can the user dismiss without reading? | The notification can be marked read; the Account standing item stays until acknowledged |
 | User-facing reason | Admin picks a category and a required short message; internal reason stays admin-only |
-| Warning expiry | None in v1; only explicit revoke |
-| Counter | `profiles.warning_count` becomes derived from active warnings |
-| Old clients | No warning notifications until `account_warning_notifications_enabled` is turned on after app adoption |
+| Warning expiry | Admin chooses 7/14/30/60/90 days; the user-facing warning disappears at the deadline, the record stays |
+| Counter | `profiles.warning_count` counts every retained, non-revoked warning |
+| Old clients | Warning notifications are sent immediately; older builds show a generic Activity row until they update |
 | Public visibility | Never |
 
 ---
@@ -99,6 +125,9 @@ create table public.account_warnings (
     check (category in ('spam', 'harassment', 'irrelevant', 'other')),
   message text not null check (char_length(message) between 1 and 500),
   internal_reason text,
+  visible_days integer not null default 30
+    check (visible_days between 1 and 365),
+  visible_until timestamptz not null,
   issued_by uuid,
   created_at timestamptz not null default now(),
   acknowledged_at timestamptz,
@@ -214,20 +243,21 @@ path, and it is covered by tests.
 
 ### 5.4 Notification handling
 
-`notify()` already accepts any kind. No change to `list_notifications` is
-required for the row to appear; its actor join returns `null` for the new kind,
-which the app already handles. Ensure the `possible_match` filter does not
-exclude it (it does not).
+`notify()` already accepts any kind. The migration also updates
+`notifications_kind_check` for `account_warning`. To keep the client consistent:
 
-Add a config flag `account_warning_notifications_enabled` (boolean, default
-`false`) in `pipeline_config`. When false, the warning row is still created but
-no notification is inserted. This is the rollout gate for old clients.
+- `list_notifications` hides `account_warning` rows whose warning is revoked or
+  past `visible_until`.
+- `count_unread_notifications` applies the same filter so the badge cannot count
+  an invisible warning.
+
+Notifications are sent immediately when a warning is issued. Warnings are rare,
+and older app builds show a neutral generic Activity row until they update.
 
 ### 5.5 Migration set
 
-1. `2026xxxx_account_warnings.sql` — table, indexes, trigger, RLS, revokes.
-2. `2026xxxx_admin_warning_rpcs.sql` — issue/revoke/get/acknowledge RPCs.
-3. `2026xxxx_warning_config_flag.sql` — config key with default false.
+One additive migration: `20261120001000_account_warnings.sql` (table, indexes,
+trigger, kind constraint, RPCs, notification filters).
 
 All additive. No column drops, no signature changes to existing RPCs.
 
@@ -242,10 +272,9 @@ All additive. No column drops, no signature changes to existing RPCs.
   - required “Message to the user” textarea (1–500, pre-filled policy copy,
     editable);
   - internal reason stays the existing field.
-- **User detail**: Warning history (active/acknowledged/revoked) with message,
-  date, actor, and a Revoke action.
-- **Moderation report detail**: show the warning and its acknowledgment state.
-- **Audit**: render `warning.issue` / `warning.revoke`; revert works.
+- **User detail**: Warning history (visible/hidden/revoked) with message, dates,
+  acknowledgment, and internal reason. Revocation is available through audit
+  revert; there is no separate revoke button yet.
 - **Analytics**: no change required; optionally count active warnings in Safety
   later.
 
@@ -294,29 +323,27 @@ behavior.
 
 Order matters because the app is live.
 
-1. **Apply migrations** with the notification flag off. Existing behavior is
-   byte-for-byte unchanged.
+1. **Apply the migration.** Existing behavior is unchanged until a warning is
+   issued.
 2. **Deploy `admin-api`** with the new optional fields and RPC calls. Old
    console payloads still work.
 3. **Deploy admin console** with the warning message/history UI.
-4. **Ship the consumer app** and monitor adoption through `client_errors.app_version`
-   and store metrics.
-5. **Enable `account_warning_notifications_enabled`.** Test first with an
-   internal account:
-   - admin warns the test account;
-   - the account receives one notification, opens Account standing, acknowledges;
-   - admin sees the acknowledgment;
-   - revoke removes it from both sides and decrements the counter.
+4. **Ship the consumer app** and monitor adoption through
+   `client_errors.app_version` and store metrics.
+5. **Test with an internal account:** admin warns it; the account receives one
+   notification, opens Account standing, acknowledges; the admin sees the
+   acknowledgment; audit revert or `admin_revoke_warning` removes it and
+   decrements the counter.
 6. **Watch** for 24–48 hours: notification errors, account-screen errors,
    duplicate warnings, counter drift.
 7. Announce the policy to moderators.
 
-### Why the flag
+### Why delivery starts immediately
 
-An old client maps `account_warning` to `unknown`, which currently surfaces as a
-generic update under **Updates**. Turning the flag on only after adoption avoids
-confusing users on old builds. Warnings still record while the flag is off; only
-delivery waits.
+Warnings are rare and time-sensitive. Older app builds map `account_warning` to
+`unknown`, which shows a neutral Activity row rather than breaking, so there is
+no destructive behavior while users update. The detail view is available as soon
+as the new build lands.
 
 ---
 
@@ -325,13 +352,12 @@ delivery waits.
 - No changes to `profiles` columns, auth bans, matching, or existing RPC
   signatures.
 - No new grants on `profiles` or `notifications`.
-- `list_notifications` untouched.
+- `list_notifications` only gained a filter for `account_warning`; existing
+  kinds are untouched. `count_unread_notifications` mirrors it.
 - Audit revert remains the only mutation path for resolved reports; its warning
   branch is additive.
 - Existing notification kinds, filters, and preferences unchanged.
 - New table is service-only; no RLS policy widening.
-- Feature flag defaults off; no warning notification is sent without an explicit
-  config change.
 - If the consumer app is unavailable, admin warning still records history and
   the counter; nothing blocks moderation.
 
@@ -376,9 +402,10 @@ delivery waits.
 
 ## 11. Rollback
 
-- Set `account_warning_notifications_enabled` back to `false`; delivery stops.
-- Revoke test warnings; the trigger restores counters.
-- The table and RPCs are harmless if unused; no destructive rollback needed.
+- Revoke warnings via `admin_revoke_warning`; the trigger restores counters and
+  the notification disappears from the client.
+- Hide the feature by leaving warnings unissued; the table and RPCs are harmless
+  if unused.
 - The admin console can keep the history UI reading the table.
 - Existing report resolution still works without a warning message (defaults).
 
@@ -388,11 +415,12 @@ delivery waits.
 
 1. Should a third active warning auto-suspend? (Recommend: no, keep human
    review; revisit after data.)
-2. Should warnings expire after N days? (Recommend: no expiry in v1.)
+2. Should the visibility window be per-warning? (Implemented: per warning,
+   7–90 days; expand to custom values if needed.)
 3. Should the user be able to appeal from the warning card? (Recommend: link to
    Support, no formal workflow.)
 4. Should the notification survive the user disabling “Activity updates”?
-   (Recommend: yes, it is an account notice.)
+   (Implemented: yes, it is an account notice.)
 5. Do we need email for users who never open the app? (Out of scope; push +
    in-app first.)
 
@@ -401,4 +429,8 @@ delivery waits.
 ## 13. Changelog
 
 - 2026-11-20 — Plan created. Current warning path audited; no user-facing
-  warning exists. Proposed table, RPCs, admin/app changes, flag-gated rollout.
+  warning existed.
+- 2026-11-20 — Implemented: `account_warnings`, visibility window, counter
+  trigger, notification kind, admin duration/message fields, consumer Account
+  standing and acknowledgment, expiry-aware list/badge filters. Verified with a
+  live admin warning and client RPC read/ack/revoke.

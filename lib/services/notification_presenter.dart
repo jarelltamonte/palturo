@@ -229,6 +229,8 @@ class NotificationPresenter {
         unawaited(Haptics.selection());
       } else if (item.kind == AppNotificationKind.possibleMatch) {
         unawaited(Haptics.selection());
+      } else if (item.kind == AppNotificationKind.accountWarning) {
+        unawaited(Haptics.warning());
       }
     }
     final rawTap = _tapFor(item, view);
@@ -303,6 +305,8 @@ class NotificationPresenter {
           skillName: view.skillName,
           role: _roleFrom(item.possibleMatchRole ?? item.role),
         );
+      case ActivityDestination.accountStanding:
+        return () => AppRouter.openAccountStanding();
       case ActivityDestination.none:
         if (item.kind == AppNotificationKind.skillModeration) {
           return () => AppRouter.openProfile();
@@ -442,6 +446,10 @@ bool notificationKindEnabled(AppNotificationKind kind) {
       return PreferencesService.instance.activityNotificationsEnabled;
     case AppNotificationKind.possibleMatch:
       return PreferencesService.instance.possibleMatchNotificationsEnabled;
+    case AppNotificationKind.accountWarning:
+      // Account notices are not marketing; keep them delivered even when
+      // activity categories are muted. The master toggle still applies.
+      return true;
     case AppNotificationKind.unknown:
       return false;
   }

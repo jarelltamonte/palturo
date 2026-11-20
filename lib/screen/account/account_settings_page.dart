@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:palturo/services/profile_service.dart';
+import 'package:palturo/screen/account/account_standing_page.dart';
 import 'package:palturo/screen/account/change_password_page.dart';
 import 'package:palturo/screen/account/delete_account_page.dart';
 import 'package:palturo/screen/account/privacy_page.dart';
@@ -345,6 +346,14 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
               ),
             ),
             onTap: _openNameEditor,
+          ),
+
+          _section('ACCOUNT STANDING'),
+          _tile(
+            icon: Icons.gavel_outlined,
+            title: 'Warnings & notices',
+            subtitle: 'Review any account warnings.',
+            onTap: () => _open(const AccountStandingPage()),
           ),
 
           _section('SECURITY'),

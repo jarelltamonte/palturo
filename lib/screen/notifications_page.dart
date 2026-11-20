@@ -236,6 +236,9 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
             _showFallback('This profile is no longer available.');
           }
         }
+      case ActivityDestination.accountStanding:
+        unawaited(_markItemRead(item));
+        await AppRouter.openAccountStanding();
       case ActivityDestination.none:
         _showFallback(
           item.kind == AppNotificationKind.skillModeration
@@ -275,6 +278,7 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
       case ActivityFilter.updates:
         return item.kind.isFeedback ||
             item.kind == AppNotificationKind.skillModeration ||
+            item.kind == AppNotificationKind.accountWarning ||
             item.kind == AppNotificationKind.unknown;
     }
   }
@@ -537,6 +541,7 @@ bool activityMatchesFilter(AppNotification item, ActivityFilter filter) {
     case ActivityFilter.updates:
       return item.kind.isFeedback ||
           item.kind == AppNotificationKind.skillModeration ||
+          item.kind == AppNotificationKind.accountWarning ||
           item.kind == AppNotificationKind.unknown;
   }
 }

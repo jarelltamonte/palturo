@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/services/match_api.dart';
 
-enum ActivityDestination { incomingRequests, sentRequests, chat, profile, none }
+enum ActivityDestination { incomingRequests, sentRequests, chat, profile, accountStanding, none }
 
 /// Pure presentation model for one notification row.
 ///
@@ -173,6 +173,23 @@ ActivityItemView presentActivity(
         icon: Icons.workspace_premium_outlined,
         destination: ActivityDestination.none,
       );
+    case 'account_warning':
+      {
+        final message = _text(payload['message']);
+        final category = _text(payload['category']);
+        final body =
+            message ??
+            (category == null
+                ? 'A moderator reviewed your account. Open Account standing for details.'
+                : 'A moderator reviewed your account for $category. Open Account standing for details.');
+        return ActivityItemView(
+          title: 'Account warning',
+          body: body,
+          actionLabel: 'Review',
+          icon: Icons.shield_outlined,
+          destination: ActivityDestination.accountStanding,
+        );
+      }
     default:
       return const ActivityItemView(
         title: 'Activity',

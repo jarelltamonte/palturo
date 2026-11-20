@@ -10,6 +10,7 @@ enum AppNotificationKind {
   feedbackReady('feedback_ready'),
   skillModeration('skill_moderation'),
   possibleMatch('possible_match'),
+  accountWarning('account_warning'),
   unknown('unknown');
 
   const AppNotificationKind(this.wireValue);
@@ -37,6 +38,9 @@ enum AppNotificationKind {
 
   /// A suggestion computed from a new profile, not a confirmed connection.
   bool get isPossibleMatch => this == AppNotificationKind.possibleMatch;
+
+  /// An account notice that must stay visible regardless of category toggles.
+  bool get isAccountNotice => this == AppNotificationKind.accountWarning;
 }
 
 class AppNotification {

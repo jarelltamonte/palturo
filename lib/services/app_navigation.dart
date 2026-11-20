@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:palturo/screen/account/account_standing_page.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_room.dart';
 import 'package:palturo/screen/notifications_page.dart';
@@ -62,6 +63,9 @@ class AppRouter {
   }
 
   static Future<void> openProfile() => _push((_) => const ProfilePage());
+
+  static Future<void> openAccountStanding() =>
+      _push((_) => const AccountStandingPage());
 
   /// Opens the read-only profile card for another member. Returns false when
   /// the profile is gone or the navigator is not ready, so Activity can show a

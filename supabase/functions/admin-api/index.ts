@@ -506,6 +506,7 @@ Deno.serve(async (req) => {
           { data: auditRows },
           { data: authUser },
           { data: warnings },
+          { data: accountWarnings },
         ] = await Promise.all([
           admin.from("profiles").select("*").eq("id", id).maybeSingle(),
           admin
@@ -533,6 +534,14 @@ Deno.serve(async (req) => {
             .eq("user_id", id)
             .order("created_at", { ascending: false })
             .limit(50),
+          admin
+            .from("account_warnings")
+            .select(
+              "id,report_id,category,message,internal_reason,visible_days,visible_until,created_at,acknowledged_at,revoked_at,revoke_reason,issued_by",
+            )
+            .eq("user_id", id)
+            .order("created_at", { ascending: false })
+            .limit(50),
         ]);
         if (!profile) return json({ error: "User not found" }, 404);
         if (!reveal) profile.email = maskEmail(profile.email);
@@ -546,6 +555,7 @@ Deno.serve(async (req) => {
             skills: skills ?? [],
             reports: reports ?? [],
             warnings: warnings ?? [],
+            account_warnings: accountWarnings ?? [],
             audit: auditRows ?? [],
             auth: authUser?.user
               ? {
@@ -711,6 +721,17 @@ Deno.serve(async (req) => {
           return json({ error: "Invalid moderation action" }, 400);
         }
 
+        const warningDays = clampInt(payload.warning_days, 30, 1, 365);
+        const warningCategoryRaw = String(payload.warning_category ?? "other").toLowerCase();
+        const warningCategory = ["spam", "harassment", "irrelevant", "other"].includes(
+          warningCategoryRaw,
+        )
+          ? warningCategoryRaw
+          : "other";
+        const warningMessage =
+          String(payload.warning_message ?? "").trim() ||
+          "A moderator reviewed a report about your account and found it did not follow the PalTuro community guidelines. Please review the guidelines; repeated violations can lead to suspension.";
+
         const { data: report } = await admin
           .from("reports")
           .select("*")
@@ -745,19 +766,27 @@ Deno.serve(async (req) => {
 
         const before = await moderationSnapshot(admin, reportedId);
         let userAfter: any = before.profile;
+        let warningResult: any = null;
         const now = new Date().toISOString();
 
         if (actionTaken === "warn") {
-          const { data, error } = await admin
-            .from("profiles")
-            .update({
-              warning_count: Number(before.profile?.warning_count ?? 0) + 1,
-              last_warned_at: now,
-            })
-            .eq("id", reportedId)
-            .select("moderation_status,suspended_at,warning_count,last_warned_at")
-            .single();
+          const { data: warning, error } = await admin.rpc("admin_issue_warning", {
+            p_user: reportedId,
+            p_report: id,
+            p_category: warningCategory,
+            p_message: warningMessage,
+            p_internal_reason: reason,
+            p_visible_days: warningDays,
+            p_actor: user.id,
+          });
           if (error) throw error;
+          warningResult = warning;
+          const { data, error: profileError } = await admin
+            .from("profiles")
+            .select("moderation_status,suspended_at,warning_count,last_warned_at")
+            .eq("id", reportedId)
+            .single();
+          if (profileError) throw profileError;
           userAfter = data;
         } else if (actionTaken === "suspend" || actionTaken === "ban") {
           const { error: authError } = await admin.auth.admin.updateUserById(reportedId, {
@@ -808,10 +837,14 @@ Deno.serve(async (req) => {
             before: { report, user: before },
             after: { report: afterReport, user: userAfter },
             action: actionTaken,
+            warning: warningResult,
           },
           reason,
         );
-        return json({ ok: true, data: { action: actionTaken, user: userAfter } });
+        return json({
+          ok: true,
+          data: { action: actionTaken, user: userAfter, warning: warningResult },
+        });
       }
 
       case "moderation.skills": {
@@ -1673,15 +1706,37 @@ Deno.serve(async (req) => {
 
               const userId = reportBefore.reported_id;
               const userBefore = detail.before?.user;
+              const wasWarn = reportBefore.action_taken === "warn";
+              if (userId && wasWarn) {
+                const { data: activeWarning } = await admin
+                  .from("account_warnings")
+                  .select("id")
+                  .eq("report_id", original.target_id)
+                  .is("revoked_at", null)
+                  .maybeSingle();
+                if (activeWarning?.id) {
+                  const { error: revokeError } = await admin.rpc("admin_revoke_warning", {
+                    p_warning: activeWarning.id,
+                    p_actor: user.id,
+                    p_reason: `Revert audit #${id}: ${reason}`,
+                  });
+                  if (revokeError) throw revokeError;
+                }
+              }
               if (userId && userBefore?.profile) {
+                const restore: Record<string, unknown> = {
+                  moderation_status: userBefore.profile.moderation_status,
+                  suspended_at: userBefore.profile.suspended_at,
+                };
+                // The warning counter is derived from account_warnings. For a
+                // revoke, the trigger already restored it.
+                if (!wasWarn) {
+                  restore.warning_count = userBefore.profile.warning_count;
+                  restore.last_warned_at = userBefore.profile.last_warned_at;
+                }
                 const { error: profileError } = await admin
                   .from("profiles")
-                  .update({
-                    moderation_status: userBefore.profile.moderation_status,
-                    suspended_at: userBefore.profile.suspended_at,
-                    warning_count: userBefore.profile.warning_count,
-                    last_warned_at: userBefore.profile.last_warned_at,
-                  })
+                  .update(restore)
                   .eq("id", userId);
                 if (profileError) throw profileError;
                 const stillBanned =

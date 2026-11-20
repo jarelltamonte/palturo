@@ -261,7 +261,7 @@ void main() {
     await _pump(tester, theme: lightMode, users: users.call);
 
     expect(
-      find.textContaining('No mentors are free in this domain right now'),
+      find.textContaining('No mentors are free in this category right now'),
       findsOneWidget,
     );
     expect(find.text('SKILLS'), findsOneWidget);
@@ -290,7 +290,7 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.text('mentors here'), findsOneWidget);
     expect(
-      find.textContaining('Matched with 3 mentors in this domain'),
+      find.textContaining('Matched with 3 mentors in this category'),
       findsOneWidget,
     );
     expect(
@@ -316,7 +316,7 @@ void main() {
     expect(find.text('1'), findsOneWidget);
     expect(find.text('mentor here'), findsOneWidget);
     expect(
-      find.textContaining('Matched with 1 mentor in this domain'),
+      find.textContaining('Matched with 1 mentor in this category'),
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
@@ -432,70 +432,71 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('domain, category, and skill pages read as different levels', (
-    tester,
-  ) async {
-    await _pump(
-      tester,
-      theme: lightMode,
-      users: _programmingUsers,
-      nodePath: 'modern_practical_skills',
-      nodeLabel: 'Modern Practical Skills',
-      nodeDepth: 1,
-      nodeKind: 'category',
-      taxonomy: _programmingTaxonomy,
-    );
-    expect(find.text('DOMAIN'), findsOneWidget);
-    expect(find.text('SUBCATEGORIES'), findsOneWidget);
-    expect(find.text('Part of '), findsNothing);
-    expect(find.text('Programming'), findsOneWidget);
+  testWidgets(
+    'category, subcategory, and skill pages read as different levels',
+    (tester) async {
+      await _pump(
+        tester,
+        theme: lightMode,
+        users: _programmingUsers,
+        nodePath: 'modern_practical_skills',
+        nodeLabel: 'Modern Practical Skills',
+        nodeDepth: 1,
+        nodeKind: 'category',
+        taxonomy: _programmingTaxonomy,
+      );
+      expect(find.text('CATEGORY'), findsOneWidget);
+      expect(find.text('SUBCATEGORIES'), findsOneWidget);
+      expect(find.text('Part of '), findsNothing);
+      expect(find.text('Programming'), findsOneWidget);
 
-    await _pump(
-      tester,
-      theme: lightMode,
-      users: _programmingUsers,
-      nodePath: 'modern_practical_skills.programming',
-      nodeLabel: 'Programming',
-      ancestors: const [
-        BrowseCrumb(
-          label: 'Modern Practical Skills',
-          path: 'modern_practical_skills',
-        ),
-      ],
-      nodeDepth: 2,
-      nodeKind: 'category',
-      taxonomy: _programmingTaxonomy,
-    );
-    expect(find.text('CATEGORY'), findsOneWidget);
-    expect(find.text('Part of Modern Practical Skills'), findsOneWidget);
-    expect(find.text('SKILLS'), findsOneWidget);
-    expect(find.text('General Programming'), findsOneWidget);
+      await _pump(
+        tester,
+        theme: lightMode,
+        users: _programmingUsers,
+        nodePath: 'modern_practical_skills.programming',
+        nodeLabel: 'Programming',
+        ancestors: const [
+          BrowseCrumb(
+            label: 'Modern Practical Skills',
+            path: 'modern_practical_skills',
+          ),
+        ],
+        nodeDepth: 2,
+        nodeKind: 'category',
+        taxonomy: _programmingTaxonomy,
+      );
+      expect(find.text('SUBCATEGORY'), findsOneWidget);
+      expect(find.text('Part of Modern Practical Skills'), findsOneWidget);
+      expect(find.text('SKILLS'), findsOneWidget);
+      expect(find.text('General Programming'), findsOneWidget);
 
-    await _pump(
-      tester,
-      theme: lightMode,
-      users: _programmingUsers,
-      nodePath: 'modern_practical_skills.programming.general_programming',
-      nodeLabel: 'General Programming',
-      ancestors: const [
-        BrowseCrumb(
-          label: 'Modern Practical Skills',
-          path: 'modern_practical_skills',
-        ),
-        BrowseCrumb(
-          label: 'Programming',
-          path: 'modern_practical_skills.programming',
-        ),
-      ],
-      nodeDepth: 3,
-      nodeKind: 'skill',
-      taxonomy: _programmingTaxonomy,
-    );
-    expect(find.text('SKILL'), findsOneWidget);
-    expect(find.text('Part of Programming'), findsOneWidget);
-    expect(find.text('SKILLS'), findsNothing);
-    expect(find.text('Start browsing mentors'), findsOneWidget);
-    expect(find.text('Modern Practical Skills'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      await _pump(
+        tester,
+        theme: lightMode,
+        users: _programmingUsers,
+        nodePath: 'modern_practical_skills.programming.general_programming',
+        nodeLabel: 'General Programming',
+        ancestors: const [
+          BrowseCrumb(
+            label: 'Modern Practical Skills',
+            path: 'modern_practical_skills',
+          ),
+          BrowseCrumb(
+            label: 'Programming',
+            path: 'modern_practical_skills.programming',
+          ),
+        ],
+        nodeDepth: 3,
+        nodeKind: 'skill',
+        taxonomy: _programmingTaxonomy,
+      );
+      expect(find.text('SKILL'), findsOneWidget);
+      expect(find.text('Part of Programming'), findsOneWidget);
+      expect(find.text('SKILLS'), findsNothing);
+      expect(find.text('Start browsing mentors'), findsOneWidget);
+      expect(find.text('Modern Practical Skills'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

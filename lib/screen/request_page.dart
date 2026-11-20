@@ -232,7 +232,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
         ),
       const FilterSection(
         key: 'domain',
-        title: 'Declared skill domain',
+        title: 'Declared skill category',
         options: [
           FilterOption('All requests', 'all'),
           FilterOption('In my declared skills', 'inside'),

@@ -25,9 +25,9 @@ class BrowseCrumb {
 
 /// Human-readable level for a taxonomy node.
 String browseLevelLabel({required String kind, required int depth}) {
-  if (depth <= 1) return 'Domain';
+  if (depth <= 1) return 'Category';
   if (kind == 'skill') return 'Skill';
-  return 'Category';
+  return 'Subcategory';
 }
 
 IconData exploreRootIcon(String path) {

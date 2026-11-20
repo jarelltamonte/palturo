@@ -334,7 +334,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted || requestId != _requestId) return;
       final message = friendlyError(
         e,
-        fallback: "Couldn't load domains. Please try again.",
+        fallback: "Couldn't load categories. Please try again.",
       );
       setState(() {
         _loading = false;
@@ -367,7 +367,7 @@ class _ExplorePageState extends State<ExplorePage> {
     try {
       final roleResult = await _filterByRole(_roots, role: role, force: force);
       // Count every root: Mentor mode shows the teaching domains as cards and
-      // the rest in an "Explore other domains" grid.
+      // the rest in an "Explore other categories" grid.
       final counts = await _rootCountsFor(_roots, role: role);
       if (!mounted || requestId != _requestId || role != _role) return;
       final snapshot = _RoleSnapshot(
@@ -397,7 +397,7 @@ class _ExplorePageState extends State<ExplorePage> {
       if (!mounted || requestId != _requestId || role != _role) return;
       final message = friendlyError(
         e,
-        fallback: "Couldn't load domains. Please try again.",
+        fallback: "Couldn't load categories. Please try again.",
       );
       setState(() {
         _roleLoading = false;
@@ -643,10 +643,10 @@ class _ExplorePageState extends State<ExplorePage> {
               if (teachingRoots.isNotEmpty) ...[
                 _buildMentorSectionLabel(
                   context,
-                  'YOUR TEACHING DOMAINS',
+                  'YOUR TEACHING CATEGORIES',
                   hint:
                       '${teachingRoots.length} '
-                      'domain${teachingRoots.length == 1 ? '' : 's'}',
+                      'categor${teachingRoots.length == 1 ? 'y' : 'ies'}',
                 ),
                 const SizedBox(height: 8),
                 for (final root in teachingRoots) ...[
@@ -667,7 +667,7 @@ class _ExplorePageState extends State<ExplorePage> {
                 if (gridRoots.isNotEmpty) const SizedBox(height: 6),
               ],
               if (gridRoots.isNotEmpty) ...[
-                _buildMentorSectionLabel(context, 'EXPLORE OTHER DOMAINS'),
+                _buildMentorSectionLabel(context, 'EXPLORE OTHER CATEGORIES'),
                 const SizedBox(height: 8),
                 _buildDomainGrid(context, gridRoots),
               ],
@@ -705,8 +705,8 @@ class _ExplorePageState extends State<ExplorePage> {
         _query.trim().isNotEmpty
             ? 'RESULTS'
             : featuredShown
-            ? 'MORE DOMAINS'
-            : 'ALL DOMAINS';
+            ? 'MORE CATEGORIES'
+            : 'ALL CATEGORIES';
     return Text(
       label,
       style: AppTextStyles.boldText.copyWith(
@@ -804,7 +804,7 @@ class _ExplorePageState extends State<ExplorePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'No domains match "${_query.trim()}".',
+              'No categories match "${_query.trim()}".',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 fontSize: 14,
@@ -837,8 +837,8 @@ class _ExplorePageState extends State<ExplorePage> {
               _role == ExploreRole.mentor
                   ? _hasMentorSkills
                       ? 'No learners are looking for your skills right now. Check back soon.'
-                      : 'You haven\'t added any mentor skills yet. Add some to your profile and matching domains will show up here.'
-                  : 'No domains available right now.',
+                      : 'You haven\'t added any mentor skills yet. Add some to your profile and matching categories will show up here.'
+                  : 'No categories available right now.',
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 fontSize: 14,
@@ -860,7 +860,7 @@ class _ExplorePageState extends State<ExplorePage> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: _loadTaxonomy,
-                child: const Text('Refresh domains'),
+                child: const Text('Refresh categories'),
               ),
             ],
           ],
@@ -878,7 +878,7 @@ class _ExplorePageState extends State<ExplorePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              _error ?? "Couldn't load domains. Please try again.",
+              _error ?? "Couldn't load categories. Please try again.",
               textAlign: TextAlign.center,
               style: AppTextStyles.regularText.copyWith(
                 fontSize: 14,
@@ -1018,7 +1018,7 @@ class _ExploreInfoDialogState extends State<_ExploreInfoDialog> {
   static const _titles = ['Browse', 'Heads up'];
 
   static const _messages = [
-    'Browse domains to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a domain and swipe through people who are teaching or learning in it.',
+    'Browse categories to discover skills and knowledge shared by other users. Use the toggle to switch between learning and mentoring, then pick a category and swipe through people who are teaching or learning in it.',
     'Most people you swipe on here won\'t match the skills you declared. That\'s intentional: Browse is for discovering something new, so keep an open mind.',
   ];
 
@@ -1257,7 +1257,7 @@ class _FieldGuideSearch extends StatelessWidget {
               cursorColor: AppColors.primary,
               style: AppTextStyles.regularText.copyWith(color: textTheme),
               decoration: InputDecoration(
-                hintText: 'Search domains',
+                hintText: 'Search categories',
                 hintStyle: AppTextStyles.regularText.copyWith(color: muted),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
@@ -1685,7 +1685,7 @@ class _FieldGuideSkeleton extends StatelessWidget {
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
     final cardHeight = (132 * scale).toDouble();
     return Semantics(
-      label: 'Loading domains',
+      label: 'Loading categories',
       child: LayoutBuilder(
         builder: (context, constraints) {
           final columns =

@@ -94,11 +94,11 @@ void main() {
       find.text('Follow a craft, meet the person behind it.'),
       findsOneWidget,
     );
-    expect(find.text('Search domains'), findsOneWidget);
+    expect(find.text('Search categories'), findsOneWidget);
     expect(find.text('FEATURED'), findsOneWidget);
     // The feature card owns one domain, so the grid lists the rest.
-    expect(find.text('MORE DOMAINS'), findsOneWidget);
-    expect(find.text('ALL DOMAINS'), findsNothing);
+    expect(find.text('MORE CATEGORIES'), findsOneWidget);
+    expect(find.text('ALL CATEGORIES'), findsNothing);
     // Domain numbers are gone from both the section label and the cards.
     expect(
       find.byWidgetPredicate(
@@ -195,12 +195,12 @@ void main() {
     await tester.tap(find.text('Mentor'));
     await tester.pumpAndSettle();
 
-    expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+    expect(find.text('YOUR TEACHING CATEGORIES'), findsOneWidget);
     expect(find.text('Cooking & Culinary'), findsOneWidget);
     expect(find.text('Filipino Cooking'), findsOneWidget);
     expect(find.text('YOU TEACH HERE'), findsOneWidget);
     // The rest of the directory stays available below the teaching card.
-    expect(find.text('EXPLORE OTHER DOMAINS'), findsOneWidget);
+    expect(find.text('EXPLORE OTHER CATEGORIES'), findsOneWidget);
     expect(find.text('Household Skills'), findsOneWidget);
     expect(find.text('FEATURED'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -235,7 +235,7 @@ void main() {
 
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
-      expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+      expect(find.text('YOUR TEACHING CATEGORIES'), findsOneWidget);
       final callsAfterMentor = calls;
 
       // The learner snapshot was cached on the first load.
@@ -246,7 +246,7 @@ void main() {
       // The mentor snapshot is cached too: no second fetch and no skeleton.
       await tester.tap(find.text('Mentor'));
       await tester.pump();
-      expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+      expect(find.text('YOUR TEACHING CATEGORIES'), findsOneWidget);
       expect(calls, callsAfterMentor);
       expect(tester.takeException(), isNull);
     },
@@ -380,7 +380,7 @@ void main() {
     await tester.tap(find.text('Mentor'));
     await tester.pumpAndSettle();
 
-    expect(find.text('YOUR TEACHING DOMAINS'), findsOneWidget);
+    expect(find.text('YOUR TEACHING CATEGORIES'), findsOneWidget);
     expect(find.text('Filipino Cooking'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

@@ -737,9 +737,9 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
     final matchedNoun = _total == 1 ? _noun : '${_noun}s';
     final text =
         matched
-            ? 'Matched with $_total $matchedNoun in this domain. '
+            ? 'Matched with $_total $matchedNoun in this category. '
                 'No new ${_noun}s are free right now.$tail'
-            : 'No ${_noun}s are free in this domain right now.$tail';
+            : 'No ${_noun}s are free in this category right now.$tail';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -999,8 +999,8 @@ class _SkillRow extends StatelessWidget {
       button: true,
       label:
           countText == null
-              ? '$label. ${isCategory ? 'Category' : 'Skill'}.'
-              : '$label. ${isCategory ? 'Category' : 'Skill'}. $countText.',
+              ? '$label. ${isCategory ? 'Subcategory' : 'Skill'}.'
+              : '$label. ${isCategory ? 'Subcategory' : 'Skill'}. $countText.',
       onTap: onTap,
       excludeSemantics: true,
       child: InkWell(
@@ -1016,7 +1016,7 @@ class _SkillRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isCategory ? 'CATEGORY' : 'SKILL',
+                  isCategory ? 'SUBCATEGORY' : 'SKILL',
                   style: AppTextStyles.boldText.copyWith(
                     fontSize: 8,
                     letterSpacing: 0.6,

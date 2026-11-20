@@ -36,7 +36,7 @@ security definer
 set search_path to 'public'
 as $$
 begin
-  if new.note is distinct from old.note then
+  if tg_op = 'UPDATE' and new.note is distinct from old.note then
     new.note_approved := false;
     new.note_approval_source := null;
   end if;

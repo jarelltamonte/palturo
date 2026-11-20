@@ -185,6 +185,25 @@ skill_buckets as (
     min(case when n = 0 then 1 when n <= 2 then 2 when n <= 5 then 3 else 4 end) as ord
   from skill_counts
   group by 1
+),
+location_countries as (
+  select country_code as code, count(*)::int as n
+  from public.profile_locations
+  group by country_code
+),
+ph_groups as (
+  select public.ph_island_group(region_code, region) as name, count(*)::int as n
+  from public.profile_locations
+  where country_code = 'PH'
+  group by 1
+),
+ph_cities as (
+  select city as name, max(region) as region, count(*)::int as n
+  from public.profile_locations
+  where country_code = 'PH'
+    and city is not null
+    and btrim(city) <> ''
+  group by city
 )
 select jsonb_build_object(
   'days', (select n from win),
@@ -282,6 +301,33 @@ select jsonb_build_object(
       limit 8
     ) q
   ), '[]'::jsonb),
+  'locations', jsonb_build_object(
+    'captured', (select count(*)::int from public.profile_locations),
+    'total', (select count(*)::int from public.profiles),
+    'coverage', case
+      when (select count(*) from public.profiles) > 0
+      then round(
+        (select count(*) from public.profile_locations)::numeric
+        / (select count(*) from public.profiles), 3)
+      else null
+    end,
+    'countries', coalesce((
+      select jsonb_agg(jsonb_build_object('code', code, 'count', n) order by n desc)
+      from (
+        select * from location_countries order by n desc limit 10
+      ) q
+    ), '[]'::jsonb),
+    'island_groups', coalesce((
+      select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by n desc)
+      from ph_groups
+    ), '[]'::jsonb),
+    'cities', coalesce((
+      select jsonb_agg(jsonb_build_object('name', name, 'region', region, 'count', n) order by n desc)
+      from (
+        select * from ph_cities order by n desc limit 10
+      ) q
+    ), '[]'::jsonb)
+  ),
   'languages', coalesce((
     select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by n desc)
     from (

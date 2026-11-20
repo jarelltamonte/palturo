@@ -52,8 +52,11 @@ class PrivacyPage extends StatelessWidget {
           Text(
             'PalTuro stores the profile details, skills, requests, messages, '
             'and feedback needed to run matching, chat, safety, and account '
-            'features. Your profile and activity are visible only where the '
-            'product needs them.',
+            'features. It also stores an approximate location (country, '
+            'region, and city) derived from your network address so we can '
+            'understand the user base; the IP address itself is never stored. '
+            'Your profile and activity are visible only where the product '
+            'needs them.',
             style: AppTextStyles.regularText.copyWith(
               color: textTheme.withValues(alpha: 0.8),
               fontSize: 14,

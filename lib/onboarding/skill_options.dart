@@ -2,9 +2,10 @@ import 'onboarding_models.dart';
 
 /// The selectable skill layer.
 ///
-/// Selections stop at depth 2 of the taxonomy. Depth 3 stays in the database
-/// for search aliases, showcase captions, and matching focus, but users are
-/// never asked to pick an oddly specific leaf such as a single dish.
+/// Selections target the selectable `kind='skill'` nodes: mostly depth 2, plus
+/// the four depth-3 Programming skills. Deeper focus leaves stay in the
+/// database for search aliases, showcase captions, and matching specificity,
+/// but users are never asked to pick an oddly specific leaf such as a dish.
 const kSelectableSkills = <OnboardingOption>[
   // Agriculture & Livelihood
   OnboardingOption('farming', 'Farming'),

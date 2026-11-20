@@ -50,10 +50,11 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
   learning-style details.
 - Skills are selected from the 29 selectable nodes (25 at depth 2 plus 4
   Programming skills at depth 3): Farming, Filipino Cooking, Filipino Dessert
-  Making, Filipino Embroidery, Programming, Sewing, Painting, and Philippine
-  Script Writing.
-- The interests step has a search field. It filters the depth-2 chips, accepts
-  Enter for an exact match, and offers `Create "<name>"` for a new skill.
+  Making, Filipino Embroidery, General/Python/C#/Web Programming, Sewing,
+  Painting, and Philippine Script Writing.
+- The interests step has a search field. It filters the selectable skill chips,
+  accepts Enter for an exact match, and offers `Create "<name>"` for a new
+  skill.
 - Creating a skill moderates it immediately through the `classify-skill` Edge
   Function. A short dialog rotates skill facts while the check runs. A rejection
   or an unavailable classifier keeps the skill out of the list and explains why
@@ -136,7 +137,7 @@ lib/
 supabase/
   migrations/         forward-only database changes
   functions/          classify-skill, get-matches, generate-embeddings,
-                      delete-account, moderate-notes
+                      delete-account, admin-api, moderate-notes
   schema.sql          structural baseline (stale content; migrations win)
   seed.sql            taxonomy seed
 cloudflare/           Worker config and HTTPS redirect
@@ -208,10 +209,11 @@ supabase functions deploy moderate-notes --no-verify-jwt
 ```
 
 `classify-skill` is the moderation gate for custom skill names. It judges the
-skill name, attaches an existing node or creates a pending node, and places the
-matched or created skill in `user_skills` (with a more specific leaf as focus).
-It also cleans casing and spacing and treats a near-spelling of an existing
-node as that node. Rejections are logged to `skill_moderation_log`.
+skill name, attaches an existing node or creates one (auto-approved when
+confident, otherwise pending), and places the matched or created skill in
+`user_skills` (with a more specific leaf as focus). It also cleans casing and
+spacing and treats a near-spelling of an existing node as that node. Rejections
+are logged to `skill_moderation_log`.
 
 Send `dry_run: true` to classify without writing `user_skills` or creating
 nodes. Onboarding uses this when a chip is created, then calls again without

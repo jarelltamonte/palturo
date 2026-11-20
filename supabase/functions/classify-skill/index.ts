@@ -330,12 +330,16 @@ Deno.serve(async (req) => {
         root_category: {
           type: "choice",
           instructions: "Which top-level domain fits this skill best?",
-          criteria: Object.fromEntries(roots.map((r) => [normalize(r.name), r.name])),
+          criteria: Object.fromEntries(
+            roots.map((r) => [normalize(r.name), JSON.stringify(r.name)]),
+          ),
         },
         subgroup: {
           type: "choice",
           instructions: "Which visible group within the taxonomy fits this skill best?",
-          criteria: Object.fromEntries(groups.map((g) => [normalize(g.name), g.name])),
+          criteria: Object.fromEntries(
+            groups.map((g) => [normalize(g.name), JSON.stringify(g.name)]),
+          ),
         },
         taxonomy_skill: {
           type: "choice",

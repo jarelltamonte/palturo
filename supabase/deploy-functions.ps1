@@ -3,20 +3,29 @@
 
 $ErrorActionPreference = 'Stop'
 
-$envFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.env.cli'
-if (-not (Test-Path $envFile)) {
-    throw "Missing $envFile. Add SUPABASE_PAT to it first."
-}
-
-$pat = $null
-Get-Content $envFile | ForEach-Object {
-    if ($_ -match '^\s*SUPABASE_PAT\s*=\s*(.+?)\s*$') {
-        $pat = $matches[1].Trim()
+# Accept the token from the environment, the repo root, or the sibling
+# experimental checkout. Never put this PAT in .env / --dart-define; it is an
+# account-level token and must stay out of the client build.
+$pat = $env:SUPABASE_PAT
+$envFile = $null
+if ([string]::IsNullOrWhiteSpace($pat)) {
+    $candidates = @(
+        (Join-Path (Split-Path -Parent $PSScriptRoot) '.env.cli'),
+        (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'palturo\.env.cli')
+    )
+    $envFile = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $envFile) {
+        throw "Missing .env.cli. Set SUPABASE_PAT or add .env.cli to the repo root."
+    }
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*SUPABASE_PAT\s*=\s*(.+?)\s*$') {
+            $pat = $matches[1].Trim()
+        }
     }
 }
 
 if ([string]::IsNullOrWhiteSpace($pat) -or $pat -eq 'REPLACE_AND_ROTATE') {
-    throw "Set a real SUPABASE_PAT in $envFile before deploying."
+    throw "Set a real SUPABASE_PAT (environment or .env.cli) before deploying."
 }
 
 $env:SUPABASE_ACCESS_TOKEN = $pat
@@ -26,6 +35,7 @@ try {
         'classify-skill',
         'generate-embeddings',
         'get-matches',
+        'admin-api',
         'moderate-notes',
         'delete-account'
     )

@@ -177,11 +177,17 @@ grant usage, select on sequence public.skill_change_log_id_seq to service_role;
 grant usage, select on sequence public.sandbox_results_id_seq to service_role;
 grant usage, select on sequence public.analytics_events_id_seq to service_role;
 
--- Seed the owner used by the build/test environment.
+-- Seed the owner used by local/build environments only when that account
+-- already exists and nobody has been bootstrapped yet. A fresh production
+-- database has no auth users at migration time; create the first owner
+-- afterwards with the one-off insert documented in supabase/README.md.
 insert into public.admin_users (user_id, role, status, mfa_required)
-values ('f1b94e59-0978-4e3d-9b0c-5d6f73a24e6a', 'owner', 'active', true)
-on conflict (user_id) do update
-set role = 'owner', status = 'active';
+select 'f1b94e59-0978-4e3d-9b0c-5d6f73a24e6a', 'owner', 'active', true
+where exists (
+  select 1 from auth.users where id = 'f1b94e59-0978-4e3d-9b0c-5d6f73a24e6a'
+)
+and not exists (select 1 from public.admin_users)
+on conflict (user_id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Analytics RPCs (service role only)

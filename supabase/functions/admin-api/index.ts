@@ -1730,6 +1730,19 @@ Deno.serve(async (req) => {
         if (!isRevertible(original)) {
           return json({ error: "This action cannot be reverted" }, 400);
         }
+        // Reverting an access change re-grants or removes admin rows, so it
+        // needs the same owner-only rule as admins.add/update/remove.
+        if (
+          ["admin.add", "admin.update", "admin.remove"].includes(
+            original.action,
+          ) &&
+          adminRow.role !== "owner"
+        ) {
+          return json(
+            { error: "Only an owner can revert admin access changes" },
+            403,
+          );
+        }
 
         const detail = original.detail ?? {};
         let result: any = {};

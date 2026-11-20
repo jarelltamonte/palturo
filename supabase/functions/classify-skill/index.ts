@@ -305,12 +305,12 @@ Deno.serve(async (req) => {
           .filter((n) => n.is_visible || n.is_leaf)
           .map(
             (n) =>
-              `${"  ".repeat(n.depth - 1)}- ${n.name}${
+              `${"  ".repeat(n.depth - 1)}- ${JSON.stringify(n.name)}${
                 n.is_leaf ? (n.status === "pending" ? " (skill, pending)" : " (skill)") : ""
               }`,
           )
           .join("\n") +
-        `\n\n== SUBMISSION ==\nSkill name: "${name}"\nIntent: the user wants to ${kind === "teach" ? "TEACH" : "LEARN"} this skill.\n\n` +
+        `\n\n== SUBMISSION ==\nSkill name: ${JSON.stringify(name)}\nIntent: the user wants to ${kind === "teach" ? "TEACH" : "LEARN"} this skill.\n\n` +
         `Decide how to handle this submission. Match by MEANING, not spelling: the submission may be in Filipino/Tagalog or English, or use a synonym for a taxonomy skill. ` +
         `If a taxonomy skill already covers its meaning, prefer attach_existing and pick both the fitting group and the exact taxonomy_skill. ` +
         `If it is a genuinely new teachable/learnable skill, choose create_new and pick the most specific visible group. ` +
@@ -346,7 +346,9 @@ Deno.serve(async (req) => {
             ...Object.fromEntries(
               [...semanticByKey.entries()].map(([key, n]) => [
                 key,
-                n.status === "pending" ? `${n.name} (pending)` : (n.name as string),
+                n.status === "pending"
+                  ? `${JSON.stringify(n.name)} (pending)`
+                  : JSON.stringify(n.name),
               ]),
             ),
             none: "No existing skill has the same meaning",
@@ -499,7 +501,7 @@ Deno.serve(async (req) => {
         `== NOTE CONTEXT RULES ==\n` +
         `A note on a skill placement should describe the user's goals, teaching approach, background, schedule constraints, or expectations for THAT skill.\n` +
         `A note is NOT relevant if it discusses an unrelated activity, event, or aspiration (e.g. joining a fun run when the skill is cooking).\n\n` +
-        `== SKILL ==\n"${skillDecision.node?.["name"] ?? name}"\n\n== USER NOTE ==\n"${note}"`;
+        `== SKILL ==\n${JSON.stringify(skillDecision.node?.["name"] ?? name)}\n\n== USER NOTE ==\n${JSON.stringify(note)}`;
 
       const questions2 = {
         note_relevant: {
@@ -537,10 +539,24 @@ Deno.serve(async (req) => {
     }
 
     if (noteStored && skillDecision.placementId) {
-      await admin
+      // Two steps: the reset trigger clears approval whenever the note text
+      // changes, so write the text first and approve in a second statement
+      // where the note is unchanged.
+      const { error: noteErr } = await admin
         .from("user_skills")
-        .update({ note, note_approved: true })
+        .update({ note })
         .eq("id", skillDecision.placementId);
+      if (!noteErr) {
+        await admin
+          .from("user_skills")
+          .update({
+            note_approved: true,
+            // Tag provenance so admin moderation can distinguish an
+            // automated pass from a human review.
+            note_approval_source: "inference",
+          })
+          .eq("id", skillDecision.placementId);
+      }
     }
 
     return json({

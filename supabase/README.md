@@ -1,23 +1,23 @@
 # Database baseline and migrations
 
-`schema.sql` is the public-schema snapshot of project `yjcrfgvenilptrnudvcb`
+`schema.sql` is a **structural baseline** for project `yjcrfgvenilptrnudvcb`
 (generated 2026-10-24 with `supabase db dump --linked --schema public`). It is
-documentation and schema of record, not an automatically applied migration.
-
-Forward-only migrations in `migrations/` are the source of change after that
-baseline. The latest migration is
-`20261117000100_request_source.sql`.
+the only source of the base tables and extensions, and it is stale as content:
+never treat it as the current schema and never skip the migrations that follow
+it. The latest migration is `20261121000100_launch_hardening.sql`.
 
 ## Current taxonomy
 
-- 9 depth-1 categories.
-- 26 depth-2 selectable skills.
-- 16 depth-3 leaves.
+- 9 depth-1 domains.
+- 29 selectable skills: 25 at depth 2 plus 4 Programming skills at depth 3.
+- 16 depth-3 focus skills (hidden in the picker; stored in
+  `user_skills.focus_skill_id`).
 
-Selections live in `user_skills.skill_id` at depth 2. A specific leaf matched by
-the classifier is stored in `user_skills.focus_skill_id` and appended to the
-matching passage as `(focus: ...)`. The depth-2 guard trigger rejects deeper
-selections.
+Selections live in `user_skills.skill_id` and must target a `kind='skill'`
+node (25 at depth 2 plus the 4 depth-3 Programming skills). A more specific
+leaf matched by the classifier is stored in `user_skills.focus_skill_id` and
+appended to the matching passage as `(focus: ...)`; the kind guard rejects
+categories and other non-skill nodes.
 
 `skill_showcases` is the public table discovery reads. The editor keys media by
 the depth-2 skill and keeps a specific caption. `connections.skill_name` and
@@ -28,18 +28,21 @@ request came from.
 
 ## Rebuild a fresh environment
 
-Run against a Supabase Postgres instance. The base `anon`, `authenticated`,
-and `service_role` roles and the `auth` schema must already exist.
+Run against a Supabase Postgres instance with the base `anon`, `authenticated`,
+and `service_role` roles and the `auth` schema already present.
 
-1. Apply `schema.sql`. It starts with the extension prerequisites (`ltree`,
-   `vector`, `pgcrypto`, `uuid-ossp`, `pg_cron`, `pg_net`,
-   `supabase_vault`) and then creates the public schema.
-2. Apply `seed.sql` for the 51 taxonomy `skill_nodes` rows (parent-first,
-   idempotent via `ON CONFLICT`).
-3. Apply the auth trigger migration
-   `migrations/20261023001800_auth_profile_triggers.sql` (profile creation on
-   signup and email mirroring). Auth internals are intentionally not in the
-   public dump.
+1. Restore `schema.sql` once. It provides the extensions (`ltree`, `vector`,
+   `pgcrypto`, `uuid-ossp`, `pg_cron`, `pg_net`, `supabase_vault`), base
+   tables, indexes, RLS, and the migrations up to `20261023001700`. Because it
+   is a `--schema public` dump it does **not** contain the triggers on
+   `auth.users`.
+2. Apply `seed.sql` for the taxonomy rows. It is idempotent and must run before
+   the kind/level migrations, which expect the original row shape.
+3. Mark the baseline migrations applied with
+   `supabase migration repair --status applied <id>` through
+   `20261023001700`, then apply every later file in `migrations/` in filename
+   order. Start with `20261023001800_auth_profile_triggers.sql`; it is the only
+   source of the signup and email-sync triggers.
 4. Apply `cron.sql` to recreate the rate-limit cleanup and moderation-worker
    jobs.
 5. Recreate storage buckets and policies, Edge Function secrets, Resend SMTP,
@@ -47,7 +50,9 @@ and `service_role` roles and the `auth` schema must already exist.
    the public schema.
 6. Configure `pipeline_config` (worker URL and embedding weights) and auth
    redirect settings for the new environment.
-7. In Supabase Realtime settings, turn off "Allow public access". Private
+7. Sign up the first account, then insert it into `admin_users` with role
+   `owner` (see the root README).
+8. In Supabase Realtime settings, turn off "Allow public access". Private
    chat/notification topics are enforced by
    `migrations/20261107000300_realtime_topic_acl.sql`; with public access on, a
    modified client could still join a public topic.
@@ -68,6 +73,7 @@ and `service_role` roles and the `auth` schema must already exist.
 supabase functions deploy classify-skill
 supabase functions deploy get-matches
 supabase functions deploy generate-embeddings
+supabase functions deploy admin-api
 supabase functions deploy delete-account
 supabase functions deploy moderate-notes --no-verify-jwt
 ```
@@ -88,16 +94,19 @@ skill cap.
 
 ## Important
 
-- The baseline already contains the end state of migrations `000100` through
-  `001700`. Do not apply those migrations after restoring `schema.sql`; use the
-  migrations only to evolve an existing database.
+- `schema.sql` is the structural baseline (extensions, tables, indexes, RLS)
+  captured on 2026-10-24. It is stale as content and does not replace the
+  migrations, but no migration creates the base tables or `ltree`/`vector`
+  extensions, so a brand-new database still starts from it.
+- After restoring the baseline, mark the migrations it already reflects as
+  applied (`supabase migration repair --status applied <id>` through
+  `20261023001700`), then apply later migrations normally, starting with
+  `20261023001800_auth_profile_triggers.sql`. Replaying the baseline migrations
+  collides with existing objects; skipping `20261023001800` leaves signup
+  without a profile row.
 - The baseline ends with explicit anon/authenticated revokes for existing
   objects and default-privilege revokes that keep future postgres-created
   public tables, sequences, and functions private by default.
-- If you use `supabase db push` after restoring, first mark the baseline
-  migrations applied with
-  `supabase migration repair --status applied <ids>` through
-  `20261023001800`; otherwise push replays them and collides.
 - Migrations after the baseline are forward-only and should be applied normally.
 - `seed.sql` contains only taxonomy rows; it has no profiles, messages,
   credentials, or secrets.

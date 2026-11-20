@@ -240,7 +240,10 @@ Deno.serve(async (req) => {
       p_w_skills: cfg.wSkills,
       p_w_context: cfg.wContext,
     });
-    if (candErr) return json({ error: `candidate retrieval: ${candErr.message}` }, 500);
+    if (candErr) {
+      console.error(`[get-matches] candidate retrieval: ${candErr.message}`);
+      return json({ error: "candidate_retrieval_failed" }, 500);
+    }
     const candidates = (cands ?? []) as Array<{ candidate_id: string; bi_score: number }>;
 
     if (candidates.length === 0) {

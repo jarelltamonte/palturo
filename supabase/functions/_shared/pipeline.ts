@@ -240,21 +240,14 @@ export async function ensureFreshEmbeddings(
       embedding: vecLiteral(vectors[i]),
     }));
 
-    const batchKeys = new Set(
-      batch.map((r) => `${r.user_id}|${r.role}|${r.field_group}`),
-    );
-    for (const key of batchKeys) {
-      const [user_id, role, field_group] = key.split("|");
-      const { error: delErr } = await admin
-        .from("profile_embeddings")
-        .delete()
-        .eq("user_id", user_id)
-        .eq("role", role)
-        .eq("field_group", field_group)
-        .eq("input_type", inputType);
-      if (delErr) throw new Error(`embedding delete: ${delErr.message}`);
-    }
-    const { error: insErr } = await admin.from("profile_embeddings").insert(payload);
+    // Upsert on the embedding's primary key. Delete-then-insert removed the
+    // existing vectors before the new ones were safely stored, so a failed or
+    // racing insert dropped the user out of matching until the next heal.
+    const { error: insErr } = await admin
+      .from("profile_embeddings")
+      .upsert(payload, {
+        onConflict: "user_id,role,field_group,input_type",
+      });
     if (insErr) throw new Error(`embedding upsert: ${insErr.message}`);
     cost += vectors.length * 0.00002; // rough estimate for instrumentation honesty
   }

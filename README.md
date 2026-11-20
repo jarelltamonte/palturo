@@ -48,9 +48,10 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
 - Email sign-up, login, password reset, and account deletion.
 - Onboarding collects a role, skills, and optional availability, language, and
   learning-style details.
-- Skills are selected at **depth 2** of the taxonomy: 26 choices such as
-  Farming, Filipino Cooking, Filipino Dessert Making, Filipino Embroidery,
-  Programming, Sewing, Painting, and Philippine Script Writing.
+- Skills are selected from the 29 selectable nodes (25 at depth 2 plus 4
+  Programming skills at depth 3): Farming, Filipino Cooking, Filipino Dessert
+  Making, Filipino Embroidery, Programming, Sewing, Painting, and Philippine
+  Script Writing.
 - The interests step has a search field. It filters the depth-2 chips, accepts
   Enter for an exact match, and offers `Create "<name>"` for a new skill.
 - Creating a skill moderates it immediately through the `classify-skill` Edge
@@ -136,7 +137,7 @@ supabase/
   migrations/         forward-only database changes
   functions/          classify-skill, get-matches, generate-embeddings,
                       delete-account, moderate-notes
-  schema.sql          public-schema baseline
+  schema.sql          structural baseline (stale content; migrations win)
   seed.sql            taxonomy seed
 cloudflare/           Worker config and HTTPS redirect
 web/                  Flutter web shell, splash, and CSP headers
@@ -157,8 +158,11 @@ docs/                 auth runbook and historical reports
 
 ## Data model and taxonomy
 
-- 9 depth-1 categories, 26 depth-2 selectable skills, 16 depth-3 leaves.
-- Selections are stored in `user_skills.skill_id` at depth 2.
+- 9 depth-1 domains, 29 selectable skills (25 at depth 2 plus 4 Programming
+  skills at depth 3), and 16 depth-3 focus skills stored in
+  `user_skills.focus_skill_id`.
+- Selections are stored in `user_skills.skill_id`: 25 depth-2 skills plus the
+  4 depth-3 Programming skills.
 - A specific leaf typed or matched by the classifier is stored in
   `user_skills.focus_skill_id`. It is appended to the matching passage as
   `(focus: ...)` so specificity still counts without exposing an oddly specific
@@ -180,7 +184,7 @@ Key RPCs include `save_user_skills`, `set_skill_showcases`,
 ## Backend and migrations
 
 Apply forward-only migrations in `supabase/migrations/` to the linked project.
-The latest migration is `20261114001200_showcase_cache_invalidation.sql`.
+The latest migration is `20261121000100_launch_hardening.sql`.
 
 Storage buckets:
 
@@ -198,19 +202,32 @@ Deploy the Edge Functions:
 supabase functions deploy classify-skill
 supabase functions deploy get-matches
 supabase functions deploy generate-embeddings
+supabase functions deploy admin-api
 supabase functions deploy delete-account
 supabase functions deploy moderate-notes --no-verify-jwt
 ```
 
 `classify-skill` is the moderation gate for custom skill names. It judges the
 skill name, attaches an existing node or creates a pending node, and places the
-depth-2 parent in `user_skills` with the leaf as focus. It also cleans casing
-and spacing and treats a near-spelling of an existing node as that node.
-Rejections are logged to `skill_moderation_log`.
+matched or created skill in `user_skills` (with a more specific leaf as focus).
+It also cleans casing and spacing and treats a near-spelling of an existing
+node as that node. Rejections are logged to `skill_moderation_log`.
 
 Send `dry_run: true` to classify without writing `user_skills` or creating
 nodes. Onboarding uses this when a chip is created, then calls again without
 the flag on save.
+
+### First admin on a fresh database
+
+Migrations do not seed an owner on a clean database (there are no auth users
+yet). After the first account signs up, grant it owner access once:
+
+```sql
+insert into public.admin_users (user_id, role, status, mfa_required)
+values ('<auth user id>', 'owner', 'active', true);
+```
+
+The admin console then requires TOTP at AAL2 before any privileged action.
 
 `moderate-notes` runs as a server-side queue worker, not from the app. It is
 deployed with `verify_jwt = false` and authenticates with `x-worker-secret`.
@@ -254,7 +271,7 @@ redirect URLs, and verification checklist.
 ## Testing
 
 - `flutter analyze --no-pub`: clean.
-- `flutter test`: 310 tests.
+- `flutter test`: 370 tests.
 - Coverage includes the desktop shell, exhausted deck, Explore deck, seen-card
   persistence, Browse filters, onboarding search and depth-2 options, login
   keyboard behavior, banner without an Overlay, notification badge and realtime
@@ -271,7 +288,10 @@ current README.
 - Security-definer functions set `search_path`.
 - Profile and showcase URLs are constrained to the project storage origin.
 - The CSP allows only self, Supabase, and the font/script hosts the app needs.
-- Anonymous execution is limited to helper and trigger functions.
+- Anonymous execution is limited to the rate-limited `report_client_error`
+  helper plus four pure, side-effect-free URL/slug helpers. Every
+  security-definer function is either revoked from client roles or returns
+  `trigger` (which PostgREST does not expose).
 - Never commit `.env`, `.env.cli`, or `.env.cloudflare`.
 
 ## Known limitations

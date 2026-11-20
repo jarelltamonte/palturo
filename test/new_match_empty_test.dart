@@ -82,11 +82,38 @@ void main() {
     final noSkill = buildIceBreakers(name: 'Lolo Ben Cruz');
 
     expect(learner.first, contains('Kitchen Basics'));
-    expect(learner[1], contains('Lolo'));
+    expect(learner.first, contains('Lolo'));
     expect(learner[1], contains('learn'));
     expect(mentor[1], contains('teaching'));
     expect(noSkill.first, isNot(contains('Kitchen Basics')));
     expect(learner.length, 3);
+  });
+
+  test('starters read as messages, not instructions', () {
+    for (final role in [PersonRole.learner, PersonRole.mentor, null]) {
+      for (final skill in ['Kitchen Basics', null]) {
+        final starters = buildIceBreakers(
+          name: 'Lolo Ben Cruz',
+          skillName: skill,
+          role: role,
+        );
+        expect(starters.first, startsWith('Hi Lolo!'), reason: '$role/$skill');
+        expect(starters.toSet().length, starters.length);
+        for (final starter in starters) {
+          expect(starter, endsWith('?'), reason: starter);
+          expect(starter, isNot(contains('Ask ')), reason: starter);
+          expect(starter, isNot(contains('Share ')), reason: starter);
+          expect(starter, isNot(contains('what they')), reason: starter);
+          expect(starter.length, greaterThan(20), reason: starter);
+        }
+        if (role == PersonRole.mentor) {
+          expect(starters.any((s) => s.contains('teaching')), isTrue);
+        }
+        if (role == PersonRole.learner) {
+          expect(starters.any((s) => s.contains('learn')), isTrue);
+        }
+      }
+    }
   });
 
   testWidgets('new match shows the profile, preferences, and starters', (
@@ -140,6 +167,7 @@ void main() {
     final starters = buildIceBreakers(
       name: 'Lolo Ben Cruz',
       skillName: 'Kitchen Basics',
+      role: PersonRole.learner,
     );
     String? used;
     await _pump(
@@ -244,6 +272,7 @@ void main() {
     final starters = buildIceBreakers(
       name: 'Lolo Ben Cruz',
       skillName: 'Kitchen Basics',
+      role: PersonRole.learner,
     );
     for (final starter in starters) {
       expect(find.text(starter), findsOneWidget);

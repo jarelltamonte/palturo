@@ -16,22 +16,36 @@ List<String> buildIceBreakers({
   PersonRole? role,
 }) {
   final first = name.trim().split(RegExp(r'\s+')).first;
-  final peer = first.isEmpty ? 'them' : first;
+  final peer = first.isEmpty ? 'there' : first;
   final skill = (skillName ?? '').trim();
+  final greeting = 'Hi $peer!';
+
   if (skill.isEmpty) {
     return [
-      'What made you want to try something new?',
-      'Ask $peer what they are hoping to find here.',
-      'Share one thing you are curious about right now.',
+      '$greeting What are you hoping to learn or teach here?',
+      role == PersonRole.mentor
+          ? 'What do you enjoy most about teaching?'
+          : role == PersonRole.learner
+          ? 'What are you hoping to learn first?'
+          : 'What brought you to PalTuro?',
+      'What’s something you’ve been curious about lately?',
     ];
   }
-  return [
-    'What’s the first thing you want to learn about $skill?',
-    role == PersonRole.mentor
-        ? 'Ask $peer what they love most about teaching $skill.'
-        : 'Ask $peer what made them want to learn $skill.',
-    'Share one tip about $skill you swear by.',
-  ];
+
+  final roleQuestion =
+      role == PersonRole.mentor
+          ? 'What do you enjoy most about teaching $skill?'
+          : role == PersonRole.learner
+          ? 'What are you hoping to learn first about $skill?'
+          : 'What are you hoping to get from $skill?';
+  final nextStep =
+      role == PersonRole.mentor
+          ? 'What’s one thing you wish every beginner knew about $skill?'
+          : role == PersonRole.learner
+          ? 'What’s the first thing you want to try with $skill?'
+          : 'What’s one thing you’re hoping to try with $skill?';
+
+  return ['$greeting What got you into $skill?', roleQuestion, nextStep];
 }
 
 /// The first screen of a new chat: who you matched with, their preferences and
@@ -142,9 +156,11 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
 
   static String _tagFor(String text) {
     final trimmed = text.trimLeft();
-    if (trimmed.startsWith('Ask ')) return 'Ask';
-    if (trimmed.startsWith('Share ')) return 'Share';
-    return 'Question';
+    if (trimmed.startsWith('Hi ') || trimmed.startsWith('Hey ')) {
+      return 'Opener';
+    }
+    if (trimmed.contains('?')) return 'Question';
+    return 'Opener';
   }
 
   @override

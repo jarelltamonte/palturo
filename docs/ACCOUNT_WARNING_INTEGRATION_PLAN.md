@@ -39,6 +39,12 @@ changelog as work lands.
   clean, 320 tests pass, admin typecheck/build and 23/23 production smoke pass.
 - Caveat: notifications are sent immediately, so consumers on builds older than
   this change see a generic “Activity” row until they update.
+- The consumer web app was still serving the previous bundle when the first
+  warning was tested; `tool/deploy_web.ps1` was run after verifying the backend
+  record and notification. The new bundle (`palturo.app`, Worker version
+  `127c30a4-1a0c-4b55-9922-dee25aa98a97`) contains the Account warning copy,
+  Account standing page, and acknowledgment. Native builds still need their own
+  release.
 
 ---
 

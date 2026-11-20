@@ -125,6 +125,66 @@ request_buckets as (
     min(case when n = 1 then 1 when n = 2 then 2 when n <= 5 then 3 else 4 end) as ord
   from request_counts
   group by 1
+),
+language_counts as (
+  select lang as name, count(*)::int as n
+  from public.profiles p, unnest(coalesce(p.languages, '{}'::text[])) as lang
+  where btrim(lang) <> ''
+  group by lang
+),
+availability_days as (
+  select p.id, d.day
+  from public.profiles p
+  cross join lateral (
+    select jsonb_array_elements_text(p.availability) as day
+    where jsonb_typeof(p.availability) = 'array'
+    union all
+    select jsonb_object_keys(p.availability) as day
+    where jsonb_typeof(p.availability) = 'object'
+  ) d
+),
+availability_counts as (
+  select
+    day as name,
+    count(*)::int as n,
+    min(case lower(day)
+      when 'monday' then 1
+      when 'tuesday' then 2
+      when 'wednesday' then 3
+      when 'thursday' then 4
+      when 'friday' then 5
+      when 'saturday' then 6
+      when 'sunday' then 7
+      else 8
+    end) as ord
+  from availability_days
+  group by day
+),
+teaching_style_counts as (
+  select style as name, count(*)::int as n
+  from public.profiles p, unnest(coalesce(p.teaching_styles, '{}'::text[])) as style
+  where btrim(style) <> ''
+  group by style
+),
+learning_style_counts as (
+  select style as name, count(*)::int as n
+  from public.profiles p, unnest(coalesce(p.learning_styles, '{}'::text[])) as style
+  where btrim(style) <> ''
+  group by style
+),
+skill_counts as (
+  select p.id, count(us.id)::int as n
+  from public.profiles p
+  left join public.user_skills us on us.user_id = p.id
+  group by p.id
+),
+skill_buckets as (
+  select
+    case when n = 0 then '0' when n <= 2 then '1-2' when n <= 5 then '3-5' else '6+' end as bucket,
+    count(*)::int as count,
+    min(case when n = 0 then 1 when n <= 2 then 2 when n <= 5 then 3 else 4 end) as ord
+  from skill_counts
+  group by 1
 )
 select jsonb_build_object(
   'days', (select n from win),
@@ -222,33 +282,31 @@ select jsonb_build_object(
       limit 8
     ) q
   ), '[]'::jsonb),
-  'top_users', coalesce((
-    select jsonb_agg(
-      jsonb_build_object(
-        'id', id,
-        'name', name,
-        'role', role,
-        'messages', messages,
-        'requests', requests,
-        'last_seen_at', last_seen_at
-      )
-      order by messages desc, requests desc, last_seen_at desc
-    )
+  'languages', coalesce((
+    select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by n desc)
     from (
-      select
-        p.id,
-        coalesce(p.display_name, 'Unnamed') as name,
-        p.role::text as role,
-        coalesce(mc.n, 0) as messages,
-        coalesce(rc.n, 0) as requests,
-        p.last_seen_at
-      from public.profiles p
-      left join message_counts mc on mc.user_id = p.id
-      left join request_counts rc on rc.user_id = p.id
-      where coalesce(mc.n, 0) + coalesce(rc.n, 0) > 0
-      order by coalesce(mc.n, 0) desc, coalesce(rc.n, 0) desc, p.last_seen_at desc
-      limit 10
+      select * from language_counts order by n desc limit 10
     ) q
+  ), '[]'::jsonb),
+  'availability', coalesce((
+    select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by ord)
+    from availability_counts
+  ), '[]'::jsonb),
+  'teaching_styles', coalesce((
+    select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by n desc)
+    from (
+      select * from teaching_style_counts order by n desc limit 8
+    ) q
+  ), '[]'::jsonb),
+  'learning_styles', coalesce((
+    select jsonb_agg(jsonb_build_object('name', name, 'count', n) order by n desc)
+    from (
+      select * from learning_style_counts order by n desc limit 8
+    ) q
+  ), '[]'::jsonb),
+  'skills_per_user', coalesce((
+    select jsonb_agg(jsonb_build_object('bucket', bucket, 'count', count) order by ord)
+    from skill_buckets
   ), '[]'::jsonb)
 );
 $$;

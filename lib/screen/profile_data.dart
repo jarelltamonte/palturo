@@ -24,6 +24,16 @@ class ProfileData {
   final Map<String, String> learningNotes;
   final Map<String, String> teachingNotes;
 
+  /// Whether each stored note passed moderation. Keyed by skill name. A note
+  /// text that exists but is not approved does not make a side discoverable.
+  final Map<String, bool> learningNoteApproved;
+  final Map<String, bool> teachingNoteApproved;
+
+  /// Teaching skills backed by an approved taxonomy node. Unresolved custom
+  /// skills are excluded because the backend does not treat them as public
+  /// placements.
+  final Set<String> approvedTeachingSkills;
+
   /// True only when the notes query succeeded. A save must not overwrite
   /// stored notes with empty values after a transient read failure.
   final bool notesLoaded;
@@ -58,6 +68,9 @@ class ProfileData {
     this.teachingSkillImages = const {},
     this.learningNotes = const {},
     this.teachingNotes = const {},
+    this.learningNoteApproved = const {},
+    this.teachingNoteApproved = const {},
+    this.approvedTeachingSkills = const {},
     this.notesLoaded = false,
     this.changedLearningNotes = const {},
     this.changedTeachingNotes = const {},
@@ -113,6 +126,44 @@ class ProfileData {
   /// True when at least one teaching skill still lacks its own showcase.
   bool get hasIncompleteShowcases => missingShowcaseSkillIds.isNotEmpty;
 
+  /// True when every teaching skill has a non-empty note.
+  bool get hasAllTeachingNotes => teachingSkillIds.every(
+    (id) => (teachingNotes[id]?.trim() ?? '').isNotEmpty,
+  );
+
+  bool get hasApprovedTeachingSkill => approvedTeachingSkills.isNotEmpty;
+
+  /// True when every approved teaching skill has a present, approved note.
+  bool get hasAllApprovedTeachingNotes => approvedTeachingSkills.every(
+    (id) =>
+        (teachingNotes[id]?.trim() ?? '').isNotEmpty &&
+        (teachingNoteApproved[id] ?? false),
+  );
+
+  /// True when approved teaching notes exist but at least one is in moderation.
+  bool get hasTeachingNotesPendingReview =>
+      hasApprovedTeachingSkill &&
+      approvedTeachingSkills.every(
+        (id) => (teachingNotes[id]?.trim() ?? '').isNotEmpty,
+      ) &&
+      !hasAllApprovedTeachingNotes;
+
+  /// The mentor side is discoverable only with an approved teaching skill,
+  /// showcase media, and an approved note on every approved teaching skill.
+  bool get mentorReady =>
+      notesLoaded &&
+      hasApprovedTeachingSkill &&
+      hasAnyShowcase &&
+      hasAllApprovedTeachingNotes;
+
+  /// True when the profile teaches but is not yet discoverable as a mentor.
+  bool get needsMentorSetup =>
+      notesLoaded &&
+      !needsSetup &&
+      (effectiveRole == OnboardingRole.teach ||
+          effectiveRole == OnboardingRole.both) &&
+      !mentorReady;
+
   String? get genderLabel => switch (gender) {
     'woman' => 'Woman',
     'man' => 'Man',
@@ -139,6 +190,9 @@ class ProfileData {
     Map<String, String>? teachingSkillImages,
     Map<String, String>? learningNotes,
     Map<String, String>? teachingNotes,
+    Map<String, bool>? learningNoteApproved,
+    Map<String, bool>? teachingNoteApproved,
+    Set<String>? approvedTeachingSkills,
     bool? notesLoaded,
     Set<String>? changedLearningNotes,
     Set<String>? changedTeachingNotes,
@@ -168,6 +222,10 @@ class ProfileData {
       teachingSkillImages: teachingSkillImages ?? this.teachingSkillImages,
       learningNotes: learningNotes ?? this.learningNotes,
       teachingNotes: teachingNotes ?? this.teachingNotes,
+      learningNoteApproved: learningNoteApproved ?? this.learningNoteApproved,
+      teachingNoteApproved: teachingNoteApproved ?? this.teachingNoteApproved,
+      approvedTeachingSkills:
+          approvedTeachingSkills ?? this.approvedTeachingSkills,
       notesLoaded: notesLoaded ?? this.notesLoaded,
       changedLearningNotes: changedLearningNotes ?? this.changedLearningNotes,
       changedTeachingNotes: changedTeachingNotes ?? this.changedTeachingNotes,

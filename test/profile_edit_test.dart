@@ -360,9 +360,7 @@ void main() {
     expect(service.captured?.gender, 'woman');
   });
 
-  testWidgets('an invalid age blocks saving and shows guidance', (
-    tester,
-  ) async {
+  testWidgets('an under-18 age blocks saving with a popup', (tester) async {
     final service = _CapturingProfileService();
     await pumpEdit(tester, service: service);
 
@@ -372,14 +370,42 @@ void main() {
       ),
       matching: find.byType(TextField),
     );
-    await tester.enterText(ageField, '9');
+    await tester.enterText(ageField, '17');
     await tester.pump();
 
-    expect(find.text('Enter an age between 13 and 120.'), findsOneWidget);
+    expect(find.text('Enter an age between 13 and 120.'), findsNothing);
     await tester.ensureVisible(find.text('Save').first);
     await tester.tap(find.text('Save').first);
     await tester.pumpAndSettle();
 
+    expect(find.text('Check your age'), findsOneWidget);
+    expect(find.textContaining('18 and older'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(service.captured, isNull);
+  });
+
+  testWidgets('an over-120 age blocks saving with a popup', (tester) async {
+    final service = _CapturingProfileService();
+    await pumpEdit(tester, service: service);
+
+    final ageField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is TopLabeledField && widget.label == 'Age',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(ageField, '130');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Save').first);
+    await tester.tap(find.text('Save').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Check your age'), findsOneWidget);
+    expect(find.textContaining('120 or less'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
     expect(service.captured, isNull);
   });
 

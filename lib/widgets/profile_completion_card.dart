@@ -111,20 +111,31 @@ class ProfileCompletionCard extends StatelessWidget {
             if (!complete && missing.isNotEmpty) ...[
               const SizedBox(height: 10),
               for (final item in missing)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
+                Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  decoration: BoxDecoration(
+                    color: fill.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: fill.withValues(alpha: 0.32)),
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: fill.withValues(alpha: 0.16),
+                          shape: BoxShape.circle,
+                        ),
                         child: Icon(
-                          Icons.radio_button_unchecked,
+                          Icons.priority_high_rounded,
                           size: 13,
                           color: fill,
                         ),
                       ),
-                      const SizedBox(width: 7),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

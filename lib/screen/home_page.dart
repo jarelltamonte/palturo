@@ -29,6 +29,7 @@ import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/exhausted_deck_view.dart';
 import 'package:palturo/widgets/card_guide_overlay.dart';
+import 'package:palturo/widgets/mentor_setup_banner.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/swipe_deck.dart';
 import 'package:palturo/utils/friendly_error.dart';
@@ -715,7 +716,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _maybeShowProfileNudge() async {
     if (_profileNudgeShown) return;
     final profile = _myProfile;
-    if (profile == null || profile.isProfileCompleted) return;
+    if (profile == null) return;
+    // Mentors get the persistent readiness banner instead of a second toast.
+    if (profile.needsMentorSetup || profile.isProfileCompleted) return;
     _profileNudgeShown = true;
     final needsShowcase = profile.needsShowcase;
     AppBannerController.instance.show(
@@ -992,6 +995,29 @@ class _HomePageState extends State<HomePage> {
             ? _buildDeck(people)
             : _buildExhaustedState();
 
+    final myProfile = _myProfile;
+    final mentorBanner =
+        myProfile != null && myProfile.needsMentorSetup && !_guideActive
+            ? MentorSetupBanner(
+              needsShowcase: !myProfile.hasAnyShowcase,
+              needsNotes: !myProfile.hasAllApprovedTeachingNotes,
+              notesPendingReview: myProfile.hasTeachingNotesPendingReview,
+              skillPendingReview: !myProfile.hasApprovedTeachingSkill,
+              onTap: _openSettings,
+            )
+            : null;
+
+    final bodyContent =
+        mentorBanner == null
+            ? content
+            : Column(
+              children: [
+                mentorBanner,
+                const SizedBox(height: 10),
+                Expanded(child: content),
+              ],
+            );
+
     return PopScope(
       canPop: !_guideActive,
       child: Scaffold(
@@ -1185,10 +1211,10 @@ class _HomePageState extends State<HomePage> {
                   ? Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 460),
-                      child: content,
+                      child: bodyContent,
                     ),
                   )
-                  : content,
+                  : bodyContent,
         ),
       ),
     );

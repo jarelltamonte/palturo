@@ -278,16 +278,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     return false;
   }
 
-  String? get _ageError {
-    final text = _ageController.text.trim();
-    if (text.isEmpty) return null;
-    final age = int.tryParse(text);
-    if (age == null || age < 13 || age > 120) {
-      return 'Enter an age between 13 and 120.';
-    }
-    return null;
-  }
-
   String get _genderLabel => switch (_gender) {
     'woman' => 'Woman',
     'man' => 'Man',
@@ -814,6 +804,53 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  Future<void> _showAgeRangeDialog(int? age) async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final message =
+        age != null && age < 18
+            ? 'PalTuro is for people 18 and older. Please enter an age of 18 '
+                'or above.'
+            : age != null && age > 120
+            ? 'Please enter an age of 120 or less.'
+            : 'Please enter a valid age between 18 and 120.';
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(context),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Check your age',
+              style: AppTextStyles.boldText.copyWith(
+                color: textTheme,
+                fontSize: 18,
+              ),
+            ),
+            content: Text(
+              message,
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.accentText(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
   ProfileData _draftProfile() {
     final selectedDays = parseAvailableDays(_availability.keys);
     final parsedAge = int.tryParse(_ageController.text.trim());
@@ -989,8 +1026,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
-    if (_ageError != null) {
-      showAppError(context, _ageError!);
+    final ageText = _ageController.text.trim();
+    final ageValue = int.tryParse(ageText);
+    if (ageText.isNotEmpty &&
+        (ageValue == null || ageValue < 18 || ageValue > 120)) {
+      await _showAgeRangeDialog(ageValue);
       return;
     }
 
@@ -1391,55 +1431,58 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Container(
-                          padding:
-                              _ageController.text.trim().isEmpty
-                                  ? const EdgeInsets.symmetric(horizontal: 8)
-                                  : EdgeInsets.zero,
-                          decoration:
-                              _ageController.text.trim().isEmpty
-                                  ? BoxDecoration(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.08,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: AppColors.primary.withValues(
-                                        alpha: 0.35,
-                                      ),
-                                    ),
-                                  )
-                                  : null,
-                          child: TopLabeledField(
-                            label: 'Age',
-                            controller: _ageController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 3,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        if (_ageError != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
-                            child: Text(
-                              _ageError!,
-                              style: AppTextStyles.regularText.copyWith(
-                                color: AppColors.dangerText(context),
-                                fontSize: 11,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 88,
+                              child: Container(
+                                padding:
+                                    _ageController.text.trim().isEmpty
+                                        ? const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        )
+                                        : EdgeInsets.zero,
+                                decoration:
+                                    _ageController.text.trim().isEmpty
+                                        ? BoxDecoration(
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.35,
+                                            ),
+                                          ),
+                                        )
+                                        : null,
+                                child: TopLabeledField(
+                                  label: 'Age',
+                                  controller: _ageController,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(3),
+                                  ],
+                                  onChanged: (_) => setState(() {}),
+                                ),
                               ),
                             ),
-                          ),
-                        const SizedBox(height: 12),
-                        _DropdownInfoField(
-                          icon: Icons.person_outline,
-                          label: 'Gender',
-                          value: _genderLabel,
-                          hint: 'Select gender',
-                          onTap: _pickGender,
-                          needsAttention: _gender == null,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _DropdownInfoField(
+                                icon: Icons.person_outline,
+                                label: 'Gender',
+                                value: _genderLabel,
+                                hint: 'Select gender',
+                                onTap: _pickGender,
+                                needsAttention: _gender == null,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

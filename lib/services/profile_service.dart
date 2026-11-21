@@ -717,21 +717,34 @@ class ProfileService {
 
       final learningNotes = <String, String>{};
       final teachingNotes = <String, String>{};
+      final learningNoteApproved = <String, bool>{};
+      final teachingNoteApproved = <String, bool>{};
+      final approvedTeachingSkills = <String>{};
       var notesLoaded = false;
       try {
         final rows = await _supabase
             .from('user_skills')
-            .select('kind, note, skill:skill_id(name)')
+            .select('kind, note, note_approved, skill:skill_id(name, status)')
             .eq('user_id', user.id);
         for (final row in rows as List) {
           final skill = row['skill'];
           final name = skill is Map ? skill['name'] as String? : null;
+          final status = skill is Map ? skill['status'] as String? : null;
+          if (name != null &&
+              name.isNotEmpty &&
+              status == 'approved' &&
+              row['kind'] == 'teach') {
+            approvedTeachingSkills.add(name);
+          }
           final note = (row['note'] as String?)?.trim() ?? '';
           if (name == null || name.isEmpty || note.isEmpty) continue;
+          final approved = row['note_approved'] == true;
           if (row['kind'] == 'learn') {
             learningNotes[name] = note;
+            learningNoteApproved[name] = approved;
           } else if (row['kind'] == 'teach') {
             teachingNotes[name] = note;
+            teachingNoteApproved[name] = approved;
           }
         }
 
@@ -758,6 +771,9 @@ class ProfileService {
       return profileWithProofs.copyWith(
         learningNotes: learningNotes,
         teachingNotes: teachingNotes,
+        learningNoteApproved: learningNoteApproved,
+        teachingNoteApproved: teachingNoteApproved,
+        approvedTeachingSkills: approvedTeachingSkills,
         notesLoaded: notesLoaded,
       );
     } catch (e) {

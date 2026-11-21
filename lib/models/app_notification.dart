@@ -9,6 +9,7 @@ enum AppNotificationKind {
   requestDeclined('request_declined'),
   feedbackReady('feedback_ready'),
   skillModeration('skill_moderation'),
+  noteRejected('note_rejected'),
   possibleMatch('possible_match'),
   accountWarning('account_warning'),
   unknown('unknown');
@@ -38,6 +39,9 @@ enum AppNotificationKind {
 
   /// A suggestion computed from a new profile, not a confirmed connection.
   bool get isPossibleMatch => this == AppNotificationKind.possibleMatch;
+
+  /// A published note that inference later rejected.
+  bool get isNoteRejected => this == AppNotificationKind.noteRejected;
 
   /// An account notice that must stay visible regardless of category toggles.
   bool get isAccountNotice => this == AppNotificationKind.accountWarning;

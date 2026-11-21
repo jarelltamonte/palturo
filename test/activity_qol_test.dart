@@ -35,6 +35,7 @@ void main() {
     );
     final match = item('request_accepted');
     final moderation = item('skill_moderation');
+    final rejected = item('note_rejected');
     final possible = item('possible_match');
 
     expect(activityMatchesFilter(unreadRequest, ActivityFilter.all), isTrue);
@@ -52,6 +53,8 @@ void main() {
     expect(activityMatchesFilter(readUpdate, ActivityFilter.updates), isTrue);
     expect(activityMatchesFilter(match, ActivityFilter.requests), isTrue);
     expect(activityMatchesFilter(moderation, ActivityFilter.updates), isTrue);
+    expect(activityMatchesFilter(rejected, ActivityFilter.updates), isTrue);
+    expect(activityMatchesFilter(rejected, ActivityFilter.requests), isFalse);
 
     expect(activityMatchesFilter(possible, ActivityFilter.all), isTrue);
     expect(activityMatchesFilter(possible, ActivityFilter.matches), isTrue);

@@ -19,6 +19,7 @@ type Job = {
   note: string;
   note_hash: string;
   attempts: number;
+  decision_source: "heuristic" | "inference" | "manual" | null;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -96,18 +97,27 @@ Deno.serve(async (req) => {
 
       const { data: row } = await admin
         .from("user_skills")
-        .select("id,note")
+        .select("id,note,note_approved")
         .eq("user_id", job.user_id)
         .eq("skill_id", job.skill_id)
         .eq("kind", job.kind)
         .maybeSingle();
-      const placement = row as { id: string; note: string | null } | null;
+      const placement = row as {
+        id: string;
+        note: string | null;
+        note_approved: boolean;
+      } | null;
       if (!placement || placement.note !== job.note) {
         await audit(admin, job, "note_stale", {}, model, Number(cfg.__revision ?? 0));
         await finish(admin, job, "stale");
         stale++;
         continue;
       }
+      const wasApproved = placement.note_approved === true;
+      // Preserve the heuristic provenance on both outcomes so admin can see
+      // that a preapproval was confirmed or overturned.
+      const queueSource =
+        job.decision_source === "heuristic" ? "heuristic" : "inference";
 
       // Cheap deterministic prefilter: links, emails, phone-like strings, tags,
       // random characters, keyboard mashing, repeated filler.
@@ -131,7 +141,10 @@ Deno.serve(async (req) => {
           model,
           Number(cfg.__revision ?? 0),
         );
-        await finish(admin, job, "rejected", "inference");
+        if (wasApproved) {
+          await notifyRejection(admin, job, "prefilter");
+        }
+        await finish(admin, job, "rejected", queueSource);
         await refreshEmbeddings(admin, job.user_id);
         rejected++;
         continue;
@@ -146,8 +159,9 @@ Deno.serve(async (req) => {
       const state =
         `== NOTE CONTEXT RULES ==\n` +
         `A note on a skill placement should describe the user's goals, teaching approach, background, schedule constraints, or expectations for THAT skill.\n` +
-        `A note is NOT relevant if it discusses an unrelated activity, event, or aspiration.\n` +
-        `A note adds value only when it is a real, specific statement. Random characters, keyboard mashing, repeated filler, or generic one-word replies have no value.\n\n` +
+        `Personal motivation, experience, student counts, and short reflections are relevant when they relate to the skill.\n` +
+        `A note is NOT relevant only when it discusses an unrelated activity, event, or aspiration.\n` +
+        `A note adds value when it is a genuine statement from the user, even if it is short or informal. Only random characters, keyboard mashing, repeated filler, or generic one-word replies have no value.\n\n` +
         `== SKILL ==\n${JSON.stringify(job.name)}\n` +
         `== SKILL PATH ==\n${JSON.stringify(pathText)}\n` +
         `== PLACEMENT ==\n${JSON.stringify(job.kind)}\n\n` +
@@ -157,7 +171,7 @@ Deno.serve(async (req) => {
         note_relevant: {
           type: "noul",
           instructions:
-            "Is this note relevant to the skill above (goals, approach, constraints, expectations for that skill)?",
+            "Is this note relevant to the skill above? Accept goals, approach, background, personal motivation, constraints, or expectations for that skill, even when the note is short.",
         },
         note_safe: {
           type: "noul",
@@ -167,7 +181,7 @@ Deno.serve(async (req) => {
         note_value: {
           type: "noul",
           instructions:
-            "Does this note provide specific, useful information for a potential Pal (a goal, background, teaching/learning approach, schedule, or expectation), rather than random characters, filler, or a generic one-liner?",
+            "Does this note add genuine context for a potential Pal (a goal, background, motivation, teaching/learning approach, schedule, or expectation)? Accept short, informal, or personal statements; only random characters, filler, or one-word replies have no value.",
         },
       };
 
@@ -193,7 +207,11 @@ Deno.serve(async (req) => {
         .from("user_skills")
         .update({
           note_approved: ok,
-          note_approval_source: ok ? "inference" : null,
+          note_approval_source: ok
+            ? job.decision_source === "heuristic"
+              ? "heuristic"
+              : "inference"
+            : null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", placement.id)
@@ -217,7 +235,10 @@ Deno.serve(async (req) => {
         Number(cfg.__revision ?? 0),
         Number((payload as any)?.usage?.cost ?? 0),
       );
-      await finish(admin, job, ok ? "approved" : "rejected", "inference");
+      if (!ok && wasApproved) {
+        await notifyRejection(admin, job, "inference");
+      }
+      await finish(admin, job, ok ? "approved" : "rejected", queueSource);
       await refreshEmbeddings(admin, job.user_id);
       if (ok) approved++;
       else rejected++;
@@ -240,11 +261,32 @@ Deno.serve(async (req) => {
   });
 });
 
+async function notifyRejection(
+  admin: ReturnType<typeof createClient>,
+  job: Job,
+  reason: "prefilter" | "inference",
+) {
+  // Only notes that were already public (heuristic preapproval) need a notice.
+  const { error } = await admin.from("notifications").insert({
+    user_id: job.user_id,
+    kind: "note_rejected",
+    payload: {
+      skill_id: job.skill_id,
+      skill_name: job.name,
+      skill_kind: job.kind,
+      reason,
+    },
+  });
+  if (error) {
+    console.error(`[moderate-notes] notify ${job.id}: ${error.message}`);
+  }
+}
+
 async function finish(
   admin: ReturnType<typeof createClient>,
   job: Job,
   status: "approved" | "rejected" | "stale" | "unresolved",
-  source: "inference" | "manual" | null = null,
+  source: "heuristic" | "inference" | "manual" | null = null,
 ) {
   const update: Record<string, unknown> = {
     status,

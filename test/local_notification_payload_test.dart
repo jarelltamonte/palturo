@@ -177,4 +177,21 @@ void main() {
 
     expect(payload['route'], 'profile');
   });
+
+  test('rejected note opens the profile so the note can be edited', () {
+    final item = AppNotification.fromRow({
+      'id': 'n6',
+      'kind': 'note_rejected',
+      'payload': {'skill_name': 'Filipino Cooking', 'reason': 'inference'},
+      'created_at': '2026-11-21T10:00:00Z',
+    });
+
+    expect(item.kind, AppNotificationKind.noteRejected);
+    expect(item.kind.isNoteRejected, isTrue);
+    expect(item.skillName, 'Filipino Cooking');
+
+    final payload = LocalNotificationService.instance.payloadFor(item);
+    expect(payload['route'], 'profile');
+    expect(payload['notificationId'], 'n6');
+  });
 }

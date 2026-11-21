@@ -143,4 +143,18 @@ void main() {
     expect(view.body, isNot(contains('{')));
     expect(view.destination, ActivityDestination.none);
   });
+
+  test('rejected note names the skill and points at the profile', () {
+    final view = presentActivity({
+      'kind': 'note_rejected',
+      'payload': {'skill_name': 'Filipino Cooking', 'reason': 'inference'},
+    });
+
+    expect(view.title, 'Note needs an update');
+    expect(view.body, contains('Filipino Cooking'));
+    expect(view.body, contains('not approved'));
+    expect(view.actionLabel, 'Update note');
+    expect(view.destination, ActivityDestination.none);
+    expect(view.skillName, 'Filipino Cooking');
+  });
 }

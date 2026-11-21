@@ -427,6 +427,7 @@ class LocalNotificationService extends ChangeNotifier
               AppNotificationKind.possibleMatch => _requestsChannel,
               AppNotificationKind.feedbackReady ||
               AppNotificationKind.skillModeration ||
+              AppNotificationKind.noteRejected ||
               AppNotificationKind.accountWarning ||
               AppNotificationKind.unknown => _activityChannel,
             };
@@ -489,7 +490,8 @@ class LocalNotificationService extends ChangeNotifier
       case ActivityDestination.accountStanding:
         return {'route': 'account_standing', 'notificationId': item.id};
       case ActivityDestination.none:
-        return item.kind == AppNotificationKind.skillModeration
+        return item.kind == AppNotificationKind.skillModeration ||
+                item.kind == AppNotificationKind.noteRejected
             ? {'route': 'profile', 'notificationId': item.id}
             : {'route': 'activity', 'notificationId': item.id};
     }

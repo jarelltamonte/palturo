@@ -240,6 +240,11 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
         unawaited(_markItemRead(item));
         await AppRouter.openAccountStanding();
       case ActivityDestination.none:
+        if (item.kind == AppNotificationKind.noteRejected) {
+          unawaited(_markItemRead(item));
+          await AppRouter.openProfile();
+          return;
+        }
         _showFallback(
           item.kind == AppNotificationKind.skillModeration
               ? 'Open Profile to review this skill update.'
@@ -278,6 +283,7 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
       case ActivityFilter.updates:
         return item.kind.isFeedback ||
             item.kind == AppNotificationKind.skillModeration ||
+            item.kind == AppNotificationKind.noteRejected ||
             item.kind == AppNotificationKind.accountWarning ||
             item.kind == AppNotificationKind.unknown;
     }
@@ -541,6 +547,7 @@ bool activityMatchesFilter(AppNotification item, ActivityFilter filter) {
     case ActivityFilter.updates:
       return item.kind.isFeedback ||
           item.kind == AppNotificationKind.skillModeration ||
+          item.kind == AppNotificationKind.noteRejected ||
           item.kind == AppNotificationKind.accountWarning ||
           item.kind == AppNotificationKind.unknown;
   }

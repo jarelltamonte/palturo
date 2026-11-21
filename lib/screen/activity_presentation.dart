@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:palturo/services/match_api.dart';
 
-enum ActivityDestination { incomingRequests, sentRequests, chat, profile, accountStanding, none }
+enum ActivityDestination {
+  incomingRequests,
+  sentRequests,
+  chat,
+  profile,
+  accountStanding,
+  none,
+}
 
 /// Pure presentation model for one notification row.
 ///
@@ -172,6 +179,18 @@ ActivityItemView presentActivity(
         actionLabel: '',
         icon: Icons.workspace_premium_outlined,
         destination: ActivityDestination.none,
+      );
+    case 'note_rejected':
+      return ActivityItemView(
+        title: 'Note needs an update',
+        body:
+            skill == null
+                ? 'A note on your profile was not approved. Update it from Profile so Pals can see it.'
+                : 'Your note for $skill was not approved. Update it from Profile so Pals can see it.',
+        actionLabel: 'Update note',
+        icon: Icons.edit_note_outlined,
+        destination: ActivityDestination.none,
+        skillName: skill,
       );
     case 'account_warning':
       {

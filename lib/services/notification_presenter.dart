@@ -227,6 +227,8 @@ class NotificationPresenter {
         unawaited(SoundService.instance.play(AppSound.success));
       } else if (item.kind == AppNotificationKind.skillModeration) {
         unawaited(Haptics.selection());
+      } else if (item.kind == AppNotificationKind.noteRejected) {
+        unawaited(Haptics.warning());
       } else if (item.kind == AppNotificationKind.possibleMatch) {
         unawaited(Haptics.selection());
       } else if (item.kind == AppNotificationKind.accountWarning) {
@@ -308,7 +310,8 @@ class NotificationPresenter {
       case ActivityDestination.accountStanding:
         return () => AppRouter.openAccountStanding();
       case ActivityDestination.none:
-        if (item.kind == AppNotificationKind.skillModeration) {
+        if (item.kind == AppNotificationKind.skillModeration ||
+            item.kind == AppNotificationKind.noteRejected) {
           return () => AppRouter.openProfile();
         }
         return null;
@@ -447,8 +450,9 @@ bool notificationKindEnabled(AppNotificationKind kind) {
     case AppNotificationKind.possibleMatch:
       return PreferencesService.instance.possibleMatchNotificationsEnabled;
     case AppNotificationKind.accountWarning:
-      // Account notices are not marketing; keep them delivered even when
-      // activity categories are muted. The master toggle still applies.
+    case AppNotificationKind.noteRejected:
+      // Notices about the user's own account or content stay delivered even
+      // when activity categories are muted. The master toggle still applies.
       return true;
     case AppNotificationKind.unknown:
       return false;

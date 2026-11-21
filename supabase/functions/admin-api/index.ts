@@ -1402,16 +1402,33 @@ Deno.serve(async (req) => {
           if (key === "__revision") continue;
           clean[key] = value;
         }
+        const { data: currentRows } = await admin
+          .from("pipeline_config")
+          .select("key,value");
+        const beforeConfig: Record<string, unknown> = {};
+        let beforeRevision = 0;
+        for (const row of currentRows ?? []) {
+          if (row.key === "__revision") beforeRevision = Number(row.value ?? 0);
+          else beforeConfig[row.key] = row.value;
+        }
         // Each operation owns its provider, and the provider owns the endpoint
         // and model names. Normalise them here so a publish or rollback cannot
         // leave SQL reading a different model than the functions embed/rerank
-        // with. `inference_provider` is kept for backwards compatibility and
-        // mirrors the embedding provider.
+        // with. A partial payload falls back to the stored provider for the
+        // operation it omits, so publishing one selector never flips the other.
+        // `inference_provider` is kept for backwards compatibility and mirrors
+        // the embedding provider.
         const embedProvider = resolveProvider(
-          clean.embed_provider ?? clean.inference_provider,
+          clean.embed_provider ??
+            beforeConfig.embed_provider ??
+            clean.inference_provider ??
+            beforeConfig.inference_provider,
         );
         const rerankProvider = resolveProvider(
-          clean.rerank_provider ?? clean.inference_provider,
+          clean.rerank_provider ??
+            beforeConfig.rerank_provider ??
+            clean.inference_provider ??
+            beforeConfig.inference_provider,
         );
         const embedPreset = PROVIDER_PRESETS[embedProvider];
         const rerankPreset = PROVIDER_PRESETS[rerankProvider];
@@ -1424,15 +1441,6 @@ Deno.serve(async (req) => {
         clean.rerank_api = rerankPreset.rerankApi;
         if (Object.keys(clean).length === 0) {
           return json({ error: "Config must not be empty" }, 400);
-        }
-        const { data: currentRows } = await admin
-          .from("pipeline_config")
-          .select("key,value");
-        const beforeConfig: Record<string, unknown> = {};
-        let beforeRevision = 0;
-        for (const row of currentRows ?? []) {
-          if (row.key === "__revision") beforeRevision = Number(row.value ?? 0);
-          else beforeConfig[row.key] = row.value;
         }
         const { data: published, error: publishErr } = await admin.rpc(
           "admin_publish_config",

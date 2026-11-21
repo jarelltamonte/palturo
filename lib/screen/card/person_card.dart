@@ -41,6 +41,15 @@ class Person {
   /// 'full' or 'basic_bi'. Basic mode is one-way similarity.
   final String pipeline;
 
+  /// Card identity from the card-level matcher. Null on the profile path.
+  /// Two cards for the same person are separate deck entries.
+  final String? cardId;
+  final String? sourceCardId;
+  final String? skillId;
+
+  /// 'learn' | 'teach' for the card that actually matched.
+  final String? skillKind;
+
   const Person({
     required this.id,
     required this.name,
@@ -57,6 +66,10 @@ class Person {
     this.showcaseUrls = const [],
     this.compatibility,
     this.pipeline = 'full',
+    this.cardId,
+    this.sourceCardId,
+    this.skillId,
+    this.skillKind,
   });
 
   /// Card page media: showcase content first, profile photos after.
@@ -78,6 +91,10 @@ class Person {
     List<String?>? showcaseUrls,
     double? compatibility,
     String? pipeline,
+    String? cardId,
+    String? sourceCardId,
+    String? skillId,
+    String? skillKind,
   }) {
     return Person(
       id: id ?? this.id,
@@ -95,6 +112,10 @@ class Person {
       showcaseUrls: showcaseUrls ?? this.showcaseUrls,
       compatibility: compatibility ?? this.compatibility,
       pipeline: pipeline ?? this.pipeline,
+      cardId: cardId ?? this.cardId,
+      sourceCardId: sourceCardId ?? this.sourceCardId,
+      skillId: skillId ?? this.skillId,
+      skillKind: skillKind ?? this.skillKind,
     );
   }
 }
@@ -312,10 +333,11 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
         widget.person.role == PersonRole.learner
             ? 'assets/icons/rlearner.svg'
             : 'assets/icons/rmentor.svg';
-    final roleLabel =
-        widget.person.role == PersonRole.learner
-            ? 'Wants to learn'
-            : 'Wants to teach';
+    final isLearnCard =
+        widget.person.skillKind != null
+            ? widget.person.skillKind == 'learn'
+            : widget.person.role == PersonRole.learner;
+    final roleLabel = isLearnCard ? 'Wants to learn' : 'Wants to teach';
     final bodyText =
         (widget.showSkillNote ? widget.person.skillNote : widget.person.bio)
             .trim();

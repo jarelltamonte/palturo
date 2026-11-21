@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/card/person_card.dart';
+import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/services/match_api.dart';
 
 Person _person({String skillNote = 'Specific skill note'}) {
@@ -145,6 +146,98 @@ void main() {
     expect(mentor.skillName, 'Barong Embroidery');
     expect(mentor.skillNote, 'Teaching note');
     expect(mentor.role, PersonRole.mentor);
+  });
+
+  test('card mapping shows the skill that actually matched', () {
+    final profile = <String, dynamic>{
+      'p_name': 'Aling Rosa',
+      'p_role': 'both',
+      'p_bio': 'Profile bio',
+      'p_languages': 'Tagalog',
+      'p_styles': 'Discussion',
+      'p_availability': <dynamic>[],
+      'p_teaching': [
+        {
+          'skill': 'Barong Embroidery',
+          'path': 'arts_design.barong_embroidery',
+          'note': 'Teaching note',
+        },
+        {
+          'skill': 'Traditional Music',
+          'path': 'music.traditional',
+          'note': 'Music note',
+        },
+      ],
+      'p_learning': <dynamic>[],
+      'p_showcases': <dynamic>[],
+    };
+
+    final person = MatchApi.personFromPublicProfileMap(
+      profile,
+      'p1',
+      preferRole: 'mentor',
+      preferSkillId: 'music.traditional',
+    );
+
+    expect(person.skillName, 'Traditional Music');
+    expect(person.skillNote, 'Music note');
+    expect(person.skillKind, 'teach');
+  });
+
+  test('card kind overrides the profile role for the displayed side', () {
+    final profile = <String, dynamic>{
+      'p_name': 'Aling Rosa',
+      'p_role': 'mentor',
+      'p_bio': 'Profile bio',
+      'p_languages': 'Tagalog',
+      'p_styles': 'Discussion',
+      'p_availability': <dynamic>[],
+      'p_teaching': [
+        {
+          'skill': 'Barong Embroidery',
+          'path': 'arts_design.barong_embroidery',
+          'note': 'Teaching note',
+        },
+      ],
+      'p_learning': [
+        {
+          'skill': 'Traditional Music',
+          'path': 'music.traditional',
+          'note': 'Music note',
+        },
+      ],
+      'p_showcases': <dynamic>[],
+    };
+
+    final person = MatchApi.personFromPublicProfileMap(
+      profile,
+      'p1',
+      preferRole: 'mentor',
+      preferSkillId: 'music.traditional',
+      skillKind: 'learn',
+    );
+
+    expect(person.role, PersonRole.learner);
+    expect(person.skillName, 'Traditional Music');
+    expect(person.skillKind, 'learn');
+  });
+
+  test('cards from one person keep distinct deck keys', () {
+    Person card(String? cardId) => Person(
+      id: 'p1',
+      name: 'Aling Rosa',
+      schedule: 'Mon/Fri',
+      language: 'Tagalog',
+      learningStyle: 'Discussion',
+      skillName: 'Barong Embroidery',
+      role: PersonRole.mentor,
+      cardId: cardId,
+    );
+
+    expect(deckKeyFor(card('c1')), 'c1');
+    expect(deckKeyFor(card('c2')), 'c2');
+    expect(deckKeyFor(card('c1')) == deckKeyFor(card('c2')), isFalse);
+    expect(deckKeyFor(card(null)), 'p1');
   });
 
   testWidgets('For You card shows skill note, not bio', (tester) async {

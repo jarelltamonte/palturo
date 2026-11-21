@@ -34,6 +34,11 @@ import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/swipe_deck.dart';
 import 'package:palturo/utils/friendly_error.dart';
 
+/// Deck identity: one entry per card when the card matcher is on, otherwise
+/// one entry per person. The profile path leaves `cardId` null.
+@visibleForTesting
+String deckKeyFor(Person person) => person.cardId ?? person.id;
+
 enum RoleFilter { all, learner, mentor }
 
 /// How long a cold deck load may look idle before the UI admits it is slow.
@@ -242,14 +247,22 @@ class _HomePageState extends State<HomePage> {
   List<Person> _offerable(List<Person> deck) {
     if (_hiddenIds.isEmpty) return deck;
     return deck
-        .where((person) => !_hiddenIds.contains(person.id))
+        .where(
+          (person) =>
+              !_hiddenIds.contains(person.id) &&
+              !_hiddenIds.contains(_deckKeyFor(person)),
+        )
         .toList(growable: false);
   }
+
+  /// Deck identity: one entry per card when the card matcher is on, otherwise
+  /// one entry per person.
+  String _deckKeyFor(Person person) => deckKeyFor(person);
 
   List<Person> _visibleDeck(List<Person> deck, Set<String> seen) {
     if (_replayAll) return List<Person>.of(deck);
     return deck
-        .where((person) => !seen.contains(person.id))
+        .where((person) => !seen.contains(_deckKeyFor(person)))
         .toList(growable: false);
   }
 
@@ -495,7 +508,7 @@ class _HomePageState extends State<HomePage> {
   bool _sameDeck(List<Person> a, List<Person> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id) return false;
+      if (_deckKeyFor(a[i]) != _deckKeyFor(b[i])) return false;
     }
     return true;
   }
@@ -503,10 +516,11 @@ class _HomePageState extends State<HomePage> {
   List<Person> _mergeDecks(Iterable<List<Person>> decks) {
     final byId = <String, Person>{};
     for (final person in decks.expand((deck) => deck)) {
-      final existing = byId[person.id];
+      final key = _deckKeyFor(person);
+      final existing = byId[key];
       if (existing == null ||
           (person.compatibility ?? 0) > (existing.compatibility ?? 0)) {
-        byId[person.id] = person;
+        byId[key] = person;
       }
     }
     return byId.values.toList()
@@ -692,12 +706,12 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
     final people = _people;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
-    if (people[_currentIndex].id != person.id) return;
+    if (_deckKeyFor(people[_currentIndex]) != _deckKeyFor(person)) return;
     final before = _currentIndex;
     _next(right: right, connectionId: connectionId);
     if (_currentIndex == before) return;
     final mark = widget.markSeen ?? SeenDeckService.instance.markSeen;
-    unawaited(mark(person.id));
+    unawaited(mark(_deckKeyFor(person)));
   }
 
   /// A right swipe and the Connect button both land here. The request is the
@@ -940,7 +954,7 @@ class _HomePageState extends State<HomePage> {
   }) {
     final people = _people;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
-    if (people[_currentIndex].id != person.id) return;
+    if (_deckKeyFor(people[_currentIndex]) != _deckKeyFor(person)) return;
     if (_noteBlocked && !bypassNoteGate) {
       unawaited(_showNoteIssueDialog());
       return;
@@ -1010,7 +1024,7 @@ class _HomePageState extends State<HomePage> {
     final unmarkPerson = undonePerson;
     if (unmarkPerson != null) {
       final unmark = widget.unmarkSeen ?? SeenDeckService.instance.unmarkSeen;
-      unawaited(unmark(unmarkPerson.id));
+      unawaited(unmark(_deckKeyFor(unmarkPerson)));
     }
   }
 

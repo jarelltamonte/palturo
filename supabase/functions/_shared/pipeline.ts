@@ -1,4 +1,4 @@
-// PalTuro — shared NIM client + pipeline helpers (used by generate-embeddings & get-matches)
+﻿// PalTuro â€” shared NIM client + pipeline helpers (used by generate-embeddings & get-matches)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -43,6 +43,12 @@ export interface PipelineCfg {
   rateLimitGetMatches: number;
   rateLimitWindowSeconds: number;
   maxDeckSize: number;
+  matcherMode: "profile" | "gated" | "cards";
+  minSkillScore: number;
+  minFinalScore: number;
+  requireDiscoveryMedia: boolean;
+  maxPerUser: number;
+  maxPerSkill: number;
 }
 
 export type InferenceProvider = "nvidia" | "deepinfra";
@@ -158,6 +164,17 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
     rateLimitGetMatches: intIn(cfg.get_matches_rate_limit, 60, 1, 10000),
     rateLimitWindowSeconds: intIn(cfg.get_matches_rate_window_seconds, 3600, 60, 86400),
     maxDeckSize: intIn(cfg.max_deck_size, 20, 1, 100),
+    matcherMode: (() => {
+      const mode = unstr(cfg.matcher_mode, "profile");
+      if (mode === "cards") return "cards" as const;
+      if (mode === "gated") return "gated" as const;
+      return "profile" as const;
+    })(),
+    minSkillScore: numIn(cfg.min_skill_score, 0.50, 0, 1),
+    minFinalScore: numIn(cfg.min_final_score, 0.50, 0, 1),
+    requireDiscoveryMedia: cfg.require_discovery_media !== false,
+    maxPerUser: intIn(cfg.max_per_user, 2, 1, 10),
+    maxPerSkill: intIn(cfg.max_per_skill, 3, 1, 50),
   };
 }
 
@@ -347,6 +364,122 @@ export async function rerankTexts(
 const vecLiteral = (e: number[]) => `[${e.join(",")}]`;
 
 /**
+ * Per-card vectors for the card-level matcher.
+ *
+ * Card identity is `user_skills.id`; `build_card_passages_bulk` returns one
+ * canonical passage per card. Absence of the Phase 1 table/function is treated
+ * as "not deployed yet" and never breaks the profile pipeline.
+ */
+export async function ensureFreshCardEmbeddings(
+  admin: Admin,
+  userIds: string[],
+  cfg: PipelineCfg,
+  key: string,
+  timeoutMs = 30000,
+  maxAttempts = 3,
+): Promise<{ upserted: number; costEmbeddings: number }> {
+  if (userIds.length === 0) return { upserted: 0, costEmbeddings: 0 };
+
+  const { data: cardRows, error: cardErr } = await admin
+    .from("user_skills")
+    .select("id")
+    .in("user_id", userIds);
+  if (cardErr) {
+    console.error(`[embeddings] card ids: ${cardErr.message}`);
+    return { upserted: 0, costEmbeddings: 0 };
+  }
+  const cardIds = (cardRows ?? []).map((r) => r.id as string);
+  if (cardIds.length === 0) return { upserted: 0, costEmbeddings: 0 };
+
+  const { data, error } = await admin.rpc("build_card_passages_bulk", {
+    p_cards: cardIds,
+  });
+  if (error) {
+    // Phase 1 not applied yet (or a transient failure): the profile path must
+    // keep working.
+    console.error(`[embeddings] card passages: ${error.message}`);
+    return { upserted: 0, costEmbeddings: 0 };
+  }
+  const rows = (data ?? []) as Array<{
+    card_id: string;
+    user_id: string;
+    source_text: string;
+    source_hash: string;
+  }>;
+  if (rows.length === 0) return { upserted: 0, costEmbeddings: 0 };
+
+  const { data: existing, error: existingErr } = await admin
+    .from("card_embeddings")
+    .select("card_id,input_type,source_hash,model_name")
+    .in("card_id", cardIds);
+  if (existingErr) {
+    console.error(`[embeddings] card embeddings: ${existingErr.message}`);
+    return { upserted: 0, costEmbeddings: 0 };
+  }
+  const have = new Set(
+    (existing ?? [])
+      .filter((r) => r.model_name === cfg.embeddingModel)
+      .map((r) => `${r.card_id}|${r.input_type}:${r.source_hash}`),
+  );
+
+  const toUpsert = rows.filter((r) => {
+    const kPass = `${r.card_id}|passage:${r.source_hash}`;
+    const kQuery = `${r.card_id}|query:${r.source_hash}`;
+    return !have.has(kPass) || !have.has(kQuery);
+  });
+  if (toUpsert.length === 0) return { upserted: 0, costEmbeddings: 0 };
+
+  let cost = 0;
+  for (const inputType of ["passage", "query"] as const) {
+    const batch = toUpsert.filter((r) => {
+      const k = `${r.card_id}|${inputType}:${r.source_hash}`;
+      return !have.has(k);
+    });
+    if (batch.length === 0) continue;
+
+    const vectors = await embedTexts(
+      key,
+      cfg,
+      batch.map((r) => r.source_text),
+      inputType,
+      timeoutMs,
+      maxAttempts,
+    );
+    if (vectors.length !== batch.length) {
+      throw new Error(
+        `card embedding count mismatch: expected ${batch.length}, got ${vectors.length}`,
+      );
+    }
+    const payload = batch.map((r, i) => ({
+      card_id: r.card_id,
+      input_type: inputType,
+      source_text: r.source_text,
+      source_hash: r.source_hash,
+      model_name: cfg.embeddingModel,
+      embedding: vecLiteral(vectors[i]),
+    }));
+    const { error: insErr } = await admin
+      .from("card_embeddings")
+      .upsert(payload, { onConflict: "card_id,input_type" });
+    if (insErr) throw new Error(`card embedding upsert: ${insErr.message}`);
+    cost += vectors.length * 0.00002;
+  }
+
+  // Card vectors change pair rankings; drop cached card decks that include
+  // any touched user. The table only exists from Phase 2 onward.
+  try {
+    await admin.from("match_cache_v2").delete().in("user_id", userIds);
+    await admin.from("match_cache_v2").delete().in("candidate_id", userIds);
+  } catch (e) {
+    console.error(
+      `[embeddings] card cache invalidation: ${(e as Error)?.message ?? e}`,
+    );
+  }
+
+  return { upserted: toUpsert.length, costEmbeddings: cost };
+}
+
+/**
  * Ensure profile_embeddings rows (both input types) are current for the given users.
  * Reads build_profile_passages() (SQL) and diffs against stored source_hash.
  */
@@ -360,6 +493,20 @@ export async function ensureFreshEmbeddings(
 ): Promise<{ upserted: number; costEmbeddings: number }> {
   if (userIds.length === 0) return { upserted: 0, costEmbeddings: 0 };
 
+  const cards = await ensureFreshCardEmbeddings(
+    admin,
+    userIds,
+    cfg,
+    key,
+    timeoutMs,
+    maxAttempts,
+  ).catch((e) => {
+    console.error(
+      `[embeddings] card refresh: ${(e as Error)?.message ?? e}`,
+    );
+    return { upserted: 0, costEmbeddings: 0 };
+  });
+
   // passages via bulk SQL function
   const { data, error } = await admin.rpc("build_passages_bulk", { p_users: userIds });
   if (error) throw new Error(`passages: ${error.message}`);
@@ -370,7 +517,9 @@ export async function ensureFreshEmbeddings(
     source_text: string;
     source_hash: string;
   }>;
-  if (rows.length === 0) return { upserted: 0, costEmbeddings: 0 };
+  if (rows.length === 0) {
+    return { upserted: cards.upserted, costEmbeddings: cards.costEmbeddings };
+  }
 
   // existing stored hashes (scoped to the users being healed). Vectors from a
   // different embedding model are treated as missing: comparing vectors across
@@ -391,7 +540,9 @@ export async function ensureFreshEmbeddings(
     const kQuery = `${r.user_id}|${r.role}|${r.field_group}|query:${r.source_hash}`;
     return !have.has(kPass) || !have.has(kQuery);
   });
-  if (toUpsert.length === 0) return { upserted: 0, costEmbeddings: 0 };
+  if (toUpsert.length === 0) {
+    return { upserted: cards.upserted, costEmbeddings: cards.costEmbeddings };
+  }
 
   // Each input type is refreshed independently. Delete only the keys in this
   // batch: deleting every touched pair would remove a still-valid query vector
@@ -458,7 +609,10 @@ export async function ensureFreshEmbeddings(
     console.error(`[embeddings] cache invalidation (user): ${userCache.error.message}`);
   }
 
-  return { upserted: toUpsert.length, costEmbeddings: cost };
+  return {
+    upserted: toUpsert.length + cards.upserted,
+    costEmbeddings: cost + cards.costEmbeddings,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -711,3 +865,4 @@ export async function recordInferenceEvent(
     console.error(`[inference] event write: ${(e as Error)?.message ?? e}`);
   }
 }
+

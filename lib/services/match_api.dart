@@ -21,6 +21,15 @@ class MatchLite {
   final String role; // 'learner' | 'mentor' | 'both'
   final double compatibility; // calibrated 0..1
   final String pipeline; // 'full' | 'basic_bi'
+
+  /// Card-level identity (matcher_mode = cards). Null on the profile path.
+  final String? cardId;
+  final String? sourceCardId;
+  final String? skillId;
+  final String? skillName;
+  final String? skillPath;
+  final String? skillKind;
+
   const MatchLite({
     required this.userId,
     required this.rank,
@@ -28,6 +37,12 @@ class MatchLite {
     required this.role,
     required this.compatibility,
     required this.pipeline,
+    this.cardId,
+    this.sourceCardId,
+    this.skillId,
+    this.skillName,
+    this.skillPath,
+    this.skillKind,
   });
 
   PersonRole get personRole =>
@@ -39,10 +54,15 @@ class MatchLite {
     schedule: '',
     language: '',
     learningStyle: '',
-    skillName: '',
+    skillName: skillName ?? '',
+    skillPath: skillPath ?? '',
     role: personRole,
     bio: bio,
     photoUrls: [avatarUrl],
+    cardId: cardId,
+    sourceCardId: sourceCardId,
+    skillId: skillId,
+    skillKind: skillKind,
   );
 }
 
@@ -325,6 +345,12 @@ class MatchApi {
             role: (r['role'] ?? 'both') as String,
             compatibility: (r['compatibility'] as num?)?.toDouble() ?? 0.0,
             pipeline: (r['pipeline'] ?? 'full') as String,
+            cardId: r['card_id'] as String?,
+            sourceCardId: r['source_card_id'] as String?,
+            skillId: r['skill_id'] as String?,
+            skillName: r['skill_name'] as String?,
+            skillPath: r['skill_path'] as String?,
+            skillKind: r['skill_kind'] as String?,
           ),
         )
         .toList();
@@ -343,10 +369,18 @@ class MatchApi {
   static Future<Person?> getPersonFromPublicProfile(
     String userId, {
     String? preferRole,
+    String? preferSkillId,
+    String? skillKind,
   }) async {
     final p = await getPublicProfile(userId);
     if (p == null) return null;
-    return personFromPublicProfileMap(p, userId, preferRole: preferRole);
+    return personFromPublicProfileMap(
+      p,
+      userId,
+      preferRole: preferRole,
+      preferSkillId: preferSkillId,
+      skillKind: skillKind,
+    );
   }
 
   /// Pure mapping used by deck enrichment and tests.
@@ -354,17 +388,24 @@ class MatchApi {
   /// [preferRole] lets a deck show the side it is actually browsing: a `both`
   /// profile appears as a learner in the learner deck and as a mentor in the
   /// mentor deck, instead of always showing its teaching side.
+  ///
+  /// [preferSkillId] is the card's path. The card matcher returns the skill
+  /// that actually matched, which may not be the first one on the profile.
   static Person personFromPublicProfileMap(
     Map<String, dynamic> p,
     String userId, {
     String? preferRole,
+    String? preferSkillId,
+    String? skillKind,
   }) {
     String name = ((p['p_name'] ?? '') as String).trim();
     if (name.isEmpty) name = 'Community member';
     final profileRole = p['p_role']?.toString();
     final isLearner =
-        preferRole == 'learner' ||
-        (preferRole == null && profileRole == 'learner');
+        skillKind != null
+            ? skillKind == 'learn'
+            : preferRole == 'learner' ||
+                (preferRole == null && profileRole == 'learner');
     final teaching = (p['p_teaching'] as List?) ?? [];
     final learning = (p['p_learning'] as List?) ?? [];
     final preferred = isLearner ? learning : teaching;
@@ -375,18 +416,30 @@ class MatchApi {
     String skillPath = '';
     String skillNote = '';
     if (skillEntries.isNotEmpty) {
-      final entry = skillEntries.first as Map;
-      // Prefer the node name: the path leaf is a slug and loses casing and
-      // symbols ("python_programming", "c_sharp_programming").
-      final raw = ((entry['path'] ?? '') as String);
-      skillPath = raw;
-      final entryName = (entry['skill'] ?? '').toString().trim();
-      skill =
-          entryName.isNotEmpty
-              ? entryName
-              : raw.split('.').last.replaceAll('_', ' ').trim();
-      if (preferred.isNotEmpty) {
-        skillNote = ((entry['note'] as String?) ?? '').trim();
+      final entries = skillEntries.whereType<Map>().toList(growable: false);
+      if (entries.isNotEmpty) {
+        final wanted = (preferSkillId ?? '').trim();
+        var entry = entries.first;
+        if (wanted.isNotEmpty) {
+          for (final candidate in entries) {
+            if ((candidate['path'] as String?) == wanted) {
+              entry = candidate;
+              break;
+            }
+          }
+        }
+        // Prefer the node name: the path leaf is a slug and loses casing and
+        // symbols ("python_programming", "c_sharp_programming").
+        final raw = ((entry['path'] ?? '') as String);
+        skillPath = raw;
+        final entryName = (entry['skill'] ?? '').toString().trim();
+        skill =
+            entryName.isNotEmpty
+                ? entryName
+                : raw.split('.').last.replaceAll('_', ' ').trim();
+        if (preferred.isNotEmpty) {
+          skillNote = ((entry['note'] as String?) ?? '').trim();
+        }
       }
     }
     final showcases =
@@ -410,6 +463,7 @@ class MatchApi {
       skillNote: skillNote,
       photoUrls: [(p['p_avatar'] as String?)],
       showcaseUrls: showcases,
+      skillKind: skillKind ?? (isLearner ? 'learn' : 'teach'),
     );
   }
 
@@ -486,6 +540,8 @@ class MatchApi {
           final person = await getPersonFromPublicProfile(
             m.userId,
             preferRole: asRoleDb,
+            preferSkillId: m.skillPath,
+            skillKind: m.skillKind,
           );
           if (person == null) return null;
           // carry the compatibility score onto the card (spec §6.3 indicator)
@@ -504,6 +560,10 @@ class MatchApi {
             showcaseUrls: person.showcaseUrls,
             compatibility: m.compatibility,
             pipeline: m.pipeline,
+            cardId: m.cardId ?? person.cardId,
+            sourceCardId: m.sourceCardId ?? person.sourceCardId,
+            skillId: m.skillId ?? person.skillId,
+            skillKind: m.skillKind ?? person.skillKind,
           );
         } catch (error) {
           // Surface a dead session instead of caching an empty deck that looks

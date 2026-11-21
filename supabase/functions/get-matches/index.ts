@@ -20,6 +20,7 @@ import {
   rerankCircuitOpen,
   sigmoid,
 } from "../_shared/pipeline.ts";
+import { handleCardMatches } from "./cards.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -148,13 +149,28 @@ Deno.serve(async (req) => {
     const meRole = targetRole === "mentor" ? "learner" : "mentor";
 
     const cfg = await getConfig(admin);
+    const gated = cfg.matcherMode === "gated";
 
     const started = Date.now();
+
+    // Card-level matching is flag-gated. The profile pipeline below stays the
+    // default and the rollback path.
+    if (cfg.matcherMode === "cards") {
+      return await handleCardMatches({
+        admin,
+        user,
+        targetRole,
+        cfg,
+        started,
+        useCache: payload.refresh !== false,
+        json,
+      });
+    }
 
     // ---------- CACHE-FIRST fast path ----------
     // If the cached ranking is still valid (same config; nothing changed since
     // refresh on either side), skip ALL NIM work and return the stored order.
-    if (payload.refresh !== false) {
+    if (payload.refresh !== false && !gated) {
       const { data: fresh } = await admin.rpc("cache_is_fresh", {
         p_user: user.id,
         p_role: targetRole,
@@ -286,18 +302,42 @@ Deno.serve(async (req) => {
     }
 
     // ---------- 2. Stage 1: weighted multi-vector retrieval (SQL) ----------
-    const { data: cands, error: candErr } = await admin.rpc("match_candidates", {
+    // `gated` keeps the profile rerank but retrieves candidates only through a
+    // compatible skill card (Phase 0), and returns the skill that matched.
+    const rpcName = gated ? "match_candidates_v2" : "match_candidates";
+    const { data: cands, error: candErr } = await admin.rpc(rpcName, {
       p_user: user.id,
       p_target: targetRole,
       p_limit: cfg.topK,
       p_w_skills: cfg.wSkills,
       p_w_context: cfg.wContext,
+      ...(gated
+        ? {
+            p_min_skill: cfg.minSkillScore,
+            p_require_media: cfg.requireDiscoveryMedia,
+          }
+        : {}),
     });
     if (candErr) {
       console.error(`[get-matches] candidate retrieval: ${candErr.message}`);
       return json({ error: "candidate_retrieval_failed" }, 500);
     }
-    const candidates = (cands ?? []) as Array<{ candidate_id: string; bi_score: number }>;
+    const candidates = (cands ?? []) as Array<{
+      candidate_id: string;
+      bi_score: number;
+      card_id?: string;
+      source_card_id?: string;
+      skill_id?: string;
+      skill_name?: string;
+      skill_path?: string;
+      skill_kind?: string;
+      skill_score?: number;
+    }>;
+    const cardById = new Map(
+      candidates
+        .filter((c) => c.card_id)
+        .map((c) => [c.candidate_id, c] as const),
+    );
 
     if (candidates.length === 0) {
       await refreshCache(admin, user.id, targetRole, [], cfg, "full");
@@ -544,7 +584,11 @@ Deno.serve(async (req) => {
 
     // Never offer someone the viewer already has a connection with.
     const excluded = await excludedUserIds(admin, user.id);
-    const visible = ranked.filter((s) => !excluded.has(s.candidate_id));
+    const cleared =
+      gated
+        ? ranked.filter((s) => s.calibrated_score >= cfg.minFinalScore)
+        : ranked;
+    const visible = cleared.filter((s) => !excluded.has(s.candidate_id));
 
     // Enforce the deck cap after exclusions and normalize ranks 1..N so cached
     // decks never expose gaps or more cards than the configured cap.
@@ -565,6 +609,7 @@ Deno.serve(async (req) => {
 
     const results = deck.map((s) => {
       const p = byId.get(s.candidate_id)!;
+      const card = cardById.get(s.candidate_id);
       return {
         user_id: s.candidate_id,
         rank: s.rank,
@@ -573,6 +618,15 @@ Deno.serve(async (req) => {
         compatibility: s.calibrated_score,
         bi_score: s.bi_score,
         pipeline: mode,
+        ...(card
+          ? {
+              card_id: card.card_id,
+              skill_id: card.skill_id,
+              skill_name: card.skill_name,
+              skill_path: card.skill_path,
+              skill_kind: card.skill_kind,
+            }
+          : {}),
       };
     });
 

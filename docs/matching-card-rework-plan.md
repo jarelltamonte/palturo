@@ -1,6 +1,8 @@
-# Card-level matching rework
+﻿# Card-level matching rework
 
-Status: proposal. Nothing below is implemented yet except where marked.
+Status: implemented locally in code and migrations; **not applied, deployed, or
+pushed**. See `matching-card-implementation-guide.md` for the build guide and
+the implementation status table.
 
 Scope: `get-matches`, `match_candidates`, `profile_embeddings`, the For You deck,
 and the request/notification payloads that depend on "which skill matched".
@@ -29,11 +31,11 @@ to be first alphabetically.
 
 | Object | Shape | Notes |
 |---|---|---|
-| `user_skills` | `(user_id, skill_id, kind, note, note_approved, tags)` | `kind` ∈ `teach` / `learn` / `secondary` |
+| `user_skills` | `(user_id, skill_id, kind, note, note_approved, tags)` | `kind` âˆˆ `teach` / `learn` / `secondary` |
 | `enforce_skill_caps` | trigger | max **3** per `kind` (`secondary` exempt) |
-| `skill_showcases` | `(user_id, skill_id?, media_url, …)` | `skill_id` is **nullable**; not used by matching |
+| `skill_showcases` | `(user_id, skill_id?, media_url, â€¦)` | `skill_id` is **nullable**; not used by matching |
 | `profiles.learning_skills` / `teaching_skills` | text[] | legacy mirrors, synced by trigger |
-| `profile_embeddings` | `(user_id, role, field_group, input_type, embedding 1024d)` | 4 passages × 2 input types = **8 vectors/user** |
+| `profile_embeddings` | `(user_id, role, field_group, input_type, embedding 1024d)` | 4 passages Ã— 2 input types = **8 vectors/user** |
 | `match_cache` | PK `(user_id, as_role, candidate_id)` | user-level, no card columns |
 
 ### Pipeline (`supabase/functions/get-matches/index.ts`)
@@ -49,7 +51,7 @@ to be first alphabetically.
 5. `profile_match_view` rebuilds the aggregated offer/context text per user.
 6. Direction A reranks candidates; direction B asks "does the candidate also
    want me?", bounded to `rerank_b_limit` (10).
-7. `combineReciprocal` (geometric mean by default) → `calibrated_score`, which
+7. `combineReciprocal` (geometric mean by default) â†’ `calibrated_score`, which
    is **the only final score**. No skill component, no threshold.
 8. Sort, drop existing connections/blocks, cap at `max_deck_size` (20), cache.
 
@@ -58,7 +60,7 @@ to be first alphabetically.
 - Fetches **both** decks (`as_role=learner` and `as_role=mentor`), 10 each.
 - Merges and **dedupes by user id**, so a person can only appear once.
 - Enriches each match with `get_public_profile`, then
-  `personFromPublicProfileMap` picks `preferred.first` — the **first skill by
+  `personFromPublicProfileMap` picks `preferred.first` â€” the **first skill by
   name**, not the skill that matched.
 - A request sends `skill_name`/`skill_path` (the connection already supports
   skill context), but the card that produced it may show a different skill.
@@ -89,7 +91,7 @@ Music.
 5. There is **no `min_skill_score` or `min_final_score`** check, so a weak pair
    still enters the top 20.
 6. `require_discovery_media` is documented but not implemented. A teaching
-   skill **without a showcase** is still matchable — exactly the "profile 1 had
+   skill **without a showcase** is still matchable â€” exactly the "profile 1 had
    the skill but no showcase" observation.
 7. The card then displays the first teaching/learning skill alphabetically, so
    the visible skill may not even be the one that scored.
@@ -128,8 +130,8 @@ skill_card {
 A match is a pair of cards on **compatible skill nodes**:
 
 ```
-(their learn card) ↔ (my teach card)     -- when I am browsing learners
-(their teach card) ↔ (my learn card)     -- when I am browsing mentors
+(their learn card) â†” (my teach card)     -- when I am browsing learners
+(their teach card) â†” (my learn card)     -- when I am browsing mentors
 ```
 
 - Skill compatibility uses the taxonomy tree (`ltree`): exact 1.0, child 0.8,
@@ -138,7 +140,7 @@ A match is a pair of cards on **compatible skill nodes**:
 - The deck item carries `card_id`, `skill_id/path/kind`, `note`, `showcase`,
   `compatibility`, and `match_card_id`.
 - A user may appear up to 5 times across the whole system, at most once per
-  card. In a single deck, `max_per_user` (default 1–2) decides.
+  card. In a single deck, `max_per_user` (default 1â€“2) decides.
 
 ### Scoring
 
@@ -174,14 +176,14 @@ mostly implementing that contract at card granularity. Add:
 | `skill_cards` table or view | Card identity, visibility, showcase binding |
 | `card_embeddings (card_id, input_type, embedding)` | Per-card skill vectors; HNSW index |
 | `skill_showcases.skill_id` NOT NULL for teach | Makes the showcase gate enforceable |
-| `match_cache_v2 (viewer, as_kind, candidate_card, …)` | Cache the card pair, not the user |
+| `match_cache_v2 (viewer, as_kind, candidate_card, â€¦)` | Cache the card pair, not the user |
 | `connections.card_id` (optional) | Know which card the request came from |
 | `notifications` payload: `card_id`, `kind`, `skill_path` | Possible-match notifications become card-specific |
 
 ### New SQL surface
 
-- `build_card_passages(p_card)` → `skills` passage + card text.
-- `match_cards(p_user, p_target_kind, p_limit, p_params)` → card pairs with
+- `build_card_passages(p_card)` â†’ `skills` passage + card text.
+- `match_cards(p_user, p_target_kind, p_limit, p_params)` â†’ card pairs with
   `skill_score`, `bi_score`, `candidate_card_id`, `source_card_id`.
 - Keep `build_profile_passages` only for the **context** group.
 - `cache_is_fresh` must also watch `skill_cards.updated_at`,
@@ -196,7 +198,7 @@ mostly implementing that contract at card granularity. Add:
 
 ### Client
 
-- `Person` → `MatchCard` (or add `cardId`/`sourceCardId`/`skillKind`).
+- `Person` â†’ `MatchCard` (or add `cardId`/`sourceCardId`/`skillKind`).
 - Deck/seen/replay keys become card ids; migrate the local seen set (safe: card
   ids are new, so users see the guide/deck once more).
 - A request passes the card's skill (already supported server-side).
@@ -211,25 +213,25 @@ mostly implementing that contract at card granularity. Add:
 
 | Phase | Work | Estimate |
 |---|---|---|
-| 0 | Stopgap gates (see §8) — no schema change | **1–2 days** |
-| 1 | `skill_cards` view + `card_embeddings` + backfill | **4–6 days** |
-| 2 | `match_cards` + edge function + cache v2 + tests | **8–10 days** |
-| 3 | Client cards, seen keys, request payload, UI badges | **5–7 days** |
-| 4 | Dual-run, cutover, remove user-level path | **3–5 days** |
+| 0 | Stopgap gates (see Â§8) â€” no schema change | **1â€“2 days** |
+| 1 | `skill_cards` view + `card_embeddings` + backfill | **4â€“6 days** |
+| 2 | `match_cards` + edge function + cache v2 + tests | **8â€“10 days** |
+| 3 | Client cards, seen keys, request payload, UI badges | **5â€“7 days** |
+| 4 | Dual-run, cutover, remove user-level path | **3â€“5 days** |
 
-Total ≈ **4–6 weeks** solo, ~3 weeks with a second pair of hands. Phase 0 is a
+Total â‰ˆ **4â€“6 weeks** solo, ~3 weeks with a second pair of hands. Phase 0 is a
 day or two and fixes the reported class of bug immediately.
 
 ### Runtime / infra
 
-- **Embeddings**: today 8 vectors/user (4 passages × passage+query). Cards:
-  5 cards × 2 + 2 context groups × 2 = **14 vectors/user** (+75% per profile
+- **Embeddings**: today 8 vectors/user (4 passages Ã— passage+query). Cards:
+  5 cards Ã— 2 + 2 context groups Ã— 2 = **14 vectors/user** (+75% per profile
   save, but profile saves are rare). Backfill is one batch per user.
 - **Rerank**: direction A stays one batch. Direction B becomes per **pair**
   instead of per candidate; bound it to `rerank_b_limit` pairs (default 10) and
-  reuse the existing deadline/budget. Expect **+20–60%** rerank calls on a cold
+  reuse the existing deadline/budget. Expect **+20â€“60%** rerank calls on a cold
   deck, unchanged on cached decks.
-- **Storage**: 1024 × 4 B ≈ 4 KB/vector. +6 vectors/user ≈ +24 KB/user
+- **Storage**: 1024 Ã— 4 B â‰ˆ 4 KB/vector. +6 vectors/user â‰ˆ +24 KB/user
   (~240 MB per 10k users, before index overhead).
 - **Latency**: prefilter by `skill_id`/`ltree` before vector search should keep
   the candidate pool small; expected **neutral to +30%** on cold loads.
@@ -255,7 +257,7 @@ day or two and fixes the reported class of bug immediately.
 3. **Taxonomy depth.** "Traditional Music" and "Music Theory" may be siblings
    under Music. Sibling 0.45 should *not* pass the hard gate by default; the
    current doc allows it, which reproduces the complaint at a smaller scale.
-4. **General vs specific.** "General Programming" ↔ "Python" is 0.55/0.50. A
+4. **General vs specific.** "General Programming" â†” "Python" is 0.55/0.50. A
    hard gate must include these or the deck starves; make the gate
    `>= min_skill_score` (e.g. 0.4), not `== 1`.
 5. **Showcase removed after a match.** Teach card becomes hidden; cache must
@@ -264,7 +266,7 @@ day or two and fixes the reported class of bug immediately.
    `note_approved` already gates the text).
 7. **Visibility toggles.** Paused/hidden cards must leave decks and caches
    immediately; no stale card in `match_cache`.
-8. **Cap reduction 3 → 2 teach.** Do not delete data. Keep the third card
+8. **Cap reduction 3 â†’ 2 teach.** Do not delete data. Keep the third card
    `hidden` with a migration note; product decides later.
 9. **Connections are user-level.** One accepted connection blocks every card
    between two people. Card-level connections are a bigger change; decide
@@ -272,7 +274,7 @@ day or two and fixes the reported class of bug immediately.
 10. **Blocks/reports stay user-level.** All cards excluded, both directions.
 11. **Seen/replay keys.** Person ids become card ids; the existing local seen
     set becomes inert (acceptable) but must not hide people forever.
-12. **Deck exhaustion.** 5 cards × fewer unique people means the deck empties
+12. **Deck exhaustion.** 5 cards Ã— fewer unique people means the deck empties
     faster; `getRandomDeck`/Browse is the escape hatch, not a fallback pool in
     For You.
 13. **First-card guide.** Now per card; decide whether "first card" means first
@@ -317,9 +319,9 @@ No schema change. Fixes the reported class of bug in a day or two:
 4. **Showcase gate.** Exclude teach cards without an approved showcase
    (`require_discovery_media`).
 5. **Tests** (deterministic fixtures):
-   - viewer teaches Web Dev ↔ candidate wants Traditional Music → **excluded**
-   - viewer teaches Web Dev ↔ candidate wants Web Dev → **included**
-   - teach card without showcase → **excluded**
+   - viewer teaches Web Dev â†” candidate wants Traditional Music â†’ **excluded**
+   - viewer teaches Web Dev â†” candidate wants Web Dev â†’ **included**
+   - teach card without showcase â†’ **excluded**
    - exact match ranks above sibling/context-only
    - empty deck is allowed; it must not be padded with unrelated people
 
@@ -355,3 +357,4 @@ Phase 0 does not deliver per-card visibility or the 5-card UX. It stops the
 - Deck starvation is surfaced as "no more matches", never padded.
 - Deterministic fixtures cover the reported case, reciprocity, caps, and
   visibility.
+

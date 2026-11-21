@@ -61,7 +61,10 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
   ];
 
   late final List<Widget> _pages = [
-    HomePage(onBrowse: () => _onItemTapped(1)),
+    HomePage(
+      onBrowse: () => _onItemTapped(1),
+      onOpenProfile: () => _onItemTapped(4),
+    ),
     _ExploreTab(
       navigatorKey: _exploreNavKey,
       isActive: () => _selectedIndex == _exploreIndex,

@@ -104,6 +104,10 @@ class HomePage extends StatefulWidget {
   /// Switches the shell to Browse. Null when HomePage is used standalone.
   final VoidCallback? onBrowse;
 
+  /// Switches the shell to the Profile tab. Null when HomePage is used
+  /// standalone; the card guide falls back to a pushed profile in that case.
+  final VoidCallback? onOpenProfile;
+
   const HomePage({
     super.key,
     this.deckLoader,
@@ -113,6 +117,7 @@ class HomePage extends StatefulWidget {
     this.markSeen,
     this.unmarkSeen,
     this.onBrowse,
+    this.onOpenProfile,
   });
 
   @override
@@ -370,9 +375,15 @@ class _HomePageState extends State<HomePage> {
             showShowcaseStep:
                 _myProfile?.role == OnboardingRole.teach ||
                 _myProfile?.role == OnboardingRole.both,
-            onOpenProfile: () => AppRouter.openProfile(),
+            onOpenProfile:
+                widget.onOpenProfile ?? () => AppRouter.openProfile(),
             onFinished: () async {
-              await CardGuideService.instance.markSeen();
+              try {
+                await CardGuideService.instance.markSeen();
+              } catch (_) {
+                // A storage failure must not leave the guide covering the
+                // deck; the flag is only a one-time hint.
+              }
               entry.remove();
               if (identical(_guideEntry, entry)) _guideEntry = null;
               if (!mounted) return;

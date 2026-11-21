@@ -91,6 +91,7 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
 
   int _index = 0;
   bool _finishing = false;
+  bool _openingProfile = false;
 
   @override
   void initState() {
@@ -200,8 +201,17 @@ class _CardGuideOverlayState extends State<CardGuideOverlay> {
                 onShowcasePrimary:
                     step.showcaseStep
                         ? () async {
-                          await _next();
-                          widget.onOpenProfile?.call();
+                          // A double tap must not finish twice and open two
+                          // profiles. "Do Later" also starts finishing, so do
+                          // not navigate after it.
+                          if (_openingProfile || _finishing) return;
+                          _openingProfile = true;
+                          try {
+                            await _next();
+                            widget.onOpenProfile?.call();
+                          } finally {
+                            _openingProfile = false;
+                          }
                         }
                         : null,
               ),

@@ -358,6 +358,10 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: bgTheme,
       appBar: AppChrome.appBar(
         actionsPadding: EdgeInsets.zero,
+        leading:
+            (ModalRoute.of(context)?.canPop ?? false)
+                ? AppChrome.backButton(context, color: textTheme)
+                : null,
         title: Text(
           'Profile',
           style: AppTextStyles.headingText.copyWith(color: textTheme),

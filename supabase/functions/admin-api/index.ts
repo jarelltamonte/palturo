@@ -1414,20 +1414,30 @@ Deno.serve(async (req) => {
         // Each operation owns its provider, and the provider owns the endpoint
         // and model names. Normalise them here so a publish or rollback cannot
         // leave SQL reading a different model than the functions embed/rerank
-        // with. A partial payload falls back to the stored provider for the
-        // operation it omits, so publishing one selector never flips the other.
+        // with. Resolution order:
+        //   1. the submitted per-operation key;
+        //   2. a legacy single-provider payload (neither per-op key present),
+        //      which applies to both operations;
+        //   3. the stored provider for that operation.
+        // That keeps old snapshots rollback-able and lets a partial payload
+        // change one selector without flipping the other.
         // `inference_provider` is kept for backwards compatibility and mirrors
         // the embedding provider.
+        const hasPerOpProvider =
+          clean.embed_provider != null || clean.rerank_provider != null;
+        const legacyProvider = hasPerOpProvider
+          ? undefined
+          : clean.inference_provider;
         const embedProvider = resolveProvider(
           clean.embed_provider ??
+            legacyProvider ??
             beforeConfig.embed_provider ??
-            clean.inference_provider ??
             beforeConfig.inference_provider,
         );
         const rerankProvider = resolveProvider(
           clean.rerank_provider ??
+            legacyProvider ??
             beforeConfig.rerank_provider ??
-            clean.inference_provider ??
             beforeConfig.inference_provider,
         );
         const embedPreset = PROVIDER_PRESETS[embedProvider];

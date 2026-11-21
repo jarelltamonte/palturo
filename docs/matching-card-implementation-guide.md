@@ -47,7 +47,7 @@ has **not** been regenerated; the migrations are authoritative.
 |---|---|---|
 | `matcher_mode` | `profile` | `get-matches` (`profile` \| `gated` \| `cards`) |
 | `min_skill_score` | `0.50` | card gate |
-| `min_final_score` | `0.50` | deck filter |
+| `min_final_score` | `0.35` | deck filter |
 | `require_discovery_media` | `true` | teach cards |
 | `max_per_user` | `2` | diversity pass |
 | `max_per_skill` | `3` | diversity pass |
@@ -250,7 +250,7 @@ In `supabase/functions/get-matches/index.ts`:
 ```ts
 matcherMode: unstr(cfg.matcher_mode, "profile"),
 minSkillScore: numIn(cfg.min_skill_score, 0.50, 0, 1),
-minFinalScore: numIn(cfg.min_final_score, 0.50, 0, 1),
+minFinalScore: numIn(cfg.min_final_score, 0.35, 0, 1),
 requireDiscoveryMedia: cfg.require_discovery_media !== false,
 maxPerUser: intIn(cfg.max_per_user, 2, 1, 10),
 maxPerSkill: intIn(cfg.max_per_skill, 3, 1, 50),
@@ -818,4 +818,5 @@ invalidate automatically.
 - [ ] SQL fixtures + Deno unit tests + widget tests
 - [ ] Metrics dashboard + config rollback drilled
 - [ ] Phase 4 cleanup scheduled
+
 

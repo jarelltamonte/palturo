@@ -38,6 +38,34 @@ The repo's migrations are incremental on top of `supabase/schema.sql`. Follow
 - The reported failure: Diego learns Traditional Music, Marisol teaches Web
   Development only. Diego must never appear in Marisol's learner deck.
 
+## Production mocks
+
+Tagged test accounts for the live app. They are **not** local fixtures.
+
+- 20 accounts, `mock01@palturo.dev` … `mock20@palturo.dev`
+- Auth metadata: `mock: true`, `mock_batch: "2026-11-22"`
+- Bio prefix `[MOCK]`
+- Password: `MockPass!2026`
+- 47 skill cards (21 teach, 26 learn), 21 showcases, all notes approved
+
+Seed:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File supabase/tests/seed_mock_accounts.ps1
+# apply supabase/tests/seed_mock_accounts.sql with the Management API
+# then call generate-embeddings once per mock and clear match caches
+```
+
+Remove everything in one batch:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File supabase/tests/remove_mock_accounts.ps1 -Confirm
+```
+
+The removal matches **both** the email pattern and `raw_user_meta_data.mock = true`,
+deletes the profiles (cascading cards, showcases, embeddings, connections), then
+deletes the auth users and clears both match caches.
+
 ## Run
 
 ```powershell

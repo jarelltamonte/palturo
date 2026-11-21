@@ -171,7 +171,7 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
       return "profile" as const;
     })(),
     minSkillScore: numIn(cfg.min_skill_score, 0.50, 0, 1),
-    minFinalScore: numIn(cfg.min_final_score, 0.50, 0, 1),
+    minFinalScore: numIn(cfg.min_final_score, 0.35, 0, 1),
     requireDiscoveryMedia: cfg.require_discovery_media !== false,
     maxPerUser: intIn(cfg.max_per_user, 2, 1, 10),
     maxPerSkill: intIn(cfg.max_per_skill, 3, 1, 50),

@@ -460,13 +460,18 @@ export async function handleCardMatches(opts: {
     } else {
       reciprocal = Math.max(c.bi_score, 0);
     }
+    // The reranker compresses short card texts: exact cooking pairs scored
+    // ~0.09 in production. Floor the final score at the structured
+    // bi-encoder score so a valid exact pair is ranked and never filtered
+    // out by min_final_score; the reranker still wins when it scores higher.
+    const calibrated = Math.max(reciprocal, Math.max(c.bi_score, 0));
     return {
       ...c,
       rank: 0,
       rerank_score_a: pa,
       rerank_score_b: pb,
       reciprocal_score: reciprocal,
-      calibrated_score: reciprocal,
+      calibrated_score: calibrated,
     };
   });
 

@@ -40,7 +40,7 @@ grant execute on function public.skill_pair_score(extensions.ltree, extensions.l
 insert into public.pipeline_config (key, value) values
   ('matcher_mode', '"profile"'::jsonb),
   ('min_skill_score', '0.50'::jsonb),
-  ('min_final_score', '0.50'::jsonb),
+  ('min_final_score', '0.35'::jsonb),
   ('require_discovery_media', 'true'::jsonb),
   ('max_per_user', '2'::jsonb),
   ('max_per_skill', '3'::jsonb)

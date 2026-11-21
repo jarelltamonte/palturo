@@ -221,15 +221,23 @@ the flag on save.
 
 ### Inference provider
 
-Embeddings and reranking run through one provider at a time. Choose it in
-**Admin → Matching → Retrieval & embeddings** (`inference_provider`):
+Embeddings and reranking are selected independently, so the fastest/cheapest
+hybrid is possible: one provider for embeddings, another for rerank. Choose both
+in **Admin → Matching → Retrieval & embeddings** (`embed_provider` and
+`rerank_provider`):
 
 | Provider | Embeddings | Rerank |
 | --- | --- | --- |
 | `nvidia` | `nvidia/nemotron-3.5-embed-1b` | `nvidia/nemotron-3.5-rerank-8b` |
 | `deepinfra` | `nvidia/Nemotron-3.5-Embed-8B-BF16` | `nvidia/Nemotron-3.5-Rerank-8B-BF16` |
 
-The provider preset owns the endpoints and model names. Store the matching key
+The benchmarks found **DeepInfra embeddings + NVIDIA NIM rerank** to be the
+fastest combination while embeddings stayed stable. Both operations use the same
+Nemotron 3.5 model family, so vectors remain interchangeable unless the
+embedding model name changes. `inference_provider` is still written for
+backwards compatibility and mirrors `embed_provider`.
+
+The provider presets own the endpoints and model names. Store the matching key
 as a function secret (or in `integration_secrets` under the same name):
 
 ```sh
@@ -237,17 +245,25 @@ supabase secrets set NIM_API_KEY=<key>
 supabase secrets set DEEPINFRA_API_KEY=<key>
 ```
 
-The admin editor reports whether the selected provider's key is present.
+The admin editor reports whether each selected provider's key is present.
 **Rebuild embeddings** on the same page re-embeds every onboarded profile with
-the active provider. The admin API also exposes an owner/admin-only
+the active embedding provider. The admin API also exposes an owner/admin-only
 `benchmark.inference` action used for the provider comparison report at
 <https://docs.palturo.app/benchmarks/>.
 
-Switching providers changes the embedding model, so stored vectors are ignored
-by model name and regenerated on each profile's next load or save; publishing
-also clears deck caches. The first deck loads after a switch are slower while
-those vectors are rebuilt. The embedding dimension stays at the
-`profile_embeddings.embedding` width (1024).
+Changing the embedding provider changes the embedding model, so stored vectors
+from the previous model are ignored by model name (and purged on publish) and
+regenerated on each profile's next load or save; publishing also clears deck
+caches. The first deck loads after an embedding switch are slower while those
+vectors are rebuilt. The embedding dimension stays at the
+`profile_embeddings.embedding` width (1024). Changing only the rerank provider
+does not touch stored vectors.
+
+> **Production note:** NVIDIA's hosted API Catalog (`integrate.api.nvidia.com`)
+> is a trial service with a default 40 requests/minute limit and no production
+> SLA. Run NIM in production only under a paid NVIDIA AI Enterprise subscription
+> or a self-hosted NIM container. DeepInfra is rate-limited by concurrent
+> requests (200 per model per account, not RPM) and has no fixed per-minute cap.
 
 ### First admin on a fresh database
 

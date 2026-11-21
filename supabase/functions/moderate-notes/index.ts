@@ -6,7 +6,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   ensureFreshEmbeddings,
   getConfig,
-  inferenceKey,
+  providerKey,
 } from "../_shared/pipeline.ts";
 import { inspectNote } from "../_shared/note_rules.ts";
 
@@ -325,7 +325,7 @@ async function refreshEmbeddings(
 ) {
   try {
     const cfg = await getConfig(admin as any);
-    const key = await inferenceKey(admin as any, cfg);
+    const key = await providerKey(admin as any, cfg.embedProvider);
     if (!key) return;
     await ensureFreshEmbeddings(admin as any, [userId], cfg, key, 15000);
   } catch (e) {

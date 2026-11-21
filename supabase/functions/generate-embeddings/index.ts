@@ -5,7 +5,7 @@
 // are regenerated because the freshness check includes model_name.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { ensureFreshEmbeddings, getConfig, inferenceKey } from "../_shared/pipeline.ts";
+import { ensureFreshEmbeddings, getConfig, providerKey } from "../_shared/pipeline.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -59,9 +59,9 @@ Deno.serve(async (req) => {
     }
 
     const cfg = await getConfig(admin);
-    const key = await inferenceKey(admin, cfg);
+    const key = await providerKey(admin, cfg.embedProvider);
     if (!key) {
-      return json({ error: "inference_key_missing", provider: cfg.provider }, 503);
+      return json({ error: "inference_key_missing", provider: cfg.embedProvider }, 503);
     }
 
     const result = await ensureFreshEmbeddings(admin, [user.id], cfg, key);

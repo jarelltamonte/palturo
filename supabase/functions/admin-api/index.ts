@@ -7,7 +7,7 @@ import {
   embedTexts,
   ensureFreshEmbeddings,
   getConfig,
-  inferenceKey,
+  providerKey,
   PROVIDER_PRESETS,
   rerankTexts,
   resolveProvider,
@@ -983,7 +983,7 @@ Deno.serve(async (req) => {
         if (before.user_id) {
           try {
             const cfg = await getConfig(admin as any);
-            const key = await inferenceKey(admin as any, cfg);
+            const key = await providerKey(admin as any, cfg.embedProvider);
             if (key) {
               await ensureFreshEmbeddings(admin as any, [before.user_id], cfg, key);
             }
@@ -1402,16 +1402,26 @@ Deno.serve(async (req) => {
           if (key === "__revision") continue;
           clean[key] = value;
         }
-        // The provider owns the endpoint/model names. Normalise them here so a
-        // publish or rollback cannot leave SQL reading a different model than
-        // the functions embed with.
-        const provider = resolveProvider(clean.inference_provider);
-        const preset = PROVIDER_PRESETS[provider];
-        clean.inference_provider = provider;
-        clean.embedding_model = preset.embeddingModel;
-        clean.embedding_api = preset.embeddingApi;
-        clean.rerank_model = preset.rerankModel;
-        clean.rerank_api = preset.rerankApi;
+        // Each operation owns its provider, and the provider owns the endpoint
+        // and model names. Normalise them here so a publish or rollback cannot
+        // leave SQL reading a different model than the functions embed/rerank
+        // with. `inference_provider` is kept for backwards compatibility and
+        // mirrors the embedding provider.
+        const embedProvider = resolveProvider(
+          clean.embed_provider ?? clean.inference_provider,
+        );
+        const rerankProvider = resolveProvider(
+          clean.rerank_provider ?? clean.inference_provider,
+        );
+        const embedPreset = PROVIDER_PRESETS[embedProvider];
+        const rerankPreset = PROVIDER_PRESETS[rerankProvider];
+        clean.embed_provider = embedProvider;
+        clean.rerank_provider = rerankProvider;
+        clean.inference_provider = embedProvider;
+        clean.embedding_model = embedPreset.embeddingModel;
+        clean.embedding_api = embedPreset.embeddingApi;
+        clean.rerank_model = rerankPreset.rerankModel;
+        clean.rerank_api = rerankPreset.rerankApi;
         if (Object.keys(clean).length === 0) {
           return json({ error: "Config must not be empty" }, 400);
         }
@@ -1472,10 +1482,10 @@ Deno.serve(async (req) => {
 
       case "embeddings.backfill": {
         const cfg = await getConfig(admin as any);
-        const key = await inferenceKey(admin as any, cfg);
+        const key = await providerKey(admin as any, cfg.embedProvider);
         if (!key) {
           return json(
-            { error: "inference_key_missing", provider: cfg.provider },
+            { error: "inference_key_missing", provider: cfg.embedProvider },
             503,
           );
         }
@@ -1520,13 +1530,13 @@ Deno.serve(async (req) => {
           "embeddings.backfill",
           "profile",
           String(ids.length),
-          { provider: cfg.provider, offset, limit, upserted },
+          { provider: cfg.embedProvider, offset, limit, upserted },
           null,
         );
         return json({
           ok: true,
           data: {
-            provider: cfg.provider,
+            provider: cfg.embedProvider,
             processed: ids.length,
             upserted,
             next_offset: ids.length === limit ? offset + limit : null,
@@ -1547,16 +1557,21 @@ Deno.serve(async (req) => {
         const base = await getConfig(admin as any);
         const cfg: any = {
           ...base,
-          provider,
-          providerLabel: provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
-          secretName: preset.secretName,
+          embedProvider: provider,
+          rerankProvider: provider,
+          embedProviderLabel:
+            provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+          rerankProviderLabel:
+            provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+          embedSecretName: preset.secretName,
+          rerankSecretName: preset.secretName,
           rerankStyle: preset.rerankStyle,
           embeddingModel: preset.embeddingModel,
           embeddingApi: preset.embeddingApi,
           rerankModel: preset.rerankModel,
           rerankApi: preset.rerankApi,
         };
-        const key = await inferenceKey(admin as any, cfg);
+        const key = await providerKey(admin as any, provider);
         if (!key) {
           return json(
             { error: "inference_key_missing", provider },

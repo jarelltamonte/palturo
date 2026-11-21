@@ -12,9 +12,12 @@ export const num = (v: unknown, dflt: number) =>
   Number.isFinite(Number(v)) ? Number(v) : dflt;
 
 export interface PipelineCfg {
-  provider: InferenceProvider;
-  providerLabel: string;
-  secretName: string;
+  embedProvider: InferenceProvider;
+  rerankProvider: InferenceProvider;
+  embedProviderLabel: string;
+  rerankProviderLabel: string;
+  embedSecretName: string;
+  rerankSecretName: string;
   rerankStyle: "nvidia" | "deepinfra";
   embeddingModel: string;
   rerankModel: string;
@@ -94,18 +97,27 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   const cfg: Record<string, any> = {};
   for (const r of rows ?? []) cfg[r.key] = r.value;
   const weights = cfg.embedding_weights ?? {};
-  const provider = resolveProvider(cfg.inference_provider);
-  const preset = PROVIDER_PRESETS[provider];
+  const embedProvider = resolveProvider(
+    cfg.embed_provider ?? cfg.inference_provider,
+  );
+  const rerankProvider = resolveProvider(
+    cfg.rerank_provider ?? cfg.inference_provider,
+  );
+  const embedPreset = PROVIDER_PRESETS[embedProvider];
+  const rerankPreset = PROVIDER_PRESETS[rerankProvider];
   return {
-    provider,
-    providerLabel: provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
-    secretName: preset.secretName,
-    rerankStyle: preset.rerankStyle,
-    embeddingModel: preset.embeddingModel,
-    rerankModel: preset.rerankModel,
+    embedProvider,
+    rerankProvider,
+    embedProviderLabel: embedProvider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+    rerankProviderLabel: rerankProvider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+    embedSecretName: embedPreset.secretName,
+    rerankSecretName: rerankPreset.secretName,
+    rerankStyle: rerankPreset.rerankStyle,
+    embeddingModel: embedPreset.embeddingModel,
+    rerankModel: rerankPreset.rerankModel,
     embeddingDim: intIn(cfg.embedding_dim, 1024, 64, 4096),
-    embeddingApi: preset.embeddingApi,
-    rerankApi: preset.rerankApi,
+    embeddingApi: embedPreset.embeddingApi,
+    rerankApi: rerankPreset.rerankApi,
     wSkills: numIn(weights.skills, 0.7, 0, 1),
     wContext: numIn(weights.context, 0.3, 0, 1),
     topK: intIn(cfg.candidate_pool_k, 50, 5, 500),
@@ -124,17 +136,18 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   };
 }
 
-/** Reads the provider's API key from the function environment, then Vault-ish config. */
-export async function inferenceKey(
+/** Reads one provider's API key from the function environment, then config. */
+export async function providerKey(
   admin: Admin,
-  cfg: PipelineCfg,
+  provider: InferenceProvider,
 ): Promise<string | null> {
-  let key = Deno.env.get(cfg.secretName);
+  const name = PROVIDER_PRESETS[provider].secretName;
+  let key = Deno.env.get(name);
   if (!key) {
     const { data } = await admin
       .from("integration_secrets")
       .select("value")
-      .eq("name", cfg.secretName)
+      .eq("name", name)
       .maybeSingle();
     key = (data as any)?.value ?? null;
   }
@@ -150,7 +163,7 @@ export async function embedTexts(
   timeoutMs = 30000,
 ): Promise<number[][]> {
   const body = JSON.stringify(
-    cfg.provider === "deepinfra"
+    cfg.embedProvider === "deepinfra"
       ? {
           input: texts,
           model: cfg.embeddingModel,
@@ -190,7 +203,7 @@ export async function embedTexts(
       }
       const detail = await res.text();
       lastError = new Error(
-        `${cfg.providerLabel} embed failed (${res.status}): ${detail}`,
+        `${cfg.embedProviderLabel} embed failed (${res.status}): ${detail}`,
       );
       if (attempt === 3 || ![429, 500, 502, 503, 504].includes(res.status)) {
         throw lastError;
@@ -201,7 +214,7 @@ export async function embedTexts(
     }
     await new Promise((resolve) => setTimeout(resolve, 1000 * attempt * attempt));
   }
-  throw lastError ?? new Error(`${cfg.providerLabel} embed failed`);
+  throw lastError ?? new Error(`${cfg.embedProviderLabel} embed failed`);
 }
 
 const asLogit = (value: number, mayBeProbability: boolean) => {
@@ -250,7 +263,7 @@ export async function rerankTexts(
   });
   if (!res.ok) {
     throw new Error(
-      `${cfg.providerLabel} rerank failed (${res.status}): ${await res.text()}`,
+      `${cfg.rerankProviderLabel} rerank failed (${res.status}): ${await res.text()}`,
     );
   }
   const data = await res.json();

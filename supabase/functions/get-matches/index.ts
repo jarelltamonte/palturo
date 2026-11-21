@@ -9,7 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  Admin, PipelineCfg, ensureFreshEmbeddings, getConfig, inferenceKey, rerankTexts, sigmoid,
+  Admin, PipelineCfg, ensureFreshEmbeddings, getConfig, providerKey, rerankTexts, sigmoid,
 } from "../_shared/pipeline.ts";
 
 const CORS = {
@@ -139,9 +139,13 @@ Deno.serve(async (req) => {
     const meRole = targetRole === "mentor" ? "learner" : "mentor";
 
     const cfg = await getConfig(admin);
-    const key = await inferenceKey(admin, cfg);
-    if (!key) {
-      return json({ error: "inference_key_missing", provider: cfg.provider }, 503);
+    const embedKey = await providerKey(admin, cfg.embedProvider);
+    const rerankKey = await providerKey(admin, cfg.rerankProvider);
+    if (!embedKey && !rerankKey) {
+      return json(
+        { error: "inference_key_missing", providers: { embed: cfg.embedProvider, rerank: cfg.rerankProvider } },
+        503,
+      );
     }
 
     const started = Date.now();
@@ -170,7 +174,8 @@ Deno.serve(async (req) => {
             mode: "cached",
             healed: 0,
             config_version: cfg.configRevision,
-            provider: cfg.provider,
+            embed_provider: cfg.embedProvider,
+            rerank_provider: cfg.rerankProvider,
             ms: Date.now() - started,
             results,
           });
@@ -208,7 +213,8 @@ Deno.serve(async (req) => {
           mode: "cached_stale",
           rate_limited: true,
           config_version: cfg.configRevision,
-            provider: cfg.provider,
+          embed_provider: cfg.embedProvider,
+          rerank_provider: cfg.rerankProvider,
           ms: Date.now() - started,
           results,
         });
@@ -223,17 +229,23 @@ Deno.serve(async (req) => {
     // A slow/unavailable embedding provider must not fail the whole request:
     // retrieval can still use whatever vectors are already stored.
     let healed = 0;
-    try {
-      const healedRes = await ensureFreshEmbeddings(
-        admin,
-        [user.id],
-        cfg,
-        key,
-        12000,
+    if (embedKey) {
+      try {
+        const healedRes = await ensureFreshEmbeddings(
+          admin,
+          [user.id],
+          cfg,
+          embedKey,
+          12000,
+        );
+        healed = healedRes.upserted;
+      } catch (e) {
+        console.error(`[get-matches] embedding self-heal failed: ${(e as Error)?.message ?? e}`);
+      }
+    } else {
+      console.error(
+        `[get-matches] no ${cfg.embedSecretName}; using stored vectors`,
       );
-      healed = healedRes.upserted;
-    } catch (e) {
-      console.error(`[get-matches] embedding self-heal failed: ${(e as Error)?.message ?? e}`);
     }
 
     // ---------- 2. Stage 1: weighted multi-vector retrieval (SQL) ----------
@@ -314,7 +326,8 @@ Deno.serve(async (req) => {
     let rerankB: Array<number | null> = [];
     let aByIndex = new Map<number, number>();
     try {
-      rerankA = await rerankTexts(key, cfg, myDoc, docs, A_TIMEOUT_MS);
+      if (!rerankKey) throw new Error("rerank key missing");
+      rerankA = await rerankTexts(rerankKey, cfg, myDoc, docs, A_TIMEOUT_MS);
 
       // Direction B: does the candidate also want me? Each candidate has a
       // different query, so this cannot be a single batch. Bound it to the
@@ -357,7 +370,7 @@ Deno.serve(async (req) => {
             context: targetRole === "mentor" ? p.learner_context : p.mentor_context,
           })}`;
           try {
-            const r = await rerankTexts(key, cfg, q, [myOfferDoc], perCallTimeout);
+            const r = await rerankTexts(rerankKey, cfg, q, [myOfferDoc], perCallTimeout);
             rerankB[i] = r[0]?.logit ?? null;
           } catch {
             rerankB[i] = null;
@@ -449,7 +462,8 @@ Deno.serve(async (req) => {
       mode,
       healed,
       config_version: cfg.configRevision,
-            provider: cfg.provider,
+            embed_provider: cfg.embedProvider,
+            rerank_provider: cfg.rerankProvider,
       ms: Date.now() - started,
       results,
     });

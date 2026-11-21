@@ -156,9 +156,9 @@ export async function embedTexts(
           model: cfg.embeddingModel,
           dimensions: cfg.embeddingDim,
           encoding_format: "float",
-          // DeepInfra's Nemotron embed separates search queries from stored
-          // documents, the same distinction NIM calls input_type.
-          task: inputType === "passage" ? "document" : "query",
+          // DeepInfra's Nemotron embed rejects `task`; it uses the same
+          // query/passage split as NIM.
+          input_type: inputType,
         }
       : {
           input: texts,

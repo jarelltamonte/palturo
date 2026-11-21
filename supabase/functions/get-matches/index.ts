@@ -499,8 +499,10 @@ async function refreshCache(
     role: names?.get(s.candidate_id)?.role ?? "both",
     model_name: mode === "full" ? cfg.rerankModel : cfg.embeddingModel,
     config_version: cfg.configRevision,
-            provider: cfg.provider,
   }));
-  await admin.from("match_cache").insert(payload);
+  const { error } = await admin.from("match_cache").insert(payload);
+  if (error) {
+    console.error(`[get-matches] cache write: ${error.message}`);
+  }
 }
 

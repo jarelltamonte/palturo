@@ -4,9 +4,13 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
+  embedTexts,
   ensureFreshEmbeddings,
   getConfig,
   inferenceKey,
+  PROVIDER_PRESETS,
+  rerankTexts,
+  resolveProvider,
 } from "../_shared/pipeline.ts";
 
 const CORS_BASE = {
@@ -107,8 +111,10 @@ const ACTION_PERMISSION: Record<string, string> = {
   "config.get": "config.read",
   "config.saveDraft": "config.write",
   "config.publish": "config.write",
+  "embeddings.backfill": "config.write",
   "config.rollback": "config.write",
   "sandbox.run": "sandbox.run",
+  "benchmark.inference": "sandbox.run",
   "sandbox.list": "sandbox.run",
   "sandbox.get": "sandbox.run",
   "audit.list": "audit.read",
@@ -1396,6 +1402,16 @@ Deno.serve(async (req) => {
           if (key === "__revision") continue;
           clean[key] = value;
         }
+        // The provider owns the endpoint/model names. Normalise them here so a
+        // publish or rollback cannot leave SQL reading a different model than
+        // the functions embed with.
+        const provider = resolveProvider(clean.inference_provider);
+        const preset = PROVIDER_PRESETS[provider];
+        clean.inference_provider = provider;
+        clean.embedding_model = preset.embeddingModel;
+        clean.embedding_api = preset.embeddingApi;
+        clean.rerank_model = preset.rerankModel;
+        clean.rerank_api = preset.rerankApi;
         if (Object.keys(clean).length === 0) {
           return json({ error: "Config must not be empty" }, 400);
         }
@@ -1419,6 +1435,25 @@ Deno.serve(async (req) => {
           },
         );
         if (publishErr) return json({ error: publishErr.message }, 409);
+        const beforeModel = String(beforeConfig.embedding_model ?? "");
+        const nextModel = String(clean.embedding_model ?? "");
+        const embeddingsReset = Boolean(
+          nextModel && beforeModel && nextModel !== beforeModel,
+        );
+        if (embeddingsReset) {
+          // Vectors from the previous model are meaningless to the new one.
+          // match_candidates also filters by model, but removing them keeps
+          // every consumer (including possible-match) consistent.
+          const { error: purgeErr } = await admin
+            .from("profile_embeddings")
+            .delete()
+            .neq("model_name", nextModel);
+          if (purgeErr) {
+            console.error(
+              `[admin-api] stale embedding purge: ${purgeErr.message}`,
+            );
+          }
+        }
         await admin.from("match_cache").delete().gte("rank", 0);
         await audit(
           action === "config.rollback" ? "config.rollback" : "config.publish",
@@ -1432,7 +1467,188 @@ Deno.serve(async (req) => {
           },
           reason,
         );
-        return json({ ok: true, data: published });
+        return json({ ok: true, data: { ...published, embeddings_reset: embeddingsReset } });
+      }
+
+      case "embeddings.backfill": {
+        const cfg = await getConfig(admin as any);
+        const key = await inferenceKey(admin as any, cfg);
+        if (!key) {
+          return json(
+            { error: "inference_key_missing", provider: cfg.provider },
+            503,
+          );
+        }
+        const limit = clampInt(payload.limit, 50, 1, 200);
+        const offset = clampInt(payload.offset, 0, 0, 100000);
+        const { data: rows, error } = await admin
+          .from("profiles")
+          .select("id")
+          .eq("has_completed_onboarding", true)
+          .order("id")
+          .range(offset, offset + limit - 1);
+        if (error) throw error;
+        const ids = (rows ?? []).map((r: any) => r.id as string);
+        let upserted = 0;
+        const batchSize = 10;
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const batch = ids.slice(i, i + batchSize);
+          try {
+            const res = await ensureFreshEmbeddings(
+              admin as any,
+              batch,
+              cfg,
+              key,
+              30000,
+            );
+            upserted += res.upserted;
+          } catch (e) {
+            const detail = String((e as Error)?.message ?? e).slice(0, 300);
+            console.error(`[admin-api] embeddings backfill: ${detail}`);
+            return json(
+              {
+                error: "embedding_backfill_failed",
+                detail,
+                processed: i,
+                upserted,
+              },
+              502,
+            );
+          }
+        }
+        await audit(
+          "embeddings.backfill",
+          "profile",
+          String(ids.length),
+          { provider: cfg.provider, offset, limit, upserted },
+          null,
+        );
+        return json({
+          ok: true,
+          data: {
+            provider: cfg.provider,
+            processed: ids.length,
+            upserted,
+            next_offset: ids.length === limit ? offset + limit : null,
+          },
+        });
+      }
+
+      case "benchmark.inference": {
+        const provider = resolveProvider(payload.provider);
+        const preset = PROVIDER_PRESETS[provider];
+        const operation = String(payload.operation ?? "embed");
+        if (!["embed", "rerank"].includes(operation)) {
+          return json({ error: "operation must be embed or rerank" }, 400);
+        }
+        const size = clampInt(payload.size, 8, 1, 64);
+        const iterations = clampInt(payload.iterations, 3, 1, 10);
+        const concurrency = clampInt(payload.concurrency, 1, 1, 8);
+        const base = await getConfig(admin as any);
+        const cfg: any = {
+          ...base,
+          provider,
+          providerLabel: provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+          secretName: preset.secretName,
+          rerankStyle: preset.rerankStyle,
+          embeddingModel: preset.embeddingModel,
+          embeddingApi: preset.embeddingApi,
+          rerankModel: preset.rerankModel,
+          rerankApi: preset.rerankApi,
+        };
+        const key = await inferenceKey(admin as any, cfg);
+        if (!key) {
+          return json(
+            { error: "inference_key_missing", provider },
+            503,
+          );
+        }
+        const words = [
+          "cooking", "weaving", "guitar", "adobo", "patterns", "harvest",
+          "market", "lesson", "practice", "family", "barangay", "teacher",
+          "learner", "schedule", "weekend", "language", "design", "repair",
+          "garden", "recipe",
+        ];
+        const makeText = (n: number, seed: number) =>
+          Array.from(
+            { length: n },
+            (_, i) => words[(seed + i * 7) % words.length],
+          ).join(" ");
+        const runOne = async () => {
+          const started = performance.now();
+          if (operation === "embed") {
+            const texts = Array.from({ length: size }, (_, i) =>
+              makeText(40 + (i % 10), i),
+            );
+            const vectors = await embedTexts(key, cfg, texts, "passage", 30000);
+            return { ms: performance.now() - started, units: vectors.length };
+          }
+          const query = makeText(18, 3);
+          const docs = Array.from({ length: size }, (_, i) =>
+            makeText(50 + (i % 12), i + 1),
+          );
+          const ranked = await rerankTexts(key, cfg, query, docs, 30000);
+          return { ms: performance.now() - started, units: ranked.length };
+        };
+
+        const errors: string[] = [];
+        try {
+          await runOne(); // warm-up: TLS, provider cold start
+        } catch (e) {
+          errors.push(String((e as Error)?.message ?? e).slice(0, 200));
+        }
+        const samples: number[] = [];
+        let units = 0;
+        const wallStart = performance.now();
+        for (let round = 0; round < iterations; round++) {
+          const results = await Promise.allSettled(
+            Array.from({ length: concurrency }, () => runOne()),
+          );
+          for (const result of results) {
+            if (result.status === "fulfilled") {
+              samples.push(result.value.ms);
+              units += result.value.units;
+            } else {
+              errors.push(
+                String(result.reason?.message ?? result.reason).slice(0, 200),
+              );
+            }
+          }
+        }
+        const wallMs = performance.now() - wallStart;
+        const sorted = [...samples].sort((a, b) => a - b);
+        const percentile = (p: number) =>
+          sorted.length
+            ? sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))]
+            : null;
+        await audit(
+          "benchmark.inference",
+          "provider",
+          `${provider}:${operation}`,
+          { size, iterations, concurrency, requests: samples.length },
+          null,
+        );
+        return json({
+          ok: true,
+          data: {
+            provider,
+            operation,
+            size,
+            iterations,
+            concurrency,
+            wall_ms: wallMs,
+            requests: samples.length,
+            error_count: errors.length,
+            min_ms: sorted[0] ?? null,
+            p50_ms: percentile(0.5),
+            p95_ms: percentile(0.95),
+            max_ms: sorted[sorted.length - 1] ?? null,
+            units_total: units,
+            throughput_per_s: wallMs > 0 ? (samples.length * 1000) / wallMs : null,
+            samples_ms: samples,
+            errors: errors.slice(0, 3),
+          },
+        });
       }
 
       case "sandbox.run": {

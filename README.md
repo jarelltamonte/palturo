@@ -238,6 +238,10 @@ supabase secrets set DEEPINFRA_API_KEY=<key>
 ```
 
 The admin editor reports whether the selected provider's key is present.
+**Rebuild embeddings** on the same page re-embeds every onboarded profile with
+the active provider. The admin API also exposes an owner/admin-only
+`benchmark.inference` action used for the provider comparison report at
+<https://docs.palturo.app/benchmarks/>.
 
 Switching providers changes the embedding model, so stored vectors are ignored
 by model name and regenerated on each profile's next load or save; publishing

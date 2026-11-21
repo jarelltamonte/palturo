@@ -95,6 +95,8 @@ const ACTION_PERMISSION: Record<string, string> = {
   "users.unban": "users.write",
   "users.delete": "users.write",
   "users.resetMfa": "users.write",
+  "users.cardVisibility": "users.write",
+  "matcher.cardStats": "config.read",
   "moderation.reports": "moderation.read",
   "moderation.resolveReport": "moderation.write",
   "moderation.skills": "moderation.read",
@@ -549,7 +551,7 @@ Deno.serve(async (req) => {
           admin.from("profiles").select("*").eq("id", id).maybeSingle(),
           admin
             .from("user_skills")
-            .select("kind,note,skill:skill_id(id,name,path,kind),focus:focus_skill_id(name)")
+            .select("id,kind,note,visibility,skill:skill_id(id,name,path,kind),focus:focus_skill_id(name)")
             .eq("user_id", id),
           admin
             .from("reports")
@@ -721,6 +723,34 @@ Deno.serve(async (req) => {
         if (error) throw error;
         await audit("user.reset_mfa", "profile", id, null, reason);
         return json({ ok: true, data: { id } });
+      }
+
+      case "users.cardVisibility": {
+        const cardId = String(payload.card_id ?? "");
+        const visibility = String(payload.visibility ?? "");
+        if (!cardId) return json({ error: "Card id is required" }, 400);
+        if (!["discoverable", "paused", "hidden"].includes(visibility)) {
+          return json(
+            { error: "visibility must be discoverable, paused, or hidden" },
+            400,
+          );
+        }
+        const { data: card, error } = await admin
+          .from("user_skills")
+          .update({ visibility })
+          .eq("id", cardId)
+          .select("id,user_id,kind,visibility")
+          .maybeSingle();
+        if (error) throw error;
+        if (!card) return json({ error: "Card not found" }, 404);
+        await audit(
+          "user.card_visibility",
+          "user_skill",
+          cardId,
+          { user_id: (card as any).user_id, visibility },
+          null,
+        );
+        return json({ ok: true, data: card });
       }
 
       case "moderation.reports": {
@@ -1340,6 +1370,62 @@ Deno.serve(async (req) => {
         return json({ ok: true, data });
       }
 
+      case "matcher.cardStats": {
+        const head = { count: "exact" as const, head: true };
+        const [
+          cards,
+          teach,
+          learn,
+          discoverable,
+          paused,
+          hidden,
+          emb,
+          profEmb,
+          cacheV2,
+          modeRow,
+        ] = await Promise.all([
+          admin.from("user_skills").select("*", head),
+          admin.from("user_skills").select("*", head).eq("kind", "teach"),
+          admin.from("user_skills").select("*", head).eq("kind", "learn"),
+          admin.from("user_skills").select("*", head).eq("visibility", "discoverable"),
+          admin.from("user_skills").select("*", head).eq("visibility", "paused"),
+          admin.from("user_skills").select("*", head).eq("visibility", "hidden"),
+          admin.from("card_embeddings").select("card_id,input_type"),
+          admin.from("profile_embeddings").select("*", head),
+          admin.from("match_cache_v2").select("*", head),
+          admin
+            .from("pipeline_config")
+            .select("value")
+            .eq("key", "matcher_mode")
+            .maybeSingle(),
+        ]);
+        const embRows = (emb.data ?? []) as Array<{
+          card_id: string;
+          input_type: string;
+        }>;
+        const embeddedCards = new Set(embRows.map((r) => r.card_id)).size;
+        const embeddedPassages = embRows.filter((r) => r.input_type === "passage").length;
+        const totalCards = cards.count ?? 0;
+        return json({
+          ok: true,
+          data: {
+            matcher_mode: modeRow.data?.value ?? "profile",
+            cards: totalCards,
+            teach: teach.count ?? 0,
+            learn: learn.count ?? 0,
+            discoverable: discoverable.count ?? 0,
+            paused: paused.count ?? 0,
+            hidden: hidden.count ?? 0,
+            embedded_cards: embeddedCards,
+            embedded_passages: embeddedPassages,
+            card_embedding_rows: embRows.length,
+            coverage: totalCards > 0 ? embeddedPassages / totalCards : 0,
+            profile_embeddings: profEmb.count ?? 0,
+            card_cache_rows: cacheV2.count ?? 0,
+          },
+        });
+      }
+
       case "config.get": {
         const [{ data: config }, { data: versions }] = await Promise.all([
           admin.from("pipeline_config").select("key,value,description,updated_at").order("key"),
@@ -1529,6 +1615,7 @@ Deno.serve(async (req) => {
           }
         }
         await admin.from("match_cache").delete().gte("rank", 0);
+        await admin.from("match_cache_v2").delete().gte("rank", 0);
         await audit(
           action === "config.rollback" ? "config.rollback" : "config.publish",
           "pipeline_config",

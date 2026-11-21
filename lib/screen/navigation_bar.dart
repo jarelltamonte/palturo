@@ -64,6 +64,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget> {
     HomePage(
       onBrowse: () => _onItemTapped(1),
       onOpenProfile: () => _onItemTapped(4),
+      isActive: () => _selectedIndex == 0,
     ),
     _ExploreTab(
       navigatorKey: _exploreNavKey,

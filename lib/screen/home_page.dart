@@ -16,6 +16,7 @@ import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/screen/profile_edit.dart';
 import 'package:palturo/screen/utils/filter_bottom_sheet.dart';
 import 'package:palturo/services/app_navigation.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/haptics.dart';
 import 'package:palturo/services/match_api.dart';
 import 'package:palturo/services/card_guide_service.dart';
@@ -108,6 +109,13 @@ class HomePage extends StatefulWidget {
   /// standalone; the card guide falls back to a pushed profile in that case.
   final VoidCallback? onOpenProfile;
 
+  /// Whether For You is the tab the user is actually looking at.
+  ///
+  /// The shell keeps every tab mounted, so `mounted` alone cannot tell the
+  /// card guide that Home is off screen. Null means "always active", which is
+  /// correct when HomePage is a root route on its own.
+  final bool Function()? isActive;
+
   const HomePage({
     super.key,
     this.deckLoader,
@@ -118,6 +126,7 @@ class HomePage extends StatefulWidget {
     this.unmarkSeen,
     this.onBrowse,
     this.onOpenProfile,
+    this.isActive,
   });
 
   @override
@@ -171,12 +180,14 @@ class _HomePageState extends State<HomePage> {
   );
   bool _guideActive = false;
   bool _guideChecked = false;
+  Set<String> _guideSeen = const {};
   OverlayEntry? _guideEntry;
 
   @override
   void initState() {
     super.initState();
     ProfileService.profileRevision.addListener(_onProfileRevision);
+    AppShellState.instance.addListener(_onShellStateChanged);
     _loadDeck();
     unawaited(
       MatchApi.possibleMatchLive().then((live) {
@@ -190,6 +201,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     ProfileService.profileRevision.removeListener(_onProfileRevision);
+    AppShellState.instance.removeListener(_onShellStateChanged);
     _guideEntry?.remove();
     _guideEntry = null;
     _slowTimer?.cancel();
@@ -348,31 +360,70 @@ class _HomePageState extends State<HomePage> {
       });
     }
 
+    _guideSeen = seen;
     unawaited(_scheduleGuideCheck(seen));
+  }
+
+  /// True only while For You is the visible surface: its tab is selected and
+  /// no other route has been pushed over the shell.
+  bool get _guideSurfaceVisible {
+    if (!(widget.isActive?.call() ?? true)) return false;
+    final route = ModalRoute.of(context);
+    return route == null || route.isCurrent;
+  }
+
+  /// The shell keeps every tab mounted, so switching tabs must actively close
+  /// a guide that is already on screen. It is also the cue to retry a guide
+  /// that was deferred while For You was off screen.
+  void _onShellStateChanged() {
+    if (!mounted) return;
+    if (_guideActive) {
+      if (!_guideSurfaceVisible) _closeCardGuide();
+      return;
+    }
+    if (!_guideChecked) unawaited(_scheduleGuideCheck(_guideSeen));
+  }
+
+  void _closeCardGuide() {
+    if (!_guideActive) return;
+    _guideEntry?.remove();
+    _guideEntry = null;
+    if (!mounted) return;
+    setState(() {
+      _guideActive = false;
+      // The guide is a one-time tour; leaving the tab consumes it rather than
+      // showing it again on every return.
+      _guideChecked = true;
+    });
   }
 
   Future<void> _scheduleGuideCheck(Set<String> seen) async {
     if (!mounted || _guideChecked || _guideActive) return;
     if (_people.isEmpty || _currentIndex >= _people.length) return;
+    // Defer instead of opening over another tab. `_guideChecked` stays false so
+    // the next visit to For You can show it.
+    if (!_guideSurfaceVisible) return;
+
     final shouldShow = await CardGuideService.instance.shouldShow(seen);
-    if (!mounted) return;
+    if (!mounted || _guideChecked || _guideActive) return;
     if (!shouldShow) {
       _guideChecked = true;
       return;
     }
-    _guideChecked = true;
+    // The user can leave For You during the storage read; never insert after
+    // that, or the overlay paints on top of whatever page they switched to.
+    if (!_guideSurfaceVisible) return;
 
     await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || _guideActive) return;
+    if (!mounted || _guideChecked || _guideActive) return;
+    if (!_guideSurfaceVisible) return;
     if (_guideKeys.card?.currentContext == null) {
       // The card may not have laid out yet. Try once more on the next frame;
       // if it still is not ready, leave the flag unset for a later visit.
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted || _guideActive) return;
-        if (_guideKeys.card?.currentContext == null) {
-          _guideChecked = false;
-          return;
-        }
+        if (!mounted || _guideChecked || _guideActive) return;
+        if (!_guideSurfaceVisible) return;
+        if (_guideKeys.card?.currentContext == null) return;
         await _openCardGuide();
       });
       return;
@@ -383,6 +434,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _openCardGuide() async {
     if (!mounted || _guideActive) return;
     if (_people.isEmpty || _currentIndex >= _people.length) return;
+    if (!_guideSurfaceVisible) return;
     final overlay = Overlay.of(context, rootOverlay: true);
     setState(() => _guideActive = true);
 
@@ -415,6 +467,9 @@ class _HomePageState extends State<HomePage> {
     );
     _guideEntry = entry;
     overlay.insert(entry);
+    // Consume the one-time tour as soon as it is on screen. Waiting for the
+    // final step meant an interrupted guide returned on the next launch.
+    unawaited(CardGuideService.instance.markSeen());
   }
 
   String get _roleKey => switch (_roleFilter) {

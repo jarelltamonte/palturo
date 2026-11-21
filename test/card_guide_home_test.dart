@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/home_page.dart';
+import 'package:palturo/services/app_shell_state.dart';
 import 'package:palturo/services/card_guide_service.dart';
 import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/theme/theme.dart';
@@ -34,6 +35,7 @@ Future<void> _pumpHome(
   WidgetTester tester, {
   required List<Person> people,
   Set<String> seen = const {},
+  bool Function()? isActive,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -45,6 +47,7 @@ Future<void> _pumpHome(
         markSeen: (_) async {},
         unmarkSeen: (_) async {},
         onBrowse: () {},
+        isActive: isActive,
       ),
     ),
   );
@@ -53,6 +56,7 @@ Future<void> _pumpHome(
 
 void main() {
   setUp(() async {
+    AppShellState.instance.reset();
     SharedPreferences.setMockInitialValues({});
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
@@ -99,6 +103,51 @@ void main() {
     await _pumpHome(tester, people: const []);
 
     expect(find.text('Your first card'), findsNothing);
+  });
+
+  testWidgets('the guide waits until For You is the active tab', (
+    tester,
+  ) async {
+    var active = false;
+    await _pumpHome(tester, people: const [_person], isActive: () => active);
+
+    expect(find.text('Your first card'), findsNothing);
+    // Deferred, not consumed: the next visit to For You must still show it.
+    expect(await CardGuideService.instance.shouldShow(const {}), isTrue);
+
+    active = true;
+    AppShellState.instance.setSelectedTab(1);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your first card'), findsOneWidget);
+  });
+
+  testWidgets('leaving the tab closes the guide and it never returns', (
+    tester,
+  ) async {
+    var active = true;
+    await _pumpHome(tester, people: const [_person], isActive: () => active);
+    expect(find.text('Your first card'), findsOneWidget);
+
+    active = false;
+    AppShellState.instance.setSelectedTab(1);
+    await tester.pumpAndSettle();
+    expect(find.text('Your first card'), findsNothing);
+
+    // Returning to For You must not replay a guide the account already saw.
+    active = true;
+    AppShellState.instance.setSelectedTab(0);
+    await tester.pumpAndSettle();
+    expect(find.text('Your first card'), findsNothing);
+  });
+
+  testWidgets('the one-time flag is written as soon as the guide opens', (
+    tester,
+  ) async {
+    await _pumpHome(tester, people: const [_person]);
+    expect(find.text('Your first card'), findsOneWidget);
+
+    expect(await CardGuideService.instance.shouldShow(const {}), isFalse);
   });
 
   testWidgets('completing the guide persists and does not repeat', (

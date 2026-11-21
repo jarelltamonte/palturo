@@ -34,6 +34,10 @@ class ProfileData {
   /// placements.
   final Set<String> approvedTeachingSkills;
 
+  /// Queue status for notes that are still pending or were rejected, keyed by
+  /// `kind|name`. Approved notes are absent.
+  final Map<String, String> noteReviewStatus;
+
   /// True only when the notes query succeeded. A save must not overwrite
   /// stored notes with empty values after a transient read failure.
   final bool notesLoaded;
@@ -71,6 +75,7 @@ class ProfileData {
     this.learningNoteApproved = const {},
     this.teachingNoteApproved = const {},
     this.approvedTeachingSkills = const {},
+    this.noteReviewStatus = const {},
     this.notesLoaded = false,
     this.changedLearningNotes = const {},
     this.changedTeachingNotes = const {},
@@ -156,6 +161,23 @@ class ProfileData {
       hasAnyShowcase &&
       hasAllApprovedTeachingNotes;
 
+  /// 0..1 progress toward mentor discovery: showcase plus one approved note
+  /// for every approved teaching skill.
+  double get mentorProgress {
+    if (!hasApprovedTeachingSkill) return 0;
+    final total = 1 + approvedTeachingSkills.length;
+    final completed =
+        (hasAnyShowcase ? 1 : 0) +
+        approvedTeachingSkills
+            .where(
+              (name) =>
+                  (teachingNotes[name]?.trim() ?? '').isNotEmpty &&
+                  (teachingNoteApproved[name] ?? false),
+            )
+            .length;
+    return (completed / total).clamp(0.0, 1.0);
+  }
+
   /// True when the profile teaches but is not yet discoverable as a mentor.
   bool get needsMentorSetup =>
       notesLoaded &&
@@ -163,6 +185,30 @@ class ProfileData {
       (effectiveRole == OnboardingRole.teach ||
           effectiveRole == OnboardingRole.both) &&
       !mentorReady;
+
+  String? noteReviewStatusFor(String kind, String name) =>
+      noteReviewStatus['$kind|$name'];
+
+  bool isNoteRejected(String kind, String name) =>
+      noteReviewStatusFor(kind, name) == 'rejected';
+
+  bool isNotePending(String kind, String name) =>
+      noteReviewStatusFor(kind, name) == 'pending';
+
+  List<String> get rejectedLearningNoteNames => learningSkillIds
+      .where((name) => isNoteRejected('learn', name))
+      .toList(growable: false);
+
+  List<String> get rejectedTeachingNoteNames => teachingSkillIds
+      .where((name) => isNoteRejected('teach', name))
+      .toList(growable: false);
+
+  List<String> get rejectedNoteNames => {
+    ...rejectedLearningNoteNames,
+    ...rejectedTeachingNoteNames,
+  }.toList(growable: false);
+
+  bool get hasRejectedNotes => rejectedNoteNames.isNotEmpty;
 
   String? get genderLabel => switch (gender) {
     'woman' => 'Woman',
@@ -193,6 +239,7 @@ class ProfileData {
     Map<String, bool>? learningNoteApproved,
     Map<String, bool>? teachingNoteApproved,
     Set<String>? approvedTeachingSkills,
+    Map<String, String>? noteReviewStatus,
     bool? notesLoaded,
     Set<String>? changedLearningNotes,
     Set<String>? changedTeachingNotes,
@@ -226,6 +273,7 @@ class ProfileData {
       teachingNoteApproved: teachingNoteApproved ?? this.teachingNoteApproved,
       approvedTeachingSkills:
           approvedTeachingSkills ?? this.approvedTeachingSkills,
+      noteReviewStatus: noteReviewStatus ?? this.noteReviewStatus,
       notesLoaded: notesLoaded ?? this.notesLoaded,
       changedLearningNotes: changedLearningNotes ?? this.changedLearningNotes,
       changedTeachingNotes: changedTeachingNotes ?? this.changedTeachingNotes,

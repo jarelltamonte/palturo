@@ -27,6 +27,7 @@ import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/chat_mute_sheet.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
 import 'package:palturo/widgets/user_avatar.dart';
+import 'package:palturo/widgets/mentor_setup_reminder.dart';
 
 /// Maps a live conversation row to the Chats list model.
 ///
@@ -782,8 +783,9 @@ class _ChatsPageState extends State<ChatsPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
+              const SliverToBoxAdapter(child: SizedBox(height: 4)),
+              const SliverToBoxAdapter(child: MentorSetupReminder()),
               if (showMatchesSection) ...[
-                const SliverToBoxAdapter(child: SizedBox(height: 4)),
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height:

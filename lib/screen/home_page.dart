@@ -29,7 +29,7 @@ import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_banner.dart';
 import 'package:palturo/widgets/exhausted_deck_view.dart';
 import 'package:palturo/widgets/card_guide_overlay.dart';
-import 'package:palturo/widgets/mentor_setup_banner.dart';
+import 'package:palturo/widgets/flagged_notes_banner.dart';
 import 'package:palturo/widgets/person_card_skeleton.dart';
 import 'package:palturo/widgets/swipe_deck.dart';
 import 'package:palturo/utils/friendly_error.dart';
@@ -176,6 +176,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    ProfileService.profileRevision.addListener(_onProfileRevision);
     _loadDeck();
     unawaited(
       MatchApi.possibleMatchLive().then((live) {
@@ -188,11 +189,32 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    ProfileService.profileRevision.removeListener(_onProfileRevision);
     _guideEntry?.remove();
     _guideEntry = null;
     _slowTimer?.cancel();
     _timeoutTimer?.cancel();
     super.dispose();
+  }
+
+  bool _refreshingProfile = false;
+
+  void _onProfileRevision() {
+    unawaited(_refreshMyProfile());
+  }
+
+  Future<void> _refreshMyProfile() async {
+    if (_refreshingProfile) return;
+    _refreshingProfile = true;
+    try {
+      final fetched = await ProfileService().getCurrentUserProfile();
+      if (!mounted) return;
+      if (fetched != null) setState(() => _myProfile = fetched);
+    } catch (_) {
+      // The deck still works; the banner catches up on the next read.
+    } finally {
+      _refreshingProfile = false;
+    }
   }
 
   Future<Set<String>> _loadSeen() async {
@@ -996,23 +1018,20 @@ class _HomePageState extends State<HomePage> {
             : _buildExhaustedState();
 
     final myProfile = _myProfile;
-    final mentorBanner =
-        myProfile != null && myProfile.needsMentorSetup && !_guideActive
-            ? MentorSetupBanner(
-              needsShowcase: !myProfile.hasAnyShowcase,
-              needsNotes: !myProfile.hasAllApprovedTeachingNotes,
-              notesPendingReview: myProfile.hasTeachingNotesPendingReview,
-              skillPendingReview: !myProfile.hasApprovedTeachingSkill,
+    final setupBanner =
+        myProfile != null && myProfile.hasRejectedNotes && !_guideActive
+            ? FlaggedNotesBanner(
+              skills: myProfile.rejectedNoteNames,
               onTap: _openSettings,
             )
             : null;
 
     final bodyContent =
-        mentorBanner == null
+        setupBanner == null
             ? content
             : Column(
               children: [
-                mentorBanner,
+                setupBanner,
                 const SizedBox(height: 10),
                 Expanded(child: content),
               ],

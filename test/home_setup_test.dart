@@ -1,10 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/onboarding/onboarding_models.dart';
-import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/home_page.dart';
 import 'package:palturo/screen/profile_data.dart';
 import 'package:palturo/services/preferences_service.dart';
@@ -47,47 +44,16 @@ void main() {
     expect(find.text('Update Profile'), findsNothing);
   });
 
-  testWidgets('a mentor without notes sees the setup reminder', (tester) async {
+  testWidgets('For You does not show the mentor setup reminder', (
+    tester,
+  ) async {
     final profile = ProfileData(
       schedule: 'Not set',
       role: OnboardingRole.teach,
       teachingSkillIds: const ['barong_embroidery'],
-      approvedTeachingSkills: const {'barong_embroidery'},
       teachingNotes: const {},
       notesLoaded: true,
       hasCompletedOnboarding: true,
-      languages: const ['English'],
-      availableDays: const ['Friday'],
-    );
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: lightMode,
-        home: HomePage(
-          profileLoader: () async => profile,
-          deckLoader: ({bool force = false}) async => const [],
-          seenLoader: () async => <String>{},
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Mentor setup'), findsAtLeastNWidgets(1));
-    expect(find.textContaining('Showcase + notes'), findsAtLeastNWidgets(1));
-  });
-
-  testWidgets('a ready mentor does not see the setup reminder', (tester) async {
-    final profile = ProfileData(
-      schedule: 'Not set',
-      role: OnboardingRole.teach,
-      teachingSkillIds: const ['barong_embroidery'],
-      approvedTeachingSkills: const {'barong_embroidery'},
-      teachingNotes: const {'barong_embroidery': 'Hands-on and patient.'},
-      teachingNoteApproved: const {'barong_embroidery': true},
-      notesLoaded: true,
-      teachingSkillImages: const {'barong_embroidery': 'https://x.test/a.jpg'},
-      hasCompletedOnboarding: true,
-      isProfileCompleted: true,
       languages: const ['English'],
       availableDays: const ['Friday'],
     );
@@ -107,46 +73,15 @@ void main() {
     expect(find.text('Mentor setup'), findsNothing);
   });
 
-  testWidgets('a mentor with a note under review sees the pending copy', (
+  testWidgets('a flagged note shows the red reminder on For You', (
     tester,
   ) async {
     final profile = ProfileData(
       schedule: 'Not set',
-      role: OnboardingRole.teach,
-      teachingSkillIds: const ['barong_embroidery'],
-      approvedTeachingSkills: const {'barong_embroidery'},
-      teachingNotes: const {'barong_embroidery': 'Hands-on and patient.'},
-      teachingNoteApproved: const {'barong_embroidery': false},
-      notesLoaded: true,
-      teachingSkillImages: const {'barong_embroidery': 'https://x.test/a.jpg'},
-      hasCompletedOnboarding: true,
-      languages: const ['English'],
-      availableDays: const ['Friday'],
-    );
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: lightMode,
-        home: HomePage(
-          profileLoader: () async => profile,
-          deckLoader: ({bool force = false}) async => const [],
-          seenLoader: () async => <String>{},
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Notes in review'), findsAtLeastNWidgets(1));
-  });
-
-  testWidgets('a pending teaching skill shows the skill-review copy', (
-    tester,
-  ) async {
-    final profile = ProfileData(
-      schedule: 'Not set',
-      role: OnboardingRole.teach,
-      teachingSkillIds: const ['custom_pending_skill'],
-      teachingNotes: const {},
+      role: OnboardingRole.learn,
+      learningSkillIds: const ['cooking'],
+      learningNotes: const {'cooking': 'I want to learn adobo.'},
+      noteReviewStatus: const {'learn|cooking': 'rejected'},
       notesLoaded: true,
       hasCompletedOnboarding: true,
       languages: const ['English'],
@@ -165,58 +100,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Skill in review'), findsAtLeastNWidgets(1));
-  });
-
-  testWidgets('the mentor reminder fits a narrow 200% viewport', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(320, 640);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final profile = ProfileData(
-      schedule: 'Not set',
-      role: OnboardingRole.teach,
-      teachingSkillIds: const ['barong_embroidery'],
-      approvedTeachingSkills: const {'barong_embroidery'},
-      teachingNotes: const {},
-      notesLoaded: true,
-      hasCompletedOnboarding: true,
-      languages: const ['English'],
-      availableDays: const ['Friday'],
-    );
-    final never = Completer<List<Person>>();
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: lightMode,
-        home: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(320, 640),
-            textScaler: TextScaler.linear(2),
-          ),
-          child: HomePage(
-            profileLoader: () async => profile,
-            deckLoader: ({bool force = false}) => never.future,
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('Mentor setup'), findsAtLeastNWidgets(1));
-    expect(tester.takeException(), isNull);
-
-    final title = tester.renderObject<RenderParagraph>(
-      find.text('Mentor setup').first,
-    );
-    final body = tester.renderObject<RenderParagraph>(
-      find.text('Showcase + notes').first,
-    );
-    expect(title.didExceedMaxLines, isFalse);
-    expect(body.didExceedMaxLines, isFalse);
+    expect(find.text('A note needs attention'), findsOneWidget);
+    expect(find.text('Update your flagged note.'), findsOneWidget);
   });
 }

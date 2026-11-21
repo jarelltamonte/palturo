@@ -364,6 +364,42 @@ void main() {
     expect(service.captured, isNull);
   });
 
+  testWidgets('a flagged learner note is highlighted and clears when edited', (
+    tester,
+  ) async {
+    await pumpEdit(
+      tester,
+      data: profile().copyWith(
+        noteReviewStatus: const {
+          'learn|other:Learning skill:arts_design': 'rejected',
+        },
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.textContaining('Tell us more about what you want to learn'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('FLAGGED — UPDATE TO PUBLISH'), findsOneWidget);
+    expect(find.text('Update note'), findsOneWidget);
+    expect(find.textContaining('This note was flagged'), findsOneWidget);
+
+    final noteField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is TopLabeledField && widget.label == 'Update note',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(noteField, 'I want to learn layout and color.');
+    await tester.pump();
+
+    expect(find.text('FLAGGED — UPDATE TO PUBLISH'), findsNothing);
+    expect(find.textContaining('This note was flagged'), findsNothing);
+  });
+
   testWidgets('private age and gender save with the profile', (tester) async {
     final service = _CapturingProfileService();
     await pumpEdit(tester, service: service);

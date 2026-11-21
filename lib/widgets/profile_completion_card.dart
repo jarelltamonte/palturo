@@ -28,6 +28,8 @@ class ProfileCompletionCard extends StatelessWidget {
     final complete = completion.isComplete;
     final missing = completion.missing.take(4).toList(growable: false);
     final extra = completion.remainingCount - missing.length;
+    final hasFlagged = missing.any((item) => item.flagged);
+    final danger = AppColors.dangerText(context);
 
     return Semantics(
       container: true,
@@ -42,9 +44,12 @@ class ProfileCompletionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color:
-                complete
+                hasFlagged
+                    ? danger.withValues(alpha: 0.55)
+                    : complete
                     ? AppColors.primary.withValues(alpha: 0.45)
                     : AppColors.border(context),
+            width: hasFlagged ? 1.4 : 1,
           ),
         ),
         child: Column(
@@ -56,13 +61,25 @@ class ProfileCompletionCard extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: fill.withValues(alpha: 0.16),
+                    color:
+                        hasFlagged
+                            ? danger.withValues(alpha: 0.14)
+                            : fill.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: Icon(
-                    complete ? Icons.check_circle_outline : Icons.donut_large,
+                    hasFlagged
+                        ? Icons.flag_outlined
+                        : complete
+                        ? Icons.check_circle_outline
+                        : Icons.donut_large,
                     size: 18,
-                    color: complete ? AppColors.successText(context) : fill,
+                    color:
+                        hasFlagged
+                            ? danger
+                            : complete
+                            ? AppColors.successText(context)
+                            : fill,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -78,7 +95,12 @@ class ProfileCompletionCard extends StatelessWidget {
                 Text(
                   '${completion.percent}%',
                   style: AppTextStyles.headingText.copyWith(
-                    color: complete ? AppColors.successText(context) : accent,
+                    color:
+                        hasFlagged
+                            ? danger
+                            : complete
+                            ? AppColors.successText(context)
+                            : accent,
                     fontSize: 18,
                     letterSpacing: -0.4,
                   ),
@@ -111,14 +133,8 @@ class ProfileCompletionCard extends StatelessWidget {
             if (!complete && missing.isNotEmpty) ...[
               const SizedBox(height: 10),
               for (final item in missing)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                  decoration: BoxDecoration(
-                    color: fill.withValues(alpha: 0.09),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: fill.withValues(alpha: 0.32)),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -126,13 +142,18 @@ class ProfileCompletionCard extends StatelessWidget {
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
-                          color: fill.withValues(alpha: 0.16),
+                          color:
+                              item.flagged
+                                  ? danger.withValues(alpha: 0.14)
+                                  : fill.withValues(alpha: 0.14),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.priority_high_rounded,
+                          item.flagged
+                              ? Icons.flag_outlined
+                              : Icons.priority_high_rounded,
                           size: 13,
-                          color: fill,
+                          color: item.flagged ? danger : fill,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -143,7 +164,7 @@ class ProfileCompletionCard extends StatelessWidget {
                             Text(
                               item.label,
                               style: AppTextStyles.regularText.copyWith(
-                                color: textColor,
+                                color: item.flagged ? danger : textColor,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -151,7 +172,10 @@ class ProfileCompletionCard extends StatelessWidget {
                             Text(
                               item.detail,
                               style: AppTextStyles.regularText.copyWith(
-                                color: muted,
+                                color:
+                                    item.flagged
+                                        ? danger.withValues(alpha: 0.8)
+                                        : muted,
                                 fontSize: 10.5,
                                 height: 1.35,
                               ),

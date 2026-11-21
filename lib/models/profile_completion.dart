@@ -7,12 +7,16 @@ class ProfileCompletionItem {
     required this.detail,
     required this.complete,
     required this.weight,
+    this.flagged = false,
   });
 
   final String label;
   final String detail;
   final bool complete;
   final int weight;
+
+  /// A moderation or safety item that needs attention now.
+  final bool flagged;
 }
 
 class ProfileCompletion {
@@ -56,6 +60,10 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
       (id) => (profile.teachingNotes[id]?.trim() ?? '').isEmpty,
     ),
   ];
+  final rejectedNotes = profile.rejectedNoteNames;
+  final rejectedLabel =
+      '${rejectedNotes.take(3).join(', ')}'
+      '${rejectedNotes.length > 3 ? ' and ${rejectedNotes.length - 3} more' : ''}';
 
   final items = <ProfileCompletionItem>[
     ProfileCompletionItem(
@@ -79,9 +87,15 @@ ProfileCompletion computeProfileCompletion(ProfileData profile) {
     ),
     ProfileCompletionItem(
       label: 'Skill notes',
-      detail: 'Add a note to each skill. It appears on your card.',
-      complete: profile.hasAnySkill && missingNotes.isEmpty,
+      detail:
+          rejectedNotes.isNotEmpty
+              ? 'Update the flagged note for $rejectedLabel so it can '
+                  'appear on your card.'
+              : 'Add a note to each skill. It appears on your card.',
+      complete:
+          profile.hasAnySkill && missingNotes.isEmpty && rejectedNotes.isEmpty,
       weight: 2,
+      flagged: rejectedNotes.isNotEmpty,
     ),
     if (wantsTeaching)
       ProfileCompletionItem(

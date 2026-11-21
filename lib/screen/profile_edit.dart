@@ -1607,6 +1607,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             isEditing: true,
                             initialSkillIds: _learningSkillIds,
                             notes: _learningNotes,
+                            rejectedNotes: {
+                              for (final name in _learningSkillIds)
+                                name: widget.profile.isNoteRejected(
+                                  'learn',
+                                  name,
+                                ),
+                            },
                             onChanged:
                                 (updatedIds) => setState(
                                   () => _learningSkillIds = updatedIds,
@@ -1638,6 +1645,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             attachments: _teachingSkillImages,
                             videoAttachments: _showcaseVideos,
                             notes: _teachingNotes,
+                            rejectedNotes: {
+                              for (final name in _teachingSkillIds)
+                                name: widget.profile.isNoteRejected(
+                                  'teach',
+                                  name,
+                                ),
+                            },
                             onNoteChanged: (id, note) {
                               setState(() {
                                 if (note.trim().isEmpty) {

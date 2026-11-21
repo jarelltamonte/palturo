@@ -299,6 +299,7 @@ class SkillsCard extends StatefulWidget {
   final Map<String, String>? attachments;
   final Set<String> videoAttachments;
   final Map<String, String>? notes;
+  final Map<String, bool>? rejectedNotes;
   final SkillSuggestionService suggestionService;
   final ValueChanged<List<String>>? onChanged;
   final void Function(String skillId, String note)? onNoteChanged;
@@ -319,6 +320,7 @@ class SkillsCard extends StatefulWidget {
     this.attachments,
     this.videoAttachments = const {},
     this.notes,
+    this.rejectedNotes,
     this.suggestionService = const LocalSkillSuggestionService(),
     this.onChanged,
     this.onNoteChanged,
@@ -334,6 +336,7 @@ class SkillsCard extends StatefulWidget {
     required bool isEditing,
     List<String> initialSkillIds = const [],
     Map<String, String>? notes,
+    Map<String, bool>? rejectedNotes,
     SkillSuggestionService suggestionService =
         const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
@@ -349,6 +352,7 @@ class SkillsCard extends StatefulWidget {
       initialSkillIds: initialSkillIds,
       showAttachFile: false,
       notes: notes,
+      rejectedNotes: rejectedNotes,
       suggestionService: suggestionService,
       onChanged: onChanged,
       onNoteChanged: onNoteChanged,
@@ -363,6 +367,7 @@ class SkillsCard extends StatefulWidget {
     Map<String, String>? attachments,
     Set<String> videoAttachments = const {},
     Map<String, String>? notes,
+    Map<String, bool>? rejectedNotes,
     SkillSuggestionService suggestionService =
         const LocalSkillSuggestionService(),
     ValueChanged<List<String>>? onChanged,
@@ -384,6 +389,7 @@ class SkillsCard extends StatefulWidget {
       attachments: attachments,
       videoAttachments: videoAttachments,
       notes: notes,
+      rejectedNotes: rejectedNotes,
       suggestionService: suggestionService,
       onChanged: onChanged,
       onNoteChanged: onNoteChanged,
@@ -647,6 +653,7 @@ class _SkillsCardState extends State<SkillsCard> {
                 labelSuffix: widget.labelSuffix,
                 rowLabel: _skillIds.length > 1 ? 'Skill ${i + 1}' : null,
                 initialNote: _notes[i],
+                noteRejected: widget.rejectedNotes?[_skillIds[i]] ?? false,
                 suggestionService: widget.suggestionService,
                 showAttachFile: widget.showAttachFile,
                 attachmentPath: _resolveAttachmentPath(_skillIds[i]),
@@ -693,6 +700,7 @@ class _SkillRow extends StatefulWidget {
   final String labelSuffix;
   final String? rowLabel;
   final String initialNote;
+  final bool noteRejected;
   final SkillSuggestionService suggestionService;
   final bool showAttachFile;
   final String? attachmentPath;
@@ -716,6 +724,7 @@ class _SkillRow extends StatefulWidget {
     required this.labelSuffix,
     this.rowLabel,
     required this.initialNote,
+    this.noteRejected = false,
     required this.suggestionService,
     required this.showAttachFile,
     this.attachmentPath,
@@ -747,6 +756,7 @@ class _SkillRowState extends State<_SkillRow> {
   String? _pickedCategoryId;
   String? _pendingOldId;
   String _lastNote = '';
+  String _flaggedNote = '';
   double _fieldWidth = 0;
 
   bool get _isLearn => widget.labelSuffix.toLowerCase() == 'learn';
@@ -756,6 +766,7 @@ class _SkillRowState extends State<_SkillRow> {
     super.initState();
     _noteController.text = widget.initialNote;
     _lastNote = widget.initialNote;
+    _flaggedNote = widget.noteRejected ? widget.initialNote.trim() : '';
     _noteController.addListener(_onNoteControllerChanged);
     _focusNode.addListener(_onFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -771,6 +782,10 @@ class _SkillRowState extends State<_SkillRow> {
       _requestId++;
       _suggestions = const [];
       _loading = false;
+    }
+
+    if (widget.noteRejected && !oldWidget.noteRejected) {
+      _flaggedNote = widget.initialNote.trim();
     }
 
     // The cleared row's old skill may have been re-added through another row.
@@ -800,6 +815,9 @@ class _SkillRowState extends State<_SkillRow> {
     if (text == _lastNote) return;
     _lastNote = text;
     widget.onNoteChanged(text);
+    // The note field's rejection highlight depends on whether the text still
+    // matches the flagged text, so rebuild this row as the user edits.
+    if (mounted) setState(() {});
   }
 
   void _onFocusChanged() {
@@ -1155,8 +1173,14 @@ class _SkillRowState extends State<_SkillRow> {
         _isLearn
             ? 'Tell us more about what you want to learn'
             : 'Tell us more about what you can teach';
-    final needsAttention =
-        widget.isEditing && _noteController.text.trim().isEmpty;
+    final noteText = _noteController.text.trim();
+    final needsAttention = widget.isEditing && noteText.isEmpty;
+    final flagged =
+        widget.isEditing &&
+        widget.noteRejected &&
+        noteText.isNotEmpty &&
+        noteText == _flaggedNote;
+    final danger = AppColors.dangerText(context);
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -1179,7 +1203,26 @@ class _SkillRowState extends State<_SkillRow> {
                     letterSpacing: 0.6,
                   ),
                 ),
-                if (needsAttention)
+                if (flagged)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: danger.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'FLAGGED — UPDATE TO PUBLISH',
+                      style: AppTextStyles.boldText.copyWith(
+                        color: danger,
+                        fontSize: 8,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  )
+                else if (needsAttention)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 7,
@@ -1203,11 +1246,17 @@ class _SkillRowState extends State<_SkillRow> {
           ),
           Container(
             padding:
-                needsAttention
+                needsAttention || flagged
                     ? const EdgeInsets.symmetric(horizontal: 8)
                     : EdgeInsets.zero,
             decoration:
-                needsAttention
+                flagged
+                    ? BoxDecoration(
+                      color: danger.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: danger.withValues(alpha: 0.5)),
+                    )
+                    : needsAttention
                     ? BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
@@ -1219,7 +1268,7 @@ class _SkillRowState extends State<_SkillRow> {
             child: IgnorePointer(
               ignoring: !widget.isEditing,
               child: TopLabeledField(
-                label: 'Add note',
+                label: flagged ? 'Update note' : 'Add note',
                 controller: _noteController,
                 maxLines: 3,
                 maxLength: kSkillNoteMaxLength,
@@ -1227,7 +1276,19 @@ class _SkillRowState extends State<_SkillRow> {
               ),
             ),
           ),
-          if (needsAttention)
+          if (flagged)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 4),
+              child: Text(
+                'This note was flagged. Update it so it can appear on your '
+                'card.',
+                style: AppTextStyles.regularText.copyWith(
+                  color: danger,
+                  fontSize: 11,
+                ),
+              ),
+            )
+          else if (needsAttention)
             Padding(
               padding: const EdgeInsets.only(left: 8, top: 4),
               child: Text(

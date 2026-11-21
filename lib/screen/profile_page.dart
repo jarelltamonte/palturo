@@ -30,6 +30,7 @@ import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/profile_completion_card.dart';
+import 'package:palturo/widgets/flagged_notes_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 String _skillLabel(String id, List<OnboardingOption> options) {
@@ -380,6 +381,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           isComplete: completion?.isComplete ?? false,
                         ),
                       ),
+                      if (_profile!.hasRejectedNotes)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: FlaggedNotesBanner(
+                            skills: _profile!.rejectedNoteNames,
+                            onTap: _openEdit,
+                          ),
+                        ),
                       if (completion != null && !completion.isComplete)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

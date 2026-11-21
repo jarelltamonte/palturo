@@ -582,6 +582,7 @@ class ProfileService {
     }
 
     await refreshEmbeddings();
+    notifyProfileChanged();
   }
 
   /// Server-side fallback for [saveOnboardingPreferences].
@@ -720,6 +721,7 @@ class ProfileService {
       final learningNoteApproved = <String, bool>{};
       final teachingNoteApproved = <String, bool>{};
       final approvedTeachingSkills = <String>{};
+      final noteReviewStatus = <String, String>{};
       var notesLoaded = false;
       try {
         final rows = await _supabase
@@ -768,12 +770,37 @@ class ProfileService {
         // Notes are optional; the profile still loads without them.
       }
 
+      if (notesLoaded) {
+        try {
+          final rows = await _supabase
+              .rpc('get_my_note_reviews')
+              .timeout(const Duration(seconds: 3));
+          for (final row in rows as List) {
+            if (row is! Map) continue;
+            final kind = row['kind']?.toString();
+            final name = row['name']?.toString().trim();
+            final status = row['status']?.toString();
+            if (kind == null ||
+                name == null ||
+                name.isEmpty ||
+                status == null ||
+                status.isEmpty) {
+              continue;
+            }
+            noteReviewStatus['$kind|$name'] = status;
+          }
+        } catch (_) {
+          // Review status is advisory; a read failure must not hide notes.
+        }
+      }
+
       return profileWithProofs.copyWith(
         learningNotes: learningNotes,
         teachingNotes: teachingNotes,
         learningNoteApproved: learningNoteApproved,
         teachingNoteApproved: teachingNoteApproved,
         approvedTeachingSkills: approvedTeachingSkills,
+        noteReviewStatus: noteReviewStatus,
         notesLoaded: notesLoaded,
       );
     } catch (e) {

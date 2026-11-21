@@ -77,9 +77,9 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
   `other:onboarding:...` id.
 - A mentor can save without a showcase, but the mentor side stays hidden from
   Browse, Explore, For You, and possible-match fan-out until showcase media and
-  an approved note on every approved teaching skill exist. Home keeps a
-  persistent "Mentor setup" reminder, and Profile's completion card lists the
-  missing pieces.
+  an approved note on every approved teaching skill exist. Chats and Requests
+  keep a persistent "Mentor setup" progress reminder, and Profile's completion
+  card lists the missing pieces.
 - A learner side is hidden until every approved learning skill has an approved
   note. Visibility is per side: a profile that teaches and learns can appear as
   a learner while still hidden as a mentor.
@@ -98,6 +98,9 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
 - The worker can confirm or overturn the preapproval. An overturn unapproves the
   note and sends a `note_rejected` notification that opens Profile so the author
   can rewrite it. The queue keeps the heuristic provenance for admin review.
+- A rejected note also shows red reminders on For You, Profile, the completion
+  list, and its note field in the editor. Editing the note clears the red state
+  and queues the new text for review.
 - Admin moderation filters and badges heuristic preapprovals separately from
   inference and manual decisions.
 

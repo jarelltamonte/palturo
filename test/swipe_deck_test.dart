@@ -74,6 +74,112 @@ void main() {
     expect(find.byKey(const ValueKey('a')), findsOneWidget);
   });
 
+  testWidgets('a blocked swipe settles back and reports the block', (
+    tester,
+  ) async {
+    var swipes = 0;
+    var blocked = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SwipeDeck(
+            cardKey: 'a',
+            hintEnabled: false,
+            blocked: true,
+            onBlocked: () => blocked++,
+            onSwiped: (_) => swipes++,
+            child: Container(
+              key: const ValueKey('a'),
+              color: Colors.teal,
+              alignment: Alignment.center,
+              child: const Text('a'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final card = find.byKey(const ValueKey('a'));
+    final before = tester.getCenter(card);
+    await tester.drag(find.byType(SwipeDeck), const Offset(400, 0));
+    await tester.pumpAndSettle();
+
+    expect(swipes, 0);
+    expect(blocked, 1);
+    expect(card, findsOneWidget);
+    expect((tester.getCenter(card) - before).distance, lessThan(1));
+  });
+
+  testWidgets('a non-forced dismiss on a blocked deck reports the block', (
+    tester,
+  ) async {
+    var swipes = 0;
+    var blocked = 0;
+    final key = GlobalKey<SwipeDeckState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SwipeDeck(
+            key: key,
+            cardKey: 'a',
+            hintEnabled: false,
+            blocked: true,
+            onBlocked: () => blocked++,
+            onSwiped: (_) => swipes++,
+            child: Container(
+              key: const ValueKey('a'),
+              color: Colors.teal,
+              alignment: Alignment.center,
+              child: const Text('a'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    key.currentState!.dismiss();
+    await tester.pumpAndSettle();
+
+    expect(blocked, 1);
+    expect(swipes, 0);
+    expect(find.byKey(const ValueKey('a')), findsOneWidget);
+  });
+
+  testWidgets('a forced dismiss bypasses the blocked gate', (tester) async {
+    var swipes = 0;
+    var blocked = 0;
+    final key = GlobalKey<SwipeDeckState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SwipeDeck(
+            key: key,
+            cardKey: 'a',
+            hintEnabled: false,
+            blocked: true,
+            onBlocked: () => blocked++,
+            onSwiped: (_) => swipes++,
+            child: Container(
+              key: const ValueKey('a'),
+              color: Colors.teal,
+              alignment: Alignment.center,
+              child: const Text('a'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    key.currentState!.dismiss(force: true);
+    await tester.pumpAndSettle();
+
+    expect(blocked, 0);
+    expect(swipes, 1);
+  });
+
   testWidgets('SwipeDeck hint does not throw or block input', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -195,20 +301,22 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: StatefulBuilder(
-            builder: (context, setState) => SwipeDeck(
-              cardKey: card,
-              hintEnabled: false,
-              onSwiped: (_) => setState(() {
-                swipes++;
-                card = 'b';
-              }),
-              child: Container(
-                key: ValueKey(card),
-                color: Colors.teal,
-                alignment: Alignment.center,
-                child: Text(card),
-              ),
-            ),
+            builder:
+                (context, setState) => SwipeDeck(
+                  cardKey: card,
+                  hintEnabled: false,
+                  onSwiped:
+                      (_) => setState(() {
+                        swipes++;
+                        card = 'b';
+                      }),
+                  child: Container(
+                    key: ValueKey(card),
+                    color: Colors.teal,
+                    alignment: Alignment.center,
+                    child: Text(card),
+                  ),
+                ),
           ),
         ),
       ),
@@ -267,20 +375,22 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: StatefulBuilder(
-            builder: (context, setState) => SwipeDeck(
-              cardKey: 'card$index',
-              hintEnabled: false,
-              onSwiped: (_) => setState(() {
-                swipes++;
-                index++;
-              }),
-              child: Container(
-                key: ValueKey('card$index'),
-                color: Colors.teal,
-                alignment: Alignment.center,
-                child: Text('$index'),
-              ),
-            ),
+            builder:
+                (context, setState) => SwipeDeck(
+                  cardKey: 'card$index',
+                  hintEnabled: false,
+                  onSwiped:
+                      (_) => setState(() {
+                        swipes++;
+                        index++;
+                      }),
+                  child: Container(
+                    key: ValueKey('card$index'),
+                    color: Colors.teal,
+                    alignment: Alignment.center,
+                    child: Text('$index'),
+                  ),
+                ),
           ),
         ),
       ),
@@ -311,7 +421,9 @@ void main() {
       ),
     );
 
-    final gesture = await tester.startGesture(tester.getCenter(find.byType(SwipeDeck)));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(SwipeDeck)),
+    );
     await gesture.moveBy(const Offset(-120, 0));
     await tester.pump();
 

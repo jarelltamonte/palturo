@@ -20,6 +20,8 @@ class SwipeDeck extends StatefulWidget {
     this.enabled = true,
     this.hintEnabled = true,
     this.busy = false,
+    this.blocked = false,
+    this.onBlocked,
   });
 
   final String cardKey;
@@ -30,6 +32,11 @@ class SwipeDeck extends StatefulWidget {
   final bool enabled;
   final bool hintEnabled;
   final bool busy;
+
+  /// When true, a swipe settles back to center instead of exiting, then calls
+  /// [onBlocked]. Used when the owner must fix a flagged note first.
+  final bool blocked;
+  final VoidCallback? onBlocked;
 
   @override
   State<SwipeDeck> createState() => SwipeDeckState();
@@ -123,8 +130,12 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
     });
   }
 
-  void dismiss({bool right = false}) {
+  void dismiss({bool right = false, bool force = false}) {
     if (!widget.enabled || _exiting) return;
+    if (widget.blocked && !force) {
+      widget.onBlocked?.call();
+      return;
+    }
     _cancelHint();
     _exitRight = right;
     _exiting = true;
@@ -168,18 +179,14 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (!widget.enabled || _exiting) return;
-    final next = (_dx + details.delta.dx).clamp(
-      -_width * 1.2,
-      _width * 1.2,
-    );
+    final next = (_dx + details.delta.dx).clamp(-_width * 1.2, _width * 1.2);
     setState(() => _dx = next);
     final nextArmed = _dx.abs() > _width * _threshold;
     if (nextArmed && !_armed) Haptics.impact();
     _armed = nextArmed;
   }
 
-  void _onDragCancel() {
-    if (!widget.enabled || _exiting) return;
+  void _settleBack({VoidCallback? andThen}) {
     _settleFrom = _dx;
     _settle.forward(from: 0).whenComplete(() {
       if (!mounted) return;
@@ -187,7 +194,13 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
         _dx = 0;
         _armed = false;
       });
+      andThen?.call();
     });
+  }
+
+  void _onDragCancel() {
+    if (!widget.enabled || _exiting) return;
+    _settleBack();
   }
 
   void _onDragEnd(DragEndDetails details) {
@@ -196,14 +209,11 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
     final flung = velocity.abs() > 800 && velocity.sign == _dx.sign;
     final passed = _dx.abs() > _width * _threshold || flung;
     if (!passed) {
-      _settleFrom = _dx;
-      _settle.forward(from: 0).whenComplete(() {
-        if (!mounted) return;
-        setState(() {
-          _dx = 0;
-          _armed = false;
-        });
-      });
+      _settleBack();
+      return;
+    }
+    if (widget.blocked) {
+      _settleBack(andThen: widget.onBlocked);
       return;
     }
     dismiss(right: _dx > 0);
@@ -225,8 +235,7 @@ class SwipeDeckState extends State<SwipeDeck> with TickerProviderStateMixin {
         final hintAngle = 0.012 * hint;
         final showSurface = displayDx.abs() > 4 || _exiting;
         final goingRight = displayDx >= 0;
-        final foreground =
-            goingRight ? AppColors.textSecondary : Colors.white;
+        final foreground = goingRight ? AppColors.textSecondary : Colors.white;
         final surfaceColor =
             widget.busy
                 ? AppColors.elevatedSurface(context)

@@ -30,7 +30,6 @@ import 'package:palturo/widgets/user_avatar.dart';
 import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/widgets/app_feedback.dart';
-import 'package:palturo/widgets/mentor_setup_reminder.dart';
 
 class ConnectionRequest {
   final String id;
@@ -1343,7 +1342,6 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
       ),
       body: Column(
         children: [
-          const MentorSetupReminder(),
           if (_view == RequestView.incoming)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),

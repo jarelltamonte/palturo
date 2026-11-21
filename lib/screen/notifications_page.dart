@@ -20,6 +20,7 @@ import 'package:palturo/widgets/app_chrome.dart';
 import 'package:palturo/widgets/app_empty_state.dart';
 import 'package:palturo/widgets/app_feedback.dart';
 import 'package:palturo/widgets/app_skeleton.dart';
+import 'package:palturo/widgets/mentor_setup_reminder.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -490,6 +491,9 @@ class _NotificationsPageState extends State<NotificationsPage> with RouteAware {
               )
               : Column(
                 children: [
+                  const MentorSetupReminder(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  ),
                   if (all.isNotEmpty) _filterBar(textColor),
                   Expanded(
                     child:

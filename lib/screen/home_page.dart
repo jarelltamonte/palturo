@@ -8,7 +8,6 @@ import 'package:palturo/theme/app_motion.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:palturo/models/card_guide.dart';
 import 'package:palturo/screen/card/person_card.dart';
-import 'package:palturo/screen/card/skills_card.dart' show toTitleCase;
 import 'package:palturo/screen/action_dialogs.dart';
 import 'package:palturo/screen/explore_deck_page.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
@@ -142,10 +141,11 @@ class _HomePageState extends State<HomePage> {
   String? _error;
   ProfileData? _myProfile;
   bool _profileNudgeShown = false;
+  bool _noteIssueDialogOpen = false;
+  final Set<String> _noteGateBypass = <String>{};
   bool _possibleMatchLive = false;
 
   RoleFilter _roleFilter = RoleFilter.all;
-  String _skillFilter = 'all';
   int _currentIndex = 0;
   final List<int> _history = [];
   final List<bool> _historyRight = [];
@@ -321,10 +321,6 @@ class _HomePageState extends State<HomePage> {
         } else if (_currentIndex > _people.length) {
           _currentIndex = _people.length;
         }
-        if (_skillFilter != 'all' &&
-            !_people.any((person) => person.skillName == _skillFilter)) {
-          _skillFilter = 'all';
-        }
       });
     } on TimeoutException {
       if (!mounted || generation != _deckGeneration) return;
@@ -474,6 +470,7 @@ class _HomePageState extends State<HomePage> {
 
     if (mounted && me != null) {
       setState(() => _myProfile = me);
+      unawaited(_maybeShowProfileNudge());
     }
 
     // No role or no skill means there is nothing to match on yet. Skip the
@@ -578,27 +575,11 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  bool get _hasActiveFilter =>
-      _roleFilter != RoleFilter.all || _skillFilter != 'all';
-
-  List<Person> get _filteredPeople {
-    if (_skillFilter == 'all') return _people;
-    return _people
-        .where((person) => person.skillName == _skillFilter)
-        .toList(growable: false);
-  }
+  bool get _hasActiveFilter => _roleFilter != RoleFilter.all;
 
   List<FilterSection> get _filterSections {
-    final skills =
-        _people
-            .map((person) => person.skillName.trim())
-            .where((skill) => skill.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-
-    return [
-      const FilterSection(
+    return const [
+      FilterSection(
         key: 'role',
         title: 'Show',
         options: [
@@ -607,15 +588,6 @@ class _HomePageState extends State<HomePage> {
           FilterOption('Mentors', 'mentor'),
         ],
       ),
-      if (skills.isNotEmpty)
-        FilterSection(
-          key: 'skill',
-          title: 'Skill',
-          options: [
-            const FilterOption('All skills', 'all'),
-            for (final skill in skills) FilterOption(toTitleCase(skill), skill),
-          ],
-        ),
     ];
   }
 
@@ -623,18 +595,16 @@ class _HomePageState extends State<HomePage> {
     FilterBottomSheet.show(
       context,
       sections: _filterSections,
-      selected: {'role': _roleFilter.name, 'skill': _skillFilter},
+      selected: {'role': _roleFilter.name},
       onApply: (result) {
         final newRole = RoleFilter.values.firstWhere(
           (r) => r.name == result['role'],
           orElse: () => RoleFilter.all,
         );
-        final newSkill = result['skill'] ?? 'all';
         final roleChanged = newRole != _roleFilter;
 
         setState(() {
           _roleFilter = newRole;
-          _skillFilter = newSkill;
           _replayAll = false;
           if (roleChanged) _people = const [];
           _currentIndex = 0;
@@ -650,7 +620,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _next({bool right = false, String? connectionId}) {
-    if (_currentIndex >= _filteredPeople.length || _undoing) return;
+    if (_currentIndex >= _people.length || _undoing) return;
 
     setState(() {
       _history.add(_currentIndex);
@@ -665,7 +635,7 @@ class _HomePageState extends State<HomePage> {
   /// and a button/request callback can otherwise both advance the same card.
   void _advanceFrom(Person person, {bool right = false, String? connectionId}) {
     if (!mounted) return;
-    final people = _filteredPeople;
+    final people = _people;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
     if (people[_currentIndex].id != person.id) return;
     final before = _currentIndex;
@@ -680,6 +650,12 @@ class _HomePageState extends State<HomePage> {
   Future<void> _handleSwiped(Person person, bool right) async {
     if (_guideActive) {
       _resetCard();
+      return;
+    }
+    final allowNoteBypass = _noteGateBypass.remove(person.id);
+    if (_noteBlocked && !allowNoteBypass) {
+      _resetCard();
+      unawaited(_showNoteIssueDialog());
       return;
     }
     if (!right) {
@@ -735,13 +711,148 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  bool get _noteBlocked => _myProfile?.hasRejectedNotes == true;
+
+  Future<void> _showNoteIssueDialog() async {
+    if (_noteIssueDialogOpen || !mounted) return;
+    _noteIssueDialogOpen = true;
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final danger = AppColors.dangerText(context);
+    final fix = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(dialogContext),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.flag_outlined, color: danger, size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Fix your note first',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'A note on your profile was flagged by moderation. Update it '
+              'before sending requests or skipping cards.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(
+                  'Not now',
+                  style: AppTextStyles.regularText.copyWith(
+                    color: AppColors.mutedText(dialogContext),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(
+                  'Fix note',
+                  style: AppTextStyles.boldText.copyWith(color: danger),
+                ),
+              ),
+            ],
+          ),
+    );
+    _noteIssueDialogOpen = false;
+    if (fix == true && mounted) await _openSettings();
+  }
+
   Future<void> _maybeShowProfileNudge() async {
     if (_profileNudgeShown) return;
     final profile = _myProfile;
     if (profile == null) return;
-    // Mentors get the persistent readiness banner instead of a second toast.
-    if (profile.needsMentorSetup || profile.isProfileCompleted) return;
+    if (profile.isProfileCompleted &&
+        !profile.needsMentorSetup &&
+        !profile.hasRejectedNotes) {
+      return;
+    }
     _profileNudgeShown = true;
+
+    if (profile.hasRejectedNotes) {
+      AppBannerController.instance.show(
+        AppBannerData(
+          id: 'profile-nudge',
+          title: 'A note needs attention',
+          body: 'Update your flagged note so it can appear on your card.',
+          icon: Icons.flag_outlined,
+          actionLabel: 'Fix note',
+          onAction: _openSettings,
+          duration: const Duration(seconds: 10),
+        ),
+      );
+      return;
+    }
+
+    if (profile.needsMentorSetup) {
+      final pendingSkill = !profile.hasApprovedTeachingSkill;
+      final needsShowcase = !profile.hasAnyShowcase;
+      final notesPending = profile.hasTeachingNotesPendingReview;
+      final needsNotes = !profile.hasAllApprovedTeachingNotes;
+
+      final String title;
+      final String body;
+      final String actionLabel;
+      if (pendingSkill) {
+        title = 'Mentor setup in review';
+        body =
+            'Your teaching skill is still being reviewed. We will remind you '
+            'when it is ready.';
+        actionLabel = 'View profile';
+      } else if (notesPending && !needsShowcase) {
+        title = 'Mentor notes in review';
+        body =
+            'Your teaching notes are being reviewed. We will remind you if '
+            'they need changes.';
+        actionLabel = 'View profile';
+      } else if (needsShowcase) {
+        title = 'Add a showcase';
+        body =
+            notesPending
+                ? 'Add a showcase so learners can find you. Your teaching '
+                    'notes are also being reviewed.'
+                : needsNotes
+                ? 'Add a showcase and a note to each teaching skill so '
+                    'learners can find you.'
+                : 'Add a showcase so learners can find you.';
+        actionLabel = 'Add showcase';
+      } else {
+        title = 'Finish your mentor setup';
+        body = 'Add a note to each teaching skill so learners can find you.';
+        actionLabel = 'Finish setup';
+      }
+
+      AppBannerController.instance.show(
+        AppBannerData(
+          id: 'profile-nudge',
+          title: title,
+          body: body,
+          icon: Icons.workspace_premium_outlined,
+          actionLabel: actionLabel,
+          onAction: _openSettings,
+          duration: const Duration(seconds: 10),
+        ),
+      );
+      return;
+    }
+
     final needsShowcase = profile.needsShowcase;
     AppBannerController.instance.show(
       AppBannerData(
@@ -762,20 +873,30 @@ class _HomePageState extends State<HomePage> {
 
   void _resetCard() {
     if (!mounted) return;
+    _noteGateBypass.clear();
     _swipeKey.currentState?.reset();
   }
 
-  void _dismissCard(Person person, {bool right = false}) {
-    final people = _filteredPeople;
+  void _dismissCard(
+    Person person, {
+    bool right = false,
+    bool bypassNoteGate = false,
+  }) {
+    final people = _people;
     if (_currentIndex < 0 || _currentIndex >= people.length) return;
     if (people[_currentIndex].id != person.id) return;
+    if (_noteBlocked && !bypassNoteGate) {
+      unawaited(_showNoteIssueDialog());
+      return;
+    }
+    if (bypassNoteGate) _noteGateBypass.add(person.id);
 
     final state = _swipeKey.currentState;
     if (state == null || state.widget.cardKey != person.id) {
       _handleSwiped(person, right);
       return;
     }
-    state.dismiss(right: right);
+    state.dismiss(right: right, force: bypassNoteGate);
   }
 
   Future<void> _undo() async {
@@ -784,7 +905,7 @@ class _HomePageState extends State<HomePage> {
     final index = _history.last;
     final right = _historyRight.last;
     final connectionId = _historyConnectionIds.last;
-    final people = _filteredPeople;
+    final people = _people;
     final undonePerson =
         index >= 0 && index < people.length ? people[index] : null;
 
@@ -873,6 +994,8 @@ class _HomePageState extends State<HomePage> {
         cardKey: current.id,
         enabled: !_sendingRequest && !_guideActive,
         busy: _sendingRequest,
+        blocked: _noteBlocked,
+        onBlocked: () => unawaited(_showNoteIssueDialog()),
         rightLabel: 'Send request',
         leftLabel: 'Skip',
         onSwiped: (right) => _handleSwiped(current, right),
@@ -952,7 +1075,7 @@ class _HomePageState extends State<HomePage> {
 
       showAppSuccess(context, 'You blocked ${person.name}');
       setState(() => _hiddenIds.add(person.id));
-      _dismissCard(person);
+      _dismissCard(person, bypassNoteGate: true);
     } catch (e) {
       if (!mounted) return;
 
@@ -983,7 +1106,7 @@ class _HomePageState extends State<HomePage> {
 
       showAppSuccess(context, 'Thanks for your report.');
       setState(() => _hiddenIds.add(person.id));
-      _dismissCard(person);
+      _dismissCard(person, bypassNoteGate: true);
     } catch (e) {
       if (!mounted) return;
 
@@ -1003,7 +1126,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).colorScheme.secondary;
 
-    final people = _filteredPeople;
+    final people = _people;
     final hasMore = _currentIndex < people.length;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final desktop = MediaQuery.sizeOf(context).width >= 900;

@@ -5,8 +5,8 @@ import 'package:palturo/theme/app_text_styles.dart';
 /// Persistent reminder that a mentor is still hidden from discovery.
 ///
 /// The backend only shows the mentor side once a showcase exists and every
-/// teaching skill has an approved note. This banner lives on Chats and
-/// Requests until then.
+/// teaching skill has an approved note. This banner appears on Activity until
+/// then.
 class MentorSetupBanner extends StatelessWidget {
   const MentorSetupBanner({
     super.key,

@@ -7,8 +7,8 @@ import 'package:palturo/services/profile_service.dart';
 import 'package:palturo/widgets/mentor_setup_banner.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Loads the owner's profile and shows the mentor readiness reminder on Chats
-/// and Requests. Collapses to zero height when the mentor side is ready, and
+/// Loads the owner's profile and shows the mentor readiness reminder on the
+/// Activity page. Collapses to zero height when the mentor side is ready, and
 /// reloads after a profile save so the layout shifts with the content.
 class MentorSetupReminder extends StatefulWidget {
   const MentorSetupReminder({

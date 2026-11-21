@@ -219,6 +219,32 @@ Send `dry_run: true` to classify without writing `user_skills` or creating
 nodes. Onboarding uses this when a chip is created, then calls again without
 the flag on save.
 
+### Inference provider
+
+Embeddings and reranking run through one provider at a time. Choose it in
+**Admin → Matching → Retrieval & embeddings** (`inference_provider`):
+
+| Provider | Embeddings | Rerank |
+| --- | --- | --- |
+| `nvidia` | `nvidia/nemotron-3.5-embed-1b` | `nvidia/nemotron-3.5-rerank-8b` |
+| `deepinfra` | `nvidia/Nemotron-3.5-Embed-8B-BF16` | `nvidia/Nemotron-3.5-Rerank-8B-BF16` |
+
+The provider preset owns the endpoints and model names. Store the matching key
+as a function secret (or in `integration_secrets` under the same name):
+
+```sh
+supabase secrets set NIM_API_KEY=<key>
+supabase secrets set DEEPINFRA_API_KEY=<key>
+```
+
+The admin editor reports whether the selected provider's key is present.
+
+Switching providers changes the embedding model, so stored vectors are ignored
+by model name and regenerated on each profile's next load or save; publishing
+also clears deck caches. The first deck loads after a switch are slower while
+those vectors are rebuilt. The embedding dimension stays at the
+`profile_embeddings.embedding` width (1024).
+
 ### First admin on a fresh database
 
 Migrations do not seed an owner on a clean database (there are no auth users

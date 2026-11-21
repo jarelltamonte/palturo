@@ -47,7 +47,8 @@ and `service_role` roles and the `auth` schema already present.
    jobs.
 5. Recreate storage buckets and policies, Edge Function secrets, Resend SMTP,
    and Vault/worker settings from the deployment runbook. They are not part of
-   the public schema.
+   the public schema. The inference provider uses `NIM_API_KEY` or
+   `DEEPINFRA_API_KEY` (selected by `inference_provider`).
 6. Configure `pipeline_config` (worker URL and embedding weights) and auth
    redirect settings for the new environment.
 7. Sign up the first account, then insert it into `admin_users` with role

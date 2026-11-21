@@ -9,7 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
-  Admin, PipelineCfg, ensureFreshEmbeddings, getConfig, nimKey, nimRerank, sigmoid,
+  Admin, PipelineCfg, ensureFreshEmbeddings, getConfig, inferenceKey, rerankTexts, sigmoid,
 } from "../_shared/pipeline.ts";
 
 const CORS = {
@@ -139,8 +139,10 @@ Deno.serve(async (req) => {
     const meRole = targetRole === "mentor" ? "learner" : "mentor";
 
     const cfg = await getConfig(admin);
-    const key = await nimKey(admin);
-    if (!key) return json({ error: "NIM_API_KEY not configured" }, 503);
+    const key = await inferenceKey(admin, cfg);
+    if (!key) {
+      return json({ error: "inference_key_missing", provider: cfg.provider }, 503);
+    }
 
     const started = Date.now();
 
@@ -168,6 +170,7 @@ Deno.serve(async (req) => {
             mode: "cached",
             healed: 0,
             config_version: cfg.configRevision,
+            provider: cfg.provider,
             ms: Date.now() - started,
             results,
           });
@@ -205,6 +208,7 @@ Deno.serve(async (req) => {
           mode: "cached_stale",
           rate_limited: true,
           config_version: cfg.configRevision,
+            provider: cfg.provider,
           ms: Date.now() - started,
           results,
         });
@@ -310,7 +314,7 @@ Deno.serve(async (req) => {
     let rerankB: Array<number | null> = [];
     let aByIndex = new Map<number, number>();
     try {
-      rerankA = await nimRerank(key, cfg, myDoc, docs, A_TIMEOUT_MS);
+      rerankA = await rerankTexts(key, cfg, myDoc, docs, A_TIMEOUT_MS);
 
       // Direction B: does the candidate also want me? Each candidate has a
       // different query, so this cannot be a single batch. Bound it to the
@@ -353,7 +357,7 @@ Deno.serve(async (req) => {
             context: targetRole === "mentor" ? p.learner_context : p.mentor_context,
           })}`;
           try {
-            const r = await nimRerank(key, cfg, q, [myOfferDoc], perCallTimeout);
+            const r = await rerankTexts(key, cfg, q, [myOfferDoc], perCallTimeout);
             rerankB[i] = r[0]?.logit ?? null;
           } catch {
             rerankB[i] = null;
@@ -445,6 +449,7 @@ Deno.serve(async (req) => {
       mode,
       healed,
       config_version: cfg.configRevision,
+            provider: cfg.provider,
       ms: Date.now() - started,
       results,
     });
@@ -494,6 +499,7 @@ async function refreshCache(
     role: names?.get(s.candidate_id)?.role ?? "both",
     model_name: mode === "full" ? cfg.rerankModel : cfg.embeddingModel,
     config_version: cfg.configRevision,
+            provider: cfg.provider,
   }));
   await admin.from("match_cache").insert(payload);
 }

@@ -12,6 +12,10 @@ export const num = (v: unknown, dflt: number) =>
   Number.isFinite(Number(v)) ? Number(v) : dflt;
 
 export interface PipelineCfg {
+  provider: InferenceProvider;
+  providerLabel: string;
+  secretName: string;
+  rerankStyle: "nvidia" | "deepinfra";
   embeddingModel: string;
   rerankModel: string;
   embeddingDim: number;
@@ -34,6 +38,49 @@ export interface PipelineCfg {
   maxDeckSize: number;
 }
 
+export type InferenceProvider = "nvidia" | "deepinfra";
+
+interface ProviderPreset {
+  secretName: string;
+  embeddingApi: string;
+  embeddingModel: string;
+  rerankApi: string;
+  rerankModel: string;
+  rerankStyle: "nvidia" | "deepinfra";
+}
+
+/**
+ * Provider presets own the endpoint and model names. Switching the provider in
+ * the admin panel changes the vector space, so stored vectors are ignored by
+ * model name and lazily regenerated.
+ */
+export const PROVIDER_PRESETS: Record<InferenceProvider, ProviderPreset> = {
+  nvidia: {
+    secretName: "NIM_API_KEY",
+    embeddingApi: "https://integrate.api.nvidia.com/v1/embeddings",
+    embeddingModel: "nvidia/nemotron-3.5-embed-1b",
+    rerankApi:
+      "https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking",
+    rerankModel: "nvidia/nemotron-3.5-rerank-8b",
+    rerankStyle: "nvidia",
+  },
+  deepinfra: {
+    secretName: "DEEPINFRA_API_KEY",
+    embeddingApi: "https://api.deepinfra.com/v1/openai/embeddings",
+    embeddingModel: "nvidia/Nemotron-3.5-Embed-8B-BF16",
+    rerankApi:
+      "https://api.deepinfra.com/v1/inference/nvidia/Nemotron-3.5-Rerank-8B-BF16",
+    rerankModel: "nvidia/Nemotron-3.5-Rerank-8B-BF16",
+    rerankStyle: "deepinfra",
+  },
+};
+
+export function resolveProvider(value: unknown): InferenceProvider {
+  return String(value ?? "").trim().toLowerCase() === "deepinfra"
+    ? "deepinfra"
+    : "nvidia";
+}
+
 const intIn = (v: unknown, dflt: number, min: number, max: number) => {
   const n = Math.trunc(num(v, dflt));
   return Math.max(min, Math.min(max, Number.isFinite(n) ? n : dflt));
@@ -47,15 +94,18 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   const cfg: Record<string, any> = {};
   for (const r of rows ?? []) cfg[r.key] = r.value;
   const weights = cfg.embedding_weights ?? {};
+  const provider = resolveProvider(cfg.inference_provider);
+  const preset = PROVIDER_PRESETS[provider];
   return {
-    embeddingModel: unstr(cfg.embedding_model, "nvidia/nemotron-3.5-embed-1b"),
-    rerankModel: unstr(cfg.rerank_model, "nvidia/nemotron-3.5-rerank-8b"),
+    provider,
+    providerLabel: provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+    secretName: preset.secretName,
+    rerankStyle: preset.rerankStyle,
+    embeddingModel: preset.embeddingModel,
+    rerankModel: preset.rerankModel,
     embeddingDim: intIn(cfg.embedding_dim, 1024, 64, 4096),
-    embeddingApi: unstr(cfg.embedding_api, "https://integrate.api.nvidia.com/v1/embeddings"),
-    rerankApi: unstr(
-      cfg.rerank_api,
-      "https://ai.api.nvidia.com/v1/retrieval/nvidia/nemotron-3.5-rerank-8b/reranking",
-    ),
+    embeddingApi: preset.embeddingApi,
+    rerankApi: preset.rerankApi,
     wSkills: numIn(weights.skills, 0.7, 0, 1),
     wContext: numIn(weights.context, 0.3, 0, 1),
     topK: intIn(cfg.candidate_pool_k, 50, 5, 500),
@@ -74,35 +124,51 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   };
 }
 
-export async function nimKey(admin: Admin): Promise<string | null> {
-  let key = Deno.env.get("NIM_API_KEY");
+/** Reads the provider's API key from the function environment, then Vault-ish config. */
+export async function inferenceKey(
+  admin: Admin,
+  cfg: PipelineCfg,
+): Promise<string | null> {
+  let key = Deno.env.get(cfg.secretName);
   if (!key) {
     const { data } = await admin
       .from("integration_secrets")
       .select("value")
-      .eq("name", "NIM_API_KEY")
+      .eq("name", cfg.secretName)
       .maybeSingle();
     key = (data as any)?.value ?? null;
   }
   return key;
 }
 
-/** Embed texts with the NIM embedding model. inputType: 'query' | 'passage'. */
-export async function nimEmbed(
+/** Embed texts with the configured provider. inputType: 'query' | 'passage'. */
+export async function embedTexts(
   key: string,
   cfg: PipelineCfg,
   texts: string[],
   inputType: "query" | "passage",
   timeoutMs = 30000,
 ): Promise<number[][]> {
-  const body = JSON.stringify({
-    input: texts,
-    model: cfg.embeddingModel,
-    input_type: inputType,
-    dimensions: cfg.embeddingDim,
-  });
+  const body = JSON.stringify(
+    cfg.provider === "deepinfra"
+      ? {
+          input: texts,
+          model: cfg.embeddingModel,
+          dimensions: cfg.embeddingDim,
+          encoding_format: "float",
+          // DeepInfra's Nemotron embed separates search queries from stored
+          // documents, the same distinction NIM calls input_type.
+          task: inputType === "passage" ? "document" : "query",
+        }
+      : {
+          input: texts,
+          model: cfg.embeddingModel,
+          input_type: inputType,
+          dimensions: cfg.embeddingDim,
+        },
+  );
   let lastError: unknown = null;
-  // The hosted embedding service occasionally returns a transient 503
+  // Hosted embedding services occasionally return a transient 503
   // ("Service is overloaded"). A retry keeps onboarding/profile saves from
   // silently losing their vectors for an entire session.
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -115,11 +181,17 @@ export async function nimEmbed(
       });
       if (res.ok) {
         const data = await res.json();
-        // response: { data: [{ embedding: number[] }, ...] }
-        return (data.data ?? []).map((d: any) => d.embedding as number[]);
+        // OpenAI-compatible response: { data: [{ index, embedding }, ...] }
+        const rows = (data.data ?? []) as Array<{ index?: number; embedding: number[] }>;
+        return rows
+          .slice()
+          .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+          .map((d) => d.embedding);
       }
       const detail = await res.text();
-      lastError = new Error(`NIM embed failed (${res.status}): ${detail}`);
+      lastError = new Error(
+        `${cfg.providerLabel} embed failed (${res.status}): ${detail}`,
+      );
       if (attempt === 3 || ![429, 500, 502, 503, 504].includes(res.status)) {
         throw lastError;
       }
@@ -129,33 +201,82 @@ export async function nimEmbed(
     }
     await new Promise((resolve) => setTimeout(resolve, 1000 * attempt * attempt));
   }
-  throw lastError ?? new Error("NIM embed failed");
+  throw lastError ?? new Error(`${cfg.providerLabel} embed failed`);
 }
 
+const asLogit = (value: number, mayBeProbability: boolean) => {
+  if (!Number.isFinite(value)) return Number.NEGATIVE_INFINITY;
+  if (mayBeProbability && value >= 0 && value <= 1) {
+    const p = Math.min(1 - 1e-6, Math.max(1e-6, value));
+    return Math.log(p / (1 - p));
+  }
+  return value;
+};
+
 /** Rerank passages against a query. Returns [{index, logit}]. */
-export async function nimRerank(
+export async function rerankTexts(
   key: string,
   cfg: PipelineCfg,
   queryText: string,
   passageTexts: string[],
   timeoutMs = 30000,
 ): Promise<Array<{ index: number; logit: number }>> {
+  const body = JSON.stringify(
+    cfg.rerankStyle === "deepinfra"
+      ? {
+          // DeepInfra pairs each document with its own query entry and returns
+          // a flat score list in the same order.
+          queries: passageTexts.map(() => queryText),
+          documents: passageTexts,
+        }
+      : {
+          model: cfg.rerankModel,
+          // Hosted rerankers each expose their own
+          // /v1/retrieval/<model>/reranking endpoint, and the model field must
+          // name that same model.
+          query: { text: queryText },
+          passages: passageTexts.map((t) => ({ text: t })),
+        },
+  );
   const res = await fetch(cfg.rerankApi, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: cfg.rerankModel,
-      // Hosted rerankers each expose their own /v1/retrieval/<model>/reranking
-      // endpoint, and the model field must name that same model.
-      query: { text: queryText },
-      passages: passageTexts.map((t) => ({ text: t })),
-    }),
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body,
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
-    throw new Error(`NIM rerank failed (${res.status}): ${await res.text()}`);
+    throw new Error(
+      `${cfg.providerLabel} rerank failed (${res.status}): ${await res.text()}`,
+    );
   }
-  return (await res.json()).rankings ?? [];
+  const data = await res.json();
+  if (cfg.rerankStyle === "deepinfra") {
+    const scores = Array.isArray(data.scores) ? data.scores : [];
+    if (scores.length > 0) {
+      // One query is repeated per document, so the response is a flat list.
+      // A nested list appears when several distinct queries are sent.
+      const flat = Array.isArray(scores[0]) ? scores[0] : scores;
+      return flat.map((score: unknown, index: number) => ({
+        index,
+        // Nemotron 3.5 Rerank returns raw logits (often negative), so they
+        // must not be reinterpreted as probabilities.
+        logit: asLogit(Number(score), false),
+      }));
+    }
+    const results = Array.isArray(data.results) ? data.results : [];
+    return results.map((row: any, index: number) => ({
+      index: Number.isFinite(Number(row.index)) ? Number(row.index) : index,
+      logit: asLogit(
+        Number(row.relevance_score ?? row.score ?? row.logit),
+        true,
+      ),
+    }));
+  }
+  return (data.rankings ?? []) as Array<{ index: number; logit: number }>;
 }
 
 const vecLiteral = (e: number[]) => `[${e.join(",")}]`;
@@ -217,7 +338,7 @@ export async function ensureFreshEmbeddings(
     });
     if (batch.length === 0) continue;
 
-    const vectors = await nimEmbed(
+    const vectors = await embedTexts(
       key,
       cfg,
       batch.map((r) => r.source_text),

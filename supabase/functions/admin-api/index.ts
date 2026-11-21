@@ -6,7 +6,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   ensureFreshEmbeddings,
   getConfig,
-  nimKey,
+  inferenceKey,
 } from "../_shared/pipeline.ts";
 
 const CORS_BASE = {
@@ -977,7 +977,7 @@ Deno.serve(async (req) => {
         if (before.user_id) {
           try {
             const cfg = await getConfig(admin as any);
-            const key = await nimKey(admin as any);
+            const key = await inferenceKey(admin as any, cfg);
             if (key) {
               await ensureFreshEmbeddings(admin as any, [before.user_id], cfg, key);
             }
@@ -1325,11 +1325,25 @@ Deno.serve(async (req) => {
         for (const row of config ?? []) {
           if (row.key !== "__revision") values[row.key] = row.value;
         }
+        // Report which provider keys exist so the switch cannot be published
+        // into a provider with no credentials.
+        const { data: secretRows } = await admin
+          .from("integration_secrets")
+          .select("name")
+          .in("name", ["NIM_API_KEY", "DEEPINFRA_API_KEY"]);
+        const names = new Set((secretRows ?? []).map((r: any) => r.name));
+        const providers = {
+          nvidia: Boolean(Deno.env.get("NIM_API_KEY")) || names.has("NIM_API_KEY"),
+          deepinfra:
+            Boolean(Deno.env.get("DEEPINFRA_API_KEY")) ||
+            names.has("DEEPINFRA_API_KEY"),
+        };
         return json({
           ok: true,
           data: {
             config: config ?? [],
             values,
+            providers,
             revision: Number(
               (config ?? []).find((r: any) => r.key === "__revision")?.value ?? 0,
             ),

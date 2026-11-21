@@ -5,7 +5,7 @@
 // are regenerated because the freshness check includes model_name.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { ensureFreshEmbeddings, getConfig, nimKey } from "../_shared/pipeline.ts";
+import { ensureFreshEmbeddings, getConfig, inferenceKey } from "../_shared/pipeline.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -59,8 +59,10 @@ Deno.serve(async (req) => {
     }
 
     const cfg = await getConfig(admin);
-    const key = await nimKey(admin);
-    if (!key) return json({ error: "NIM_API_KEY not configured" }, 503);
+    const key = await inferenceKey(admin, cfg);
+    if (!key) {
+      return json({ error: "inference_key_missing", provider: cfg.provider }, 503);
+    }
 
     const result = await ensureFreshEmbeddings(admin, [user.id], cfg, key);
     return json({

@@ -46,8 +46,15 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
 ### Authentication and onboarding
 
 - Email sign-up, login, password reset, and account deletion.
-- Onboarding collects a role, skills, and optional availability, language, and
-  learning-style details.
+- Onboarding is mandatory and has no skip. It collects a role, at least one
+  skill, one required note per selected learner skill, and availability,
+  language, and learning-style details.
+- Each learner note is written on its own page
+  ("Tell us more about what you want to learn about {skill}") and must be 10-150
+  characters. The review step blocks saving until every learner skill has a
+  note. Teaching notes are added later from Profile.
+- A profile that has not finished onboarding always returns to it, including on
+  a fresh sign-in.
 - Skills are selected from the 29 selectable nodes (25 at depth 2 plus 4
   Programming skills at depth 3): Farming, Filipino Cooking, Filipino Dessert
   Making, Filipino Embroidery, General/Python/C#/Web Programming, Sewing,
@@ -68,23 +75,45 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
   and 2 teaching skills.
 - The review step shows the readable skill name, never the internal
   `other:onboarding:...` id.
-- A mentor can save without a showcase. The editor explains that showcase media
-  is what makes the profile discoverable; Browse, Explore, and For You exclude
-  teaching profiles without media until one is added.
+- A mentor can save without a showcase, but the mentor side stays hidden from
+  Browse, Explore, For You, and possible-match fan-out until showcase media and
+  an approved note on every approved teaching skill exist. Home keeps a
+  persistent "Mentor setup" reminder, and Profile's completion card lists the
+  missing pieces.
+- A learner side is hidden until every approved learning skill has an approved
+  note. Visibility is per side: a profile that teaches and learns can appear as
+  a learner while still hidden as a mentor.
+- Profile completion rows use a highlighted attention style for each missing
+  requirement. Age and gender sit on one compact row; age is optional but must
+  be 18-120 when set, with a dialog instead of an inline error.
 - A user with no role or no skills sees a setup checklist on For You instead of
   a match search: a complete-profile note, Explore, and Update Profile.
+
+### Skill notes
+
+- A deterministic prefilter mirrors `note_rules.ts` in SQL. Clean notes are
+  preapproved immediately at save, tagged `heuristic`, and queued for the
+  inference worker. Preapproval keeps onboarding fast while still reviewing
+  every note asynchronously.
+- The worker can confirm or overturn the preapproval. An overturn unapproves the
+  note and sends a `note_rejected` notification that opens Profile so the author
+  can rewrite it. The queue keeps the heuristic provenance for admin review.
+- Admin moderation filters and badges heuristic preapprovals separately from
+  inference and manual decisions.
 
 ### Discovery
 
 - **For You** ranks reciprocal matches with the `get-matches` Edge Function and
-  excludes blocks, existing Pals, pending requests, and teaching profiles with
-  no showcase media.
+  excludes blocks, existing Pals, pending requests, profiles whose target side
+  is not ready (learner notes, or mentor showcase plus teaching notes), and
+  unapproved skills.
 - **Explore** is an endless random deck of new people. It excludes self, blocks,
-  existing connections, and profiles without discovery media. The client
+  existing connections, and profiles that are not ready on any side. A `both`
+  profile is labeled with the side that is actually ready. The client
   deduplicates recently shown cards and prefetches near the end.
 - **Browse** shows the nine depth-1 categories, hides branches with nobody for
-  the active role, and shows live counts. The category page lists depth-2
-  skills and filters empty child skills.
+  the active role, and shows live counts using the same per-side gates. The
+  category page lists depth-2 skills and filters empty child skills.
 - Incoming requests show the discovery surface that produced them:
   `Found you as a match`, `Discovered you in Explore`, or `Found you in
   Browse`. Legacy requests show no source note.
@@ -128,7 +157,7 @@ of crashing. Only the publishable (anon) key belongs in `.env`.
 ```
 lib/
   authentication/     login, register, password reset, legal dialogs
-  onboarding/         intro, role, interests, details, review
+  onboarding/         intro, role, interests, skill notes, details, review
   screen/             For You, Browse, Chats, Requests, Profile, Settings
   screen/card/        person card, request card, skills card
   services/           Supabase adapters, notifications, media, deck state

@@ -265,6 +265,31 @@ does not touch stored vectors.
 > or a self-hosted NIM container. DeepInfra is rate-limited by concurrent
 > requests (200 per model per account, not RPM) and has no fixed per-minute cap.
 
+#### Rerank fallback and circuit breaker
+
+Rerank runs the configured primary first. Set `rerank_fallback_provider`
+(`deepinfra`, `nvidia`, or `none`) to retry an unresponsive call on another
+provider. The same Nemotron 3.5 Rerank model family is used on both, so the
+scores stay comparable when a deck mixes providers.
+
+- The fallback is per call, not per deck. If direction A or any direction-B
+  call fails or times out, that call is retried on the fallback; the rest of the
+  deck goes straight to the fallback to avoid paying the timeout again.
+- `rerank_failure_threshold` consecutive deck-level primary failures open a
+  shared circuit breaker. `rerank_cooldown_seconds` is how long new decks skip
+  the primary. A successful probe closes the breaker.
+- If both providers fail, the deck drops to `basic_bi` (bi-encoder ranking),
+  the same graceful degradation as before.
+- Set `rerank_fallback_provider = none` to disable fallback and keep
+  primary-only behaviour.
+
+Each uncached deck appends one row to `inference_events` with per-provider call
+counts, failures, latency, and whether the fallback was used. `provider_circuit`
+holds the shared breaker state. Admin -> Analytics -> System shows rerank
+calls, fallback rate, provider success/avg/p95, breaker status, fallback
+activity, active routing, and the latest deck events. Events are kept for 30
+days by the `inference-events-cleanup` cron job in `supabase/cron.sql`.
+
 ### First admin on a fresh database
 
 Migrations do not seed an owner on a clean database (there are no auth users

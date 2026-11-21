@@ -448,6 +448,29 @@ Deno.serve(async (req) => {
       case "analytics": {
         const surface = String(payload.surface ?? "growth");
         const days = clampInt(payload.days, 30, 1, 365);
+        if (surface === "system") {
+          const [baseResult, inferenceResult] = await Promise.all([
+            admin.rpc("admin_system"),
+            admin.rpc("admin_inference_system"),
+          ]);
+          if (baseResult.error) throw baseResult.error;
+          if (inferenceResult.error) {
+            console.error(
+              `[admin-api] inference analytics: ${inferenceResult.error.message}`,
+            );
+          }
+          return json({
+            ok: true,
+            data: {
+              ...(baseResult.data ?? {}),
+              inference: inferenceResult.error
+                ? null
+                : inferenceResult.data ?? null,
+            },
+            surface,
+            days,
+          });
+        }
         const rpc =
           surface === "growth" ? "admin_growth"
           : surface === "users" ? "admin_user_analytics"
@@ -456,7 +479,6 @@ Deno.serve(async (req) => {
           : surface === "demographics" ? "admin_demographics"
           : surface === "conversations" ? "admin_conversations"
           : surface === "safety" ? "admin_safety"
-          : surface === "system" ? "admin_system"
           : surface === "activity" ? "admin_activity"
           : "";
         if (!rpc) return json({ error: "Unknown analytics surface" }, 400);
@@ -1331,8 +1353,10 @@ Deno.serve(async (req) => {
         for (const row of config ?? []) {
           if (row.key !== "__revision") values[row.key] = row.value;
         }
-        // Report which provider keys exist so the switch cannot be published
-        // into a provider with no credentials.
+        // Report which provider keys exist so the editor can warn before a
+        // provider is selected without credentials. This is advisory; the
+        // runtime degrades to the other provider or basic_bi instead of
+        // failing the publish.
         const { data: secretRows } = await admin
           .from("integration_secrets")
           .select("name")
@@ -1449,6 +1473,28 @@ Deno.serve(async (req) => {
         clean.embedding_api = embedPreset.embeddingApi;
         clean.rerank_model = rerankPreset.rerankModel;
         clean.rerank_api = rerankPreset.rerankApi;
+        const fallbackRaw = String(
+          clean.rerank_fallback_provider ?? "deepinfra",
+        ).trim().toLowerCase();
+        let fallback = ["none", "nvidia", "deepinfra"].includes(fallbackRaw)
+          ? fallbackRaw
+          : "none";
+        if (fallback !== "none" && fallback === rerankProvider) {
+          // A fallback equal to the primary is a no-op; store the explicit
+          // disabled value so the admin UI does not advertise a second path.
+          fallback = "none";
+        }
+        clean.rerank_fallback_provider = fallback;
+        const thresholdRaw = clean.rerank_failure_threshold;
+        clean.rerank_failure_threshold =
+          thresholdRaw == null || thresholdRaw === ""
+            ? 3
+            : clampInt(thresholdRaw, 3, 1, 20);
+        const cooldownRaw = clean.rerank_cooldown_seconds;
+        clean.rerank_cooldown_seconds =
+          cooldownRaw == null || cooldownRaw === ""
+            ? 60
+            : clampInt(cooldownRaw, 60, 10, 600);
         if (Object.keys(clean).length === 0) {
           return json({ error: "Config must not be empty" }, 400);
         }

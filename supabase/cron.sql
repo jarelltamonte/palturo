@@ -14,6 +14,18 @@ select cron.schedule(
 
 do $$
 begin
+  perform cron.unschedule('inference-events-cleanup');
+exception when others then null;
+end $$;
+
+select cron.schedule(
+  'inference-events-cleanup',
+  '25 * * * *',
+  $cron$delete from public.inference_events where created_at < now() - interval '30 days';$cron$
+);
+
+do $$
+begin
   perform cron.unschedule('moderate-notes');
 exception when others then null;
 end $$;

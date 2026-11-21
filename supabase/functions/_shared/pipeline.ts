@@ -14,6 +14,10 @@ export const num = (v: unknown, dflt: number) =>
 export interface PipelineCfg {
   embedProvider: InferenceProvider;
   rerankProvider: InferenceProvider;
+  rerankFallbackProvider: InferenceProvider | null;
+  rerankFallbackLabel: string | null;
+  rerankFailureThreshold: number;
+  rerankCooldownSeconds: number;
   embedProviderLabel: string;
   rerankProviderLabel: string;
   embedSecretName: string;
@@ -105,9 +109,30 @@ export async function getConfig(admin: Admin): Promise<PipelineCfg> {
   );
   const embedPreset = PROVIDER_PRESETS[embedProvider];
   const rerankPreset = PROVIDER_PRESETS[rerankProvider];
+  const fallbackRaw = String(cfg.rerank_fallback_provider ?? "deepinfra")
+    .trim()
+    .toLowerCase();
+  const fallbackCandidate = fallbackRaw === "none" || fallbackRaw === ""
+    ? null
+    : resolveProvider(fallbackRaw);
+  // A fallback equal to the primary is a no-op; treat it as disabled so the
+  // runner never pays for a second attempt in the same failing call.
+  const rerankFallbackProvider =
+    fallbackCandidate && fallbackCandidate !== rerankProvider
+      ? fallbackCandidate
+      : null;
   return {
     embedProvider,
     rerankProvider,
+    rerankFallbackProvider,
+    rerankFallbackLabel:
+      rerankFallbackProvider === null
+        ? null
+        : rerankFallbackProvider === "deepinfra"
+        ? "DeepInfra"
+        : "NVIDIA NIM",
+    rerankFailureThreshold: intIn(cfg.rerank_failure_threshold, 3, 1, 20),
+    rerankCooldownSeconds: intIn(cfg.rerank_cooldown_seconds, 60, 10, 600),
     embedProviderLabel: embedProvider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
     rerankProviderLabel: rerankProvider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
     embedSecretName: embedPreset.secretName,
@@ -161,6 +186,7 @@ export async function embedTexts(
   texts: string[],
   inputType: "query" | "passage",
   timeoutMs = 30000,
+  maxAttempts = 3,
 ): Promise<number[][]> {
   const body = JSON.stringify(
     cfg.embedProvider === "deepinfra"
@@ -184,7 +210,7 @@ export async function embedTexts(
   // Hosted embedding services occasionally return a transient 503
   // ("Service is overloaded"). A retry keeps onboarding/profile saves from
   // silently losing their vectors for an entire session.
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(cfg.embeddingApi, {
         method: "POST",
@@ -205,12 +231,12 @@ export async function embedTexts(
       lastError = new Error(
         `${cfg.embedProviderLabel} embed failed (${res.status}): ${detail}`,
       );
-      if (attempt === 3 || ![429, 500, 502, 503, 504].includes(res.status)) {
+      if (attempt === maxAttempts || ![429, 500, 502, 503, 504].includes(res.status)) {
         throw lastError;
       }
     } catch (e) {
       lastError = e;
-      if (attempt === 3) throw e;
+      if (attempt === maxAttempts) throw e;
     }
     await new Promise((resolve) => setTimeout(resolve, 1000 * attempt * attempt));
   }
@@ -267,29 +293,55 @@ export async function rerankTexts(
     );
   }
   const data = await res.json();
+  const expected = passageTexts.length;
+  const validate = (
+    rows: Array<{ index: number; logit: number }>,
+  ) => {
+    if (expected === 0) return rows;
+    if (rows.length !== expected) {
+      throw new Error(
+        `${cfg.rerankProviderLabel} rerank returned ${rows.length}/${expected} scores`,
+      );
+    }
+    const seen = new Set(rows.map((row) => row.index));
+    for (let i = 0; i < expected; i++) {
+      if (!seen.has(i)) {
+        throw new Error(
+          `${cfg.rerankProviderLabel} rerank missing index ${i}`,
+        );
+      }
+    }
+    return rows;
+  };
   if (cfg.rerankStyle === "deepinfra") {
     const scores = Array.isArray(data.scores) ? data.scores : [];
     if (scores.length > 0) {
       // One query is repeated per document, so the response is a flat list.
       // A nested list appears when several distinct queries are sent.
       const flat = Array.isArray(scores[0]) ? scores[0] : scores;
-      return flat.map((score: unknown, index: number) => ({
-        index,
-        // Nemotron 3.5 Rerank returns raw logits (often negative), so they
-        // must not be reinterpreted as probabilities.
-        logit: asLogit(Number(score), false),
-      }));
+      return validate(
+        flat.map((score: unknown, index: number) => ({
+          index,
+          // Nemotron 3.5 Rerank returns raw logits (often negative), so they
+          // must not be reinterpreted as probabilities.
+          logit: asLogit(Number(score), false),
+        })),
+      );
     }
     const results = Array.isArray(data.results) ? data.results : [];
-    return results.map((row: any, index: number) => ({
-      index: Number.isFinite(Number(row.index)) ? Number(row.index) : index,
-      logit: asLogit(
-        Number(row.relevance_score ?? row.score ?? row.logit),
-        true,
-      ),
-    }));
+    return validate(
+      results.map((row: any, index: number) => ({
+        index: Number.isFinite(Number(row.index)) ? Number(row.index) : index,
+        logit: asLogit(
+          Number(row.relevance_score ?? row.score ?? row.logit),
+          true,
+        ),
+      })),
+    );
   }
-  return (data.rankings ?? []) as Array<{ index: number; logit: number }>;
+  return validate(
+    (data.rankings ?? []) as Array<{ index: number; logit: number }>,
+  );
 }
 
 const vecLiteral = (e: number[]) => `[${e.join(",")}]`;
@@ -304,6 +356,7 @@ export async function ensureFreshEmbeddings(
   cfg: PipelineCfg,
   key: string,
   timeoutMs = 30000,
+  maxAttempts = 3,
 ): Promise<{ upserted: number; costEmbeddings: number }> {
   if (userIds.length === 0) return { upserted: 0, costEmbeddings: 0 };
 
@@ -357,6 +410,7 @@ export async function ensureFreshEmbeddings(
       batch.map((r) => r.source_text),
       inputType,
       timeoutMs,
+      maxAttempts,
     );
     if (vectors.length !== batch.length) {
       throw new Error(
@@ -405,4 +459,255 @@ export async function ensureFreshEmbeddings(
   }
 
   return { upserted: toUpsert.length, costEmbeddings: cost };
+}
+
+// ---------------------------------------------------------------------------
+// Rerank fallback
+// ---------------------------------------------------------------------------
+
+export interface RerankTarget {
+  provider: InferenceProvider;
+  key: string | null;
+}
+
+export interface RerankStats {
+  primaryCalls: number;
+  primaryFailures: number;
+  primaryLatencyMs: number;
+  primarySamples: number[];
+  primaryLastError: string | null;
+  fallbackCalls: number;
+  fallbackFailures: number;
+  fallbackLatencyMs: number;
+  fallbackSamples: number[];
+  fallbackLastError: string | null;
+  lastError: string | null;
+}
+
+/** Copy the pipeline config with another provider's rerank preset applied. */
+export function rerankConfigFor(
+  cfg: PipelineCfg,
+  provider: InferenceProvider,
+): PipelineCfg {
+  if (provider === cfg.rerankProvider) return cfg;
+  const preset = PROVIDER_PRESETS[provider];
+  return {
+    ...cfg,
+    rerankProvider: provider,
+    rerankProviderLabel: provider === "deepinfra" ? "DeepInfra" : "NVIDIA NIM",
+    rerankSecretName: preset.secretName,
+    rerankStyle: preset.rerankStyle,
+    rerankModel: preset.rerankModel,
+    rerankApi: preset.rerankApi,
+  };
+}
+
+/** True when the shared circuit breaker is still inside its cool-down. */
+export async function rerankCircuitOpen(
+  admin: Admin,
+  provider: InferenceProvider,
+): Promise<boolean> {
+  try {
+    const { data, error } = await admin
+      .from("provider_circuit")
+      .select("status,breaker_until")
+      .eq("provider", provider)
+      .eq("operation", "rerank")
+      .maybeSingle();
+    if (error || !data) return false;
+    if (data.status !== "open" || !data.breaker_until) return false;
+    return new Date(data.breaker_until).getTime() > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+/** Persist one deck's primary outcome. Success resets the breaker. */
+export async function recordRerankCircuit(
+  admin: Admin,
+  provider: InferenceProvider,
+  success: boolean,
+  failure: boolean,
+  error: string | null,
+  threshold: number,
+  cooldownSeconds: number,
+): Promise<void> {
+  if (!success && !failure) return;
+  try {
+    const { error: rpcError } = await admin.rpc("record_rerank_circuit", {
+      p_provider: provider,
+      p_success: success,
+      p_failure: failure,
+      p_error: error,
+      p_threshold: threshold,
+      p_cooldown_seconds: cooldownSeconds,
+    });
+    if (rpcError) {
+      console.error(`[rerank] circuit write: ${rpcError.message}`);
+    }
+  } catch (e) {
+    console.error(`[rerank] circuit write: ${(e as Error)?.message ?? e}`);
+  }
+}
+
+export interface RerankRunner {
+  run: (
+    queryText: string,
+    passageTexts: string[],
+    timeoutMs: number,
+    deadline?: number,
+  ) => Promise<Array<{ index: number; logit: number }>>;
+  stats: RerankStats;
+  isPrimaryDown: () => boolean;
+}
+
+/**
+ * Runs rerank calls against the primary provider and falls back per call.
+ * Once a primary call fails, the rest of the deck goes straight to the
+ * fallback (or to basic_bi if neither provider has a key).
+ */
+export function createRerankRunner(opts: {
+  cfg: PipelineCfg;
+  primary: RerankTarget;
+  fallback: RerankTarget | null;
+  primaryDown: boolean;
+}): RerankRunner {
+  const stats: RerankStats = {
+    primaryCalls: 0,
+    primaryFailures: 0,
+    primaryLatencyMs: 0,
+    primarySamples: [],
+    primaryLastError: null,
+    fallbackCalls: 0,
+    fallbackFailures: 0,
+    fallbackLatencyMs: 0,
+    fallbackSamples: [],
+    fallbackLastError: null,
+    lastError: null,
+  };
+  let down = opts.primaryDown;
+  const primaryCfg = rerankConfigFor(opts.cfg, opts.primary.provider);
+  const fallbackCfg = opts.fallback
+    ? rerankConfigFor(opts.cfg, opts.fallback.provider)
+    : null;
+
+  const remaining = (deadline: number, cap: number) =>
+    Math.max(0, Math.min(cap, deadline - Date.now()));
+
+  const run = async (
+    queryText: string,
+    passageTexts: string[],
+    timeoutMs: number,
+    deadline = Date.now() + timeoutMs,
+  ) => {
+    if (!down && opts.primary.key) {
+      const attemptTimeout = remaining(deadline, timeoutMs);
+      if (attemptTimeout < 250) {
+        down = true;
+      } else {
+        const startedAt = Date.now();
+        try {
+          const rows = await rerankTexts(
+            opts.primary.key,
+            primaryCfg,
+            queryText,
+            passageTexts,
+            attemptTimeout,
+          );
+          const elapsed = Date.now() - startedAt;
+          stats.primaryCalls++;
+          stats.primaryLatencyMs += elapsed;
+          stats.primarySamples.push(elapsed);
+          return rows;
+        } catch (e) {
+          const elapsed = Date.now() - startedAt;
+          stats.primaryCalls++;
+          stats.primaryFailures++;
+          stats.primaryLatencyMs += elapsed;
+          stats.primarySamples.push(elapsed);
+          stats.primaryLastError = String((e as Error)?.message ?? e).slice(
+            0,
+            300,
+          );
+          stats.lastError = stats.primaryLastError;
+          down = true;
+          console.error(
+            `[rerank] ${opts.primary.provider} failed; using fallback: ${stats.primaryLastError}`,
+          );
+        }
+      }
+    }
+
+    if (opts.fallback?.key && fallbackCfg) {
+      const attemptTimeout = remaining(deadline, timeoutMs);
+      if (attemptTimeout < 250) {
+        throw new Error(
+          stats.primaryLastError ?? "rerank deadline exhausted",
+        );
+      }
+      const startedAt = Date.now();
+      try {
+        const rows = await rerankTexts(
+          opts.fallback.key,
+          fallbackCfg,
+          queryText,
+          passageTexts,
+          attemptTimeout,
+        );
+        const elapsed = Date.now() - startedAt;
+        stats.fallbackCalls++;
+        stats.fallbackLatencyMs += elapsed;
+        stats.fallbackSamples.push(elapsed);
+        return rows;
+      } catch (e) {
+        const elapsed = Date.now() - startedAt;
+        stats.fallbackCalls++;
+        stats.fallbackFailures++;
+        stats.fallbackLatencyMs += elapsed;
+        stats.fallbackSamples.push(elapsed);
+        stats.fallbackLastError = String((e as Error)?.message ?? e).slice(
+          0,
+          300,
+        );
+        stats.lastError = stats.fallbackLastError;
+        throw e;
+      }
+    }
+
+    throw new Error(stats.lastError ?? "rerank provider unavailable");
+  };
+
+  return { run, stats, isPrimaryDown: () => down };
+}
+
+export interface InferenceEvent {
+  surface: string;
+  operation: string;
+  primary_provider: string;
+  fallback_provider: string | null;
+  used_provider: string;
+  primary_calls: number;
+  primary_failures: number;
+  fallback_calls: number;
+  fallback_failures: number;
+  primary_latency_ms: number;
+  fallback_latency_ms: number;
+  primary_samples_ms: number[];
+  fallback_samples_ms: number[];
+  latency_ms: number;
+  mode: string | null;
+  error: string | null;
+}
+
+/** Append-only telemetry used by Admin -> Analytics -> System. */
+export async function recordInferenceEvent(
+  admin: Admin,
+  event: InferenceEvent,
+): Promise<void> {
+  try {
+    const { error } = await admin.from("inference_events").insert(event);
+    if (error) console.error(`[inference] event write: ${error.message}`);
+  } catch (e) {
+    console.error(`[inference] event write: ${(e as Error)?.message ?? e}`);
+  }
 }

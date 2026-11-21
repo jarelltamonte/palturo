@@ -332,6 +332,38 @@ void main() {
     expect(service.captured?.teachingNotes, isEmpty);
   });
 
+  testWidgets('saving without a learner note is blocked', (tester) async {
+    final service = _CapturingProfileService();
+    await pumpEdit(
+      tester,
+      service: service,
+      data: profile().copyWith(learningNotes: const {}, notesLoaded: true),
+    );
+
+    final bioField = find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) =>
+            widget is TopLabeledField && widget.label == 'Introduce yourself',
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(bioField, 'Updated bio');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Save').first);
+    await tester.tap(find.text('Save').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Learning notes required'), findsOneWidget);
+    expect(find.textContaining('before saving'), findsOneWidget);
+    expect(find.text('Save anyway'), findsNothing);
+
+    await tester.tap(find.text('Review notes'));
+    await tester.pumpAndSettle();
+
+    expect(service.captured, isNull);
+  });
+
   testWidgets('private age and gender save with the profile', (tester) async {
     final service = _CapturingProfileService();
     await pumpEdit(tester, service: service);

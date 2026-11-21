@@ -427,9 +427,69 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
-  /// Saving is never blocked by incomplete notes or a missing showcase. Show
-  /// one reminder, let the user review, or continue and let completion track
-  /// the gap.
+  /// Learning notes block the save; teaching notes stay a reminder.
+  Future<void> _showMissingLearningNotesDialog(List<String> labels) async {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final shown = labels.take(4).toList(growable: false);
+    final extra = labels.length - shown.length;
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.elevatedSurface(dialogContext),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                const Icon(
+                  Icons.edit_note_outlined,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Learning notes required',
+                    style: AppTextStyles.boldText.copyWith(
+                      color: textTheme,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'Add a note for ${shown.join(', ')}'
+              '${extra > 0 ? ' and $extra more' : ''} before saving. '
+              'Every learning skill needs a note so Pals know what you want '
+              'to learn.',
+              style: AppTextStyles.regularText.copyWith(
+                color: textTheme.withValues(alpha: 0.8),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'Review notes',
+                  style: AppTextStyles.boldText.copyWith(
+                    color: AppColors.accentText(dialogContext),
+                  ),
+                ),
+              ),
+            ],
+          ),
+    );
+    if (!mounted) return;
+    await _scrollToLearningSkills();
+  }
+
+  /// Teaching notes and a missing showcase are reminders, not blockers.
+  /// Returns true when the user chooses to save anyway.
   Future<bool> _confirmSaveReminder({
     required List<String> missingNoteLabels,
     required bool learningFirst,
@@ -1038,6 +1098,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         .where((id) => (_learningNotes[id]?.trim() ?? '').isEmpty)
         .map(onboardingInterestLabel)
         .toList(growable: false);
+    if (widget.profile.notesLoaded && missingLearningNotes.isNotEmpty) {
+      await _showMissingLearningNotesDialog(missingLearningNotes);
+      return;
+    }
+
     final missingTeachingNotes = teachingSkills
         .where((id) => (_teachingNotes[id]?.trim() ?? '').isEmpty)
         .map(onboardingInterestLabel)

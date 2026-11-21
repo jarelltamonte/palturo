@@ -13,6 +13,23 @@ class OnboardingController extends ChangeNotifier {
   final Map<String, String> availability = {};
   final Set<String> languages = {};
 
+  /// Per-skill notes written during onboarding. Keyed by the selected option
+  /// id so a draft restores even if the display label changes.
+  final Map<String, String> learningNotes = {};
+
+  void setLearningNote(String id, String note) {
+    learningNotes[id] = note.trim();
+    notifyListeners();
+  }
+
+  bool get hasAllLearningNotes {
+    if (!wantsLearning) return true;
+    return learningInterests.every(
+      (id) =>
+          (learningNotes[id] ?? '').trim().length >= kOnboardingNoteMinLength,
+    );
+  }
+
   bool get wantsLearning =>
       role == OnboardingRole.learn || role == OnboardingRole.both;
 
@@ -113,6 +130,7 @@ class OnboardingController extends ChangeNotifier {
     'availabilityDays': availabilityDays.toList(),
     'availability': availability,
     'languages': languages.toList(),
+    'learningNotes': learningNotes,
   };
 
   void applyJson(Map<String, dynamic> json) {
@@ -147,7 +165,15 @@ class OnboardingController extends ChangeNotifier {
             ) ??
             const {},
       );
+    learningNotes
+      ..clear()
+      ..addAll(_stringMap(json['learningNotes']));
     notifyListeners();
+  }
+
+  Map<String, String> _stringMap(dynamic value) {
+    if (value is! Map) return const {};
+    return value.map((key, item) => MapEntry(key.toString(), item.toString()));
   }
 
   List<String> _strings(dynamic value) {

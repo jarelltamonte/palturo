@@ -465,13 +465,20 @@ class ProfileService {
     );
 
     final resolvedLearning = <String>[];
+    final learningPayload = <Map<String, String>>[];
     for (final id in controller.learningInterests) {
-      resolvedLearning.add(await _resolveOnboardingInterest(id, 'learn'));
+      final name = await _resolveOnboardingInterest(id, 'learn');
+      resolvedLearning.add(name);
+      final note = (controller.learningNotes[id] ?? '').trim();
+      learningPayload.add({'name': name, if (note.isNotEmpty) 'note': note});
     }
 
     final resolvedTeaching = <String>[];
+    final teachingPayload = <Map<String, String>>[];
     for (final id in controller.teachingInterests) {
-      resolvedTeaching.add(await _resolveOnboardingInterest(id, 'teach'));
+      final name = await _resolveOnboardingInterest(id, 'teach');
+      resolvedTeaching.add(name);
+      teachingPayload.add({'name': name});
     }
 
     final hasUnresolvedOthers = [
@@ -530,10 +537,7 @@ class ProfileService {
               hasExistingShowcase,
         );
 
-    await _saveUserSkills(
-      resolvedLearning.map((name) => {'name': name}).toList(),
-      resolvedTeaching.map((name) => {'name': name}).toList(),
-    );
+    await _saveUserSkills(learningPayload, teachingPayload);
 
     Map<String, dynamic>? saved;
     try {

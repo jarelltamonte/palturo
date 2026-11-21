@@ -143,26 +143,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 }
                 _loadProfile();
               },
-              onSkip: () async {
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                setState(() {
-                  _resumeSkipped = true;
-                  _resumeDismissed = false;
-                });
-                try {
-                  await PreferencesService.instance.setBool(
-                    'skipped_onboarding',
-                    true,
-                  );
-                  await PreferencesService.instance.setBool(
-                    onboardingResumeDismissedKey(_uid),
-                    false,
-                  );
-                } catch (_) {
-                  // Leaving setup must not depend on preference storage.
-                }
-              },
             ),
       ),
     );

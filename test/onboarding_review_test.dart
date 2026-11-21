@@ -16,7 +16,9 @@ void main() {
           ..teachingInterests.add('barong_embroidery')
           ..learningStyles.add('Hands-on Practice')
           ..languages.add('English')
-          ..setAvailabilityDays({'Friday'});
+          ..setAvailabilityDays({'Friday'})
+          ..learningNotes['cooking_pinakbet'] =
+              'I want to cook adobo and sinigang for my family.';
 
     var saved = 0;
     await tester.pumpWidget(
@@ -38,16 +40,20 @@ void main() {
     expect(find.text('Step 5 of 5 - Review'), findsOneWidget);
     expect(find.text('Learner and mentor'), findsOneWidget);
     expect(find.text('Showcase required for visibility'), findsOneWidget);
-    for (var i = 0;
-        i < 8 && find.text('Cooking Pinakbet').evaluate().isEmpty;
-        i++) {
+    for (
+      var i = 0;
+      i < 8 && find.text('Cooking Pinakbet').evaluate().isEmpty;
+      i++
+    ) {
       await tester.drag(find.byType(ListView), const Offset(0, -100));
       await tester.pumpAndSettle();
     }
     expect(find.text('Cooking Pinakbet'), findsOneWidget);
-    for (var i = 0;
-        i < 8 && find.text('Barong Embroidery').evaluate().isEmpty;
-        i++) {
+    for (
+      var i = 0;
+      i < 8 && find.text('Barong Embroidery').evaluate().isEmpty;
+      i++
+    ) {
       await tester.drag(find.byType(ListView), const Offset(0, -100));
       await tester.pumpAndSettle();
     }
@@ -158,7 +164,8 @@ void main() {
     );
     expect(
       find.text(
-        'Add your role, availability, language, and learning style to save.',
+        'Add your role, availability, language, learning style, and a '
+        'note for every learning skill to save.',
       ),
       findsOneWidget,
     );
@@ -166,5 +173,57 @@ void main() {
       find.widgetWithText(ElevatedButton, 'Save and continue'),
     );
     expect(button.onPressed, isNull);
+  });
+
+  testWidgets('review blocks saving until every learner skill has a note', (
+    tester,
+  ) async {
+    final controller =
+        OnboardingController()
+          ..role = OnboardingRole.learn
+          ..learningInterests.add('cooking_pinakbet')
+          ..learningStyles.add('Hands-on Practice')
+          ..languages.add('English')
+          ..setAvailabilityDays({'Friday'});
+
+    Widget build() => MaterialApp(
+      theme: lightMode,
+      home: OnboardingReviewScreen(
+        controller: controller,
+        onSave: () {},
+        onEditRole: () {},
+        onEditLearning: () {},
+        onEditTeaching: () {},
+        onEditDetails: () {},
+        onEditLearningNote: (_) {},
+      ),
+    );
+
+    await tester.pumpWidget(build());
+    expect(find.text('Add a note about this skill'), findsOneWidget);
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Save and continue'),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    controller.setLearningNote(
+      'cooking_pinakbet',
+      'I want to cook adobo for my family.',
+    );
+    await tester.pumpWidget(build());
+    await tester.pump();
+    expect(find.text('Add a note about this skill'), findsNothing);
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Save and continue'),
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 }

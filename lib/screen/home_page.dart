@@ -545,9 +545,6 @@ class _HomePageState extends State<HomePage> {
                 onFinished: () {
                   if (mounted) Navigator.of(context).pop();
                 },
-                onSkip: () async {
-                  if (mounted) Navigator.of(context).pop();
-                },
               ),
         ),
       );

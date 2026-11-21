@@ -14,8 +14,8 @@ class OnboardingReviewScreen extends StatelessWidget {
   final VoidCallback onEditLearning;
   final VoidCallback onEditTeaching;
   final VoidCallback onEditDetails;
+  final void Function(int index)? onEditLearningNote;
   final String stepLabel;
-  final VoidCallback? onSkip;
 
   const OnboardingReviewScreen({
     super.key,
@@ -26,8 +26,8 @@ class OnboardingReviewScreen extends StatelessWidget {
     required this.onEditLearning,
     required this.onEditTeaching,
     required this.onEditDetails,
+    this.onEditLearningNote,
     this.stepLabel = 'Step 4 of 4 – Review',
-    this.onSkip,
   });
 
   String _roleLabel(OnboardingRole? role) => switch (role) {
@@ -47,6 +47,7 @@ class OnboardingReviewScreen extends StatelessWidget {
   bool get _isValid =>
       controller.role != null &&
       (!controller.wantsLearning || controller.learningInterests.isNotEmpty) &&
+      controller.hasAllLearningNotes &&
       (!controller.wantsTeaching || controller.teachingInterests.isNotEmpty) &&
       controller.learningStyles.isNotEmpty &&
       controller.languages.isNotEmpty &&
@@ -64,8 +65,6 @@ class OnboardingReviewScreen extends StatelessWidget {
       onBack: onBack,
       primaryLabel: 'Save and continue',
       onPrimaryPressed: _isValid ? onSave : null,
-      onSkip: onSkip,
-      showSkip: true,
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
@@ -81,7 +80,8 @@ class OnboardingReviewScreen extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'Add your role, availability, language, and learning style to save.',
+                'Add your role, availability, language, learning style, and a '
+                'note for every learning skill to save.',
                 style: AppTextStyles.regularText.copyWith(
                   color: textColor,
                   fontSize: 12,
@@ -104,6 +104,25 @@ class OnboardingReviewScreen extends StatelessWidget {
               value: _skills(controller.learningInterests),
               onEdit: onEditLearning,
             ),
+          if (controller.wantsLearning)
+            for (var i = 0; i < controller.learningInterests.length; i++)
+              _ReviewSection(
+                title:
+                    'Note · ${onboardingInterestLabel(controller.learningInterests.elementAt(i))}',
+                value:
+                    (controller.learningNotes[controller.learningInterests
+                                    .elementAt(i)] ??
+                                '')
+                            .trim()
+                            .isEmpty
+                        ? 'Add a note about this skill'
+                        : controller.learningNotes[controller.learningInterests
+                            .elementAt(i)]!,
+                onEdit:
+                    onEditLearningNote == null
+                        ? onEditLearning
+                        : () => onEditLearningNote!(i),
+              ),
           if (controller.wantsTeaching)
             _ReviewSection(
               title: 'Teaching interests',

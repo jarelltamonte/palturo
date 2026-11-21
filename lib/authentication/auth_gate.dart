@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:palturo/authentication/login.dart';
 import 'package:palturo/onboarding/onboarding_flow.dart';
 import 'package:palturo/screen/navigation_bar.dart';
-import 'package:palturo/services/preferences_service.dart';
 import 'package:palturo/widgets/desktop_route_frame.dart';
 
 class AuthGate extends StatefulWidget {
@@ -19,7 +18,6 @@ class _AuthGateState extends State<AuthGate> {
   Session? _session;
   bool _isLoading = true;
   bool _isProfileCompleted = false;
-  bool _hasSkipped = false;
   bool _loadError = false;
   int _evaluationId = 0;
   String? _lastUserId;
@@ -35,17 +33,6 @@ class _AuthGateState extends State<AuthGate> {
     ) async {
       if (data.session == null) {
         await _evaluateUserStatus(null);
-        try {
-          await PreferencesService.instance.setBool(
-            'skipped_onboarding',
-            false,
-          );
-        } catch (_) {}
-        if (mounted) {
-          setState(() {
-            _hasSkipped = false;
-          });
-        }
       } else {
         await _evaluateUserStatus(data.session);
       }
@@ -70,7 +57,6 @@ class _AuthGateState extends State<AuthGate> {
         setState(() {
           _isLoading = false;
           _isProfileCompleted = false;
-          _hasSkipped = false;
           _loadError = false;
         });
       }
@@ -94,21 +80,11 @@ class _AuthGateState extends State<AuthGate> {
           setState(() {
             _isProfileCompleted = true;
             _isLoading = false;
-            _hasSkipped = false;
             _lastUserId = userId;
             _loadError = false;
           });
         }
         return;
-      }
-
-      var savedSkip = false;
-      try {
-        savedSkip =
-            await PreferencesService.instance.getBool('skipped_onboarding') ??
-            false;
-      } catch (_) {
-        // Preferences are optional; fall through to the profile query.
       }
 
       final data = await Supabase.instance.client
@@ -126,7 +102,6 @@ class _AuthGateState extends State<AuthGate> {
       if (mounted && evaluation == _evaluationId) {
         setState(() {
           _isProfileCompleted = completedOnboarding;
-          _hasSkipped = savedSkip;
           _isLoading = false;
           _lastUserId = userId;
           _loadError = false;
@@ -201,7 +176,7 @@ class _AuthGateState extends State<AuthGate> {
       return const DesktopRouteFrame(maxWidth: 560, child: LoginPage());
     }
 
-    if (_isProfileCompleted || _hasSkipped) {
+    if (_isProfileCompleted) {
       return const NavigationBarWidget();
     }
 
@@ -210,28 +185,6 @@ class _AuthGateState extends State<AuthGate> {
       child: OnboardingFlow(
         onFinished: () {
           _evaluateUserStatus(_session);
-        },
-        onSkip: () async {
-          // Leave onboarding first. Preference storage is best-effort and
-          // must not keep the user on the review screen if it fails.
-          if (mounted) {
-            setState(() {
-              _hasSkipped = true;
-            });
-          }
-          final uid = Supabase.instance.client.auth.currentUser?.id;
-          try {
-            await PreferencesService.instance.setBool(
-              'skipped_onboarding',
-              true,
-            );
-            await PreferencesService.instance.setBool(
-              onboardingResumeDismissedKey(uid),
-              false,
-            );
-          } catch (_) {
-            // The in-memory state already left onboarding.
-          }
         },
       ),
     );

@@ -6,7 +6,11 @@ import '../theme/app_text_styles.dart';
 
 class OnboardingEntry extends StatefulWidget {
   final VoidCallback onContinue;
-  const OnboardingEntry({super.key, required this.onContinue});
+
+  /// Shown only when onboarding is presented as a dismissible pushed route.
+  final VoidCallback? onClose;
+
+  const OnboardingEntry({super.key, required this.onContinue, this.onClose});
 
   @override
   State<OnboardingEntry> createState() => _OnboardingEntryState();
@@ -66,12 +70,26 @@ class _OnboardingEntryState extends State<OnboardingEntry>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 32),
-            Text(
-              'Let’s personalize\nyour experience',
-              style: AppTextStyles.headingText.copyWith(
-                color: Theme.of(context).colorScheme.secondary,
-                height: 1.3,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Let’s personalize\nyour experience',
+                    style: AppTextStyles.headingText.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                if (widget.onClose != null)
+                  IconButton(
+                    onPressed: widget.onClose,
+                    tooltip: 'Close setup',
+                    icon: const Icon(Icons.close),
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
             Text(

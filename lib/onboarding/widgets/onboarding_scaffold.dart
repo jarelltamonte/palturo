@@ -24,9 +24,6 @@ class OnboardingScaffold extends StatelessWidget {
   final String primaryLabel;
   final VoidCallback? onPrimaryPressed;
 
-  final bool showSkip;
-  final VoidCallback? onSkip;
-
   const OnboardingScaffold({
     super.key,
     required this.title,
@@ -41,8 +38,6 @@ class OnboardingScaffold extends StatelessWidget {
     this.onBack,
     this.primaryLabel = 'Continue',
     this.onPrimaryPressed,
-    this.showSkip = true,
-    this.onSkip,
   });
 
   @override
@@ -54,8 +49,7 @@ class OnboardingScaffold extends StatelessWidget {
 
     const double backIconSize = 18;
     final double backInset =
-        (AppSpacing.pageHorizontal -
-                (AppSpacing.iconTarget - backIconSize) / 2)
+        (AppSpacing.pageHorizontal - (AppSpacing.iconTarget - backIconSize) / 2)
             .clamp(0.0, double.infinity)
             .toDouble();
 
@@ -74,7 +68,10 @@ class OnboardingScaffold extends StatelessWidget {
                   titleSpacing: 0,
                   title: Padding(
                     padding: EdgeInsets.only(
-                      left: showBackButton ? backInset : AppSpacing.pageHorizontal,
+                      left:
+                          showBackButton
+                              ? backInset
+                              : AppSpacing.pageHorizontal,
                       right: AppSpacing.pageHorizontal,
                     ),
                     child: Row(
@@ -153,16 +150,6 @@ class OnboardingScaffold extends StatelessWidget {
                   child: Text(primaryLabel),
                 ),
               ),
-              if (showSkip) ...[
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: onSkip,
-                  child: Text(
-                    'Do this later',
-                    style: AppTextStyles.regularText.copyWith(color: secondary),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

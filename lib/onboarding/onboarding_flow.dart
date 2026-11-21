@@ -14,17 +14,18 @@ export 'skill_options.dart'
 import 'screens/onboarding_final_screen.dart';
 import 'screens/onboarding_review_screen.dart';
 import 'screens/onboarding_interests_screen.dart';
+import 'screens/onboarding_note_screen.dart';
 import 'screens/onboarding_role_screen.dart';
 import 'widgets/onboarding_save_overlay.dart';
 import '../services/profile_service.dart';
 import '../services/preferences_service.dart';
-import '../screen/action_dialogs.dart';
 import '../utils/friendly_error.dart';
 
 enum OnboardingStep {
   intro,
   role,
   learningInterests,
+  learningNotes,
   teachingInterests,
   finalDetails,
   review,
@@ -43,40 +44,9 @@ String onboardingResumeDismissedKey(String? userId) =>
         ? 'onboarding_resume_dismissed'
         : 'onboarding_resume_dismissed_$userId';
 
-/// Confirms leaving onboarding, then hands off to the caller's exit path.
-///
-/// The handoff is awaited and errors are swallowed so a failed preference
-/// write can never trap the user on the review screen after they chose to
-/// finish later.
-Future<void> confirmOnboardingSkip(
-  BuildContext context,
-  Future<void> Function() onSkip,
-) async {
-  final leave = await showConfirmDialog(
-    context,
-    title: 'Finish later?',
-    message:
-        'Your matches will be less relevant until you add your role, skills, and availability.',
-    confirmLabel: 'Finish later',
-    cancelLabel: 'Keep editing',
-    destructive: false,
-  );
-  if (!leave || !context.mounted) return;
-  try {
-    await onSkip();
-  } catch (_) {
-    // The caller owns the exit path.
-  }
-}
-
 class OnboardingFlow extends StatefulWidget {
   final VoidCallback onFinished;
-  final Future<void> Function() onSkip;
-  const OnboardingFlow({
-    super.key,
-    required this.onFinished,
-    required this.onSkip,
-  });
+  const OnboardingFlow({super.key, required this.onFinished});
 
   @override
   State<OnboardingFlow> createState() => _OnboardingFlowState();
@@ -91,14 +61,19 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   bool _isSaving = false;
   bool _saveSlow = false;
   Timer? _saveSlowTimer;
+  Timer? _draftTimer;
 
   /// First-time saves warm matching, so the overlay explains the wait after
   /// this long instead of leaving a bare spinner.
   static const Duration saveSlowThreshold = Duration(seconds: 6);
 
   bool _returnToReview = false;
+  int _noteIndex = 0;
 
   OnboardingStep get _current => _history.last;
+
+  List<String> get _learningNoteIds =>
+      _controller.learningInterests.toList(growable: false);
 
   @override
   void initState() {
@@ -111,6 +86,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   @override
   void dispose() {
     _saveSlowTimer?.cancel();
+    _draftTimer?.cancel();
     _controller.removeListener(_persistDraft);
     super.dispose();
   }
@@ -132,7 +108,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     return OnboardingOption(id, onboardingInterestLabel(id));
   }
 
+  /// Debounced so typing a note does not hit platform preferences on every
+  /// keystroke.
   void _persistDraft() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 400), _writeDraft);
+  }
+
+  void _writeDraft() {
     final raw = jsonEncode(_controller.toJson());
     PreferencesService.instance.setString(_draftKey, raw).catchError((_) {});
   }
@@ -169,8 +152,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     }
   }
 
-  Future<void> _confirmSkip() => confirmOnboardingSkip(context, widget.onSkip);
-
   void _editFromReview(OnboardingStep step) {
     setState(() {
       _returnToReview = true;
@@ -178,26 +159,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     });
   }
 
-  void _backOrSkip() {
-    if (_history.length > 1) {
-      _back();
-    } else {
-      _confirmSkip();
-    }
-  }
-
   double _progress(OnboardingStep step) {
     final both = _controller.role == OnboardingRole.both;
-    final total = both ? 5 : 4;
+    final noteCount =
+        _controller.wantsLearning ? _controller.learningInterests.length : 0;
+    final total = (both ? 5 : 4) + noteCount;
     switch (step) {
       case OnboardingStep.role:
         return 1 / total;
       case OnboardingStep.learningInterests:
         return 2 / total;
+      case OnboardingStep.learningNotes:
+        final index = noteCount == 0 ? 0 : _noteIndex.clamp(0, noteCount - 1);
+        return (3 + index) / total;
       case OnboardingStep.teachingInterests:
-        return (both ? 3 : 2) / total;
+        return (both ? 3 + noteCount : 2 + noteCount) / total;
       case OnboardingStep.finalDetails:
-        return (both ? 4 : 3) / total;
+        return (both ? 4 + noteCount : 3 + noteCount) / total;
       case OnboardingStep.review:
       case OnboardingStep.complete:
         return 1;
@@ -344,12 +322,45 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     });
   }
 
+  /// True when this flow is presented as a pushed route (the setup entry
+  /// points on Home and Profile) rather than the mandatory gate root.
+  bool get _canDismissRoute => ModalRoute.of(context)?.canPop ?? false;
+
   void _back() {
-    if (_history.length > 1 && !_isSaving) {
+    if (_isSaving) return;
+    if (_history.length > 1) {
       setState(() {
         _history.removeLast();
         if (_returnToReview) _returnToReview = false;
       });
+      return;
+    }
+    // A pushed onboarding route must stay dismissible; otherwise the only
+    // exit from the intro would be force-quitting the app.
+    if (_canDismissRoute) Navigator.of(context).pop();
+  }
+
+  void _continueNote(List<String> ids) {
+    if (_returnToReview) {
+      _goTo(_next(OnboardingStep.learningNotes));
+      return;
+    }
+    if (_noteIndex < ids.length - 1) {
+      setState(() => _noteIndex++);
+      return;
+    }
+    _goTo(_next(OnboardingStep.learningNotes));
+  }
+
+  void _backNote() {
+    if (_returnToReview) {
+      _back();
+      return;
+    }
+    if (_noteIndex > 0) {
+      setState(() => _noteIndex--);
+    } else {
+      _back();
     }
   }
 
@@ -365,6 +376,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         if (_controller.wantsTeaching) return OnboardingStep.teachingInterests;
         return OnboardingStep.finalDetails;
       case OnboardingStep.learningInterests:
+        if (_controller.wantsLearning &&
+            _controller.learningInterests.isNotEmpty) {
+          _noteIndex = 0;
+          return OnboardingStep.learningNotes;
+        }
+        return _controller.wantsTeaching
+            ? OnboardingStep.teachingInterests
+            : OnboardingStep.finalDetails;
+      case OnboardingStep.learningNotes:
         return _controller.wantsTeaching
             ? OnboardingStep.teachingInterests
             : OnboardingStep.finalDetails;
@@ -390,6 +410,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     });
     try {
       await _profileService.saveOnboardingPreferences(_controller);
+      _draftTimer?.cancel();
       try {
         await PreferencesService.instance.setString(_draftKey, '');
         await PreferencesService.instance.setBool('skipped_onboarding', false);
@@ -438,7 +459,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        _backOrSkip();
+        _back();
       },
       child: Container(
         color: Theme.of(context).colorScheme.surface,
@@ -461,14 +482,16 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   Widget _buildStep(OnboardingStep step) {
     switch (step) {
       case OnboardingStep.intro:
-        return OnboardingEntry(onContinue: () => _goTo(_next(step)));
+        return OnboardingEntry(
+          onContinue: () => _goTo(_next(step)),
+          onClose: _canDismissRoute ? () => Navigator.of(context).pop() : null,
+        );
 
       case OnboardingStep.role:
         return OnboardingRoleScreen(
           controller: _controller,
           onContinue: () => _goTo(_next(step)),
-          onBack: _backOrSkip,
-          onSkip: _confirmSkip,
+          onBack: _back,
           stepLabel: '',
           progress: _progress(step),
         );
@@ -489,9 +512,41 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 progress: _progress(step),
                 stepLabel: '',
                 onContinue: () => _goTo(_next(step)),
-                onBack: _backOrSkip,
-                onSkip: _confirmSkip,
+                onBack: _back,
               ),
+        );
+
+      case OnboardingStep.learningNotes:
+        final ids = _learningNoteIds;
+        if (ids.isEmpty) {
+          // Unreachable: the interests step cannot continue without a
+          // selection. Returning to the previous step is the safe recovery.
+          return OnboardingInterestsScreen(
+            highlightWord: 'Learning?',
+            options: _dynamicOptions,
+            selected: _controller.learningInterests,
+            maxSelections: 3,
+            onToggle: (id) => _controller.toggleLearningInterest(id, max: 3),
+            onCreate: (text) => _createInterest(text, teaching: false),
+            progress: _progress(OnboardingStep.learningInterests),
+            stepLabel: '',
+            onContinue: _back,
+            onBack: _back,
+          );
+        }
+        final index = _noteIndex.clamp(0, ids.length - 1);
+        final id = ids[index];
+        return OnboardingNoteScreen(
+          key: ValueKey('onboarding-note-$id'),
+          skillLabel:
+              selectableSkillLabelForId(id) ?? onboardingInterestLabel(id),
+          initialNote: _controller.learningNotes[id] ?? '',
+          onChanged: (text) => _controller.setLearningNote(id, text),
+          onContinue: () => _continueNote(ids),
+          onBack: _backNote,
+          progress: _progress(OnboardingStep.learningNotes),
+          index: index,
+          total: ids.length,
         );
 
       case OnboardingStep.teachingInterests:
@@ -510,8 +565,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 progress: _progress(step),
                 stepLabel: '',
                 onContinue: () => _goTo(_next(step)),
-                onBack: _backOrSkip,
-                onSkip: _confirmSkip,
+                onBack: _back,
               ),
         );
 
@@ -522,8 +576,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               (context, _) => OnboardingFinalScreen(
                 controller: _controller,
                 onDone: () => _goTo(OnboardingStep.review),
-                onBack: _backOrSkip,
-                onSkip: _confirmSkip,
+                onBack: _back,
                 progress: _progress(step),
               ),
         );
@@ -532,12 +585,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         return OnboardingReviewScreen(
           controller: _controller,
           onSave: _saveAndProceed,
-          onBack: _backOrSkip,
-          onSkip: _confirmSkip,
+          onBack: _back,
           stepLabel: '',
           onEditRole: () => _editFromReview(OnboardingStep.role),
           onEditLearning:
               () => _editFromReview(OnboardingStep.learningInterests),
+          onEditLearningNote: (index) {
+            _noteIndex = index;
+            _editFromReview(OnboardingStep.learningNotes);
+          },
           onEditTeaching:
               () => _editFromReview(OnboardingStep.teachingInterests),
           onEditDetails: () => _editFromReview(OnboardingStep.finalDetails),

@@ -8,7 +8,6 @@ class OnboardingRoleScreen extends StatelessWidget {
   final OnboardingController controller;
   final VoidCallback onContinue;
   final VoidCallback? onBack;
-  final VoidCallback? onSkip;
   final String stepLabel;
   final double progress;
 
@@ -17,7 +16,6 @@ class OnboardingRoleScreen extends StatelessWidget {
     required this.controller,
     required this.onContinue,
     this.onBack,
-    this.onSkip,
     this.stepLabel = 'Step 1 of 4 – Role',
     this.progress = 0.2,
   });
@@ -44,12 +42,11 @@ class OnboardingRoleScreen extends StatelessWidget {
         return OnboardingScaffold(
           title: 'What describes\nyou best?',
           subtitle: 'Select one that applies',
-          stepLabel:'',
+          stepLabel: '',
           progress: controller.role == OnboardingRole.both ? 1 / 5 : 1 / 4,
           showBackButton: true,
           onBack: onBack,
           onPrimaryPressed: controller.role == null ? null : onContinue,
-          onSkip: onSkip,
           scrollBody: true,
           child: RoleCardGroup(
             options: _options,

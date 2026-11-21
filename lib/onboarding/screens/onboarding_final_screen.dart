@@ -34,7 +34,6 @@ class OnboardingFinalScreen extends StatelessWidget {
   final OnboardingController controller;
   final VoidCallback onDone;
   final VoidCallback? onBack;
-  final VoidCallback? onSkip;
   final double progress;
 
   const OnboardingFinalScreen({
@@ -42,7 +41,6 @@ class OnboardingFinalScreen extends StatelessWidget {
     required this.controller,
     required this.onDone,
     this.onBack,
-    this.onSkip,
     this.progress = 0.85,
   });
 
@@ -76,7 +74,6 @@ class OnboardingFinalScreen extends StatelessWidget {
           onBack: onBack,
           primaryLabel: 'Review',
           onPrimaryPressed: isValid ? onDone : null,
-          onSkip: onSkip,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

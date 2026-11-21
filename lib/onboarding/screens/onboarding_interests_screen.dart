@@ -16,7 +16,6 @@ class OnboardingInterestsScreen extends StatefulWidget {
   final double progress;
   final VoidCallback onContinue;
   final VoidCallback? onBack;
-  final VoidCallback? onSkip;
   final String stepLabel;
 
   const OnboardingInterestsScreen({
@@ -30,7 +29,6 @@ class OnboardingInterestsScreen extends StatefulWidget {
     required this.progress,
     required this.onContinue,
     this.onBack,
-    this.onSkip,
     this.stepLabel = '',
   });
 
@@ -155,7 +153,6 @@ class _OnboardingInterestsScreenState extends State<OnboardingInterestsScreen> {
       progress: widget.progress,
       showBackButton: true,
       onBack: widget.onBack,
-      onSkip: widget.onSkip,
       onPrimaryPressed: widget.selected.isNotEmpty ? widget.onContinue : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

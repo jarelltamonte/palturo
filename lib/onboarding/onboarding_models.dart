@@ -1,5 +1,10 @@
 enum OnboardingRole { learn, teach, both }
 
+/// One mandatory note page per learner skill. These bounds are shared by the
+/// note screen and the completion gate so they cannot drift apart.
+const int kOnboardingNoteMinLength = 10;
+const int kOnboardingNoteMaxLength = 150;
+
 /// Role follows the skills a profile actually has.
 ///
 /// The role picker only seeds setup. Afterwards a teaching skill means mentor,

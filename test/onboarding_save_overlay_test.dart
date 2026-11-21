@@ -20,6 +20,30 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
+  testWidgets('save overlay never inherits fallback underlines', (
+    tester,
+  ) async {
+    // The real overlay sits outside a Scaffold, where an absent Material would
+    // otherwise apply Flutter's yellow-underlined fallback text style.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: const OnboardingSaveOverlay(slow: false),
+      ),
+    );
+
+    final texts = tester.widgetList<RichText>(
+      find.descendant(
+        of: find.byType(OnboardingSaveOverlay),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(texts, isNotEmpty);
+    for (final text in texts) {
+      expect(text.text.style?.decoration, isNot(TextDecoration.underline));
+    }
+  });
+
   testWidgets('save overlay reassures once the wait is long', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

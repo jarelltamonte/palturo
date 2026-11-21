@@ -144,6 +144,10 @@ void main() {
 
     expect(AppBannerController.instance.current.value?.title, 'Add a showcase');
     expect(
+      AppBannerController.instance.current.value?.imageAsset,
+      'assets/images/triangle.png',
+    );
+    expect(
       AppBannerController.instance.current.value?.body,
       contains('Add a showcase and a note to each teaching skill'),
     );

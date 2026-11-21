@@ -279,4 +279,28 @@ void main() {
     expect(find.text('New request'), findsOneWidget);
     AppBannerController.instance.clear();
   });
+
+  testWidgets('banner image leading is decorative', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: lightMode,
+        home: AppBannerHost(child: const Scaffold(body: SizedBox.expand())),
+      ),
+    );
+
+    AppBannerController.instance.show(
+      const AppBannerData(
+        id: 'mentor-image',
+        title: 'Mentor setup',
+        body: 'Add a showcase so learners can find you.',
+        icon: Icons.change_history,
+        imageAsset: 'assets/images/triangle.png',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.excludeFromSemantics, isTrue);
+    AppBannerController.instance.clear();
+  });
 }

@@ -94,10 +94,15 @@ class MentorSetupBanner extends StatelessWidget {
                   color: fillColor.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(
-                  Icons.workspace_premium_outlined,
-                  size: 18,
-                  color: fillColor,
+                child: Padding(
+                  padding: const EdgeInsets.all(7),
+                  child: ColorFiltered(
+                    colorFilter: ColorFilter.mode(fillColor, BlendMode.srcIn),
+                    child: Image.asset(
+                      'assets/images/triangle.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),

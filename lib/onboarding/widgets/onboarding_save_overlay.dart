@@ -23,53 +23,56 @@ class OnboardingSaveOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = slow ? slowBody : body;
-    return Container(
-      color: Colors.black45,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          child: Semantics(
-            liveRegion: true,
-            label: '$title $message',
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 360),
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-              decoration: BoxDecoration(
-                color: AppColors.elevatedSurface(context),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border(context)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: AppColors.primary,
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        color: Colors.black45,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+            child: Semantics(
+              liveRegion: true,
+              label: '$title $message',
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 360),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                decoration: BoxDecoration(
+                  color: AppColors.elevatedSurface(context),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border(context)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.boldText.copyWith(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontSize: 16,
+                    const SizedBox(height: 18),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.boldText.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(context),
-                      fontSize: 12.5,
-                      height: 1.45,
+                    const SizedBox(height: 6),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.regularText.copyWith(
+                        color: AppColors.mutedText(context),
+                        fontSize: 12.5,
+                        height: 1.45,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

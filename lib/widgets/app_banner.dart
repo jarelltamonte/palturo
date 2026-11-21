@@ -18,6 +18,7 @@ class AppBannerData {
     required this.title,
     required this.body,
     required this.icon,
+    this.imageAsset,
     this.groupKey,
     this.avatarUrl,
     this.actorName,
@@ -32,6 +33,7 @@ class AppBannerData {
   final String title;
   final String body;
   final IconData icon;
+  final String? imageAsset;
   final String? groupKey;
   final String? avatarUrl;
   final String? actorName;
@@ -377,6 +379,26 @@ class _BannerLeading extends StatelessWidget {
         name: data.actorName ?? data.title,
         image: MediaUrl.image(avatarUrl),
         size: 38,
+      );
+    }
+    final imageAsset = data.imageAsset?.trim();
+    if (imageAsset != null && imageAsset.isNotEmpty) {
+      return Container(
+        width: 38,
+        height: 38,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: Image.asset(
+          imageAsset,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+          errorBuilder:
+              (context, error, stackTrace) =>
+                  Icon(data.icon, size: 19, color: AppColors.primary),
+        ),
       );
     }
     return Container(

@@ -1078,7 +1078,6 @@ class _HomePageState extends State<HomePage> {
           onBlock: () => _confirmBlock(current),
           onReport: () => _confirmReport(current),
           onOpenProfile: () => _openProfile(current),
-          showProfilePill: false,
           showShadow: true,
           showSkillNote: true,
         ),

@@ -35,7 +35,6 @@ Widget _card(
           showActions: showActions,
           onAdd: onAdd,
           showMenu: false,
-          showProfilePill: false,
           showShadow: false,
           showSkillNote: true,
           onOpenProfile: onOpenProfile,

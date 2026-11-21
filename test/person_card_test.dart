@@ -127,50 +127,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('compatibility chip explains the reciprocal match', (
-    tester,
-  ) async {
-    var whyOpened = false;
-    var profileOpened = false;
-    final matched = Person(
-      id: 'p3',
-      name: 'Alex Example',
-      schedule: 'Weekends',
-      language: 'English',
-      learningStyle: 'Visual',
-      skillName: 'Spanish',
-      role: PersonRole.mentor,
-      bio: bio,
-      compatibility: 0.86,
-      showcaseUrls: const [null],
-      photoUrls: const [null],
-    );
+  testWidgets(
+    'compatibility chip explains the match and the card opens the profile',
+    (tester) async {
+      var whyOpened = false;
+      var profileOpened = false;
+      final matched = Person(
+        id: 'p3',
+        name: 'Alex Example',
+        schedule: 'Weekends',
+        language: 'English',
+        learningStyle: 'Visual',
+        skillName: 'Spanish',
+        role: PersonRole.mentor,
+        bio: bio,
+        compatibility: 0.86,
+        showcaseUrls: const [null],
+        photoUrls: const [null],
+      );
 
-    await tester.pumpWidget(
-      harness(
-        personOverride: matched,
-        onWhyMatch: () => whyOpened = true,
-        onOpenProfile: () => profileOpened = true,
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        harness(
+          personOverride: matched,
+          onWhyMatch: () => whyOpened = true,
+          onOpenProfile: () => profileOpened = true,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('86% match'), findsOneWidget);
-    expect(find.text('View profile'), findsOneWidget);
+      expect(find.text('86% match'), findsOneWidget);
+      expect(find.text('View profile'), findsNothing);
 
-    await tester.tap(find.text('86% match'));
-    await tester.pumpAndSettle();
-    expect(whyOpened, isTrue);
+      await tester.tap(find.text('86% match'));
+      await tester.pumpAndSettle();
+      expect(whyOpened, isTrue);
 
-    await tester.tap(find.text('View profile'));
-    await tester.pumpAndSettle();
-    expect(profileOpened, isTrue);
-
-    profileOpened = false;
-    await tester.tapAt(const Offset(400, 160));
-    await tester.pumpAndSettle();
-    expect(profileOpened, isTrue);
-  });
+      profileOpened = false;
+      await tester.tapAt(const Offset(400, 160));
+      await tester.pumpAndSettle();
+      expect(profileOpened, isTrue);
+    },
+  );
 
   testWidgets('expanded bio scrolls instead of overflowing', (tester) async {
     await tester.pumpWidget(harness(textScale: 2.5));

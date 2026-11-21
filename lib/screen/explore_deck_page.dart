@@ -411,6 +411,10 @@ class ExploreDeckPageState extends State<ExploreDeckPage> {
         onOpenProfile: () => showPersonProfileDialog(context, current),
         skipLabel: 'Skip',
         addLabel: 'Send request',
+        // Match the For You card exactly: the approved skill note, no
+        // redundant profile pill (the card itself opens the profile).
+        showShadow: true,
+        showSkillNote: true,
       ),
     );
   }

@@ -133,7 +133,6 @@ class PersonCardOverlay extends StatefulWidget {
   final String addLabel;
   final bool showActions;
   final bool showMenu;
-  final bool showProfilePill;
   final bool showShadow;
   final bool showSkillNote;
 
@@ -154,7 +153,6 @@ class PersonCardOverlay extends StatefulWidget {
     this.addLabel = 'Send request',
     this.showActions = true,
     this.showMenu = true,
-    this.showProfilePill = true,
     this.showShadow = true,
     this.showSkillNote = false,
     this.guideKeys,
@@ -298,8 +296,6 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
       orElse: () => null,
     );
     final shownMedia = isDetailsPage ? backdropPhoto : currentPhoto;
-    final showProfilePill = widget.showProfilePill && !isDetailsPage;
-
     if (!isDetailsPage) _measureInfo();
     final playBottom = (widget.showActions ? 130.0 : 64.0) + _infoHeight + 10;
 
@@ -480,18 +476,6 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                           '${((widget.person.compatibility! * 100).clamp(0, 100)).round()}% match',
                       semanticsLabel:
                           '${((widget.person.compatibility! * 100).clamp(0, 100)).round()} percent match. Why this match?',
-                    ),
-                  if (widget.person.compatibility != null &&
-                      widget.onWhyMatch != null &&
-                      widget.onOpenProfile != null &&
-                      showProfilePill)
-                    const SizedBox(height: 6),
-                  if (widget.onOpenProfile != null && showProfilePill)
-                    _GlassPill(
-                      onTap: widget.onOpenProfile,
-                      icon: Icons.person_outline,
-                      label: 'View profile',
-                      semanticsLabel: 'View ${widget.person.name} profile',
                     ),
                 ],
               ),

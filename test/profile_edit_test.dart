@@ -419,6 +419,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Woman'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('Save').first);
     await tester.tap(find.text('Save').first);

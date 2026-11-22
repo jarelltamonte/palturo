@@ -298,54 +298,77 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final result = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.elevatedSurface(context),
-      builder:
-          (sheetContext) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-                  child: Text(
-                    'Gender',
-                    style: AppTextStyles.headingText.copyWith(
-                      color: Theme.of(sheetContext).colorScheme.secondary,
-                      fontSize: 18,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final secondary = Theme.of(context).colorScheme.secondary;
+        var tempSelected = _gender ?? '';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Gender',
+                      style: AppTextStyles.boldText.copyWith(color: secondary),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                  child: Text(
-                    'Private. Used only for aggregate analytics.',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: AppColors.mutedText(sheetContext),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                for (final option in options)
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                    title: Text(
-                      option.label,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Private. Used only for aggregate analytics.',
                       style: AppTextStyles.regularText.copyWith(
-                        color: Theme.of(sheetContext).colorScheme.secondary,
+                        color: AppColors.mutedText(context),
+                        fontSize: 12,
                       ),
                     ),
-                    trailing:
-                        _gender == (option.value.isEmpty ? null : option.value)
-                            ? Icon(
-                              Icons.check_circle_outline,
-                              color: AppColors.accentText(sheetContext),
-                            )
-                            : null,
-                    onTap: () => Navigator.pop(sheetContext, option.value),
-                  ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final option in options)
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: AppColors.primary,
+                              checkColor: Colors.black,
+                              value: tempSelected == option.value,
+                              title: Text(
+                                option.label,
+                                style: AppTextStyles.regularText.copyWith(
+                                  color: secondary,
+                                ),
+                              ),
+                              onChanged:
+                                  (_) => setModalState(
+                                    () => tempSelected = option.value,
+                                  ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: _doneButtonStyle,
+                        onPressed: () => Navigator.pop(context, tempSelected),
+                        child: const Text(
+                          'Apply',
+                          style: TextStyle(color: Colors.black, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
     if (result == null || !mounted) return;
     setState(() => _gender = result.isEmpty ? null : result);

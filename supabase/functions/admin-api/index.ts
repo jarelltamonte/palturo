@@ -97,6 +97,7 @@ const ACTION_PERMISSION: Record<string, string> = {
   "users.resetMfa": "users.write",
   "users.cardVisibility": "users.write",
   "matcher.cardStats": "config.read",
+  "matching.warm": "config.write",
   "moderation.reports": "moderation.read",
   "moderation.resolveReport": "moderation.write",
   "moderation.skills": "moderation.read",
@@ -447,8 +448,93 @@ Deno.serve(async (req) => {
         return json({ ok: true, data });
       }
 
-      case "analytics": {
-        const surface = String(payload.surface ?? "growth");
+      // Matching analytics reads match_cache_v2, which only fills when a deck
+      // is built. This rebuilds decks for onboarded users a batch at a time;
+      // the console calls it repeatedly until `remaining` reaches zero.
+      case "matching.warm": {
+        const limit = clampInt(payload.limit, 6, 1, 20);
+        const direction = String(payload.direction ?? "all");
+        const roles =
+          direction === "mentor" || direction === "learner"
+            ? [direction]
+            : ["mentor", "learner"];
+
+        const { data: people, error: peopleErr } = await admin
+          .from("profiles")
+          .select("id")
+          .eq("has_completed_onboarding", true)
+          .order("last_seen_at", { ascending: false, nullsFirst: false })
+          .limit(300);
+        if (peopleErr) throw peopleErr;
+
+        const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/get-matches`;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const started = Date.now();
+        const warmed = new Set<string>();
+        let skipped = 0;
+        let failed = 0;
+        const errors: string[] = [];
+
+        for (const person of people ?? []) {
+          if (warmed.size >= limit || Date.now() - started > 90_000) break;
+          const id = String((person as Record<string, unknown>).id ?? "");
+          if (!id) continue;
+
+          for (const role of roles) {
+            const { count } = await admin
+              .from("match_cache_v2")
+              .select("user_id", { count: "exact", head: true })
+              .eq("user_id", id)
+              .eq("as_role", role);
+            if ((count ?? 0) > 0) {
+              skipped += 1;
+              continue;
+            }
+
+            try {
+              const res = await fetch(functionUrl, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${serviceKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  as_role: role,
+                  refresh: false,
+                  warm_user: id,
+                }),
+              });
+              if (!res.ok) {
+                failed += 1;
+                if (errors.length < 3) errors.push(`${role}: HTTP ${res.status}`);
+              } else {
+                warmed.add(id);
+              }
+            } catch (error) {
+              failed += 1;
+              if (errors.length < 3) {
+                errors.push((error as Error)?.message ?? "warmup failed");
+              }
+            }
+          }
+        }
+
+        return json({
+          ok: true,
+          data: {
+            warmed: warmed.size,
+            skipped,
+            failed,
+            errors,
+            remaining: Math.max(
+              0,
+              (people?.length ?? 0) - skipped - warmed.size,
+            ),
+          },
+        });
+      }
+
+      case "analytics": {        const surface = String(payload.surface ?? "growth");
         const days = clampInt(payload.days, 30, 1, 365);
         if (surface === "system") {
           const [baseResult, inferenceResult] = await Promise.all([

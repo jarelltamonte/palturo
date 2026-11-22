@@ -126,25 +126,41 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) return json({ error: "Missing bearer token" }, 401);
 
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: authData } = await userClient.auth.getUser();
-    const user = authData?.user;
-    if (!user) return json({ error: "Unauthorized" }, 401);
-
-    let payload: { as_role?: string; refresh?: boolean };
+    let payload: { as_role?: string; refresh?: boolean; warm_user?: string };
     try {
       payload = await req.json();
     } catch {
       payload = {};
     }
+
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Cache warmups arrive from the admin API, which authenticates with the
+    // service key and has no end-user identity. Only that exact credential may
+    // name the user to run as; a user token can never impersonate.
+    const warmUser =
+      typeof payload.warm_user === "string" ? payload.warm_user.trim() : "";
+    let user: { id: string } | null = null;
+    if (warmUser) {
+      if (authHeader !== `Bearer ${serviceKey}`) {
+        return json({ error: "Forbidden" }, 403);
+      }
+      user = { id: warmUser };
+    } else {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: authData } = await userClient.auth.getUser();
+      user = authData?.user ?? null;
+    }
+    if (!user) return json({ error: "Unauthorized" }, 401);
+
     const targetRole = payload.as_role === "mentor" ? "mentor" : "learner"; // candidates I want
     const meRole = targetRole === "mentor" ? "learner" : "mentor";
 

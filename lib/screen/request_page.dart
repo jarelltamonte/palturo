@@ -1245,6 +1245,7 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
         scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
+        centerTitle: false,
         leadingWidth: AppSpacing.leadingWidth,
         leading:
             ModalRoute.of(context)?.isFirst == false
@@ -1265,39 +1266,42 @@ class _RequestPageState extends State<RequestPage> with RouteAware {
         ),
         actionsPadding: EdgeInsets.zero,
         actions: [
-          AppChrome.iconAction(
-            icon: Icons.notifications_none_rounded,
-            tooltip: 'Activity',
-            onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationsPage()),
-                ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  Icons.notifications_none_rounded,
-                  color: textTheme,
-                  size: 24,
-                ),
-                if (PreferencesService.instance.notificationsEnabled &&
-                    NotificationService.instance.unread > 0)
-                  Positioned(
-                    right: -1,
-                    top: -1,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
+          if (_view == RequestView.incoming)
+            AppChrome.iconAction(
+              icon: Icons.notifications_none_rounded,
+              tooltip: 'Activity',
+              onPressed:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsPage(),
                     ),
                   ),
-              ],
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    Icons.notifications_none_rounded,
+                    color: textTheme,
+                    size: 24,
+                  ),
+                  if (PreferencesService.instance.notificationsEnabled &&
+                      NotificationService.instance.unread > 0)
+                    Positioned(
+                      right: -1,
+                      top: -1,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
           Semantics(
             container: true,
             button: true,

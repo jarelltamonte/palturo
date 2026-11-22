@@ -68,6 +68,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   static const Duration saveSlowThreshold = Duration(seconds: 6);
 
   bool _returnToReview = false;
+  List<OnboardingStep>? _reviewReturnHistory;
   int _noteIndex = 0;
 
   OnboardingStep get _current => _history.last;
@@ -155,7 +156,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   void _editFromReview(OnboardingStep step) {
     setState(() {
       _returnToReview = true;
-      _history.add(step);
+      _reviewReturnHistory = List.of(_history);
+      // Jump to the real position of the edited step instead of stacking it on
+      // top of Review. Back then follows the onboarding sequence (for example,
+      // Back from Role goes to Intro), while Continue still returns to Review.
+      _history
+        ..clear()
+        ..addAll(_pathTo(step));
     });
   }
 
@@ -309,13 +316,23 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   void _goTo(OnboardingStep step) {
     setState(() {
-      if (_returnToReview &&
-          step == OnboardingStep.review &&
-          _history.length > 1) {
-        // Returning from an edit started on Review: drop the edit step so the
-        // existing Review becomes current instead of stacking a duplicate.
+      if (_returnToReview && step == OnboardingStep.review) {
+        // Returning from an edit started on Review: restore the stack the user
+        // had before editing so Back from Review still goes to the step that
+        // preceded it.
         _returnToReview = false;
-        _history.removeLast();
+        final returnHistory = _reviewReturnHistory;
+        _reviewReturnHistory = null;
+        if (returnHistory != null) {
+          _history
+            ..clear()
+            ..addAll(returnHistory);
+          if (_history.last != OnboardingStep.review) {
+            _history.add(OnboardingStep.review);
+          }
+        } else {
+          _history.add(step);
+        }
       } else {
         _history.add(step);
       }
@@ -328,13 +345,15 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
 
   void _back() {
     if (_isSaving) return;
+    _reviewReturnHistory = null;
     if (_history.length > 1) {
       setState(() {
         _history.removeLast();
-        if (_returnToReview) _returnToReview = false;
+        _returnToReview = false;
       });
       return;
     }
+    _returnToReview = false;
     // A pushed onboarding route must stay dismissible; otherwise the only
     // exit from the intro would be force-quitting the app.
     if (_canDismissRoute) Navigator.of(context).pop();
@@ -353,21 +372,45 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   }
 
   void _backNote() {
-    if (_returnToReview) {
-      _back();
+    if (_noteIndex > 0) {
+      setState(() {
+        _noteIndex--;
+        _returnToReview = false;
+        _reviewReturnHistory = null;
+      });
       return;
     }
-    if (_noteIndex > 0) {
-      setState(() => _noteIndex--);
-    } else {
-      _back();
-    }
+    _back();
   }
 
   OnboardingStep _next(OnboardingStep from) {
     if (_returnToReview && from != OnboardingStep.intro) {
       return OnboardingStep.review;
     }
+    final next = _nextInFlow(from);
+    if (from == OnboardingStep.learningInterests &&
+        next == OnboardingStep.learningNotes) {
+      _noteIndex = 0;
+    }
+    return next;
+  }
+
+  /// Canonical steps leading to [target]. Used when jumping into an edit from
+  /// Review so Back walks the real sequence rather than popping to Review.
+  List<OnboardingStep> _pathTo(OnboardingStep target) {
+    final path = <OnboardingStep>[OnboardingStep.intro];
+    var current = OnboardingStep.intro;
+    while (current != target) {
+      final next = _nextInFlow(current);
+      if (next == current || next == OnboardingStep.review) break;
+      path.add(next);
+      current = next;
+    }
+    if (path.last != target) path.add(target);
+    return path;
+  }
+
+  OnboardingStep _nextInFlow(OnboardingStep from) {
     switch (from) {
       case OnboardingStep.intro:
         return OnboardingStep.role;
@@ -378,7 +421,6 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       case OnboardingStep.learningInterests:
         if (_controller.wantsLearning &&
             _controller.learningInterests.isNotEmpty) {
-          _noteIndex = 0;
           return OnboardingStep.learningNotes;
         }
         return _controller.wantsTeaching
@@ -419,6 +461,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
       }
       if (!mounted) return;
       _returnToReview = false;
+      _reviewReturnHistory = null;
       _goTo(OnboardingStep.complete);
     } catch (e) {
       if (!mounted) return;

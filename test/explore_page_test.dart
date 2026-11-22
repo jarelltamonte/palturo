@@ -150,6 +150,7 @@ void main() {
       find.textContaining('There are currently no mentors in Martial Arts'),
       findsOneWidget,
     );
+    expect(find.byIcon(Icons.group_off_outlined), findsOneWidget);
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
     expect(find.textContaining('There are currently no mentors'), findsNothing);

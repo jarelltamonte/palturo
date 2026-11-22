@@ -586,7 +586,7 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
                 child: Icon(
                   exploreRootIcon(widget.nodePath),
                   size: iconSize * 0.5,
-                  color: fill,
+                  color: accent,
                 ),
               ),
               const SizedBox(width: 12),

@@ -491,6 +491,7 @@ class _ExplorePageState extends State<ExplorePage> {
       message:
           'There are currently no ${noun}s in $label. Check back soon as more '
           'people join PalTuro.',
+      icon: Icons.group_off_outlined,
     );
   }
 
@@ -1405,7 +1406,11 @@ class _FeaturedDomainCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.45),
                   ),
                 ),
-                child: Icon(icon, size: 28, color: AppColors.primary),
+                child: Icon(
+                  icon,
+                  size: 28,
+                  color: AppColors.accentText(context),
+                ),
               ),
             ],
           ),
@@ -1480,7 +1485,11 @@ class _TeachingDomainCard extends StatelessWidget {
                         color: exploreTileTint(context),
                         borderRadius: BorderRadius.circular(13),
                       ),
-                      child: Icon(icon, size: 22, color: AppColors.primary),
+                      child: Icon(
+                        icon,
+                        size: 22,
+                        color: AppColors.accentText(context),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

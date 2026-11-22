@@ -53,6 +53,7 @@ Future<void> showInfoDialog(
   required String title,
   required String message,
   String buttonLabel = 'OK',
+  IconData? icon,
 }) async {
   await showAdaptiveDialog<void>(
     context: context,
@@ -61,6 +62,7 @@ Future<void> showInfoDialog(
           title: title,
           message: message,
           buttonLabel: buttonLabel,
+          icon: icon,
         ),
   );
 }
@@ -69,11 +71,13 @@ class _InfoDialog extends StatelessWidget {
   final String title;
   final String message;
   final String buttonLabel;
+  final IconData? icon;
 
   const _InfoDialog({
     required this.title,
     required this.message,
     required this.buttonLabel,
+    this.icon,
   });
 
   @override
@@ -92,10 +96,30 @@ class _InfoDialog extends StatelessWidget {
       ),
     );
 
-    final body = Text(
-      message,
-      textAlign: TextAlign.center,
-      style: AppTextStyles.regularText.copyWith(color: textTheme, fontSize: 14),
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, size: 28, color: AppColors.accentText(context)),
+          ),
+          const SizedBox(height: 14),
+        ],
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.regularText.copyWith(
+            color: textTheme,
+            fontSize: 14,
+          ),
+        ),
+      ],
     );
 
     if (isIOS) {
@@ -103,7 +127,7 @@ class _InfoDialog extends StatelessWidget {
         title: titleWidget,
         content: Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: Material(color: Colors.transparent, child: body),
+          child: Material(color: Colors.transparent, child: content),
         ),
         actions: [
           CupertinoDialogAction(
@@ -125,7 +149,7 @@ class _InfoDialog extends StatelessWidget {
       backgroundColor: AppColors.elevatedSurface(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       title: titleWidget,
-      content: SizedBox(width: double.maxFinite, child: body),
+      content: SizedBox(width: double.maxFinite, child: content),
       actions: [
         TextButton(
           onPressed: () {

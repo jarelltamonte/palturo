@@ -54,6 +54,16 @@ const kDeckSlowMessage = 'Looking for the perfect matches…';
 const kDeckSlowHint =
     'New profiles can take a little longer while we build your matches.';
 
+/// Shown while the deck is rebuilt after the user edits their profile, so a
+/// changed deck reads as a response to the edit rather than a random refresh.
+@visibleForTesting
+const kDeckProfileMessage = 'Finding matches for your updated profile…';
+
+/// The notice only appears if the rebuild outlives this, so a fast response
+/// does not flash a strip on and off.
+@visibleForTesting
+const kDeckProfileNoticeDelay = Duration(milliseconds: 400);
+
 /// Hard cap for a cold deck load. After this the UI offers a retry.
 ///
 /// A brand-new profile has to embed its passages before the matcher can rank
@@ -159,6 +169,14 @@ class _HomePageState extends State<HomePage> {
   final Set<String> _noteGateBypass = <String>{};
   bool _possibleMatchLive = false;
 
+  /// True from a profile write until the deck it triggered finishes loading.
+  /// Drives the "updated profile" copy instead of the generic slow-deck copy.
+  bool _profileReload = false;
+
+  /// Debounces [_profileReload] into a visible notice.
+  bool _profileNotice = false;
+  Timer? _profileNoticeTimer;
+
   RoleFilter _roleFilter = RoleFilter.all;
   int _currentIndex = 0;
   final List<int> _history = [];
@@ -192,6 +210,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     ProfileService.profileRevision.addListener(_onProfileRevision);
+    ProfileService.matchInputsRevision.addListener(_onMatchInputsRevision);
     AppShellState.instance.addListener(_onShellStateChanged);
     _loadDeck();
     unawaited(
@@ -206,11 +225,13 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     ProfileService.profileRevision.removeListener(_onProfileRevision);
+    ProfileService.matchInputsRevision.removeListener(_onMatchInputsRevision);
     AppShellState.instance.removeListener(_onShellStateChanged);
     _guideEntry?.remove();
     _guideEntry = null;
     _slowTimer?.cancel();
     _timeoutTimer?.cancel();
+    _profileNoticeTimer?.cancel();
     super.dispose();
   }
 
@@ -218,6 +239,49 @@ class _HomePageState extends State<HomePage> {
 
   void _onProfileRevision() {
     unawaited(_refreshMyProfile());
+  }
+
+  /// A matching edit — skills, notes, role, languages, styles, availability.
+  /// Cosmetic edits (bio, age, name, avatar) only bump [profileRevision], so
+  /// For You refreshes the profile view without rebuilding the deck.
+  void _onMatchInputsRevision() {
+    if (_guideActive) return;
+    _startProfileReload();
+    unawaited(_loadDeck(force: true));
+  }
+
+  void _startProfileReload() {
+    _profileNoticeTimer?.cancel();
+    _profileNoticeTimer = null;
+    if (mounted) {
+      setState(() {
+        _profileReload = true;
+        _profileNotice = false;
+      });
+    } else {
+      _profileReload = true;
+      _profileNotice = false;
+    }
+    // Only announce it if the rebuild is slow enough to be noticed; otherwise
+    // the strip would appear and vanish within a frame or two.
+    _profileNoticeTimer = Timer(kDeckProfileNoticeDelay, () {
+      if (!mounted || !_profileReload) return;
+      setState(() => _profileNotice = true);
+    });
+  }
+
+  /// Ends the profile-reload state. Only the load that is still current may
+  /// clear it, so a superseded load cannot hide a newer rebuild's message.
+  void _endProfileReload(int generation) {
+    if (generation != _deckGeneration) return;
+    _profileNoticeTimer?.cancel();
+    _profileNoticeTimer = null;
+    if (!mounted) return;
+    if (!_profileReload && !_profileNotice) return;
+    setState(() {
+      _profileReload = false;
+      _profileNotice = false;
+    });
   }
 
   Future<void> _refreshMyProfile() async {
@@ -372,6 +436,10 @@ class _HomePageState extends State<HomePage> {
         _slowLoad = false;
       });
     }
+
+    // Every terminal path above falls through to here; a superseded or
+    // unmounted load returns early and leaves the flag to the newer load.
+    _endProfileReload(generation);
 
     _guideSeen = seen;
     unawaited(_scheduleGuideCheck(seen));
@@ -1218,13 +1286,28 @@ class _HomePageState extends State<HomePage> {
             )
             : null;
 
+    // A profile edit rebuilds the deck in place. Say why, but only once the
+    // rebuild has lasted long enough to be worth explaining (a fast response
+    // would otherwise flash this on and off).
+    final refreshNotice =
+        _profileNotice && !_loading && !_guideActive
+            ? _buildProfileRefreshNotice()
+            : null;
+
+    final banners = <Widget>[
+      if (setupBanner != null) setupBanner,
+      if (refreshNotice != null) refreshNotice,
+    ];
+
     final bodyContent =
-        setupBanner == null
+        banners.isEmpty
             ? content
             : Column(
               children: [
-                setupBanner,
-                const SizedBox(height: 10),
+                for (final banner in banners) ...[
+                  banner,
+                  const SizedBox(height: 10),
+                ],
                 Expanded(child: content),
               ],
             );
@@ -1458,13 +1541,13 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    kDeckSlowMessage,
+                    _profileReload ? kDeckProfileMessage : kDeckSlowMessage,
                     textAlign: TextAlign.center,
                     style: AppTextStyles.regularText.copyWith(
                       color: Theme.of(context).colorScheme.secondary,
                     ),
                   ),
-                  if (_slowLoad) ...[
+                  if (_slowLoad && !_profileReload) ...[
                     const SizedBox(height: 2),
                     Text(
                       kDeckSlowHint,
@@ -1485,8 +1568,47 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildErrorState(Color textColor) {
-    final raw =
+  /// Slim, non-blocking notice above the deck while a profile edit rebuilds
+  /// the cards. The previous deck stays visible and usable underneath.
+  Widget _buildProfileRefreshNotice() {
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: AppColors.elevatedSurface(context),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.border(context)),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                kDeckProfileMessage,
+                style: AppTextStyles.regularText.copyWith(
+                  color: AppColors.mutedText(context),
+                  fontSize: 12.5,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Color textColor) {    final raw =
         (_error ?? '').replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
     final message =
         raw.isEmpty ? "Couldn't load recommendations. Please try again." : raw;

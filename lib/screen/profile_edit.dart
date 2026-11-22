@@ -1159,6 +1159,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     try {
       final savedProfile = await _profileService.updateProfile(
         updated,
+        previous: widget.profile,
         newPhotoLocalPaths: _photos,
         teachingSkillImages: teachingSkillImages,
         onClassifyingSkill: (skillName) {

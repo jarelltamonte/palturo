@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint, ValueNotifier;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, debugPrint, ValueNotifier, visibleForTesting;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -138,6 +139,55 @@ class ProfileService {
 
   static void notifyProfileChanged() {
     profileRevision.value++;
+  }
+
+  /// Bumped only when a write changes something the matcher reads: role,
+  /// skills, their notes, languages, styles or availability. For You listens
+  /// to this so a bio or age edit does not rebuild the deck.
+  static final ValueNotifier<int> matchInputsRevision = ValueNotifier<int>(0);
+
+  static void notifyMatchInputsChanged() {
+    matchInputsRevision.value++;
+  }
+
+  /// Whether [after] differs from [before] in a way that can change a deck.
+  ///
+  /// Mirrors what `match_cards` reads from the viewer: the skill cards that
+  /// become the query, their notes, and the context passage (languages,
+  /// styles, availability). Bio, age, gender, name, avatar and showcase media
+  /// are deliberately excluded — bio carries zero embedding weight, and the
+  /// rest are display, demographics, or other people's view of you.
+  @visibleForTesting
+  static bool matchInputsChanged(ProfileData? before, ProfileData after) {
+    if (before == null) return true;
+    if (before.effectiveRole != after.effectiveRole) return true;
+    if (!_sameSet(before.learningSkillIds, after.learningSkillIds)) return true;
+    if (!_sameSet(before.teachingSkillIds, after.teachingSkillIds)) return true;
+    if (!_sameSet(before.languages, after.languages)) return true;
+    if (!_sameSet(before.interests, after.interests)) return true;
+    if (!_sameSet(before.teachingStyles, after.teachingStyles)) return true;
+    if (!_sameSet(before.availableDays, after.availableDays)) return true;
+    // Notes are only comparable when both reads succeeded; a failed read must
+    // not look like "the note was cleared".
+    if (before.notesLoaded && after.notesLoaded) {
+      if (!_sameValues(before.learningNotes, after.learningNotes)) return true;
+      if (!_sameValues(before.teachingNotes, after.teachingNotes)) return true;
+    }
+    return false;
+  }
+
+  static bool _sameSet(List<String> a, List<String> b) {
+    final left = a.toSet();
+    final right = b.toSet();
+    return left.length == right.length && left.containsAll(right);
+  }
+
+  static bool _sameValues(Map<String, String> a, Map<String, String> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   /// Reads picked-image bytes without `File(path)`, which throws
@@ -582,6 +632,9 @@ class ProfileService {
     }
 
     await refreshEmbeddings();
+    // Onboarding establishes the role, skills and context a deck is built
+    // from, so it always counts as a matching change.
+    notifyMatchInputsChanged();
     notifyProfileChanged();
   }
 
@@ -933,6 +986,10 @@ class ProfileService {
 
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
+    /// The profile as it was when the editor opened, used to tell a matching
+    /// edit from a cosmetic one (bio, age, name). Null means "assume it
+    /// matters", which is the safe default for any other caller.
+    ProfileData? previous,
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
     void Function(String skillName)? onClassifyingSkill,
@@ -1285,6 +1342,13 @@ class ProfileService {
     // stuck for tens of seconds after the profile had already been written.
     unawaited(refreshEmbeddings());
 
+    // The deck was built from the pre-edit profile, so a matching edit must not
+    // survive the save. Cosmetic edits (bio, age, gender, name, avatar) leave
+    // the ranking untouched, so they only refresh the profile view.
+    if (matchInputsChanged(previous, updatedProfile)) {
+      MatchApi.clearCaches();
+      ProfileService.notifyMatchInputsChanged();
+    }
     ProfileService.notifyProfileChanged();
     return refreshed ?? updatedProfile;
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/chats_page.dart' show SkillTag;
 import 'package:palturo/theme/app_colors.dart';
@@ -102,18 +103,24 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
     ];
   }
 
-  List<({IconData icon, String label})> get _preferences {
+  List<({IconData icon, String? svgAsset, String label})> get _preferences {
     final person = widget.person;
     if (person == null) return const [];
-    final out = <({IconData icon, String label})>[];
-    void add(IconData icon, String value) {
+    final out = <({IconData icon, String? svgAsset, String label})>[];
+    void add(IconData icon, String value, {String? svgAsset}) {
       final text = value.trim();
-      if (text.isNotEmpty) out.add((icon: icon, label: text));
+      if (text.isNotEmpty) {
+        out.add((icon: icon, svgAsset: svgAsset, label: text));
+      }
     }
 
     add(Icons.calendar_today_outlined, person.schedule);
     add(Icons.translate, person.language);
-    add(Icons.psychology, person.learningStyle);
+    add(
+      Icons.psychology,
+      person.learningStyle,
+      svgAsset: 'assets/icons/rlearner.svg',
+    );
     return out;
   }
 
@@ -232,7 +239,8 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
 
   Widget _buildProfile(
     BuildContext context, {
-    required List<({IconData icon, String label})> preferences,
+    required List<({IconData icon, String? svgAsset, String label})>
+    preferences,
     required String bio,
     required bool canOpenProfile,
   }) {
@@ -280,7 +288,11 @@ class _NewMatchEmptyState extends State<NewMatchEmpty> {
             runSpacing: 8,
             children: [
               for (final pref in preferences)
-                _PreferenceChip(icon: pref.icon, label: pref.label),
+                _PreferenceChip(
+                  icon: pref.icon,
+                  svgAsset: pref.svgAsset,
+                  label: pref.label,
+                ),
             ],
           ),
         ],
@@ -506,9 +518,14 @@ class _ProfileAvatar extends StatelessWidget {
 }
 
 class _PreferenceChip extends StatelessWidget {
-  const _PreferenceChip({required this.icon, required this.label});
+  const _PreferenceChip({
+    required this.icon,
+    this.svgAsset,
+    required this.label,
+  });
 
   final IconData icon;
+  final String? svgAsset;
   final String label;
 
   @override
@@ -524,7 +541,15 @@ class _PreferenceChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: muted),
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 13,
+              height: 13,
+              colorFilter: ColorFilter.mode(muted, BlendMode.srcIn),
+            )
+          else
+            Icon(icon, size: 13, color: muted),
           const SizedBox(width: 6),
           Flexible(
             child: Text(

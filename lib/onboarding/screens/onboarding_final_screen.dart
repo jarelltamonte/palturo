@@ -80,7 +80,7 @@ class OnboardingFinalScreen extends StatelessWidget {
               children: [
                 OnboardingSelectField(
                   label: 'Learning Style',
-                  labelIcon: Icons.psychology,
+                  labelIconAsset: 'assets/icons/rlearner.svg',
                   hint: 'Select your learning style',
                   displayValue: controller.learningStyles.join(', '),
                   options: kLearningStyleOptions,
@@ -92,7 +92,7 @@ class OnboardingFinalScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   OnboardingSelectField(
                     label: 'Teaching Style',
-                    labelIcon: Icons.school_outlined,
+                    labelIconAsset: 'assets/icons/rmentor.svg',
                     hint: 'Select your teaching style',
                     displayValue: controller.teachingStyles.join(', '),
                     options: kTeachingStyleOptions,

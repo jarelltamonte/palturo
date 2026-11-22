@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:palturo/theme/app_spacing.dart';
 import 'package:palturo/theme/app_text_styles.dart';
@@ -1438,7 +1439,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         ),
                         const SizedBox(height: 12),
                         _DropdownInfoField(
-                          icon: Icons.psychology,
+                          iconAsset: 'assets/icons/rlearner.svg',
                           label: 'Learning Style',
                           value: _learningStyles.join(', '),
                           hint: 'Tap to set learning styles',
@@ -1456,7 +1457,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                         ),
                         const SizedBox(height: 12),
                         _DropdownInfoField(
-                          icon: Icons.school_outlined,
+                          iconAsset: 'assets/icons/rmentor.svg',
                           label: 'Teaching Style',
                           value: _teachingStyles.join(', '),
                           hint: 'Tap to set teaching styles',
@@ -1907,7 +1908,7 @@ class _ProfilePreviewPage extends StatelessWidget {
                     : profile.languages.join(', '),
           ),
           _PreviewRow(
-            icon: Icons.psychology_outlined,
+            svgAsset: 'assets/icons/rlearner.svg',
             label: 'Learning style',
             value:
                 profile.interests.isEmpty
@@ -1948,15 +1949,17 @@ class _ProfilePreviewPage extends StatelessWidget {
 }
 
 class _PreviewRow extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final String label;
   final String value;
 
   const _PreviewRow({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.label,
     required this.value,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -1966,7 +1969,18 @@ class _PreviewRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.mutedText(context)),
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 18,
+              height: 18,
+              colorFilter: ColorFilter.mode(
+                AppColors.mutedText(context),
+                BlendMode.srcIn,
+              ),
+            )
+          else
+            Icon(icon, size: 18, color: AppColors.mutedText(context)),
           const SizedBox(width: 10),
           SizedBox(
             width: 118,
@@ -2069,7 +2083,8 @@ class _ProfileSectionHeader extends StatelessWidget {
 }
 
 class _DropdownInfoField extends StatefulWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAsset;
   final String label;
   final String value;
   final String hint;
@@ -2077,13 +2092,14 @@ class _DropdownInfoField extends StatefulWidget {
   final bool needsAttention;
 
   const _DropdownInfoField({
-    required this.icon,
+    this.icon,
+    this.iconAsset,
     required this.label,
     required this.value,
     required this.hint,
     required this.onTap,
     this.needsAttention = false,
-  });
+  }) : assert(icon != null || iconAsset != null);
 
   @override
   State<_DropdownInfoField> createState() => _DropdownInfoFieldState();
@@ -2136,7 +2152,15 @@ class _DropdownInfoFieldState extends State<_DropdownInfoField> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(widget.icon, size: 18, color: textColor),
+                  if (widget.iconAsset != null)
+                    SvgPicture.asset(
+                      widget.iconAsset!,
+                      width: 18,
+                      height: 18,
+                      colorFilter: ColorFilter.mode(textColor, BlendMode.srcIn),
+                    )
+                  else
+                    Icon(widget.icon, size: 18, color: textColor),
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 120,

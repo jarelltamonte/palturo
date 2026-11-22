@@ -578,10 +578,14 @@ class _RequestCardState extends State<RequestCard>
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.psychology,
-                                size: 13,
-                                color: textTheme,
+                              SvgPicture.asset(
+                                'assets/icons/rlearner.svg',
+                                width: 13,
+                                height: 13,
+                                colorFilter: ColorFilter.mode(
+                                  textTheme,
+                                  BlendMode.srcIn,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               Flexible(

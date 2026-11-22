@@ -816,10 +816,14 @@ class _PersonCardOverlayState extends State<PersonCardOverlay> {
                               Row(
                                 key: widget.guideKeys?.learningStyle,
                                 children: [
-                                  const Icon(
-                                    Icons.psychology,
-                                    size: 15,
-                                    color: Colors.white70,
+                                  SvgPicture.asset(
+                                    'assets/icons/rlearner.svg',
+                                    width: 15,
+                                    height: 15,
+                                    colorFilter: const ColorFilter.mode(
+                                      Colors.white70,
+                                      BlendMode.srcIn,
+                                    ),
                                   ),
                                   const SizedBox(width: 6),
                                   Expanded(
@@ -1092,13 +1096,13 @@ class _DetailsPage extends StatelessWidget {
             ),
           if (learningStyle.isNotEmpty)
             _DetailRow(
-              icon: Icons.psychology,
+              svgAsset: 'assets/icons/rlearner.svg',
               label: 'Learning style',
               value: learningStyle,
             ),
           if (teachingStyle.isNotEmpty)
             _DetailRow(
-              icon: Icons.school_outlined,
+              svgAsset: 'assets/icons/rmentor.svg',
               label: 'Teaching style',
               value: teachingStyle,
             ),
@@ -1122,17 +1126,19 @@ class _DetailsPage extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? svgAsset;
   final Color iconColor;
   final String label;
   final String value;
 
   const _DetailRow({
-    required this.icon,
+    this.icon,
+    this.svgAsset,
     required this.label,
     required this.value,
     this.iconColor = Colors.white70,
-  });
+  }) : assert(icon != null || svgAsset != null);
 
   @override
   Widget build(BuildContext context) {
@@ -1141,7 +1147,15 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: iconColor),
+          if (svgAsset != null)
+            SvgPicture.asset(
+              svgAsset!,
+              width: 18,
+              height: 18,
+              colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+            )
+          else
+            Icon(icon, size: 18, color: iconColor),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

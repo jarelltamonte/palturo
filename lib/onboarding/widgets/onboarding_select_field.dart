@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/theme/app_motion.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -29,6 +30,7 @@ Future<Set<String>?> showMultiSelectPicker({
 class OnboardingSelectField extends StatefulWidget {
   final String? label;
   final IconData? labelIcon;
+  final String? labelIconAsset;
   final String hint;
   final String displayValue;
   final List<String> options;
@@ -40,6 +42,7 @@ class OnboardingSelectField extends StatefulWidget {
     super.key,
     this.label,
     this.labelIcon,
+    this.labelIconAsset,
     required this.hint,
     required this.displayValue,
     required this.options,
@@ -101,7 +104,15 @@ class _OnboardingSelectFieldState extends State<OnboardingSelectField> {
         if (widget.label != null) ...[
           Row(
             children: [
-              if (widget.labelIcon != null) ...[
+              if (widget.labelIconAsset != null) ...[
+                SvgPicture.asset(
+                  widget.labelIconAsset!,
+                  width: 18,
+                  height: 18,
+                  colorFilter: ColorFilter.mode(secondary, BlendMode.srcIn),
+                ),
+                const SizedBox(width: 6),
+              ] else if (widget.labelIcon != null) ...[
                 Icon(widget.labelIcon, size: 18, color: secondary),
                 const SizedBox(width: 6),
               ],

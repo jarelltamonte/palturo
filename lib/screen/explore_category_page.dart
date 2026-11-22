@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:palturo/screen/card/person_card.dart';
 import 'package:palturo/screen/explore_expand.dart';
 import 'package:palturo/screen/explore_taxonomy.dart';
@@ -801,7 +802,15 @@ class _ExploreCategoryPageState extends State<ExploreCategoryPage> {
         children: [
           Row(
             children: [
-              Icon(Icons.school_outlined, size: 20, color: AppColors.primary),
+              SvgPicture.asset(
+                'assets/icons/rmentor.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  AppColors.primary,
+                  BlendMode.srcIn,
+                ),
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

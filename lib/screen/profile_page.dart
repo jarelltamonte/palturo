@@ -732,7 +732,12 @@ class ProfileSummaryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Icon(Icons.psychology, size: 18, color: textColor),
+                SvgPicture.asset(
+                  'assets/icons/rlearner.svg',
+                  width: 18,
+                  height: 18,
+                  colorFilter: ColorFilter.mode(textColor, BlendMode.srcIn),
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -749,7 +754,12 @@ class ProfileSummaryCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.school_outlined, size: 18, color: textColor),
+                  SvgPicture.asset(
+                    'assets/icons/rmentor.svg',
+                    width: 18,
+                    height: 18,
+                    colorFilter: ColorFilter.mode(textColor, BlendMode.srcIn),
+                  ),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(

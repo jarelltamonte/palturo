@@ -69,3 +69,5 @@ UI-FEATURE-AUDIT*.md
 # Generated reports stay local; the public field guide is deployed separately
 docs/*.html
 docs/*.pdf
+# Widget Preview related
+.widget_preview/

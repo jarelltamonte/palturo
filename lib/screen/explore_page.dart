@@ -579,6 +579,9 @@ class _ExplorePageState extends State<ExplorePage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppChrome.appBar(
         toolbarHeight: appBarHeight,
+        // The 48px action target centers a 24px glyph, so 4px outer padding
+        // puts the icon's right edge on the 16px content inset.
+        actionsPadding: const EdgeInsets.only(right: 4),
         title: Text(
           'Browse',
           style: AppTextStyles.headingText.copyWith(color: textTheme),

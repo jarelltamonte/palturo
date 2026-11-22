@@ -201,7 +201,7 @@ Deno.serve(async (req) => {
     // ---------- taxonomy ----------
     const { data: nodes, error: nodesErr } = await admin
       .from("skill_nodes")
-      .select("id,name,path,depth,kind,is_leaf,is_visible,status")
+      .select("id,name,path,parent_id,depth,kind,is_leaf,is_visible,status")
       .order("path");
     if (nodesErr || !nodes) return json({ error: "Failed to load taxonomy" }, 500);
 
@@ -314,6 +314,7 @@ Deno.serve(async (req) => {
         `Decide how to handle this submission. Match by MEANING, not spelling: the submission may be in Filipino/Tagalog or English, or use a synonym for a taxonomy skill. ` +
         `If a taxonomy skill already covers its meaning, prefer attach_existing and pick both the fitting group and the exact taxonomy_skill. ` +
         `If it is a genuinely new teachable/learnable skill, choose create_new and pick the most specific visible group. ` +
+        `Then decide its scope: a distinct discipline is a skill; a specific dish, style, technique, or variant of a taxonomy skill is a focus of that skill. ` +
         `Judge ONLY the skill name. There is no user note in this evaluation by design.`;
 
       const questions1 = {
@@ -360,6 +361,17 @@ Deno.serve(async (req) => {
         },
         is_skill: { type: "noul", instructions: "Is this a plausible teachable/learnable practical or cultural skill?" },
         is_safe: { type: "noul", instructions: "Is this submission free of unsafe, illegal, or inappropriate content per the safety guidelines?" },
+        scope: {
+          type: "choice",
+          instructions:
+            "Is this a distinct skill, or a specific instance of an existing taxonomy skill?",
+          criteria: {
+            skill:
+              "A distinct discipline that deserves its own skill entry (for example 'Python Programming', 'Web Development', 'C# Programming')",
+            focus:
+              "A specific dish, style, technique, or variant of an existing skill (for example 'Cooking Adobo' or 'Sinigang' for Filipino Cooking, 'Arnis' for Filipino Martial Arts)",
+          },
+        },
       };
 
       const orRes = await jevCall(model, state1, questions1, admin);
@@ -393,12 +405,21 @@ Deno.serve(async (req) => {
       const rootFromModel = roots.find(
         (r) => normalize(r.name) === rootChoice || String(r.path) === rootChoice,
       );
-      // A genuinely new submission becomes a skill in a domain. Only use the
-      // model's subgroup directly when it is itself a category (for example
-      // Programming), because a skill may only contain focus nodes.
+      // A genuinely new submission becomes a skill in a domain unless the
+      // model says it is a specific instance of a named skill, in which case it
+      // becomes a focus under that skill (a skill may only contain focuses).
+      const scopeChoice = (a1.scope?.choice as string | undefined) ?? "skill";
+      const isFocusScope = scopeChoice === "focus";
+      const categoryFor = (n: (typeof nodes)[number] | null | undefined) =>
+        n == null
+          ? null
+          : n.kind === "category"
+            ? n
+            : nodes.find((p) => p.id === n.parent_id) ?? null;
       const createParent =
+        (isFocusScope && groupNode?.kind === "skill" ? groupNode : null) ??
         preferredRoot ??
-        (groupNode?.kind === "category" ? groupNode : null) ??
+        categoryFor(groupNode) ??
         rootFromModel ??
         groupNode ??
         null;
@@ -442,6 +463,23 @@ Deno.serve(async (req) => {
             const autoApprove = (actionConf ?? 0) >= confThreshold;
             if (!parent) {
               skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+            } else if (parent.kind === "skill") {
+              // A focus of the named skill: the placement stays on the skill,
+              // and the focus rides along for finer matching.
+              if (dryRun) {
+                skillDecision = { status: autoApprove ? "created" : "pending", node: draftNode(parent, cleanedName, autoApprove), action: "create_focus", confidence: actionConf, placementId: null };
+              } else {
+                const focus = await findOrCreateFocus(admin, parent, cleanedName, user.id, autoApprove);
+                if (focus.error === "too_many_new_skills") {
+                  return json({ error: "too_many_new_skills", status: "error" }, 429);
+                }
+                if (focus.error || !focus.node) {
+                  return json({ error: focus.error ?? "Could not create the focus", status: "error" }, 500);
+                }
+                const placed = await place((focus.node as any).id);
+                if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+                skillDecision = { status: autoApprove ? "created" : "pending", node: focus.node, action: "create_focus", confidence: actionConf, placementId: placed.id };
+              }
             } else if (dryRun) {
               skillDecision = { status: autoApprove ? "created" : "pending", node: draftNode(parent, cleanedName, autoApprove), action: "create_new", confidence: actionConf, placementId: null };
             } else {
@@ -472,6 +510,23 @@ Deno.serve(async (req) => {
           const autoApprove = (actionConf ?? 0) >= confThreshold;
           if (!parent) {
             skillDecision = { status: "queued", node: null, action: "queued", confidence: actionConf, stage1Answers: a1 };
+          } else if (parent.kind === "skill") {
+            // Same rule as above: a specific instance becomes a focus of the
+            // skill, not a skill of its own.
+            if (dryRun) {
+              skillDecision = { status: autoApprove ? "created" : "pending", node: draftNode(parent, cleanedName, autoApprove), action: "create_focus", confidence: actionConf, placementId: null };
+            } else {
+              const focus = await findOrCreateFocus(admin, parent, cleanedName, user.id, autoApprove);
+              if (focus.error === "too_many_new_skills") {
+                return json({ error: "too_many_new_skills", status: "error" }, 429);
+              }
+              if (focus.error || !focus.node) {
+                return json({ error: focus.error ?? "Could not create the focus", status: "error" }, 500);
+              }
+              const placed = await place((focus.node as any).id);
+              if (placed.error) return json({ error: placed.error, status: "error" }, 409);
+              skillDecision = { status: autoApprove ? "created" : "pending", node: focus.node, action: "create_focus", confidence: actionConf, placementId: placed.id };
+            }
           } else if (dryRun) {
             skillDecision = { status: autoApprove ? "created" : "pending", node: draftNode(parent, cleanedName, autoApprove), action: "create_new", confidence: actionConf, placementId: null };
           } else {
@@ -698,6 +753,28 @@ async function createAutoApprovedNode(
     }
   }
   return { node: null, error: error.message };
+}
+
+// A focus is a named instance of a skill (Cooking Adobo → Filipino Cooking).
+// Reuse an existing child before creating one, so repeated submissions converge
+// on the same node instead of piling up near-duplicates.
+async function findOrCreateFocus(
+  admin: ReturnType<typeof createClient>,
+  parent: { id: string; kind?: string },
+  name: string,
+  userId: string,
+  autoApprove: boolean,
+): Promise<{ node: Record<string, unknown> | null; error: string | null }> {
+  const { data: existing } = await admin
+    .from("skill_nodes")
+    .select("id,name,path,status,kind,is_leaf,is_visible")
+    .eq("parent_id", parent.id)
+    .eq("kind", "focus")
+    .ilike("name", name)
+    .neq("status", "rejected")
+    .maybeSingle();
+  if (existing) return { node: existing as Record<string, unknown>, error: null };
+  return createAutoApprovedNode(admin, parent, name, userId, autoApprove);
 }
 
 async function placeSkill(

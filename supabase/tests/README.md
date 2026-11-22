@@ -64,7 +64,12 @@ powershell -ExecutionPolicy Bypass -File supabase/tests/remove_mock_accounts.ps1
 
 The removal matches **both** the email pattern and `raw_user_meta_data.mock = true`,
 deletes the profiles (cascading cards, showcases, embeddings, connections), then
-deletes the auth users and clears both match caches.
+deletes the auth users and clears both match caches. It also removes
+notifications whose payload points at a mock candidate.
+
+Wave 2 (`mock21` … `mock30`, batch `2026-11-22-wave2`) was used for the rank-shift
+experiment in `docs/mock-wave2-experiment.md`. It uses the same tag and is
+removed by the same command.
 
 ## Run
 

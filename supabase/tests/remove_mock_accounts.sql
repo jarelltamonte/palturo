@@ -25,6 +25,13 @@ delete from public.reports
 where reporter_id in (select id from _mock_ids)
    or reported_id in (select id from _mock_ids);
 
+-- Notifications can outlive the candidate: remove both mock recipients and
+-- notifications whose payload points at a mock candidate.
+delete from public.notifications n
+using _mock_ids m
+where n.user_id = m.id
+   or ((n.payload ? 'candidate_id') and (n.payload ->> 'candidate_id')::uuid = m.id);
+
 delete from public.profiles
 where id in (select id from _mock_ids);
 

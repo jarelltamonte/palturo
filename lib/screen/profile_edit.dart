@@ -2071,6 +2071,14 @@ class _ProfilePreviewPage extends StatelessWidget {
                     : profile.interests.join(', '),
           ),
           _PreviewRow(
+            svgAsset: 'assets/icons/rmentor.svg',
+            label: 'Teaching style',
+            value:
+                profile.teachingStyles.isEmpty
+                    ? 'Not set'
+                    : profile.teachingStyles.join(', '),
+          ),
+          _PreviewRow(
             icon: Icons.menu_book_outlined,
             label: 'Skills to learn',
             value: '${profile.learningSkillIds.length} selected',

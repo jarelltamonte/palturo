@@ -626,4 +626,22 @@ void main() {
     expect(find.text('1 selected'), findsNWidgets(2));
     expect(find.text('Learner & Mentor'), findsOneWidget);
   });
+
+  testWidgets('preview lists learning and teaching styles', (tester) async {
+    await pumpEdit(
+      tester,
+      data: profile().copyWith(
+        interests: const ['Visual Demonstration'],
+        teachingStyles: const ['Hands-on Practice'],
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Preview profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Learning style'), findsOneWidget);
+    expect(find.text('Teaching style'), findsOneWidget);
+    expect(find.text('Visual Demonstration'), findsOneWidget);
+    expect(find.text('Hands-on Practice'), findsOneWidget);
+  });
 }

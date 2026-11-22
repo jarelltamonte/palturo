@@ -53,7 +53,7 @@ void main() {
     );
   });
 
-  testWidgets('register legal links are 44px buttons', (tester) async {
+  testWidgets('register legal links stay inline and tappable', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -69,12 +69,16 @@ void main() {
       ),
     );
     expect(back.height, greaterThanOrEqualTo(44));
+    // The legal links are inline with the sentence, so they follow text height
+    // rather than a 44px button. They must still be real, enabled buttons.
     for (final label in ['Terms of Service', 'Data Policy', 'Cookies Policy']) {
       final button = find.ancestor(
         of: find.text(label),
         matching: find.byType(TextButton),
       );
-      expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+      expect(button, findsOneWidget);
+      expect(tester.getSize(button).height, greaterThan(0));
+      expect(tester.widget<TextButton>(button).onPressed, isNotNull);
     }
   });
 

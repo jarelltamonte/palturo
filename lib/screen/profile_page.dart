@@ -722,16 +722,6 @@ class ProfileSummaryCard extends StatelessWidget {
             ],
             Row(
               children: [
-                Icon(Icons.translate, size: 18, color: textColor),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    profile.languages.join(', '),
-                    style: TextStyle(color: textColor, fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 12),
                 SvgPicture.asset(
                   'assets/icons/rlearner.svg',
                   width: 18,
@@ -746,14 +736,10 @@ class ProfileSummaryCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ],
-            ),
-            if ((profile.effectiveRole == OnboardingRole.teach ||
-                    profile.effectiveRole == OnboardingRole.both) &&
-                profile.teachingStyles.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
+                if ((profile.effectiveRole == OnboardingRole.teach ||
+                        profile.effectiveRole == OnboardingRole.both) &&
+                    profile.teachingStyles.isNotEmpty) ...[
+                  const SizedBox(width: 12),
                   SvgPicture.asset(
                     'assets/icons/rmentor.svg',
                     width: 18,
@@ -761,17 +747,31 @@ class ProfileSummaryCard extends StatelessWidget {
                     colorFilter: ColorFilter.mode(textColor, BlendMode.srcIn),
                   ),
                   const SizedBox(width: 6),
-                  Flexible(
+                  Expanded(
                     child: Text(
                       profile.teachingStyles.join(', '),
-                      maxLines: 2,
+                      maxLines: 1,
                       style: TextStyle(color: textColor, fontSize: 14),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
-              ),
-            ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.translate, size: 18, color: textColor),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    profile.languages.join(', '),
+                    style: TextStyle(color: textColor, fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

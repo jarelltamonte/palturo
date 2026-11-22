@@ -385,25 +385,6 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _legalLink(
-    String label,
-    VoidCallback onTap,
-    Color color,
-    TextStyle style,
-  ) {
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-        foregroundColor: color,
-        textStyle: style,
-        minimumSize: const Size(0, 44),
-        tapTargetSize: MaterialTapTargetSize.padded,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-      ),
-      child: Text(label),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -729,50 +710,85 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Column(
-                          children: [
-                            Text(
-                              'By signing up, you agree to our',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: textTheme.withAlpha((0.7 * 255).round()),
-                                fontSize: 12,
-                                height: 1.5,
+                        child: Text.rich(
+                          textAlign: TextAlign.center,
+                          TextSpan(
+                            style: TextStyle(
+                              color: textTheme.withAlpha((0.7 * 255).round()),
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                            children: [
+                              const TextSpan(
+                                text: 'By signing up, you agree to our ',
                               ),
-                            ),
-                            // Links live in their own row: keeping them inline
-                            // inside the sentence forced each line that held a
-                            // link to be 44px tall, and shrinking them to text
-                            // height dropped the tap target to 18px. A wrapped
-                            // row of 44px targets keeps both.
-                            Wrap(
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 2,
-                              children: [
-                                _legalLink(
-                                  'Terms of Service',
-                                  () => LegalDialogs.showTermsOfService(
-                                    context,
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showTermsOfService(
+                                        context,
+                                      ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
                                   ),
-                                  textTheme,
-                                  legalLinkStyle,
+                                  child: const Text('Terms of Service'),
                                 ),
-                                _legalLink(
-                                  'Data Policy',
-                                  () => LegalDialogs.showDataPolicy(context),
-                                  textTheme,
-                                  legalLinkStyle,
+                              ),
+                              const TextSpan(text: ',\n'),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () =>
+                                          LegalDialogs.showDataPolicy(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                  ),
+                                  child: const Text('Data Policy'),
                                 ),
-                                _legalLink(
-                                  'Cookies Policy',
-                                  () => LegalDialogs.showCookiesPolicy(context),
-                                  textTheme,
-                                  legalLinkStyle,
+                              ),
+                              const TextSpan(text: ', and '),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: TextButton(
+                                  onPressed:
+                                      () => LegalDialogs.showCookiesPolicy(
+                                        context,
+                                      ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: textTheme,
+                                    textStyle: legalLinkStyle,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                    ),
+                                  ),
+                                  child: const Text('Cookies Policy'),
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                              const TextSpan(text: '.'),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

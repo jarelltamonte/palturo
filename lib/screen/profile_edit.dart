@@ -68,7 +68,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     'Still working. Good matches take a moment.',
   ];
   static const int _minAge = 18;
-  static const int _maxAge = 100;
+  static const int _maxAge = 80;
   bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
@@ -1583,11 +1583,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                       values: const [
                                         18,
                                         30,
-                                        45,
+                                        40,
+                                        50,
                                         60,
-                                        75,
-                                        90,
-                                        100,
+                                        70,
+                                        80,
                                       ],
                                       selected: _age,
                                       onSelected:
@@ -1896,11 +1896,7 @@ class _AgeScale extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   static const double _trackInset = 24;
-  static const double _labelWidth = 40;
-
-  /// Vertical hit area. The markers are shortcuts, so they get the same 44px
-  /// target the rest of the app uses instead of a 24px sliver.
-  static const double _targetHeight = 44;
+  static const double _labelWidth = 24;
 
   @override
   Widget build(BuildContext context) {
@@ -1914,7 +1910,7 @@ class _AgeScale extends StatelessWidget {
           double.infinity,
         );
         return SizedBox(
-          height: _targetHeight,
+          height: 24,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -1932,13 +1928,13 @@ class _AgeScale extends StatelessWidget {
                       onTap: () => onSelected(value),
                       child: SizedBox(
                         width: _labelWidth,
-                        height: _targetHeight,
+                        height: 24,
                         child: Center(
                           child: Text(
                             '$value',
                             style: AppTextStyles.regularText.copyWith(
                               color: selected == value ? selectedColor : muted,
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight:
                                   selected == value
                                       ? FontWeight.w700

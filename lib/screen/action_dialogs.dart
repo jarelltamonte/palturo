@@ -46,6 +46,102 @@ Future<String?> showReportReasonDialog(
   );
 }
 
+/// A single-action dialog for informational messages. Mirrors the visual style
+/// of [showConfirmDialog] without offering a destructive choice.
+Future<void> showInfoDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String buttonLabel = 'OK',
+}) async {
+  await showAdaptiveDialog<void>(
+    context: context,
+    builder:
+        (dialogContext) => _InfoDialog(
+          title: title,
+          message: message,
+          buttonLabel: buttonLabel,
+        ),
+  );
+}
+
+class _InfoDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final String buttonLabel;
+
+  const _InfoDialog({
+    required this.title,
+    required this.message,
+    required this.buttonLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).colorScheme.secondary;
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    final actionColor = AppColors.accentText(context);
+
+    final titleWidget = Center(
+      child: Text(
+        title,
+        style: AppTextStyles.regularText.copyWith(
+          color: textTheme,
+          fontSize: 18,
+        ),
+      ),
+    );
+
+    final body = Text(
+      message,
+      textAlign: TextAlign.center,
+      style: AppTextStyles.regularText.copyWith(color: textTheme, fontSize: 14),
+    );
+
+    if (isIOS) {
+      return CupertinoAlertDialog(
+        title: titleWidget,
+        content: Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Material(color: Colors.transparent, child: body),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () {
+              Haptics.selection();
+              Navigator.pop(context);
+            },
+            child: Text(
+              buttonLabel,
+              style: AppTextStyles.regularText.copyWith(color: actionColor),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return AlertDialog(
+      scrollable: true,
+      backgroundColor: AppColors.elevatedSurface(context),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: titleWidget,
+      content: SizedBox(width: double.maxFinite, child: body),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Haptics.selection();
+            Navigator.pop(context);
+          },
+          child: Text(
+            buttonLabel,
+            style: AppTextStyles.regularText.copyWith(color: actionColor),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ConfirmDialog extends StatelessWidget {
   final String title;
   final String message;

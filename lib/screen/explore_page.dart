@@ -450,6 +450,10 @@ class _ExplorePageState extends State<ExplorePage> {
     final path = (root['path'] ?? '').toString();
     final label = (root['name'] ?? '').toString();
     if (path.isEmpty || label.isEmpty) return;
+    if (_countFor(root).total <= 0) {
+      await _showEmptyCategoryDialog(label);
+      return;
+    }
     _openingCategory = true;
     try {
       await Navigator.push(
@@ -477,6 +481,17 @@ class _ExplorePageState extends State<ExplorePage> {
     // Requests sent from the deck change who is available; refresh silently
     // from the cached snapshot so returning here never flashes a skeleton.
     if (mounted) _loadRole(_role, force: true);
+  }
+
+  Future<void> _showEmptyCategoryDialog(String label) {
+    final noun = _roleNoun;
+    return showInfoDialog(
+      context,
+      title: 'No ${noun}s yet',
+      message:
+          'There are currently no ${noun}s in $label. Check back soon as more '
+          'people join PalTuro.',
+    );
   }
 
   /// Mentors can inspect every domain, but only browse learners in a domain

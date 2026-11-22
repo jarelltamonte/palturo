@@ -128,6 +128,34 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('tapping an empty domain explains there is no one yet', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        theme: lightMode,
+        surface: const Size(390, 1600),
+        countLoader:
+            (path, {required kind}) async => path == 'martial_arts' ? 0 : 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Martial Arts'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Martial Arts'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('There are currently no mentors in Martial Arts'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('There are currently no mentors'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('cards show the domain total and how many are new', (
     tester,
   ) async {
@@ -291,6 +319,46 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('mentor tapping an empty teaching domain mentions learners', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        theme: lightMode,
+        surface: const Size(390, 1600),
+        countLoader:
+            (path, {required kind}) async =>
+                path == 'cooking_culinary' && kind == 'learn' ? 0 : 2,
+        skillsLoader:
+            () async => [
+              {
+                'kind': 'teach',
+                'path': 'cooking_culinary.filipino_cooking',
+                'name': 'Filipino Cooking',
+              },
+            ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mentor'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Cooking & Culinary'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cooking & Culinary'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining(
+        'There are currently no learners in Cooking & Culinary',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('mentor mode without skills points at the profile editor', (
     tester,

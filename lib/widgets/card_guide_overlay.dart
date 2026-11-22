@@ -350,14 +350,16 @@ class _GuideTooltip extends StatelessWidget {
                     ),
                   ),
                 ),
-                TextButton(
-                  onPressed: onNext,
-                  child: Text(
-                    'Do Later',
-                    style: AppTextStyles.regularText.copyWith(
-                      color: muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                Center(
+                  child: TextButton(
+                    onPressed: onNext,
+                    child: Text(
+                      'Do Later',
+                      style: AppTextStyles.regularText.copyWith(
+                        color: muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),

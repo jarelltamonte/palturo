@@ -22,6 +22,7 @@ class _RejectingProfileService implements ProfileService {
   @override
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
+    ProfileData? previous,
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
     void Function(String skillName)? onClassifyingSkill,
@@ -40,6 +41,7 @@ class _SlowProfileService implements ProfileService {
   @override
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
+    ProfileData? previous,
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
     void Function(String skillName)? onClassifyingSkill,
@@ -58,6 +60,7 @@ class _CapturingProfileService implements ProfileService {
   @override
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
+    ProfileData? previous,
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
     void Function(String skillName)? onClassifyingSkill,
@@ -76,6 +79,7 @@ class _HoldProfileService implements ProfileService {
   @override
   Future<ProfileData> updateProfile(
     ProfileData updatedProfile, {
+    ProfileData? previous,
     List<String?>? newPhotoLocalPaths,
     Map<String, String>? teachingSkillImages,
     void Function(String skillName)? onClassifyingSkill,
@@ -404,13 +408,8 @@ void main() {
     final service = _CapturingProfileService();
     await pumpEdit(tester, service: service);
 
-    final ageField = find.descendant(
-      of: find.byWidgetPredicate(
-        (widget) => widget is TopLabeledField && widget.label == 'Age',
-      ),
-      matching: find.byType(TextField),
-    );
-    await tester.enterText(ageField, '29');
+    final ageSlider = tester.widget<Slider>(find.byType(Slider));
+    ageSlider.onChanged!(29);
     await tester.pump();
 
     await tester.ensureVisible(find.text('Gender').last);
@@ -430,53 +429,41 @@ void main() {
     expect(service.captured?.gender, 'woman');
   });
 
-  testWidgets('an under-18 age blocks saving with a popup', (tester) async {
-    final service = _CapturingProfileService();
-    await pumpEdit(tester, service: service);
+  testWidgets('the age slider is bounded to 18 through 80', (tester) async {
+    await pumpEdit(tester);
 
-    final ageField = find.descendant(
-      of: find.byWidgetPredicate(
-        (widget) => widget is TopLabeledField && widget.label == 'Age',
-      ),
-      matching: find.byType(TextField),
-    );
-    await tester.enterText(ageField, '17');
-    await tester.pump();
-
-    expect(find.text('Enter an age between 13 and 120.'), findsNothing);
-    await tester.ensureVisible(find.text('Save').first);
-    await tester.tap(find.text('Save').first);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Check your age'), findsOneWidget);
-    expect(find.textContaining('18 and older'), findsOneWidget);
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-    expect(service.captured, isNull);
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.min, 18);
+    expect(slider.max, 80);
+    expect(slider.divisions, 62);
+    expect(slider.value, 18);
+    expect(find.text('Not set'), findsOneWidget);
   });
 
-  testWidgets('an over-120 age blocks saving with a popup', (tester) async {
-    final service = _CapturingProfileService();
-    await pumpEdit(tester, service: service);
+  testWidgets('moving the age slider shows the chosen age', (tester) async {
+    await pumpEdit(tester);
 
-    final ageField = find.descendant(
-      of: find.byWidgetPredicate(
-        (widget) => widget is TopLabeledField && widget.label == 'Age',
-      ),
-      matching: find.byType(TextField),
-    );
-    await tester.enterText(ageField, '130');
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(31);
     await tester.pump();
 
-    await tester.ensureVisible(find.text('Save').first);
-    await tester.tap(find.text('Save').first);
-    await tester.pumpAndSettle();
+    expect(find.text('31'), findsOneWidget);
+    expect(find.text('Not set'), findsNothing);
+  });
 
-    expect(find.text('Check your age'), findsOneWidget);
-    expect(find.textContaining('120 or less'), findsOneWidget);
-    await tester.tap(find.text('OK'));
+  testWidgets('tapping an age marker jumps the slider to that value', (
+    tester,
+  ) async {
+    await pumpEdit(tester);
+
+    await tester.ensureVisible(find.text('40'));
     await tester.pumpAndSettle();
-    expect(service.captured, isNull);
+    await tester.tap(find.text('40'));
+    await tester.pump();
+
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 40);
+    expect(find.text('40'), findsNWidgets(2));
   });
 
   testWidgets('the completion card carries the showcase requirement', (

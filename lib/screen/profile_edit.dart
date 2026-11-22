@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:palturo/theme/app_spacing.dart';
@@ -68,10 +67,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     'Looking for people who fit what you offer...',
     'Still working. Good matches take a moment.',
   ];
+  static const int _minAge = 18;
+  static const int _maxAge = 80;
   bool _showingProfileError = false;
 
   late final TextEditingController _bioController;
-  late final TextEditingController _ageController;
+  int? _age;
   String? _gender;
 
   late Map<String, String> _availability;
@@ -101,9 +102,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
     _profileService = widget.profileService ?? ProfileService();
     _bioController = TextEditingController(text: widget.profile.bio);
-    _ageController = TextEditingController(
-      text: widget.profile.age?.toString() ?? '',
-    );
+    // Clamp legacy out-of-range values so the slider always reflects the age.
+    _age = widget.profile.age?.clamp(_minAge, _maxAge).toInt();
     _gender = widget.profile.gender;
     _availability = _parseAvailability(widget.profile);
     _languages = List.from(widget.profile.languages);
@@ -134,7 +134,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   void dispose() {
     _stopSaveProgress();
     _bioController.dispose();
-    _ageController.dispose();
     super.dispose();
   }
 
@@ -249,9 +248,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final initialAvail = _parseAvailability(widget.profile);
 
     if (_bioController.text.trim() != widget.profile.bio.trim()) return true;
-    if (_ageController.text.trim() != (widget.profile.age?.toString() ?? '')) {
-      return true;
-    }
+    if (_age != widget.profile.age) return true;
     if (_gender != widget.profile.gender) return true;
     if (!setEquals(_availability.keys.toSet(), initialAvail.keys.toSet())) {
       return true;
@@ -278,6 +275,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
     return false;
   }
+
+  int get _sliderAge => (_age ?? _minAge).clamp(_minAge, _maxAge).toInt();
 
   String get _genderLabel => switch (_gender) {
     'woman' => 'Woman',
@@ -891,12 +890,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   Future<void> _showAgeRangeDialog(int? age) async {
     final textTheme = Theme.of(context).colorScheme.secondary;
     final message =
-        age != null && age < 18
-            ? 'PalTuro is for people 18 and older. Please enter an age of 18 '
-                'or above.'
-            : age != null && age > 120
-            ? 'Please enter an age of 120 or less.'
-            : 'Please enter a valid age between 18 and 120.';
+        age != null && age < _minAge
+            ? 'PalTuro is for people $_minAge and older. Please choose an age '
+                'of $_minAge or above.'
+            : age != null && age > _maxAge
+            ? 'Please choose an age of $_maxAge or less.'
+            : 'Please choose a valid age between $_minAge and $_maxAge.';
 
     await showDialog<void>(
       context: context,
@@ -937,11 +936,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   ProfileData _draftProfile() {
     final selectedDays = parseAvailableDays(_availability.keys);
-    final parsedAge = int.tryParse(_ageController.text.trim());
     return widget.profile.copyWith(
       bio: _bioController.text.trim(),
-      age: parsedAge,
-      clearAge: parsedAge == null,
+      age: _age,
+      clearAge: _age == null,
       gender: _gender,
       clearGender: _gender == null,
       schedule: formatScheduleDays(selectedDays),
@@ -1110,10 +1108,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       }
     }
 
-    final ageText = _ageController.text.trim();
-    final ageValue = int.tryParse(ageText);
-    if (ageText.isNotEmpty &&
-        (ageValue == null || ageValue < 18 || ageValue > 120)) {
+    final ageValue = _age;
+    if (ageValue != null && (ageValue < _minAge || ageValue > _maxAge)) {
       await _showAgeRangeDialog(ageValue);
       return;
     }
@@ -1145,7 +1141,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
     final selectedDays = parseAvailableDays(_availability.keys);
     final scheduleFormatted = formatScheduleDays(selectedDays);
-    final parsedAge = int.tryParse(_ageController.text.trim());
+    final parsedAge = _age;
 
     final updated = widget.profile.copyWith(
       bio: _bioController.text.trim(),
@@ -1258,8 +1254,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         _availability.isEmpty ||
         _learningStyles.isEmpty ||
         (wantsTeaching && _teachingStyles.isEmpty);
-    final privateNeedsCompletion =
-        _ageController.text.trim().isEmpty || _gender == null;
+    final privateNeedsCompletion = _age == null || _gender == null;
     final skillsNeedCompletion =
         (_learningSkillIds.isEmpty && _teachingSkillIds.isEmpty) ||
         completion.missing.any((item) => item.label == 'Skill notes');
@@ -1521,58 +1516,118 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 88,
-                              child: Container(
-                                padding:
-                                    _ageController.text.trim().isEmpty
-                                        ? const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                        )
-                                        : EdgeInsets.zero,
-                                decoration:
-                                    _ageController.text.trim().isEmpty
-                                        ? BoxDecoration(
-                                          color: AppColors.primary.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: AppColors.primary.withValues(
-                                              alpha: 0.35,
-                                            ),
-                                          ),
-                                        )
-                                        : null,
-                                child: TopLabeledField(
-                                  label: 'Age',
-                                  controller: _ageController,
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(3),
-                                  ],
-                                  onChanged: (_) => setState(() {}),
+                        Container(
+                          padding: EdgeInsets.zero,
+                          decoration:
+                              _age == null
+                                  ? BoxDecoration(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                    ),
+                                  )
+                                  : null,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 14,
+                                  left: 8,
+                                ),
+                                child: Text(
+                                  'Age',
+                                  style: TextStyle(
+                                    color: textTheme,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _DropdownInfoField(
-                                icon: Icons.person_outline,
-                                label: 'Gender',
-                                value: _genderLabel,
-                                hint: 'Select gender',
-                                onTap: _pickGender,
-                                needsAttention: _gender == null,
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        activeTrackColor: AppColors.primary,
+                                        inactiveTrackColor: AppColors.primary
+                                            .withValues(alpha: 0.18),
+                                        thumbColor: AppColors.primary,
+                                        overlayColor: AppColors.primary
+                                            .withValues(alpha: 0.12),
+                                        trackHeight: 4,
+                                      ),
+                                      child: Slider(
+                                        value: _sliderAge.toDouble(),
+                                        min: _minAge.toDouble(),
+                                        max: _maxAge.toDouble(),
+                                        divisions: _maxAge - _minAge,
+                                        label: '$_sliderAge',
+                                        semanticFormatterCallback:
+                                            (value) =>
+                                                '${value.round()} years old',
+                                        onChanged:
+                                            (value) => setState(
+                                              () => _age = value.round(),
+                                            ),
+                                      ),
+                                    ),
+                                    _AgeScale(
+                                      min: _minAge,
+                                      max: _maxAge,
+                                      values: const [
+                                        18,
+                                        30,
+                                        40,
+                                        50,
+                                        60,
+                                        70,
+                                        80,
+                                      ],
+                                      selected: _age,
+                                      onSelected:
+                                          (value) =>
+                                              setState(() => _age = value),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 14,
+                                  right: 8,
+                                ),
+                                child: SizedBox(
+                                  width: 44,
+                                  child: Text(
+                                    _age == null ? 'Not set' : '$_age',
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(
+                                      color:
+                                          _age == null
+                                              ? textTheme.withValues(alpha: 0.4)
+                                              : textTheme,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _DropdownInfoField(
+                          icon: Icons.person_outline,
+                          label: 'Gender',
+                          value: _genderLabel,
+                          hint: 'Select gender',
+                          onTap: _pickGender,
+                          needsAttention: _gender == null,
                         ),
                       ],
                     ),
@@ -1819,6 +1874,83 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Tappable age markers under the age slider. Tapping a value jumps the slider
+/// to it, so a wide range can be covered without fine dragging.
+class _AgeScale extends StatelessWidget {
+  const _AgeScale({
+    required this.min,
+    required this.max,
+    required this.values,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final int min;
+  final int max;
+  final List<int> values;
+  final int? selected;
+  final ValueChanged<int> onSelected;
+
+  static const double _trackInset = 24;
+  static const double _labelWidth = 24;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = AppColors.mutedText(context);
+    final selectedColor = Theme.of(context).colorScheme.secondary;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackWidth = (constraints.maxWidth - _trackInset * 2).clamp(
+          0.0,
+          double.infinity,
+        );
+        return SizedBox(
+          height: 24,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final value in values)
+                Positioned(
+                  left: (_trackInset +
+                          trackWidth * ((value - min) / (max - min)) -
+                          _labelWidth / 2)
+                      .clamp(0.0, constraints.maxWidth - _labelWidth),
+                  child: Semantics(
+                    button: true,
+                    label: 'Set age to $value',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onSelected(value),
+                      child: SizedBox(
+                        width: _labelWidth,
+                        height: 24,
+                        child: Center(
+                          child: Text(
+                            '$value',
+                            style: AppTextStyles.regularText.copyWith(
+                              color: selected == value ? selectedColor : muted,
+                              fontSize: 10,
+                              fontWeight:
+                                  selected == value
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

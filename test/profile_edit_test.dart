@@ -429,13 +429,13 @@ void main() {
     expect(service.captured?.gender, 'woman');
   });
 
-  testWidgets('the age slider is bounded to 18 through 80', (tester) async {
+  testWidgets('the age slider is bounded to 18 through 100', (tester) async {
     await pumpEdit(tester);
 
     final slider = tester.widget<Slider>(find.byType(Slider));
     expect(slider.min, 18);
-    expect(slider.max, 80);
-    expect(slider.divisions, 62);
+    expect(slider.max, 100);
+    expect(slider.divisions, 82);
     expect(slider.value, 18);
     expect(find.text('Not set'), findsOneWidget);
   });
@@ -456,14 +456,14 @@ void main() {
   ) async {
     await pumpEdit(tester);
 
-    await tester.ensureVisible(find.text('40'));
+    await tester.ensureVisible(find.text('45'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('40'));
+    await tester.tap(find.text('45'));
     await tester.pump();
 
     final slider = tester.widget<Slider>(find.byType(Slider));
-    expect(slider.value, 40);
-    expect(find.text('40'), findsNWidgets(2));
+    expect(slider.value, 45);
+    expect(find.text('45'), findsNWidgets(2));
   });
 
   testWidgets('the completion card carries the showcase requirement', (

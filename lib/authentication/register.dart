@@ -733,7 +733,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: const Size(0, 44),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
@@ -752,7 +754,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: const Size(0, 44),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),
@@ -772,7 +776,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: textTheme,
                                     textStyle: legalLinkStyle,
-                                    minimumSize: const Size(0, 44),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 2,
                                     ),

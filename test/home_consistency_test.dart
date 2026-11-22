@@ -183,6 +183,79 @@ void main() {
     expect(person.skillKind, 'teach');
   });
 
+  test('showcase media follows the card skill', () {
+    final profile = <String, dynamic>{
+      'p_name': 'RJ',
+      'p_role': 'both',
+      'p_bio': 'Bio',
+      'p_languages': 'English',
+      'p_styles': 'Discussion',
+      'p_availability': <dynamic>[],
+      'p_teaching': [
+        {
+          'skill': 'Programming',
+          'path': 'modern_practical_skills.programming',
+          'note': 'I code.',
+        },
+        {
+          'skill': 'Graphic Design',
+          'path': 'modern_practical_skills.graphic_design',
+          'note': 'I design.',
+        },
+      ],
+      'p_learning': [
+        {
+          'skill': 'Filipino Cooking',
+          'path': 'cooking_culinary.filipino_cooking',
+          'note': 'I want to cook.',
+        },
+      ],
+      'p_showcases': [
+        {
+          'media': 'https://cdn.example.com/web-dev.jpg',
+          'kind': 'image',
+          'skill': 'Programming',
+          'skill_path': 'modern_practical_skills.programming',
+        },
+      ],
+    };
+
+    // A learning card never shows teaching media.
+    final learnCard = MatchApi.personFromPublicProfileMap(
+      profile,
+      'rj',
+      preferRole: 'learner',
+      preferSkillId: 'cooking_culinary.filipino_cooking',
+      skillKind: 'learn',
+    );
+    expect(learnCard.skillName, 'Filipino Cooking');
+    expect(learnCard.showcaseUrls, isEmpty);
+    expect(learnCard.cardMedia.whereType<String>(), isEmpty);
+
+    // The teaching card for the media's own skill keeps it.
+    final matchingCard = MatchApi.personFromPublicProfileMap(
+      profile,
+      'rj',
+      preferRole: 'mentor',
+      preferSkillId: 'modern_practical_skills.programming',
+      skillKind: 'teach',
+    );
+    expect(matchingCard.showcaseUrls, [
+      'https://cdn.example.com/web-dev.jpg',
+    ]);
+
+    // A different teaching skill does not inherit it.
+    final otherSkillCard = MatchApi.personFromPublicProfileMap(
+      profile,
+      'rj',
+      preferRole: 'mentor',
+      preferSkillId: 'modern_practical_skills.graphic_design',
+      skillKind: 'teach',
+    );
+    expect(otherSkillCard.skillName, 'Graphic Design');
+    expect(otherSkillCard.showcaseUrls, isEmpty);
+  });
+
   test('card kind overrides the profile role for the displayed side', () {
     final profile = <String, dynamic>{
       'p_name': 'Aling Rosa',

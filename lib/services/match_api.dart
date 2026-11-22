@@ -442,12 +442,29 @@ class MatchApi {
         }
       }
     }
+    // Showcases are proof of what someone teaches, and each one is linked to a
+    // skill. A card is linked to one skill too, so only media for that skill
+    // rides on it; a learning card carries none and falls back to the avatar.
     final showcases =
         ((p['p_showcases'] as List?) ?? [])
             .whereType<Map>()
-            .map((m) => m['media'] as String?)
-            .whereType<String>()
+            .map(
+              (m) => (
+                media: m['media'] as String?,
+                path: (m['skill_path'] ?? '').toString(),
+              ),
+            )
+            .where((entry) => entry.media != null)
             .toList();
+    final showcaseUrls =
+        isLearner
+            ? const <String?>[]
+            : showcases
+                .where(
+                  (entry) => skillPath.isNotEmpty && entry.path == skillPath,
+                )
+                .map((entry) => entry.media)
+                .toList();
     final availabilityDays = parseAvailableDays(p['p_availability']);
     return Person(
       id: userId,
@@ -462,7 +479,7 @@ class MatchApi {
       bio: (p['p_bio'] ?? '') as String,
       skillNote: skillNote,
       photoUrls: [(p['p_avatar'] as String?)],
-      showcaseUrls: showcases,
+      showcaseUrls: showcaseUrls,
       skillKind: skillKind ?? (isLearner ? 'learn' : 'teach'),
     );
   }
@@ -1041,12 +1058,29 @@ class MatchApi {
       final teachingStyles = List<String>.from(
         r['teaching_styles'] ?? const [],
       );
-      final showcases =
+      final cardPath = (r['skill_path'] ?? '').toString();
+      final showcaseEntries =
           ((r['showcases'] as List?) ?? [])
               .whereType<Map>()
-              .map((m) => m['media'] as String?)
-              .whereType<String>()
+              .map(
+                (m) => (
+                  media: m['media'] as String?,
+                  path: (m['skill_path'] ?? '').toString(),
+                ),
+              )
+              .where((entry) => entry.media != null)
               .toList();
+      // Same rule as the deck cards: teaching media only rides on the card for
+      // the skill it belongs to, and never on a learning card.
+      final showcaseUrls =
+          kind == 'learn'
+              ? const <String?>[]
+              : showcaseEntries
+                  .where(
+                    (entry) => cardPath.isNotEmpty && entry.path == cardPath,
+                  )
+                  .map((entry) => entry.media)
+                  .toList();
       return Person(
         id: r['user_id'] as String,
         name: _displayName(r['name']),
@@ -1064,7 +1098,7 @@ class MatchApi {
         role: kind == 'learn' ? PersonRole.learner : PersonRole.mentor,
         bio: (r['note'] ?? '') as String,
         photoUrls: [r['avatar_url'] as String?],
-        showcaseUrls: showcases,
+        showcaseUrls: showcaseUrls,
       );
     }).toList();
   }

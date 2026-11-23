@@ -1909,6 +1909,13 @@ Deno.serve(async (req) => {
         if (!candidateConfig || typeof candidateConfig !== "object") {
           return json({ error: "Candidate config is required" }, 400);
         }
+        const stageInput = (payload.stages ?? {}) as Record<string, unknown>;
+        const stages = {
+          score: stageInput.score !== false,
+          gate: stageInput.gate !== false,
+          embeddings: stageInput.embeddings === true,
+          moderation: stageInput.moderation === true,
+        };
         const { data: currentConfig } = await admin
           .from("pipeline_config")
           .select("key,value");
@@ -2208,9 +2215,8 @@ Deno.serve(async (req) => {
             return useCards ? Math.max(reciprocal, bi) : reciprocal;
           };
 
-          for (const [, rows] of selected) {
-            users++;
-            const aSorted = [...rows].sort(
+          if (stages.score) for (const [, rows] of selected) {
+            users++;            const aSorted = [...rows].sort(
               (a, b) => Number(b.rerank_score_a ?? -1) - Number(a.rerank_score_a ?? -1),
             );
             const aRank = new Map(aSorted.map((r, i) => [keyOf(r), i + 1]));
@@ -2359,7 +2365,113 @@ Deno.serve(async (req) => {
             console.error(`[admin-api] sandbox snapshot: ${refreshErr.message}`);
           }
 
-          for (const [groupKey] of selected.slice(0, 20)) {
+          // Optional heavy stage: re-embed the snapshot with the candidate
+          // provider/model, then let the gate replay read the new vectors.
+          const embeddingStage = {
+            requested: stages.embeddings,
+            embedded: 0,
+            skipped: "",
+            errors: [] as string[],
+            model: "",
+            dimension: 1024,
+          };
+          if (stages.embeddings) {
+            const provider = String(
+              candidateConfig.embed_provider ?? configValue("embed_provider") ?? "deepinfra",
+            );
+            const embedModel = String(
+              candidateConfig.embedding_model ?? configValue("embedding_model") ?? "",
+            );
+            const embedApi = String(
+              candidateConfig.embedding_api ?? configValue("embedding_api") ?? "",
+            );
+            const dimension = asNumber(
+              candidateConfig.embedding_dim ?? configValue("embedding_dim"),
+              1024,
+            );
+            const embedKey =
+              provider === "nvidia"
+                ? Deno.env.get("NIM_API_KEY")
+                : Deno.env.get("DEEPINFRA_API_KEY");
+            embeddingStage.model = embedModel;
+            embeddingStage.dimension = dimension;
+            if (dimension !== 1024) {
+              embeddingStage.skipped = "sandbox vectors are fixed at 1024 dimensions";
+            } else if (!embedKey) {
+              embeddingStage.skipped = `no ${provider} embedding key configured`;
+            } else if (!embedApi || !embedModel) {
+              embeddingStage.skipped = "embedding endpoint or model missing";
+            } else {
+              const readers = [
+                {
+                  read: "sandbox_profile_texts",
+                  write: "sandbox_set_profile_embeddings",
+                  keyOf: (row: any) => ({
+                    user_id: row.user_id,
+                    role: row.role,
+                    field_group: row.field_group,
+                    input_type: row.input_type,
+                  }),
+                },
+                {
+                  read: "sandbox_card_texts",
+                  write: "sandbox_set_card_embeddings",
+                  keyOf: (row: any) => ({
+                    card_id: row.card_id,
+                    input_type: row.input_type,
+                  }),
+                },
+              ];
+              for (const reader of readers) {
+                let offset = 0;
+                while (offset < 600) {
+                  const { data: rows, error: readErr } = await admin.rpc(reader.read, {
+                    p_offset: offset,
+                    p_limit: 16,
+                  });
+                  if (readErr || !rows || rows.length === 0) break;
+                  const res = await fetch(embedApi, {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${embedKey}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      model: embedModel,
+                      input: rows.map((row: any) => row.source_text),
+                    }),
+                  });
+                  if (!res.ok) {
+                    embeddingStage.errors.push(`${reader.read}: HTTP ${res.status}`);
+                    break;
+                  }
+                  const body = await res.json();
+                  const vectors = (body?.data ?? []) as Array<{ embedding: number[] }>;
+                  if (vectors.length !== rows.length) {
+                    embeddingStage.errors.push(`${reader.read}: vector count mismatch`);
+                    break;
+                  }
+                  const items = rows.map((row: any, index: number) => ({
+                    ...reader.keyOf(row),
+                    model_name: embedModel,
+                    embedding: vectors[index].embedding,
+                  }));
+                  const { error: writeErr } = await admin.rpc(reader.write, {
+                    p_items: items,
+                  });
+                  if (writeErr) {
+                    embeddingStage.errors.push(`${reader.read}: ${writeErr.message}`);
+                    break;
+                  }
+                  embeddingStage.embedded += rows.length;
+                  offset += rows.length;
+                  if (rows.length < 16) break;
+                }
+              }
+            }
+          }
+
+          if (stages.gate) for (const [groupKey] of selected.slice(0, 20)) {
             const [gateUser, gateRole] = groupKey.split("|");
             if (!gateUser || (gateRole !== "mentor" && gateRole !== "learner")) continue;
             const runGate = (
@@ -2444,6 +2556,8 @@ Deno.serve(async (req) => {
             capped_by_user: cappedByUser,
             capped_by_skill: cappedBySkill,
             gate,
+            stages,
+            embeddings: embeddingStage,
             config_diff: configDiff,
             capped_candidates: cappedCandidates,
             as_role: roleFilter || "all",

@@ -2146,6 +2146,90 @@ Deno.serve(async (req) => {
             });
           }
 
+          // Retrieval gate simulation. match_cards is cheap and deterministic,
+          // so the published and candidate skill gates can both run for the
+          // sampled decks and their pair sets compared. This is the only way to
+          // see pairs the published gate never fetched (for example lowering
+          // min_skill_score to admit siblings).
+          const configValue = (key: string) =>
+            (currentConfig ?? []).find((row: any) => row.key === key)?.value;
+          const asNumber = (value: unknown, fallback: number) => {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : fallback;
+          };
+          const asBool = (value: unknown, fallback: boolean) => {
+            if (typeof value === "boolean") return value;
+            if (value === "true") return true;
+            if (value === "false") return false;
+            return fallback;
+          };
+          const publishedWeights = (configValue("embedding_weights") ?? {}) as Record<string, unknown>;
+          const candidateWeights = (candidateConfig.embedding_weights ?? {}) as Record<string, unknown>;
+          const baselineMinSkill = asNumber(configValue("min_skill_score"), 0.5);
+          const candidateMinSkill = asNumber(candidateConfig.min_skill_score, baselineMinSkill);
+          const baselineMedia = asBool(configValue("require_discovery_media"), true);
+          const candidateMedia = asBool(candidateConfig.require_discovery_media, baselineMedia);
+          const baselineWeights = {
+            skills: asNumber(publishedWeights.skills, 0.7),
+            context: asNumber(publishedWeights.context, 0.3),
+          };
+          const candidateWeightValues = {
+            skills: asNumber(candidateWeights.skills, baselineWeights.skills),
+            context: asNumber(candidateWeights.context, baselineWeights.context),
+          };
+
+          const gate = {
+            decks: 0,
+            baseline_pairs: 0,
+            candidate_pairs: 0,
+            kept_pairs: 0,
+            new_pairs: 0,
+            removed_pairs: 0,
+            min_skill_baseline: baselineMinSkill,
+            min_skill_candidate: candidateMinSkill,
+            media_baseline: baselineMedia,
+            media_candidate: candidateMedia,
+            weights_candidate: candidateWeightValues,
+          };
+          const cardKeys = (pairs: any[]) =>
+            new Set(pairs.map((pair) => String(pair.card_id ?? "")));
+
+          for (const [groupKey] of selected.slice(0, 20)) {
+            const [gateUser, gateRole] = groupKey.split("|");
+            if (!gateUser || (gateRole !== "mentor" && gateRole !== "learner")) continue;
+            const runGate = (
+              minSkill: number,
+              media: boolean,
+              weights: { skills: number; context: number },
+            ) =>
+              admin.rpc("match_cards", {
+                p_user: gateUser,
+                p_target: gateRole,
+                p_limit: 500,
+                p_min_skill: minSkill,
+                p_require_media: media,
+                p_w_skills: weights.skills,
+                p_w_context: weights.context,
+              });
+            const [baselineGate, candidateGate] = await Promise.all([
+              runGate(baselineMinSkill, baselineMedia, baselineWeights),
+              runGate(candidateMinSkill, candidateMedia, candidateWeightValues),
+            ]);
+            if (baselineGate.error || candidateGate.error) continue;
+            const base = cardKeys((baselineGate.data ?? []) as any[]);
+            const cand = cardKeys((candidateGate.data ?? []) as any[]);
+            gate.decks += 1;
+            gate.baseline_pairs += base.size;
+            gate.candidate_pairs += cand.size;
+            for (const cardKey of cand) {
+              if (base.has(cardKey)) gate.kept_pairs += 1;
+              else gate.new_pairs += 1;
+            }
+            for (const cardKey of base) {
+              if (!cand.has(cardKey)) gate.removed_pairs += 1;
+            }
+          }
+
           const scoredKeys = [
             "reciprocal_formula",
             "rerank_a_weight",
@@ -2155,6 +2239,9 @@ Deno.serve(async (req) => {
             "min_final_score",
             "max_per_user",
             "max_per_skill",
+            "min_skill_score",
+            "require_discovery_media",
+            "embedding_weights",
           ];
           const ignoredKeys = Object.keys(candidateConfig).filter(
             (key) => !scoredKeys.includes(key) && key !== "__revision",
@@ -2191,12 +2278,13 @@ Deno.serve(async (req) => {
             dropped_by_threshold: droppedByThreshold,
             capped_by_user: cappedByUser,
             capped_by_skill: cappedBySkill,
+            gate,
             capped_candidates: cappedCandidates,
             as_role: roleFilter || "all",
             baseline_rows: (cache ?? []).length,
             simulated_keys: scoredKeys,
             ignored_keys: ignoredKeys,
-            note: "Cached-score replay. The bi floor, formula, weights, B limit, final-score threshold, per-user/per-skill caps, and deck sizing are simulated; retrieval, embeddings, skill gates, rerank models, and timeouts are not.",
+            note: "Cached-score replay plus a live skill-gate replay. The bi floor, formula, weights, B limit, final-score threshold, per-user/per-skill caps, deck sizing, min_skill_score, require_discovery_media and embedding weights are simulated; embeddings, rerank models, and timeouts are not.",
           };
           await admin
             .from("sandbox_runs")

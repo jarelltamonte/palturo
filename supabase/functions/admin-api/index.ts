@@ -2194,6 +2194,15 @@ Deno.serve(async (req) => {
           const cardKeys = (pairs: any[]) =>
             new Set(pairs.map((pair) => String(pair.card_id ?? "")));
 
+          // The gate replay runs against the sandbox snapshot, never the live
+          // matching tables. Refresh is TTL-bounded so repeat runs are cheap.
+          const { error: refreshErr } = await admin.rpc("sandbox_refresh", {
+            p_max_age_seconds: 600,
+          });
+          if (refreshErr) {
+            console.error(`[admin-api] sandbox snapshot: ${refreshErr.message}`);
+          }
+
           for (const [groupKey] of selected.slice(0, 20)) {
             const [gateUser, gateRole] = groupKey.split("|");
             if (!gateUser || (gateRole !== "mentor" && gateRole !== "learner")) continue;
@@ -2202,7 +2211,7 @@ Deno.serve(async (req) => {
               media: boolean,
               weights: { skills: number; context: number },
             ) =>
-              admin.rpc("match_cards", {
+              admin.rpc("sandbox_match_cards", {
                 p_user: gateUser,
                 p_target: gateRole,
                 p_limit: 500,

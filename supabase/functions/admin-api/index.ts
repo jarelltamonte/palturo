@@ -2589,13 +2589,15 @@ Deno.serve(async (req) => {
             top10_overlap_pct:
               top10Overlap + top10New + top10Dropped > 0
                 ? top10Overlap / (top10Overlap + top10New + top10Dropped)
-                : 1,
-            avg_score_delta: candidates ? scoreDeltaTotal / candidates : 0,
-            changed_share: candidates ? changed / candidates : 0,
-            avg_abs_rank_shift: candidates ? absRankShiftTotal / candidates : 0,
+                : null,
+            // No surviving rows is not "no change": every ratio is undefined
+            // rather than a perfect 1.0, so the console can say why.
+            avg_score_delta: candidates ? scoreDeltaTotal / candidates : null,
+            changed_share: candidates ? changed / candidates : null,
+            avg_abs_rank_shift: candidates ? absRankShiftTotal / candidates : null,
             max_rank_shift: maxRankShift,
             rank_correlation:
-              correlationDecks > 0 ? correlationTotal / correlationDecks : 1,
+              correlationDecks > 0 ? correlationTotal / correlationDecks : null,
             a_only_share: candidates ? candidateAOnly / candidates : 0,
             floored_share: candidates ? flooredRows / candidates : 0,
             avg_bi: candidates ? biTotal / candidates : 0,

@@ -1915,6 +1915,162 @@ Deno.serve(async (req) => {
         const baselineRevision = Number(
           (currentConfig ?? []).find((r: any) => r.key === "__revision")?.value ?? 0,
         );
+
+        // Every key is compared, not just the simulated ones. The report says
+        // what the replay can measure and what only takes effect after a
+        // rebuild (vectors, models, moderation).
+        const impactOf = (key: string): string => {
+          if (
+            [
+              "reciprocal_formula",
+              "rerank_a_weight",
+              "rerank_b_weight",
+              "rerank_b_limit",
+              "max_deck_size",
+              "min_final_score",
+              "max_per_user",
+              "max_per_skill",
+            ].includes(key)
+          ) {
+            return "deck_scoring";
+          }
+          if (["min_skill_score", "require_discovery_media", "embedding_weights"].includes(key)) {
+            return "retrieval_gate";
+          }
+          if (
+            [
+              "embed_provider",
+              "embedding_model",
+              "embedding_api",
+              "embedding_dim",
+              "inference_provider",
+            ].includes(key)
+          ) {
+            return "embedding_space";
+          }
+          if (
+            [
+              "rerank_provider",
+              "rerank_model",
+              "rerank_api",
+              "rerank_fallback_provider",
+              "rerank_template",
+              "rerank_b_concurrency",
+              "rerank_budget_ms",
+              "rerank_a_timeout_ms",
+              "rerank_b_timeout_ms",
+              "rerank_failure_threshold",
+              "rerank_cooldown_seconds",
+            ].includes(key)
+          ) {
+            return "rerank_runtime";
+          }
+          if (
+            key.startsWith("decision_") ||
+            key.startsWith("note_") ||
+            key === "moderation_guidelines"
+          ) {
+            return "moderation";
+          }
+          if (key.startsWith("possible_match")) return "possible_match";
+          if (key.startsWith("get_matches_rate")) return "rate_limits";
+          if (["calibration", "worker_url"].includes(key)) return "reserved";
+          return "other";
+        };
+
+        const sameConfigValue = (a: unknown, b: unknown): boolean => {
+          if (JSON.stringify(a) === JSON.stringify(b)) return true;
+          if (a === null || b === null || a === undefined || b === undefined) return false;
+          if (
+            (a === true || a === "true") &&
+            (b === true || b === "true")
+          ) {
+            return true;
+          }
+          if (
+            (a === false || a === "false") &&
+            (b === false || b === "false")
+          ) {
+            return true;
+          }
+          const na = Number(a);
+          const nb = Number(b);
+          return Number.isFinite(na) && Number.isFinite(nb) && na === nb;
+        };
+
+        const IMMEDIATE = new Set(["deck_scoring", "retrieval_gate"]);
+        const baselineValues = new Map<string, unknown>(
+          (currentConfig ?? []).map((row: any) => [String(row.key), row.value]),
+        );
+        const candidateValues = new Map<string, unknown>(
+          Object.entries(candidateConfig as Record<string, unknown>),
+        );
+        const keys = new Set<string>([
+          ...baselineValues.keys(),
+          ...candidateValues.keys(),
+        ]);
+        const diffRows: Array<{
+          key: string;
+          baseline: unknown;
+          candidate: unknown;
+          impact: string;
+        }> = [];
+        for (const key of keys) {
+          if (key === "__revision") continue;
+          const before = baselineValues.get(key) ?? null;
+          const after = candidateValues.has(key)
+            ? candidateValues.get(key)
+            : before;
+          if (sameConfigValue(before, after)) continue;
+          diffRows.push({ key, baseline: before, candidate: after, impact: impactOf(key) });
+        }
+        const impactLabels: Record<string, string> = {
+          deck_scoring: "Deck scoring",
+          retrieval_gate: "Retrieval gate",
+          embedding_space: "Embedding space",
+          rerank_runtime: "Rerank runtime",
+          moderation: "Moderation",
+          possible_match: "Possible-match",
+          rate_limits: "Rate limits",
+          reserved: "Reserved",
+          other: "Other",
+        };
+        const impactNotes: Record<string, string> = {
+          deck_scoring: "Measured by the score replay below.",
+          retrieval_gate: "Measured by the skill-gate replay on the sandbox snapshot.",
+          embedding_space:
+            "Changes the vectors themselves. Nothing in this replay applies until every profile and card is re-embedded.",
+          rerank_runtime:
+            "Model, template, timeouts and budget are not replayed; they change live cost and latency.",
+          moderation:
+            "Applies to classify-skill and moderate-notes. It does not change an existing deck.",
+          possible_match:
+            "SQL worker settings for notifications; the replay does not model fan-out.",
+          rate_limits: "Throttling only; no effect on the pair set.",
+          reserved: "No runtime reader, or rewritten by the publisher from provider presets.",
+          other: "No simulation path.",
+        };
+        const configDiff = {
+          changed: diffRows.length,
+          rows: diffRows.sort(
+            (a, b) =>
+              (IMMEDIATE.has(a.impact) ? 0 : 1) - (IMMEDIATE.has(b.impact) ? 0 : 1) ||
+              a.key.localeCompare(b.key),
+          ),
+          by_impact: diffRows.reduce<Record<string, number>>((acc, row) => {
+            acc[row.impact] = (acc[row.impact] ?? 0) + 1;
+            return acc;
+          }, {}),
+          notes: Object.keys(impactLabels)
+            .map((id) => ({
+              id,
+              label: impactLabels[id],
+              note: impactNotes[id],
+              changed: diffRows.filter((row) => row.impact === id).length,
+            }))
+            .filter((note) => note.changed > 0),
+        };
+
         const { data: run, error: runErr } = await admin
           .from("sandbox_runs")
           .insert({
@@ -2288,6 +2444,7 @@ Deno.serve(async (req) => {
             capped_by_user: cappedByUser,
             capped_by_skill: cappedBySkill,
             gate,
+            config_diff: configDiff,
             capped_candidates: cappedCandidates,
             as_role: roleFilter || "all",
             baseline_rows: (cache ?? []).length,

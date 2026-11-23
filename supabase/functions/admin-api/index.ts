@@ -2001,6 +2001,9 @@ Deno.serve(async (req) => {
           let droppedByThreshold = 0;
           let cappedByUser = 0;
           let cappedBySkill = 0;
+          let flooredRows = 0;
+          let biTotal = 0;
+          let reciprocalTotal = 0;
 
           // Cards mode caches one row per card, so rank and baseline lookups
           // key on the card when it is available.
@@ -2044,6 +2047,8 @@ Deno.serve(async (req) => {
             // Cards mode floors the final score at the bi-encoder similarity so
             // a compressed rerank cannot empty a valid deck. Without this the
             // replay scores ~0.08 and drops every row.
+            row.__bi = bi;
+            row.__reciprocal = reciprocal;
             return useCards ? Math.max(reciprocal, bi) : reciprocal;
           };
 
@@ -2108,6 +2113,9 @@ Deno.serve(async (req) => {
               const delta = Number((row.candidate_score - baselineScore).toFixed(6));
               candidates++;
               if (row.rerank_score_b === null) candidateAOnly++;
+              biTotal += Number(row.__bi ?? 0);
+              reciprocalTotal += Number(row.__reciprocal ?? 0);
+              if (Number(row.__bi ?? 0) >= Number(row.__reciprocal ?? 0)) flooredRows++;
               scoreDeltaTotal += delta;
               const rankShift = Math.abs(candidateRank - baselineRank);
               absRankShiftTotal += rankShift;
@@ -2171,6 +2179,9 @@ Deno.serve(async (req) => {
             rank_correlation:
               correlationDecks > 0 ? correlationTotal / correlationDecks : 1,
             a_only_share: candidates ? candidateAOnly / candidates : 0,
+            floored_share: candidates ? flooredRows / candidates : 0,
+            avg_bi: candidates ? biTotal / candidates : 0,
+            avg_reciprocal: candidates ? reciprocalTotal / candidates : 0,
             formula,
             b_limit: bLimit,
             deck_cap: deckCap,

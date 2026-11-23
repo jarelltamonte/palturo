@@ -1929,9 +1929,19 @@ Deno.serve(async (req) => {
         if (runErr) throw runErr;
 
         try {
+          // Cards mode writes match_cache_v2; the legacy cache only holds
+          // profile/gated rows. Replay whichever the matcher is currently
+          // filling, preferring v2.
+          const { count: v2Count } = await admin
+            .from("match_cache_v2")
+            .select("user_id", { count: "exact", head: true });
+          const useCards = (v2Count ?? 0) > 0;
           let cacheQuery = admin
-            .from("match_cache")
-            .select("user_id,as_role,candidate_id,rank,bi_score,rerank_score_a,rerank_score_b,calibrated_score,pipeline_mode")
+            .from(useCards ? "match_cache_v2" : "match_cache")
+            .select(
+              "user_id,as_role,candidate_id,rank,bi_score,rerank_score_a,rerank_score_b,calibrated_score,pipeline_mode" +
+                (useCards ? ",candidate_card_id,skill_name,skill_path" : ""),
+            )
             .order("user_id")
             .limit(10000);
           const roleFilter = String(payload.as_role ?? "");
@@ -1941,11 +1951,30 @@ Deno.serve(async (req) => {
           const { data: cache, error: cacheErr } = await cacheQuery;
           if (cacheErr) throw cacheErr;
 
+          if (!cache || cache.length === 0) {
+            const message =
+              "No cached pairs to replay. Build decks first from Matching → Warm cache, then run the sandbox.";
+            await admin
+              .from("sandbox_runs")
+              .update({
+                status: "failed",
+                error: message,
+                finished_at: new Date().toISOString(),
+              })
+              .eq("id", run.id);
+            return json({ error: message }, 409);
+          }
+
           const aWeight = Number(candidateConfig.rerank_a_weight ?? 0.6);
           const bWeight = Number(candidateConfig.rerank_b_weight ?? 0.4);
           const formula = String(candidateConfig.reciprocal_formula ?? "geometric_mean");
           const bLimit = clampInt(candidateConfig.rerank_b_limit, 10, 0, 500);
           const deckCap = clampInt(candidateConfig.max_deck_size, 20, 1, 100);
+          // Thresholds and diversity caps are part of the deck the user sees,
+          // so they must move the replay too.
+          const minFinal = Number(candidateConfig.min_final_score ?? 0);
+          const perUserCap = clampInt(candidateConfig.max_per_user, 0, 0, 50);
+          const perSkillCap = clampInt(candidateConfig.max_per_skill, 0, 0, 100);
           const groups = new Map<string, any[]>();
           for (const row of cache ?? []) {
             const key = `${row.user_id}|${row.as_role}`;
@@ -1969,32 +1998,53 @@ Deno.serve(async (req) => {
           let correlationTotal = 0;
           let correlationDecks = 0;
           let cappedCandidates = 0;
+          let droppedByThreshold = 0;
+          let cappedByUser = 0;
+          let cappedBySkill = 0;
+
+          // Cards mode caches one row per card, so rank and baseline lookups
+          // key on the card when it is available.
+          const keyOf = (row: any) =>
+            String(row.candidate_card_id ?? row.candidate_id);
 
           const scoreOf = (row: any, aRank: number) => {
+            const bi = Math.max(Number(row.bi_score ?? 0), 0);
             const pa = row.rerank_score_a === null ? null : Number(row.rerank_score_a);
             let pb = row.rerank_score_b === null ? null : Number(row.rerank_score_b);
             if (aRank > bLimit) pb = null;
+            let reciprocal: number;
             if (pa !== null && pb !== null) {
               const a = Math.max(0, Math.min(1, pa));
               const b = Math.max(0, Math.min(1, pb));
               switch (formula) {
                 case "arithmetic_mean":
-                  return (a + b) / 2;
+                  reciprocal = (a + b) / 2;
+                  break;
                 case "weighted_mean": {
                   const total = aWeight + bWeight;
-                  return total > 0 ? (aWeight * a + bWeight * b) / total : (a + b) / 2;
+                  reciprocal = total > 0 ? (aWeight * a + bWeight * b) / total : (a + b) / 2;
+                  break;
                 }
                 case "harmonic_mean":
-                  return a + b > 0 ? (2 * a * b) / (a + b) : 0;
+                  reciprocal = a + b > 0 ? (2 * a * b) / (a + b) : 0;
+                  break;
                 case "min":
-                  return Math.min(a, b);
+                  reciprocal = Math.min(a, b);
+                  break;
                 case "geometric_mean":
                 default:
-                  return Math.sqrt(a * b);
+                  reciprocal = Math.sqrt(a * b);
+                  break;
               }
+            } else if (pa !== null) {
+              reciprocal = pa;
+            } else {
+              reciprocal = bi;
             }
-            if (pa !== null) return pa;
-            return Math.max(Number(row.bi_score ?? 0), 0);
+            // Cards mode floors the final score at the bi-encoder similarity so
+            // a compressed rerank cannot empty a valid deck. Without this the
+            // replay scores ~0.08 and drops every row.
+            return useCards ? Math.max(reciprocal, bi) : reciprocal;
           };
 
           for (const [, rows] of selected) {
@@ -2002,23 +2052,48 @@ Deno.serve(async (req) => {
             const aSorted = [...rows].sort(
               (a, b) => Number(b.rerank_score_a ?? -1) - Number(a.rerank_score_a ?? -1),
             );
-            const aRank = new Map(aSorted.map((r, i) => [r.candidate_id, i + 1]));
-            const baseline = new Map(rows.map((r) => [r.candidate_id, r]));
+            const aRank = new Map(aSorted.map((r, i) => [keyOf(r), i + 1]));
+            const baseline = new Map(rows.map((r) => [keyOf(r), r]));
             const scored = aSorted.map((row) => ({
               ...row,
-              candidate_score: scoreOf(row, aRank.get(row.candidate_id) ?? 999),
+              candidate_score: scoreOf(row, aRank.get(keyOf(row)) ?? 999),
             }));
             scored.sort((a, b) => b.candidate_score - a.candidate_score);
-            const deckScored = scored.slice(0, deckCap);
-            cappedCandidates += Math.max(0, scored.length - deckScored.length);
+
+            const eligible =
+              Number.isFinite(minFinal) && minFinal > 0
+                ? scored.filter((row) => row.candidate_score >= minFinal)
+                : scored;
+            droppedByThreshold += scored.length - eligible.length;
+
+            const deckScored: any[] = [];
+            const perUserSeen = new Map<string, number>();
+            const perSkillSeen = new Map<string, number>();
+            for (const row of eligible) {
+              if (deckScored.length >= deckCap) break;
+              const userKey = String(row.candidate_id);
+              const skillKey = String((row as any).skill_name ?? "");
+              if (perUserCap > 0 && (perUserSeen.get(userKey) ?? 0) >= perUserCap) {
+                cappedByUser += 1;
+                continue;
+              }
+              if (perSkillCap > 0 && skillKey && (perSkillSeen.get(skillKey) ?? 0) >= perSkillCap) {
+                cappedBySkill += 1;
+                continue;
+              }
+              perUserSeen.set(userKey, (perUserSeen.get(userKey) ?? 0) + 1);
+              if (skillKey) perSkillSeen.set(skillKey, (perSkillSeen.get(skillKey) ?? 0) + 1);
+              deckScored.push(row);
+            }
+            cappedCandidates += Math.max(0, eligible.length - deckScored.length);
 
             if (deckScored.length > 1) {
               const candidateRankMap = new Map(
-                deckScored.map((row, index) => [row.candidate_id, index + 1]),
+                deckScored.map((row, index) => [keyOf(row), index + 1]),
               );
               let d2 = 0;
               for (const row of deckScored) {
-                const d = Number(row.rank) - Number(candidateRankMap.get(row.candidate_id) ?? 0);
+                const d = Number(row.rank) - Number(candidateRankMap.get(keyOf(row)) ?? 0);
                 d2 += d * d;
               }
               const n = deckScored.length;
@@ -2054,7 +2129,8 @@ Deno.serve(async (req) => {
                   });
                 }
               }
-              const baseTop = baseline.get(row.candidate_id) && Number(baseline.get(row.candidate_id).rank) <= 10;
+              const baseEntry = baseline.get(keyOf(row));
+              const baseTop = baseEntry && Number(baseEntry.rank) <= 10;
               const nextTop = candidateRank <= 10;
               if (baseTop && nextTop) top10Overlap++;
               if (!baseTop && nextTop) top10New++;
@@ -2068,6 +2144,9 @@ Deno.serve(async (req) => {
             "rerank_b_weight",
             "rerank_b_limit",
             "max_deck_size",
+            "min_final_score",
+            "max_per_user",
+            "max_per_skill",
           ];
           const ignoredKeys = Object.keys(candidateConfig).filter(
             (key) => !scoredKeys.includes(key) && key !== "__revision",
@@ -2095,12 +2174,18 @@ Deno.serve(async (req) => {
             formula,
             b_limit: bLimit,
             deck_cap: deckCap,
+            min_final_score: Number.isFinite(minFinal) ? minFinal : 0,
+            max_per_user: perUserCap,
+            max_per_skill: perSkillCap,
+            dropped_by_threshold: droppedByThreshold,
+            capped_by_user: cappedByUser,
+            capped_by_skill: cappedBySkill,
             capped_candidates: cappedCandidates,
             as_role: roleFilter || "all",
             baseline_rows: (cache ?? []).length,
             simulated_keys: scoredKeys,
             ignored_keys: ignoredKeys,
-            note: "Cached-score replay only. Scoring, B limit, and deck sizing are simulated; retrieval, embeddings, rerank models, and timeouts are not.",
+            note: "Cached-score replay. The bi floor, formula, weights, B limit, final-score threshold, per-user/per-skill caps, and deck sizing are simulated; retrieval, embeddings, skill gates, rerank models, and timeouts are not.",
           };
           await admin
             .from("sandbox_runs")

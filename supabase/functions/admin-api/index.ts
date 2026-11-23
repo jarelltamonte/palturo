@@ -2221,10 +2221,17 @@ Deno.serve(async (req) => {
             );
             const aRank = new Map(aSorted.map((r, i) => [keyOf(r), i + 1]));
             const baseline = new Map(rows.map((r) => [keyOf(r), r]));
-            const scored = aSorted.map((row) => ({
-              ...row,
-              candidate_score: scoreOf(row, aRank.get(keyOf(row)) ?? 999),
-            }));
+            const scored = aSorted.map((row) => {
+              const candidate_score = scoreOf(row, aRank.get(keyOf(row)) ?? 999);
+              // scoreOf annotates the row; the spread must not happen first or
+              // the annotations are lost and the floor metrics read as zero.
+              return {
+                ...row,
+                candidate_score,
+                __bi: row.__bi,
+                __reciprocal: row.__reciprocal,
+              };
+            });
             scored.sort((a, b) => b.candidate_score - a.candidate_score);
 
             const eligible =
@@ -2422,6 +2429,18 @@ Deno.serve(async (req) => {
                   }),
                 },
               ];
+              const fitVector = (vector: number[], dim: number): number[] => {
+                if (vector.length === dim) return vector;
+                if (vector.length > dim) {
+                  // Matryoshka models return the full width; the leading
+                  // dimensions are the usable prefix, re-normalised.
+                  const cut = vector.slice(0, dim);
+                  const norm = Math.sqrt(cut.reduce((sum, value) => sum + value * value, 0));
+                  return norm > 0 ? cut.map((value) => value / norm) : cut;
+                }
+                throw new Error(`expected ${dim} dimensions, got ${vector.length}`);
+              };
+
               for (const reader of readers) {
                 let offset = 0;
                 while (offset < 600) {
@@ -2430,40 +2449,71 @@ Deno.serve(async (req) => {
                     p_limit: 16,
                   });
                   if (readErr || !rows || rows.length === 0) break;
-                  const res = await fetch(embedApi, {
-                    method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${embedKey}`,
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      model: embedModel,
-                      input: rows.map((row: any) => row.source_text),
-                    }),
-                  });
-                  if (!res.ok) {
-                    embeddingStage.errors.push(`${reader.read}: HTTP ${res.status}`);
-                    break;
+
+                  // Query and passage vectors must be embedded as their own
+                  // kind, so a page is split by input_type before calling out.
+                  const byType = new Map<string, any[]>();
+                  for (const row of rows) {
+                    const inputType = String((row as any).input_type ?? "passage");
+                    if (!byType.has(inputType)) byType.set(inputType, []);
+                    byType.get(inputType)!.push(row);
                   }
-                  const body = await res.json();
-                  const vectors = (body?.data ?? []) as Array<{ embedding: number[] }>;
-                  if (vectors.length !== rows.length) {
-                    embeddingStage.errors.push(`${reader.read}: vector count mismatch`);
-                    break;
+
+                  for (const [inputType, group] of byType) {
+                    const res = await fetch(embedApi, {
+                      method: "POST",
+                      headers: {
+                        Authorization: `Bearer ${embedKey}`,
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        input: group.map((row) => row.source_text),
+                        model: embedModel,
+                        dimensions: dimension,
+                        ...(provider === "deepinfra"
+                          ? { encoding_format: "float" }
+                          : {}),
+                        input_type: inputType,
+                      }),
+                    });
+                    if (!res.ok) {
+                      embeddingStage.errors.push(
+                        `${reader.read} (${inputType}): HTTP ${res.status}`,
+                      );
+                      continue;
+                    }
+                    const body = await res.json();
+                    const vectors = (body?.data ?? []) as Array<{ embedding: number[] }>;
+                    if (vectors.length !== group.length) {
+                      embeddingStage.errors.push(
+                        `${reader.read} (${inputType}): vector count mismatch`,
+                      );
+                      continue;
+                    }
+                    let fitted: number[][];
+                    try {
+                      fitted = vectors.map((vector) => fitVector(vector.embedding, dimension));
+                    } catch (error) {
+                      embeddingStage.errors.push(
+                        `${reader.read}: ${(error as Error).message}`,
+                      );
+                      continue;
+                    }
+                    const items = group.map((row, index) => ({
+                      ...reader.keyOf(row),
+                      model_name: embedModel,
+                      embedding: fitted[index],
+                    }));
+                    const { error: writeErr } = await admin.rpc(reader.write, {
+                      p_items: items,
+                    });
+                    if (writeErr) {
+                      embeddingStage.errors.push(`${reader.read}: ${writeErr.message}`);
+                      continue;
+                    }
+                    embeddingStage.embedded += group.length;
                   }
-                  const items = rows.map((row: any, index: number) => ({
-                    ...reader.keyOf(row),
-                    model_name: embedModel,
-                    embedding: vectors[index].embedding,
-                  }));
-                  const { error: writeErr } = await admin.rpc(reader.write, {
-                    p_items: items,
-                  });
-                  if (writeErr) {
-                    embeddingStage.errors.push(`${reader.read}: ${writeErr.message}`);
-                    break;
-                  }
-                  embeddingStage.embedded += rows.length;
+
                   offset += rows.length;
                   if (rows.length < 16) break;
                 }

@@ -1916,6 +1916,10 @@ Deno.serve(async (req) => {
           embeddings: stageInput.embeddings === true,
           moderation: stageInput.moderation === true,
         };
+        // Production floors the final score at the bi-encoder similarity. Off
+        // is a hypothetical: it shows what the rerank parameters would do on
+        // their own, which is the only way they can move a rank.
+        const applyBiFloor = payload.apply_bi_floor !== false;
         const { data: currentConfig } = await admin
           .from("pipeline_config")
           .select("key,value");
@@ -2212,7 +2216,7 @@ Deno.serve(async (req) => {
             // replay scores ~0.08 and drops every row.
             row.__bi = bi;
             row.__reciprocal = reciprocal;
-            return useCards ? Math.max(reciprocal, bi) : reciprocal;
+            return applyBiFloor && useCards ? Math.max(reciprocal, bi) : reciprocal;
           };
 
           if (stages.score) for (const [, rows] of selected) {
@@ -2607,6 +2611,7 @@ Deno.serve(async (req) => {
             capped_by_skill: cappedBySkill,
             gate,
             stages,
+            bi_floor_applied: applyBiFloor,
             embeddings: embeddingStage,
             config_diff: configDiff,
             capped_candidates: cappedCandidates,

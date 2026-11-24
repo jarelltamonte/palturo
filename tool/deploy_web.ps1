@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0) {
   throw 'SEO page generation failed.'
 }
 
-flutter build web --release --dart-define-from-file=.env.production
+flutter build web --release --pwa-strategy=none --dart-define-from-file=.env.production
 
 $merged = Join-Path $appRoot 'build\web-merged'
 if (Test-Path $merged) { Remove-Item $merged -Recurse -Force }

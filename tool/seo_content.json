@@ -1,0 +1,622 @@
+{
+  "categories": [
+    {
+      "slug": "agriculture-livelihood",
+      "name": "Agriculture & Livelihood",
+      "blurb": "Practical food-growing, fishing, and local trade skills shared by people who work with land and water.",
+      "intro": [
+        "Agriculture and livelihood skills are best learned where they are used: in a garden, on a boat, at a market stall, or beside someone who has spent years doing the work. A skills exchange lets you learn those practical foundations from a community member instead of a generic course.",
+        "PalTuro connects learners with mentors who can teach farming, fishing, and local trades through conversation and hands-on practice. You bring curiosity and a skill to share; your mentor brings experience from their own livelihood."
+      ],
+      "faqs": [
+        {
+          "q": "What agriculture skills can I learn through a skills exchange?",
+          "a": "Common starting points include vegetable gardening, soil preparation, planting schedules, fishing basics, and small local trades. The exact skills depend on the mentors in your community."
+        },
+        {
+          "q": "Do I need land or equipment to start?",
+          "a": "Not necessarily. Many learners start with container gardening, a shared plot, or observation sessions. Ask your mentor what you need before the first meeting."
+        },
+        {
+          "q": "Is a skills exchange free?",
+          "a": "PalTuro is free to join. The exchange is reciprocal: you teach something you know and learn something you want to learn."
+        }
+      ],
+      "skills": [
+        {
+          "slug": "farming",
+          "name": "Farming",
+          "summary": "Learn the seasonal, soil, and planting basics of growing food from someone who farms.",
+          "learn": ["Soil preparation and composting basics", "Planting schedules and crop rotation", "Watering, pest awareness, and harvest timing"],
+          "prepare": ["A small plot, containers, or access to a community garden", "A notebook for seasonal notes and questions"],
+          "questions": ["What grows well in my area and season?", "How do you decide when to harvest?"],
+          "examples": ["vegetable gardening", "container gardening", "composting", "seed saving"],
+          "faqs": [
+            {"q": "Can I learn farming if I only have a balcony?", "a": "Yes. Many mentors can teach container gardening, soil mixing, and small-space planting before you move to a larger plot."},
+            {"q": "How long does it take to learn the basics?", "a": "You can learn the core planting and care routine in a few sessions, but timing and observation matter. A full season gives you the most useful feedback."}
+          ]
+        },
+        {
+          "slug": "fishing",
+          "name": "Fishing",
+          "summary": "Understand fishing basics, water reading, and responsible catch practices from experienced fishers.",
+          "learn": ["Basic gear, knots, and bait", "Reading weather, tides, and safe water conditions", "Responsible catch and handling practices"],
+          "prepare": ["Comfort with water and basic safety", "A mentor-approved gear list before any trip"],
+          "questions": ["What should I never do without a local guide?", "Which seasons and conditions are safest for beginners?"],
+          "examples": ["line fishing", "net fishing", "bait preparation", "catch handling"],
+          "faqs": [
+            {"q": "Is fishing learned online?", "a": "The principles can be discussed online, but safety and technique should be learned with an experienced local mentor. Never fish alone as a beginner."},
+            {"q": "What safety rules matter most?", "a": "Check the weather, use appropriate gear, follow local regulations, and never go out without someone who knows the water."}
+          ]
+        },
+        {
+          "slug": "local-trades",
+          "name": "Local Trades",
+          "summary": "Learn practical neighborhood trades and small-business skills from people who run them.",
+          "learn": ["Basic tools and materials for a local trade", "How to price and explain a simple service", "Customer care and repeat-work habits"],
+          "prepare": ["A specific trade you want to explore", "A few questions about tools, costs, and safety"],
+          "examples": ["pet grooming", "small repairs", "market vending", "service pricing"],
+          "questions": ["What does a beginner need to buy first?", "How do you find your first customers?"],
+          "faqs": [
+            {"q": "Can I learn a trade without quitting my job?", "a": "Yes. Many people start with weekend observation, small practice jobs, and a mentor who can review their work."},
+            {"q": "Do I need capital to start?", "a": "It depends on the trade. Ask your mentor what the minimum tool set is and what can be borrowed or practiced first."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "cooking-culinary",
+      "name": "Cooking & Culinary",
+      "blurb": "Filipino cooking and dessert-making taught through family recipes, technique, and shared kitchen time.",
+      "intro": [
+        "Filipino cooking is learned through repetition, taste, and the stories around the table. A skills exchange pairs you with a home cook or dessert maker who can explain the why behind the recipe, not just the ingredient list.",
+        "You can start with a single dish, a technique, or a family specialty. The goal is confidence in the kitchen and a real person you can ask when the recipe does not behave."
+      ],
+      "faqs": [
+        {
+          "q": "What Filipino cooking skills can I learn?",
+          "a": "Learners often start with adobo, sinigang, pinakbet, kakanin, and basic knife and seasoning skills. The exact menu depends on your mentor."
+        },
+        {
+          "q": "Do I need a full kitchen?",
+          "a": "No. Many sessions start with one pot, a few ingredients, and a mentor who can adapt the recipe to what you have."
+        },
+        {
+          "q": "Can I teach cooking if I am not a chef?",
+          "a": "Yes. If you can cook a dish consistently and explain your process, you can teach it through a skills exchange."
+        }
+      ],
+      "skills": [
+        {
+          "slug": "filipino-cooking",
+          "name": "Filipino Cooking",
+          "summary": "Learn Filipino dishes and kitchen technique from a home cook who can explain the process.",
+          "learn": ["Building flavor with soy sauce, vinegar, garlic, and aromatics", "Balancing sour, salty, and sweet in Filipino dishes", "Planning a family meal from one or two pots"],
+          "prepare": ["A short list of dishes you want to learn", "Basic ingredients for your first session"],
+          "examples": ["adobo", "pinakbet", "sinigang", "kakanin"],
+          "questions": ["How do you adjust a recipe for your family's taste?", "Which steps can be prepared ahead?"],
+          "faqs": [
+            {"q": "Can I learn adobo through PalTuro?", "a": "Yes. Adobo is often one of the first dishes a cooking mentor teaches. It is a dish, not a separate skill page: it sits inside Filipino Cooking."},
+            {"q": "What if I do not have the exact ingredients?", "a": "Ask your mentor for substitutions before the session. Filipino cooking is flexible, and a good mentor will explain what can change."}
+          ]
+        },
+        {
+          "slug": "filipino-dessert-making",
+          "name": "Filipino Dessert Making",
+          "summary": "Learn kakanin, cakes, and Filipino sweets with guidance on texture, timing, and local ingredients.",
+          "learn": ["Rice-based desserts and kakanin foundations", "Steaming, baking, and setting techniques", "Sweetness and texture adjustments for local ingredients"],
+          "prepare": ["A dessert you want to make first", "Basic measuring tools and a steamer or oven"],
+          "examples": ["bibingka", "leche flan", "puto", "kakanin"],
+          "questions": ["How do you know when a kakanin is set?", "Which desserts travel well for sharing?"],
+          "faqs": [
+            {"q": "Do I need a steamer?", "a": "For many kakanin, yes. Ask your mentor whether a bamboo steamer, metal steamer, or oven adaptation is appropriate for the dessert you want to learn."},
+            {"q": "Can I learn dessert making for a small business?", "a": "Yes. Ask your mentor about batch sizes, shelf life, packaging, and costing after you learn the basic recipe."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "household-skills",
+      "name": "Household Skills",
+      "blurb": "Everyday home skills, from kitchen systems to decorating, taught by people who keep homes working.",
+      "intro": [
+        "Household skills are easy to dismiss because they look ordinary, but they save time, money, and stress. A skills exchange lets you learn the routines and small techniques that make a home easier to run.",
+        "Whether you want a better kitchen workflow or a more comfortable room, a mentor can show you what they actually do and why it works."
+      ],
+      "faqs": [
+        {
+          "q": "What household skills can I learn?",
+          "a": "Common requests include kitchen organization, meal prep routines, basic home decorating, and everyday repair and maintenance habits."
+        },
+        {
+          "q": "Is this only for people running a home?",
+          "a": "No. Renters, students, and anyone who wants more control over their space can learn these skills."
+        },
+        {
+          "q": "Can household skills be taught online?",
+          "a": "Many can. A mentor can walk through a room, a routine, or a problem on a video call and give you a plan to try."}
+      ],
+      "skills": [
+        {
+          "slug": "home-decorating",
+          "name": "Home Decorating",
+          "summary": "Make a room feel intentional with layout, light, color, and budget-friendly choices.",
+          "learn": ["Room layout and traffic flow", "Color, texture, and lighting basics", "Decorating with a small budget"],
+          "prepare": ["Photos or measurements of the room", "A budget range and one problem you want to solve"],
+          "examples": ["small-space layouts", "lighting", "wall treatments", "furniture placement"],
+          "questions": ["What should I fix before buying anything?", "How do I make a rental feel like mine?"],
+          "faqs": [
+            {"q": "Do I need to buy new furniture?", "a": "Usually not. A good first session focuses on rearranging what you already own before spending money."},
+            {"q": "Can you help with a rental unit?", "a": "Yes. Ask your mentor about removable fixes, wall-safe options, and changes your landlord will accept."}
+          ]
+        },
+        {
+          "slug": "kitchen-basics",
+          "name": "Kitchen Basics",
+          "summary": "Build a kitchen routine around safe prep, simple tools, and meals you can repeat.",
+          "learn": ["Knife safety and basic prep", "A repeatable weekly meal plan", "Storage, cleaning, and food safety habits"],
+          "prepare": ["A list of the meals you actually cook", "A photo of your kitchen setup"],
+          "examples": ["meal prep", "knife skills", "food storage", "kitchen organization"],
+          "questions": ["What tools are worth buying first?", "How do I plan meals without wasting food?"],
+          "faqs": [
+            {"q": "Is this a cooking class?", "a": "It is broader. Kitchen Basics covers the routines, tools, and safety habits that make cooking easier, not just one recipe."},
+            {"q": "Can I learn with a small kitchen?", "a": "Yes. Small-kitchen organization and multi-use tools are common topics."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "language-writing",
+      "name": "Language & Writing",
+      "blurb": "Calligraphy and Philippine script writing taught through practice, history, and patient feedback.",
+      "intro": [
+        "Writing is a physical skill as much as a mental one. A skills exchange gives you a person who can watch your hand, correct your form, and explain the history behind the letters.",
+        "You can learn calligraphy for personal projects or study Philippine scripts as a way to connect with language and heritage. Start with a script or style that interests you."
+      ],
+      "faqs": [
+        {
+          "q": "Can I learn Baybayin through PalTuro?",
+          "a": "Yes. Baybayin is a topic inside Philippine Script Writing. A mentor can teach the script, writing practice, and the context around it."
+        },
+        {
+          "q": "Do I need special pens?",
+          "a": "For calligraphy, a basic pen and paper are enough to start. Ask your mentor before buying a full set."},
+        {
+          "q": "Is this only for artists?",
+          "a": "No. These skills are for anyone who wants to write more clearly, learn a script, or understand the craft."}
+      ],
+      "skills": [
+        {
+          "slug": "calligraphy",
+          "name": "Calligraphy",
+          "summary": "Learn letterforms, spacing, and pen control through guided practice.",
+          "learn": ["Basic strokes and letter construction", "Spacing, rhythm, and composition", "Choosing tools for your budget"],
+          "prepare": ["A pen, paper, and a few reference words", "A quiet surface and 20–30 minutes to practice"],
+          "examples": ["brush lettering", "pointed pen", "event lettering", "practice drills"],
+          "questions": ["Which script should a beginner start with?", "How do I fix inconsistent spacing?"],
+          "faqs": [
+            {"q": "How often should I practice?", "a": "Short, regular practice beats long occasional sessions. Your mentor can give you a 15-minute drill routine."},
+            {"q": "Can I learn online?", "a": "Yes. A mentor can demonstrate strokes on camera and review photos of your work."}
+          ]
+        },
+        {
+          "slug": "philippine-script-writing",
+          "name": "Philippine Script Writing",
+          "summary": "Study Philippine scripts such as Baybayin through writing practice and historical context.",
+          "learn": ["Script structure and basic characters", "Writing practice and reading exercises", "Historical and cultural context"],
+          "prepare": ["A notebook and a few words you want to write", "Curiosity about the script's history"],
+          "examples": ["Baybayin", "Kulitan", "script practice", "heritage writing"],
+          "questions": ["Which script should I start with?", "How do I practice without misrepresenting the culture?"],
+          "faqs": [
+            {"q": "Is Baybayin a language?", "a": "No. Baybayin is a script. It can be used to write Philippine languages, and its history and usage are worth learning carefully."},
+            {"q": "Can I learn a Philippine script in a few sessions?", "a": "You can learn the basic characters and writing routine quickly, but reading and historical context take longer."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "martial-arts",
+      "name": "Martial Arts",
+      "blurb": "Filipino martial arts taught with discipline, safety, and respect for the tradition.",
+      "intro": [
+        "Filipino martial arts combine movement, timing, and respect for the people who keep the tradition alive. A skills exchange can connect you with a practitioner who teaches the foundations safely.",
+        "Start with stance, footwork, and control before speed. A good mentor will be clear about what is appropriate for your experience level."
+      ],
+      "faqs": [
+        {
+          "q": "Can I learn Arnis through PalTuro?",
+          "a": "Yes. Arnis is a topic inside Filipino Martial Arts. A mentor can teach foundational movements, safety, and the history of the practice."
+        },
+        {
+          "q": "Do I need equipment?",
+          "a": "Ask your mentor first. Some sessions start with empty-hand movement and borrowed practice tools."},
+        {
+          "q": "Is this suitable for beginners?",
+          "a": "Yes, with a mentor who teaches foundations and safety. Be honest about your experience and any physical limitations."}
+      ],
+      "skills": [
+        {
+          "slug": "filipino-martial-arts",
+          "name": "Filipino Martial Arts",
+          "summary": "Learn foundational Filipino martial arts movement, safety, and discipline.",
+          "learn": ["Stance, footwork, and body control", "Basic striking and defensive concepts", "Training safety and respect for the tradition"],
+          "prepare": ["Comfortable clothing and water", "A clear statement of your experience and limitations"],
+          "examples": ["Arnis", "Eskrima", "Kali", "footwork drills"],
+          "questions": ["What should a beginner practice first?", "How do I train safely at home?"],
+          "faqs": [
+            {"q": "What is the difference between Arnis, Eskrima, and Kali?", "a": "The terms overlap and are used differently across regions and schools. Ask your mentor how they use the terms and what their lineage teaches."},
+            {"q": "Can I learn without a sparring partner?", "a": "You can learn footwork and solo drills, but partner practice needs supervision. Do not spar without an experienced instructor."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "modern-practical-skills",
+      "name": "Modern Practical Skills",
+      "blurb": "Programming, design, sewing, motorcycle care, and other skills for work and daily life.",
+      "intro": [
+        "Practical skills are the ones you can use immediately: a repair, a design, a small program, or a better way to care for the things you own. A skills exchange connects you with someone who does the work in real life.",
+        "You can start with a single project and build from there. The best mentors will help you understand the process, not just copy a finished result."
+      ],
+      "faqs": [
+        {
+          "q": "What practical skills can I learn?",
+          "a": "Popular areas include programming, graphic design, sewing, motorcycle maintenance, nail art, T-shirt printing, woodworking, and roller skating."
+        },
+        {
+          "q": "Can I learn a practical skill without expensive tools?",
+          "a": "Often yes. Ask your mentor what the minimum setup is and what you can borrow, rent, or practice without buying."},
+        {
+          "q": "Can these skills lead to income?",
+          "a": "Some can. Ask your mentor about the realistic path, costs, and practice time before treating a skill as a business."}
+      ],
+      "skills": [
+        {
+          "slug": "flairtending",
+          "name": "Flairtending",
+          "summary": "Learn bottle and tool handling, performance, and safe practice for flair bartending.",
+          "learn": ["Basic grips, stalls, and transitions", "Performance timing and showmanship", "Safe practice with unbreakable tools"],
+          "prepare": ["Practice bottles or a flair training set", "A clear, uncluttered practice space"],
+          "examples": ["bottle stalls", "tin flips", "pour routines", "practice drills"],
+          "questions": ["What should I practice before touching glass?", "How do I build a short routine?"],
+          "faqs": [
+            {"q": "Is flairtending dangerous?", "a": "It can be if you start with glass or try advanced moves too early. Begin with training tools and a mentor who teaches safety."},
+            {"q": "Do I need bartending experience?", "a": "Not necessarily, but basic drink knowledge helps. Ask your mentor whether they teach flair alone or bartending plus flair."}
+          ]
+        },
+        {
+          "slug": "graphic-design",
+          "name": "Graphic Design",
+          "summary": "Learn layout, type, color, and a repeatable design process for real projects.",
+          "learn": ["Layout, hierarchy, and spacing", "Type and color choices", "A simple brief-to-delivery workflow"],
+          "prepare": ["A project you want to make", "Access to a design tool or even paper"],
+          "examples": ["social graphics", "posters", "brand basics", "layout practice"],
+          "questions": ["What should I learn first: tools or design principles?", "How do I get feedback on my work?"],
+          "faqs": [
+            {"q": "Do I need expensive software?", "a": "No. Start with a free tool or paper. Your mentor can help you choose software after you understand the principles."},
+            {"q": "Can I learn design without drawing well?", "a": "Yes. Graphic design is mostly about communication, layout, and decisions. Drawing is a separate skill."}
+          ]
+        },
+        {
+          "slug": "motorcycle-maintenance",
+          "name": "Motorcycle Maintenance",
+          "summary": "Learn the checks, tools, and maintenance habits that keep a motorcycle safe.",
+          "learn": ["Pre-ride safety checks", "Oil, chain, tire, and brake basics", "When to fix it yourself and when to see a mechanic"],
+          "prepare": ["Your motorcycle manual", "A basic tool set and a safe workspace"],
+          "examples": ["chain care", "tire checks", "oil changes", "brake inspection"],
+          "questions": ["Which checks should I do every week?", "What should I never attempt without a mechanic?"],
+          "faqs": [
+            {"q": "Can I learn maintenance on my own motorcycle?", "a": "Yes, with supervision. Start with checks and simple adjustments; leave safety-critical repairs to a qualified mechanic until you are trained."},
+            {"q": "What tools should a beginner buy?", "a": "Ask your mentor to review your manual and recommend a small set for your specific motorcycle."}
+          ]
+        },
+        {
+          "slug": "nail-art",
+          "name": "Nail Art",
+          "summary": "Learn nail preparation, color, and simple art techniques with a clean, safe setup.",
+          "learn": ["Nail prep and basic shaping", "Color, layering, and simple designs", "Hygiene and tool care"],
+          "prepare": ["A basic nail kit", "A practice hand or a friend willing to model"],
+          "examples": ["simple line art", "color blocking", "nail prep", "tool hygiene"],
+          "questions": ["What should a beginner buy first?", "How do I keep tools clean and safe?"],
+          "faqs": [
+            {"q": "Do I need a full professional kit?", "a": "No. Start with the essentials and add tools as your skills grow. Ask your mentor what they actually use."},
+            {"q": "Can I practice on myself?", "a": "Yes, but start with simple designs and follow hygiene guidance. Do not use damaged or shared tools without proper cleaning."}
+          ]
+        },
+        {
+          "slug": "programming",
+          "name": "Programming",
+          "group": true,
+          "summary": "Choose a programming path and learn the fundamentals through small, real projects.",
+          "intro": [
+            "Programming is easier to learn when you have a person who can review your code and explain the next step. A skills exchange can connect you with a developer who teaches through small projects.",
+            "You do not need to learn everything at once. Start with one language or one project, then build the habit of reading errors, testing, and asking better questions."
+          ],
+          "faqs": [
+            {"q": "Which programming language should I start with?", "a": "It depends on your goal. Python is common for beginners and data work; JavaScript/TypeScript is common for web development; C# is used in games and Windows applications."},
+            {"q": "Can I learn programming without a degree?", "a": "Yes. A mentor can help you build a project-based learning path, but consistency and practice matter more than the credential."}
+          ],
+          "children": [
+            {
+              "slug": "general-programming",
+              "name": "General Programming",
+              "summary": "Learn programming fundamentals, problem solving, and a repeatable learning habit.",
+              "learn": ["Variables, control flow, and functions", "Reading errors and debugging", "Breaking a problem into small steps"],
+              "prepare": ["A computer and a code editor", "One small project idea"],
+              "examples": ["automation scripts", "small tools", "practice exercises", "debugging"],
+              "questions": ["How do I choose my first language?", "How much math do I need?"],
+              "faqs": [
+                {"q": "Do I need to be good at math?", "a": "Most beginner programming needs basic logic more than advanced math. Specialized fields vary, so ask your mentor about your goal."},
+                {"q": "How do I practice between sessions?", "a": "Keep a small project and a list of errors. Bring the errors to your mentor instead of trying to hide them."}
+              ]
+            },
+            {
+              "slug": "python-programming",
+              "name": "Python Programming",
+              "summary": "Learn Python through scripts, data tasks, and small automations.",
+              "learn": ["Python syntax and data structures", "Reading and writing files", "Using libraries for a small project"],
+              "prepare": ["Python installed on your computer", "A small task you want to automate"],
+              "examples": ["scripts", "data cleanup", "automation", "APIs"],
+              "questions": ["What should I build first?", "How do I organize a growing script?"],
+              "faqs": [
+                {"q": "Is Python good for beginners?", "a": "Yes. Its readable syntax makes it a common first language, especially for automation, data, and scripting."},
+                {"q": "Can I learn Python online?", "a": "Yes. A mentor can review your code remotely and give you small exercises between sessions."}
+              ]
+            },
+            {
+              "slug": "c-sharp-programming",
+              "name": "C# Programming",
+              "summary": "Learn C# fundamentals and object-oriented thinking through small applications.",
+              "learn": ["C# syntax and types", "Classes, objects, and structure", "Debugging in a development environment"],
+              "prepare": ["A development environment such as Visual Studio or Rider", "A small console or desktop project idea"],
+              "examples": ["console apps", "game scripts", "desktop tools", "object-oriented practice"],
+              "questions": ["What is object-oriented programming?", "Should I learn C# for game development?"],
+              "faqs": [
+                {"q": "Is C# only for Windows?", "a": "No. C# runs on multiple platforms, though some tools and frameworks are more common on Windows."},
+                {"q": "Can I learn C# as a first language?", "a": "Yes, if you have a mentor who can explain the structure and give you small projects."}
+              ]
+            },
+            {
+              "slug": "web-development",
+              "name": "Web Development",
+              "summary": "Learn HTML, CSS, JavaScript, and the process of building a small website.",
+              "learn": ["Semantic HTML and responsive CSS", "JavaScript fundamentals", "A simple deploy and debugging workflow"],
+              "prepare": ["A browser and code editor", "A small site or page you want to build"],
+              "examples": ["landing pages", "portfolios", "small web apps", "responsive layouts"],
+              "questions": ["Should I learn a framework first?", "How do I make a site accessible?"],
+              "faqs": [
+                {"q": "Do I need to learn design too?", "a": "Basic layout and accessibility help, but you can learn them alongside development. Ask your mentor how they split the work."},
+                {"q": "How do I practice web development?", "a": "Build small pages, inspect real sites, and ask for feedback on one page at a time."}
+              ]
+            }
+          ]
+        },
+        {
+          "slug": "roller-skating",
+          "name": "Roller Skating",
+          "summary": "Learn balance, stopping, and safe practice from a patient skater.",
+          "learn": ["Stance, balance, and falling safely", "Stopping and turning basics", "Choosing and caring for skates"],
+          "prepare": ["Skates and protective gear", "A smooth, safe practice area"],
+          "examples": ["balance drills", "stopping", "turning", "safe falling"],
+          "questions": ["What gear should a beginner wear?", "How do I practice without falling badly?"],
+          "faqs": [
+            {"q": "Is roller skating hard to learn?", "a": "It takes practice, but most beginners can learn basic balance and stopping with guidance and protective gear."},
+            {"q": "Can I learn as an adult?", "a": "Yes. Many adults start from zero. Go at your own pace and prioritize safety."}
+          ]
+        },
+        {
+          "slug": "sewing",
+          "name": "Sewing",
+          "summary": "Learn machine basics, seams, and simple repairs so you can make and mend clothes.",
+          "learn": ["Machine threading and basic stitches", "Seams, hems, and simple repairs", "Reading a basic pattern"],
+          "prepare": ["A sewing machine or access to one", "Fabric, thread, and a simple project"],
+          "examples": ["hemming", "repairs", "tote bags", "simple garments"],
+          "questions": ["What should I make first?", "How do I fix tension problems?"],
+          "faqs": [
+            {"q": "Do I need an expensive machine?", "a": "No. A basic machine that sews a straight stitch is enough to learn. Ask your mentor to help you test one before buying."},
+            {"q": "Can I learn sewing by hand?", "a": "Yes. Hand sewing is a useful foundation and enough for repairs and simple projects."}
+          ]
+        },
+        {
+          "slug": "tshirt-printing",
+          "name": "T-Shirt Printing",
+          "summary": "Learn a simple printing workflow, from artwork to a wearable test print.",
+          "learn": ["Artwork preparation and separation basics", "A beginner-friendly printing method", "Curing, washing, and quality checks"],
+          "prepare": ["A design idea and a blank shirt", "A workspace with ventilation"],
+          "examples": ["screen printing", "heat transfer", "one-color prints", "sample runs"],
+          "questions": ["Which printing method is best for a beginner?", "How do I make a print last?"],
+          "faqs": [
+            {"q": "Can I print at home?", "a": "Some methods are home-friendly, but ventilation and safety matter. Ask your mentor which method fits your space."},
+            {"q": "Do I need a heat press?", "a": "Not for every method. Ask your mentor what the minimum setup is for the technique they teach."}
+          ]
+        },
+        {
+          "slug": "woodworking",
+          "name": "Woodworking",
+          "summary": "Learn safe hand-tool basics and build a simple, useful wooden project.",
+          "learn": ["Measuring, marking, and sawing", "Joinery and assembly basics", "Sanding, finishing, and tool care"],
+          "prepare": ["A simple project plan", "Access to basic hand tools and a safe workspace"],
+          "examples": ["small shelves", "boxes", "repairs", "finishing"],
+          "questions": ["Which tools should I buy first?", "How do I work safely in a small space?"],
+          "faqs": [
+            {"q": "Can I start without power tools?", "a": "Yes. Hand tools are a good way to learn control and safety before adding power tools."},
+            {"q": "What is a good first project?", "a": "A simple box or shelf teaches measuring, cutting, assembly, and finishing without requiring advanced joinery."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "performing-arts",
+      "name": "Performing Arts",
+      "blurb": "Folk dance, traditional music, and vocal music taught through practice and cultural context.",
+      "intro": [
+        "Performing arts are learned by doing, watching, and repeating. A skills exchange gives you a mentor who can demonstrate the form, correct your timing, and explain the culture behind it.",
+        "You can start with a single song, dance, or instrument. The goal is confidence and respect for the tradition, not a perfect stage performance on day one."
+      ],
+      "faqs": [
+        {
+          "q": "Can I learn Tinikling through PalTuro?",
+          "a": "Yes. Tinikling is a topic inside Folk Dance. A mentor can teach the steps, rhythm, and safety around the bamboo poles."
+        },
+        {
+          "q": "Do I need previous performance experience?",
+          "a": "No. Many learners start as adults with no formal background."},
+        {
+          "q": "Can I learn online?",
+          "a": "Some foundations can be taught online, but dance and instruments often need in-person practice for timing and safety."}
+      ],
+      "skills": [
+        {
+          "slug": "folk-dance",
+          "name": "Folk Dance",
+          "summary": "Learn Philippine folk dance steps, rhythm, and cultural context with a patient mentor.",
+          "learn": ["Basic steps and posture", "Counting music and partnering", "Cultural context and performance etiquette"],
+          "prepare": ["Comfortable clothing and water", "A clear space to practice"],
+          "examples": ["Tinikling", "Singkil", "basic folk steps", "rhythm practice"],
+          "questions": ["What should I practice first?", "How do I dance safely around props?"],
+          "faqs": [
+            {"q": "Is Tinikling hard for beginners?", "a": "The basic steps can be learned with guidance, but the bamboo timing takes practice. Start slowly and never practice advanced footwork without a mentor."},
+            {"q": "Can I learn folk dance as an adult?", "a": "Yes. Many community groups welcome adult beginners."}
+          ]
+        },
+        {
+          "slug": "traditional-music",
+          "name": "Traditional Music",
+          "summary": "Learn traditional instruments, rhythm, and ensemble listening from a practitioner.",
+          "learn": ["Instrument handling and basic patterns", "Listening and playing in an ensemble", "Cultural context and practice habits"],
+          "prepare": ["Access to the instrument or a practice alternative", "A short rhythm or piece you want to learn"],
+          "examples": ["kulintang", "agung", "rhythm patterns", "ensemble practice"],
+          "questions": ["Which instrument should I start with?", "How do I practice without disturbing neighbors?"],
+          "faqs": [
+            {"q": "Do I need my own instrument?", "a": "Not always. Ask your mentor about practice instruments, shared spaces, or temporary alternatives."},
+            {"q": "Is traditional music only for advanced musicians?", "a": "No. Many traditions have beginner patterns and ensemble roles that can be learned step by step."}
+          ]
+        },
+        {
+          "slug": "vocal-music",
+          "name": "Vocal Music",
+          "summary": "Learn breathing, pitch, and song interpretation, including Filipino vocal traditions.",
+          "learn": ["Breathing and warm-up routines", "Pitch, tone, and expression", "Song interpretation and practice habits"],
+          "prepare": ["A quiet practice space", "A song you want to work on"],
+          "examples": ["Kundiman", "breathing drills", "pitch practice", "song interpretation"],
+          "questions": ["How do I practice without straining my voice?", "How do I choose a song for my range?"],
+          "faqs": [
+            {"q": "Can I learn Kundiman through PalTuro?", "a": "Yes. Kundiman is a topic inside Vocal Music. A mentor can teach the style, phrasing, and vocal approach."},
+            {"q": "Do I need to read music?", "a": "Not to start. Many vocal mentors teach by ear and add notation as needed."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "traditional-crafts",
+      "name": "Traditional Crafts",
+      "blurb": "Weaving, embroidery, costume making, and parol-making taught through hands-on practice.",
+      "intro": [
+        "Traditional crafts carry memory and technique. A skills exchange lets you learn from someone who practices the craft, not just reads about it.",
+        "Start with a small piece and a technique you can repeat. Respect the tradition, credit your teacher, and practice before trying to sell or teach."
+      ],
+      "faqs": [
+        {
+          "q": "Can I learn Inabel weaving through PalTuro?",
+          "a": "Yes. Inabel is a topic inside Philippine Handweaving. A mentor can teach loom basics, patterns, and the cultural context."
+        },
+        {
+          "q": "Do I need a loom?",
+          "a": "For weaving, access to a loom matters. Ask your mentor about shared workspaces, small-frame alternatives, or practice methods."},
+        {
+          "q": "Can I learn a craft online?",
+          "a": "Some foundations and pattern reading can be taught online, but many crafts need in-person practice and materials."}
+      ],
+      "skills": [
+        {
+          "slug": "costume-making",
+          "name": "Costume Making",
+          "summary": "Learn measuring, construction, and finishing for performance and cultural costumes.",
+          "learn": ["Measuring and pattern basics", "Construction and fitting", "Finishing, repair, and care"],
+          "prepare": ["A costume reference or design", "Basic sewing tools and fabric"],
+          "examples": ["folk dance costumes", "fittings", "repairs", "finishing"],
+          "questions": ["What should I make first?", "How do I fit a costume without a dress form?"],
+          "faqs": [
+            {"q": "Do I need advanced sewing skills?", "a": "Start with simple constructions and repairs. Ask your mentor which project matches your current level."},
+            {"q": "Can I learn costume making without a sewing machine?", "a": "Some parts can be hand-sewn, but larger costumes usually need a machine. Ask your mentor what is realistic."}
+          ]
+        },
+        {
+          "slug": "filipino-embroidery",
+          "name": "Filipino Embroidery",
+          "summary": "Learn embroidery stitches, pattern transfer, and finishing on Philippine textiles.",
+          "learn": ["Basic stitches and tension", "Pattern transfer and design placement", "Finishing and caring for embroidered pieces"],
+          "prepare": ["Fabric, needle, thread, and a simple pattern", "Good lighting and a comfortable workspace"],
+          "examples": ["traditional motifs", "monograms", "repairs", "practice samplers"],
+          "questions": ["Which stitch should I learn first?", "How do I keep the fabric from puckering?"],
+          "faqs": [
+            {"q": "Is embroidery hard to learn?", "a": "Basic stitches are beginner-friendly. Consistency comes with short, regular practice."},
+            {"q": "Can I embroider on everyday clothes?", "a": "Yes. Ask your mentor about fabric choice and stabilizers before starting on a garment you care about."}
+          ]
+        },
+        {
+          "slug": "parol-lantern-making",
+          "name": "Parol & Lantern Making",
+          "summary": "Learn frame construction, covering, and lighting for a Filipino parol.",
+          "learn": ["Frame and shape construction", "Covering, color, and finishing", "Safe lighting and hanging"],
+          "prepare": ["A small parol design", "Basic craft tools and a safe workspace"],
+          "examples": ["capiz parol", "bamboo frames", "lantern lighting", "holiday displays"],
+          "questions": ["What materials should I use for a first parol?", "How do I make it safe to hang?"],
+          "faqs": [
+            {"q": "Can I make a parol without capiz?", "a": "Yes. Many beginners use paper, plastic, or other translucent materials. Ask your mentor what is locally available and safe."},
+            {"q": "How long does a first parol take?", "a": "A simple parol can take a few sessions. Frame construction and drying time are usually the slow parts."}
+          ]
+        },
+        {
+          "slug": "philippine-handweaving",
+          "name": "Philippine Handweaving",
+          "summary": "Learn loom basics, pattern planning, and the traditions behind Philippine handwoven textiles.",
+          "learn": ["Loom setup and basic weaving motions", "Pattern planning and color", "Finishing and caring for woven pieces"],
+          "prepare": ["Access to a loom or a mentor-approved practice setup", "A simple pattern or color plan"],
+          "examples": ["Inabel", "piña", "banig", "plain weave"],
+          "questions": ["What can I weave as a beginner?", "How do I plan a pattern without wasting yarn?"],
+          "faqs": [
+            {"q": "Can I learn Inabel weaving through PalTuro?", "a": "Yes. Inabel is a topic inside Philippine Handweaving. A mentor can teach the loom, patterns, and the tradition behind the textile."},
+            {"q": "Do I need my own loom?", "a": "Not always. Ask your mentor about shared looms, community workshops, or small-frame practice before buying equipment."}
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "visual-arts-design",
+      "name": "Visual Arts & Design",
+      "blurb": "Painting and visual practice taught through observation, color, and guided making.",
+      "intro": [
+        "Visual arts are learned by making, looking, and revising. A skills exchange gives you a mentor who can respond to your work and help you see what to practice next.",
+        "You can start with a small study, a color exercise, or a finished piece. The goal is a practice you can continue on your own."
+      ],
+      "faqs": [
+        {
+          "q": "Do I need to be good at drawing to start painting?",
+          "a": "No. Many painting mentors start with color, shape, and simple studies. Drawing can be learned alongside painting."
+        },
+        {
+          "q": "What materials should I buy first?",
+          "a": "Ask your mentor before buying a full set. A small set of paints, a few surfaces, and basic brushes are usually enough to start."},
+        {
+          "q": "Can I learn painting online?",
+          "a": "Yes. A mentor can demonstrate techniques on camera and review photos of your work."}
+      ],
+      "skills": [
+        {
+          "slug": "painting",
+          "name": "Painting",
+          "summary": "Learn color, composition, and brushwork through guided studies and feedback.",
+          "learn": ["Color mixing and value", "Composition and observation", "Brushwork and finishing"],
+          "prepare": ["A small set of paints and surfaces", "A reference image or object to paint"],
+          "examples": ["color studies", "still life", "landscape", "abstract practice"],
+          "questions": ["What should I paint first?", "How do I know when a painting is finished?"],
+          "faqs": [
+            {"q": "What paint should a beginner use?", "a": "Acrylic is forgiving and easy to clean; watercolor is portable and good for studies; oil takes longer but rewards patience. Ask your mentor what they teach."},
+            {"q": "How often should I practice?", "a": "Short, regular studies are more useful than occasional long sessions. Your mentor can suggest a weekly exercise."}
+          ]
+        }
+      ]
+    }
+  ]
+}

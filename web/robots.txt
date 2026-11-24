@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /confirm/
+Disallow: /reset/
+Disallow: /chat/
+Disallow: /profile/
+Disallow: /admin/
+Sitemap: https://palturo.app/sitemap.xml

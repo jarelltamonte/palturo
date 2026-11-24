@@ -17,6 +17,13 @@ if (-not (Test-Path '.env.production')) {
   throw 'Missing .env.production (SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY).'
 }
 
+# Regenerate the static skills-exchange pages and sitemap before Flutter copies
+# the web/ directory. These pages are real HTML and must exist in the build.
+node tool\generate_seo_pages.js
+if ($LASTEXITCODE -ne 0) {
+  throw 'SEO page generation failed.'
+}
+
 flutter build web --release --dart-define-from-file=.env.production
 
 $merged = Join-Path $appRoot 'build\web-merged'
